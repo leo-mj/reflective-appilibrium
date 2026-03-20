@@ -80,9 +80,10 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, onEditReques
 
   const visRels = state.relations.filter(r => visIds.has(r.from) && visIds.has(r.to));
 
-  // Partition elements and relations into highlighted vs rest when a node is selected.
+  // Partition elements and relations into selected / neighbours / rest when a node is selected.
   const highlightedIds = selected ? getHighlightedIds(selected, visRels) : null;
-  const hlEls = highlightedIds ? visibleEls.filter(e => highlightedIds.has(e.id)) : [];
+  const selectedEl = highlightedIds ? visibleEls.find(e => e.id === selected) ?? null : null;
+  const neighbourEls = highlightedIds ? visibleEls.filter(e => highlightedIds.has(e.id) && e.id !== selected) : [];
   const restEls = highlightedIds ? visibleEls.filter(e => !highlightedIds.has(e.id)) : visibleEls;
   const hlRels = highlightedIds ? visRels.filter(r => r.from === selected || r.to === selected) : [];
   const restRels = highlightedIds ? visRels.filter(r => r.from !== selected && r.to !== selected) : visRels;
@@ -224,10 +225,12 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, onEditReques
       {/* ── Highlighted section (only when a node is selected) ── */}
       {highlightedIds && (
         <>
-          <SectionHeader title={`${selected} + neighbours`} />
-          {j(hlEls).map(e => <ElementCard key={e.id} e={e} />)}
-          {pr(hlEls).map(e => <ElementCard key={e.id} e={e} />)}
-          {th(hlEls).map(e => <ElementCard key={e.id} e={e} />)}
+          <SectionHeader title={selected} />
+          {selectedEl && <ElementCard e={selectedEl} />}
+          {neighbourEls.length > 0 && <SectionHeader title="Neighbours" />}
+          {j(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+          {pr(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+          {th(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
           {hlRels.length > 0 && (
             <>
               <div style={{ fontSize: 10, fontWeight: "bold", letterSpacing: 1.5, color: C.dim, textTransform: "uppercase", marginBottom: 8 }}>Relations</div>
