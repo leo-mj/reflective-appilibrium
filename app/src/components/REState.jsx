@@ -14,6 +14,7 @@ import { Graph } from "./Graph.jsx";
 import { TextTab } from "./TextTab.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
 import { Legend } from "./Legend.jsx";
+import { EditModal } from "./EditModal.jsx";
 
 /**
  * Root component of the RE visualisation app.
@@ -59,8 +60,69 @@ export default function REState() {
   /** ID of the selected graph node, or null. Shared between Graph (click) and TextTab (badge click). */
   const [selected, setSelected] = useState(null);
 
-  /** @type {REStateType} */
-  const state = SAMPLE_STATE;
+  /** @type {REStateType} The mutable RE state; editing saves a new round into this. */
+  const [state, setState] = useState(SAMPLE_STATE);
+  /** The element currently open in the edit modal, or null when the modal is closed. */
+  const [editingEl, setEditingEl] = useState(null);
+
+  /**
+   * Opens the edit modal for an element. Also ensures it is selected in the graph.
+   * @param {string} elementId
+   */
+  const handleEditRequest = (elementId) => {
+    setSelected(elementId);
+    setEditingEl(state.elements.find(e => e.id === elementId) ?? null);
+  };
+
+  /**
+   * Applies edits from the modal as a new round.
+   *
+   * Status-specific fields are set automatically:
+   * - "revised"   → preserves old text in `previousText`, sets `revisedRound`
+   * - "withdrawn" → sets `withdrawnRound` and `reason`
+   * - "active"    → clears all revision/withdrawal metadata
+   *
+   * @param {import('./EditModal.jsx').EditFormData} formData
+   */
+  const handleEditSave = (formData) => {
+    const newRound = state.round + 1;
+    const oldEl = editingEl;
+    const newEl = { ...oldEl, ...formData };
+
+    if (formData.status === "revised") {
+      newEl.previousText = oldEl.text;
+      newEl.revisedRound = newRound;
+      delete newEl.withdrawnRound;
+      delete newEl.reason;
+    } else if (formData.status === "withdrawn") {
+      newEl.withdrawnRound = newRound;
+      delete newEl.previousText;
+      delete newEl.revisedRound;
+    } else {
+      delete newEl.previousText;
+      delete newEl.revisedRound;
+      delete newEl.withdrawnRound;
+      delete newEl.reason;
+    }
+
+    const diffs = ["type", "confidence", "status", "origin", "text"]
+      .filter(k => formData[k] !== oldEl[k])
+      .map(k => `${k}: ${oldEl[k]} → ${formData[k]}`);
+
+    setState(prev => ({
+      ...prev,
+      round: newRound,
+      elements: prev.elements.map(e => e.id === oldEl.id ? newEl : e),
+      log: [...prev.log, {
+        round: newRound,
+        findings: `${oldEl.id} was edited by the user.`,
+        options: "",
+        decision: "Changes applied",
+        changes: diffs.length ? diffs.join("; ") : "No fields changed",
+      }],
+    }));
+    setEditingEl(null);
+  };
   const dims = useWindowSize();
   const isWide = dims.w > 768;
 
@@ -183,11 +245,20 @@ export default function REState() {
             overflow: "hidden",
           }}>
             <TextTab state={textState} showWithdrawn={showWithdrawn}
-              selected={selected} onSelect={setSelected} />
+              selected={selected} onSelect={setSelected} onEditRequest={handleEditRequest} />
           </div>
         )}
 
       </div>
+
+      {editingEl && (
+        <EditModal
+          element={editingEl}
+          currentRound={state.round}
+          onSave={handleEditSave}
+          onCancel={() => setEditingEl(null)}
+        />
+      )}
     </div>
   );
 }

@@ -59,7 +59,7 @@ function getHighlightedIds(selected, visRels) {
  *   Functional updater called when the user clicks an ID badge.
  * @returns {React.ReactElement}
  */
-export function TextTab({ state, showWithdrawn, selected, onSelect }) {
+export function TextTab({ state, showWithdrawn, selected, onSelect, onEditRequest }) {
   const visibleEls = showWithdrawn
     ? state.elements
     : state.elements.filter(e => e.status !== "withdrawn");
@@ -130,14 +130,25 @@ export function TextTab({ state, showWithdrawn, selected, onSelect }) {
         paddingBottom: 14, borderBottom: `1px solid ${C.border}66`, marginBottom: 14,
         opacity: dim ? 0.4 : isW ? 0.55 : 1,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5, flexWrap: "wrap" }}>
-          <Badge id={e.id} />
-          <span style={{ fontSize: 10, color: C.dim }}>{e.confidence}</span>
-          {isW && <span style={{ fontSize: 10, color: C.withdrawnMark, fontStyle: "italic" }}>withdrawn</span>}
-          {isR && <span style={{ fontSize: 10, color: C.revised, fontStyle: "italic" }}>revised</span>}
-          {pCovers[e.id]?.length > 0 && (
-            <span style={{ fontSize: 10, color: C.dim }}>covers: {pCovers[e.id].join(", ")}</span>
-          )}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 5 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <Badge id={e.id} />
+            <span style={{ fontSize: 10, color: C.dim }}>{e.confidence}</span>
+            {isW && <span style={{ fontSize: 10, color: C.withdrawnMark, fontStyle: "italic" }}>withdrawn</span>}
+            {isR && <span style={{ fontSize: 10, color: C.revised, fontStyle: "italic" }}>revised</span>}
+            {pCovers[e.id]?.length > 0 && (
+              <span style={{ fontSize: 10, color: C.dim }}>covers: {pCovers[e.id].join(", ")}</span>
+            )}
+          </div>
+          <button
+            onClick={() => onEditRequest(e.id)}
+            style={{
+              flexShrink: 0, background: "none", border: `1px solid ${C.border}`,
+              borderRadius: 4, color: C.dim, cursor: "pointer", fontSize: 10,
+              padding: "1px 7px", lineHeight: 1.8,
+            }}>
+            Edit
+          </button>
         </div>
         <div style={{
           fontSize: 12, color: isW ? C.dim : C.text, lineHeight: 1.65,
