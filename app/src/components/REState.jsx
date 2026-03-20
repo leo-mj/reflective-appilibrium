@@ -10,6 +10,7 @@ import { C } from "../constants/colors.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
 import { SAMPLE_STATE } from "../state.js";
+import { elementsAtRound, nextElementId, makeDiff, makeLogEntry } from "../utils/stateUtils.js";
 import { Graph } from "./Graph.jsx";
 import { TextTab } from "./TextTab.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
@@ -106,21 +107,18 @@ export default function REState() {
     delete newEl.withdrawnRound;
     delete newEl.reason;
 
-    const diffs = ["type", "confidence", "status", "origin", "text"]
-      .filter(k => formData[k] !== oldEl[k])
-      .map(k => `${k}: ${oldEl[k]} → ${formData[k]}`);
+    const diffs = makeDiff(["type", "confidence", "status", "origin", "text"], oldEl, formData);
 
     setState(prev => ({
       ...prev,
       round: newRound,
       elements: prev.elements.map(e => e.id === oldEl.id ? newEl : e),
-      log: [...prev.log, {
-        round: newRound,
-        findings: `${oldEl.id} was edited by the user.`,
-        options: "",
-        decision: "Changes applied",
-        changes: diffs.length ? diffs.join("; ") : "No fields changed",
-      }],
+      log: [...prev.log, makeLogEntry(
+        newRound,
+        `${oldEl.id} was edited by the user.`,
+        "Changes applied",
+        diffs.length ? diffs.join("; ") : "No fields changed",
+      )],
     }));
     setEditingEl(null);
   };
@@ -133,21 +131,18 @@ export default function REState() {
    */
   const handleRelEditSave = (formData) => {
     const newRound = state.round + 1;
-    const diffs = ["type", "explanation"]
-      .filter(k => formData[k] !== editingRel[k])
-      .map(k => `${k}: ${editingRel[k]} → ${formData[k]}`);
+    const diffs = makeDiff(["type", "explanation"], editingRel, formData);
 
     setState(prev => ({
       ...prev,
       round: newRound,
       relations: prev.relations.map(r => r === editingRel ? { ...editingRel, ...formData, status: "revised", revisedRound: newRound } : r),
-      log: [...prev.log, {
-        round: newRound,
-        findings: `Relation ${editingRel.from} → ${editingRel.to} was edited by the user.`,
-        options: "",
-        decision: "Changes applied",
-        changes: diffs.length ? diffs.join("; ") : "No fields changed",
-      }],
+      log: [...prev.log, makeLogEntry(
+        newRound,
+        `Relation ${editingRel.from} → ${editingRel.to} was edited by the user.`,
+        "Changes applied",
+        diffs.length ? diffs.join("; ") : "No fields changed",
+      )],
     }));
     setEditingRel(null);
   };
@@ -162,13 +157,12 @@ export default function REState() {
         ? { ...e, status: "withdrawn", withdrawnRound: newRound, reason: "", previousText: undefined, revisedRound: undefined }
         : e
       ),
-      log: [...prev.log, {
-        round: newRound,
-        findings: `${elementId} was withdrawn by the user.`,
-        options: "",
-        decision: "Withdrawn",
-        changes: `${elementId}: status → withdrawn`,
-      }],
+      log: [...prev.log, makeLogEntry(
+        newRound,
+        `${elementId} was withdrawn by the user.`,
+        "Withdrawn",
+        `${elementId}: status → withdrawn`,
+      )],
     }));
   };
 
@@ -182,13 +176,12 @@ export default function REState() {
         ? { ...r, status: "withdrawn", withdrawnRound: newRound }
         : r
       ),
-      log: [...prev.log, {
-        round: newRound,
-        findings: `Relation ${rel.from} → ${rel.to} was withdrawn by the user.`,
-        options: "",
-        decision: "Withdrawn",
-        changes: `${rel.from} → ${rel.to}: status → withdrawn`,
-      }],
+      log: [...prev.log, makeLogEntry(
+        newRound,
+        `Relation ${rel.from} → ${rel.to} was withdrawn by the user.`,
+        "Withdrawn",
+        `${rel.from} → ${rel.to}: status → withdrawn`,
+      )],
     }));
   };
 
@@ -200,20 +193,12 @@ export default function REState() {
   /** @param {import('./AddElementModal.jsx').AddElementFormData} formData */
   const handleAddElement = (formData) => {
     const newRound = state.round + 1;
-    const prefix = formData.type === "judgment" ? "J" : formData.type === "principle" ? "P" : "T";
-    const nums = state.elements
-      .filter(e => e.id.startsWith(prefix))
-      .map(e => parseInt(e.id.slice(1)))
-      .filter(n => !isNaN(n));
-    const newId = `${prefix}${nums.length > 0 ? Math.max(...nums) + 1 : 1}`;
+    const newId = nextElementId(state.elements, formData.type);
     setState(prev => ({
       ...prev,
       round: newRound,
       elements: [...prev.elements, { id: newId, status: "active", addedRound: newRound, ...formData }],
-      log: [...prev.log, {
-        round: newRound, findings: `${newId} was added by the user.`,
-        options: "", decision: "Added", changes: `${newId} added`,
-      }],
+      log: [...prev.log, makeLogEntry(newRound, `${newId} was added by the user.`, "Added", `${newId} added`)],
     }));
     setAddingElType(null);
     handleSelectNode(() => newId);
@@ -227,10 +212,12 @@ export default function REState() {
       ...prev,
       round: newRound,
       relations: [...prev.relations, newRel],
-      log: [...prev.log, {
-        round: newRound, findings: `Relation ${formData.from} → ${formData.to} was added by the user.`,
-        options: "", decision: "Added", changes: `${formData.from} → ${formData.to} (${formData.type}) added`,
-      }],
+      log: [...prev.log, makeLogEntry(
+        newRound,
+        `Relation ${formData.from} → ${formData.to} was added by the user.`,
+        "Added",
+        `${formData.from} → ${formData.to} (${formData.type}) added`,
+      )],
     }));
     setAddingRel(false);
     handleSelectRel(() => newRel);
@@ -256,17 +243,7 @@ export default function REState() {
    * @type {REStateType}
    */
   const textState = tab === "history" ? (() => {
-    const active = state.elements.filter(e => {
-      const added = e.addedRound || 1;
-      if (added > historyRound) return false;
-      if (e.status === "withdrawn" && e.withdrawnRound && e.withdrawnRound <= historyRound) return false;
-      return true;
-    });
-    const withdrawn = state.elements.filter(e => {
-      const added = e.addedRound || 1;
-      if (added > historyRound) return false;
-      return e.status === "withdrawn" && e.withdrawnRound && e.withdrawnRound <= historyRound;
-    });
+    const { active, withdrawn } = elementsAtRound(state.elements, historyRound);
     const elements = [...active, ...withdrawn];
     const visIds = new Set(elements.map(e => e.id));
     return {

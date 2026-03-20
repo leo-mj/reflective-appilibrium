@@ -3,30 +3,58 @@
  * @module components/TextTab
  */
 
-/** @import { REState, RERelation } from '../types.js' */
+/** @import { REState, RERelation, REElement } from '../types.js' */
 
 import { useState } from "react";
 import { C, getColors } from "../constants/colors.js";
+import { getNeighbours } from "../utils/graphHelpers.js";
+
+// ─── Module-level helpers ────────────────────────────────────────────────────
 
 /**
- * Returns the set of element IDs that should be highlighted given a selected node:
- * the selected node itself plus every element directly connected to it.
+ * Builds a map from principle ID to the judgment IDs it covers via "supports" relations.
  *
- * Mirrors the same logic in {@link module:components/Graph~getNeighbours} — kept
- * as a local copy so TextTab has no dependency on Graph.
- *
- * @param {string}       selected - ID of the selected element.
- * @param {RERelation[]} visRels  - Currently visible relations.
- * @returns {Set<string>}
+ * @param {REElement[]}  principles - Visible principle elements.
+ * @param {RERelation[]} relations  - All relations in the state.
+ * @param {Set<string>}  visIds     - IDs of all currently visible elements.
+ * @param {REElement[]}  elements   - All elements in the state (for type look-ups).
+ * @returns {Object.<string, string[]>}
  */
-function getHighlightedIds(selected, visRels) {
-  const ids = new Set([selected]);
-  visRels.forEach(r => {
-    if (r.from === selected) ids.add(r.to);
-    if (r.to === selected) ids.add(r.from);
+function buildPrincipleCovers(principles, relations, visIds, elements) {
+  const covers = {};
+  principles.forEach(p => { covers[p.id] = []; });
+  relations.forEach(r => {
+    if (!visIds.has(r.from) || !visIds.has(r.to) || r.type !== "supports") return;
+    const f = elements.find(e => e.id === r.from);
+    const t = elements.find(e => e.id === r.to);
+    if (f?.type === "principle" && t?.type === "judgment") covers[f.id]?.push(t.id);
+    if (t?.type === "principle" && f?.type === "judgment") covers[t.id]?.push(f.id);
   });
-  return ids;
+  return covers;
 }
+
+// ─── Shared styles ───────────────────────────────────────────────────────────
+
+const GHOST_BTN_STYLE = {
+  background: "none", border: `1px solid ${C.border}`,
+  borderRadius: 4, color: C.dim, cursor: "pointer",
+  fontSize: 10, padding: "1px 7px", lineHeight: 1.8,
+};
+
+const WITHDRAW_BTN_STYLE = {
+  ...GHOST_BTN_STYLE,
+  background: "#dc262680", color: "#fff",
+};
+
+const CARD_STYLE = {
+  paddingBottom: 14, borderBottom: `1px solid ${C.border}66`, marginBottom: 14,
+};
+
+const META_LABEL_STYLE = {
+  fontSize: 10, fontStyle: "italic", marginTop: 5, lineHeight: 1.5,
+};
+
+// ─── Main component ──────────────────────────────────────────────────────────
 
 /**
  * Scrollable text panel that renders the full RE state as structured, styled prose.
@@ -41,76 +69,69 @@ function getHighlightedIds(selected, visRels) {
  * 5. **Coherence** — tensions, orphans, clusters from the latest coherence check.
  * 6. **Round log** — one entry per round.
  *
- * ### Selection interaction
- * Clicking a coloured ID badge (e.g. `J3`) calls `onSelect` with a functional
- * updater that toggles the selection, exactly mirroring a node click in the Graph.
- * The selected badge renders with a slightly stronger background to confirm the
- * active state.
- *
- * ### History tab synchronisation
- * When the History tab is active, the parent passes a round-filtered `state` so
- * this component automatically shows only what was visible at the displayed round
- * — no extra logic needed here.
- *
  * @param {Object}   props
  * @param {REState}  props.state          - RE state to render (may be round-filtered by parent).
  * @param {boolean}  props.showWithdrawn  - Whether to include withdrawn elements.
  * @param {string|null} props.selected    - ID of the currently selected element, or `null`.
  * @param {function(function(string|null): string|null): void} props.onSelect
  *   Functional updater called when the user clicks an ID badge.
- * @param {import('../types.js').RERelation|null} props.selectedRel - The currently selected relation, or `null`.
+ * @param {RERelation|null} props.selectedRel - The currently selected relation, or `null`.
  * @param {function(function): void} props.onSelectRel - Functional updater for selected relation.
  * @returns {React.ReactElement}
  */
-export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel, onSelectRel, onEditRequest, onEditRelRequest, onWithdrawRequest, onWithdrawRelRequest, onAddRequest, onAddRelRequest }) {
+export function TextTab({
+  state, showWithdrawn,
+  selected, onSelect,
+  selectedRel, onSelectRel,
+  onEditRequest, onEditRelRequest,
+  onWithdrawRequest, onWithdrawRelRequest,
+  onAddRequest, onAddRelRequest,
+}) {
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
+  // ── Derived data ──────────────────────────────────────────────────────────
+
   const visibleEls = showWithdrawn
     ? state.elements
     : state.elements.filter(e => e.status !== "withdrawn");
   const visIds = new Set(visibleEls.map(e => e.id));
-
-  const p = visibleEls.filter(e => e.type === "principle");
-
-  // Which judgments each principle supports (for "covers" annotation).
-  const pCovers = {};
-  p.forEach(pr => { pCovers[pr.id] = []; });
-  state.relations.forEach(r => {
-    if (!visIds.has(r.from) || !visIds.has(r.to)) return;
-    const f = state.elements.find(e => e.id === r.from);
-    const to = state.elements.find(e => e.id === r.to);
-    if (f?.type === "principle" && to?.type === "judgment" && r.type === "supports") pCovers[f.id]?.push(to.id);
-    if (to?.type === "principle" && f?.type === "judgment" && r.type === "supports") pCovers[to.id]?.push(f.id);
-  });
-
   const visRels = state.relations.filter(r => visIds.has(r.from) && visIds.has(r.to));
 
-  // Partition elements and relations into selected / neighbours / rest when a node is selected.
-  // When a relation is selected, its two endpoint elements are treated as "neighbours".
-  const relHighlightedIds = selectedRel ? new Set([selectedRel.from, selectedRel.to]) : null;
+  const principles = visibleEls.filter(e => e.type === "principle");
+  const pCovers = buildPrincipleCovers(principles, state.relations, visIds, state.elements);
+
+  // ── Selection partitions ──────────────────────────────────────────────────
+
   const highlightedIds = selected
-    ? getHighlightedIds(selected, visRels)
-    : relHighlightedIds;
+    ? getNeighbours(selected, visRels)
+    : selectedRel
+      ? new Set([selectedRel.from, selectedRel.to])
+      : null;
 
   const selectedEl = selected ? (visibleEls.find(e => e.id === selected) ?? null) : null;
   const neighbourEls = highlightedIds
     ? visibleEls.filter(e => highlightedIds.has(e.id) && e.id !== selected)
     : [];
-  const restEls = highlightedIds ? visibleEls.filter(e => !highlightedIds.has(e.id)) : visibleEls;
+  const restEls = highlightedIds
+    ? visibleEls.filter(e => !highlightedIds.has(e.id))
+    : visibleEls;
   const hlRels = selected
     ? visRels.filter(r => r.from === selected || r.to === selected)
-    : selectedRel
-      ? [selectedRel]
-      : [];
+    : selectedRel ? [selectedRel] : [];
   const restRels = selectedRel
     ? visRels.filter(r => r !== selectedRel)
-    : highlightedIds
+    : selected
       ? visRels.filter(r => r.from !== selected && r.to !== selected)
       : visRels;
 
-  // Resolve badge color from element ID (uses stroke = saturated type color).
+  // ── Colour helper ─────────────────────────────────────────────────────────
+
   const badgeColor = (id) => {
     const el = state.elements.find(e => e.id === id);
     return el ? getColors({ ...el, status: "active" }).stroke : C.dim;
   };
+
+  // ── Inner components ──────────────────────────────────────────────────────
 
   function SectionHeader({ title, onAdd }) {
     return (
@@ -123,10 +144,8 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
         <span>{title}</span>
         {onAdd && (
           <button onClick={onAdd} style={{
-            background: "none", border: `1px solid ${C.border}`, borderRadius: 4,
-            color: C.dim, cursor: "pointer", fontSize: 13, lineHeight: 1,
-            padding: "0 5px 1px", fontWeight: "bold", letterSpacing: 0,
-            textTransform: "none",
+            ...GHOST_BTN_STYLE, fontSize: 13, padding: "0 5px 1px",
+            fontWeight: "bold", letterSpacing: 0, textTransform: "none",
           }}>+</button>
         )}
       </div>
@@ -150,46 +169,40 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
     );
   }
 
+  function StatusLabel({ status }) {
+    if (status === "withdrawn")
+      return <span style={{ ...META_LABEL_STYLE, fontSize: 10, color: C.withdrawnMark }}>withdrawn</span>;
+    if (status === "revised")
+      return <span style={{ ...META_LABEL_STYLE, fontSize: 10, color: C.revised }}>revised</span>;
+    return null;
+  }
+
+  function ActionButtons({ onRevise, onWithdraw }) {
+    return (
+      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+        <button onClick={onRevise} style={GHOST_BTN_STYLE}>Revise</button>
+        {onWithdraw && <button onClick={onWithdraw} style={WITHDRAW_BTN_STYLE}>Withdraw</button>}
+      </div>
+    );
+  }
+
   function ElementCard({ e, dim }) {
     const isW = e.status === "withdrawn";
-    const isR = e.status === "revised";
     return (
-      <div style={{
-        paddingBottom: 14, borderBottom: `1px solid ${C.border}66`, marginBottom: 14,
-        opacity: dim ? 0.4 : isW ? 0.55 : 1,
-      }}>
+      <div style={{ ...CARD_STYLE, opacity: dim ? 0.4 : isW ? 0.55 : 1 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 5 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <Badge id={e.id} />
             <span style={{ fontSize: 10, color: C.dim }}>{e.confidence}</span>
-            {isW && <span style={{ fontSize: 10, color: C.withdrawnMark, fontStyle: "italic" }}>withdrawn</span>}
-            {isR && <span style={{ fontSize: 10, color: C.revised, fontStyle: "italic" }}>revised</span>}
+            <StatusLabel status={e.status} />
             {pCovers[e.id]?.length > 0 && (
               <span style={{ fontSize: 10, color: C.dim }}>covers: {pCovers[e.id].join(", ")}</span>
             )}
           </div>
-          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            <button
-              onClick={() => onEditRequest(e.id)}
-              style={{
-                background: "none", border: `1px solid ${C.border}`,
-                borderRadius: 4, color: C.dim, cursor: "pointer", fontSize: 10,
-                padding: "1px 7px", lineHeight: 1.8,
-              }}>
-              Revise
-            </button>
-            {!isW && (
-              <button
-                onClick={() => onWithdrawRequest(e.id)}
-                style={{
-                  background: "#dc262680", border: `1px solid ${C.border}`,
-                  borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: 10,
-                  padding: "1px 7px", lineHeight: 1.8,
-                }}>
-                Withdraw
-              </button>
-            )}
-          </div>
+          <ActionButtons
+            onRevise={() => onEditRequest(e.id)}
+            onWithdraw={!isW ? () => onWithdrawRequest(e.id) : null}
+          />
         </div>
         <div style={{
           fontSize: 12, color: isW ? C.dim : C.text, lineHeight: 1.65,
@@ -198,12 +211,12 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
           {e.text}
         </div>
         {e.previousText && (
-          <div style={{ fontSize: 11, color: C.dim, fontStyle: "italic", marginTop: 5, lineHeight: 1.5 }}>
+          <div style={{ ...META_LABEL_STYLE, color: C.dim }}>
             Previously: "{e.previousText}"
           </div>
         )}
         {e.reason && (
-          <div style={{ fontSize: 11, color: C.dim, fontStyle: "italic", marginTop: 5, lineHeight: 1.5 }}>
+          <div style={{ ...META_LABEL_STYLE, color: C.dim }}>
             Withdrawn: {e.reason}
           </div>
         )}
@@ -215,81 +228,94 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
     const fromEl = state.elements.find(e => e.id === r.from);
     const toEl = state.elements.find(e => e.id === r.to);
     const isSel = r === selectedRel;
-    const isRelR = r.status === "revised";
     return (
-      <div style={{
-        paddingBottom: 14, borderBottom: `1px solid ${C.border}66`, marginBottom: 14,
-        opacity: dim ? 0.4 : 1,
-      }}>
+      <div style={{ ...CARD_STYLE, opacity: dim ? 0.4 : 1 }}>
         <div
           onClick={() => { onSelectRel(prev => prev === r ? null : r); onSelect(() => null); }}
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 5, marginBottom: 8, cursor: "pointer",
-            background: isSel ? `${C.border}44` : "transparent", borderRadius: 4, padding: "2px 4px", margin: "0 -4px 8px",
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: 5, cursor: "pointer", borderRadius: 4, padding: "2px 4px", margin: "0 -4px 8px",
+            background: isSel ? `${C.border}44` : "transparent",
           }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
             <Badge id={r.from} />
             <span style={{ color: C[r.type], fontSize: 11, fontWeight: "bold" }}>→ {r.type} →</span>
             <Badge id={r.to} />
-            {isRelR && <span style={{ fontSize: 10, color: C.revised, fontStyle: "italic" }}>revised</span>}
+            <StatusLabel status={r.status} />
           </div>
-          <div onClick={e => e.stopPropagation()} style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            <button
-              onClick={() => onEditRelRequest(r)}
-              style={{
-                background: "none", border: `1px solid ${C.border}`,
-                borderRadius: 4, color: C.dim, cursor: "pointer", fontSize: 10,
-                padding: "1px 7px", lineHeight: 1.8,
-              }}>
-              Revise
-            </button>
-            {r.status !== "withdrawn" && (
-              <button
-                onClick={() => onWithdrawRelRequest(r)}
-                style={{
-                  background: "#dc262680", border: `1px solid ${C.border}`,
-                  borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: 10,
-                  padding: "1px 7px", lineHeight: 1.8,
-                }}>
-                Withdraw
-              </button>
-            )}
+          <div onClick={e => e.stopPropagation()}>
+            <ActionButtons
+              onRevise={() => onEditRelRequest(r)}
+              onWithdraw={r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null}
+            />
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 6, paddingLeft: 4 }}>
-          {fromEl && (
-            <div style={{ fontSize: 11, color: C.text, lineHeight: 1.5 }}>
-              <span style={{ color: badgeColor(r.from), fontWeight: "bold", marginRight: 6 }}>{r.from}:</span>
-              {fromEl.text}
-            </div>
-          )}
-          {toEl && (
-            <div style={{ fontSize: 11, color: C.text, lineHeight: 1.5 }}>
-              <span style={{ color: badgeColor(r.to), fontWeight: "bold", marginRight: 6 }}>{r.to}:</span>
-              {toEl.text}
-            </div>
-          )}
+          {[fromEl && r.from, toEl && r.to].filter(Boolean).map(id => {
+            const el = state.elements.find(e => e.id === id);
+            return (
+              <div key={id} style={{ fontSize: 11, color: C.text, lineHeight: 1.5 }}>
+                <span style={{ color: badgeColor(id), fontWeight: "bold", marginRight: 6 }}>{id}:</span>
+                {el.text}
+              </div>
+            );
+          })}
         </div>
         <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5, fontStyle: "italic" }}>{r.explanation}</div>
       </div>
     );
   }
 
-  const [showAddMenu, setShowAddMenu] = useState(false);
+  function CoherenceGroup({ title, color, items }) {
+    if (!items.length) return null;
+    return (
+      <div style={{ marginBottom: 12 }}>
+        <div style={{
+          fontSize: 10, color, fontWeight: "bold",
+          letterSpacing: 1, textTransform: "uppercase", marginBottom: 6,
+        }}>{title}</div>
+        {items.map((item, i) => (
+          <div key={i} style={{
+            fontSize: 11, color: C.dim, marginBottom: 6,
+            lineHeight: 1.5, paddingLeft: 8, borderLeft: `2px solid ${color}55`,
+          }}>{item}</div>
+        ))}
+      </div>
+    );
+  }
 
-  const hasCoherence = state.coherence.tensions.length > 0
-    || state.coherence.orphans.length > 0
-    || state.coherence.clusters.length > 0;
+  // ── Render helpers ────────────────────────────────────────────────────────
 
-  const j = (els) => els.filter(e => e.type === "judgment");
-  const pr = (els) => els.filter(e => e.type === "principle");
-  const th = (els) => els.filter(e => e.type === "theory");
+  /** Renders element cards for all three types in order: judgments, principles, theories. */
+  const renderElementCards = (els, dim) =>
+    ["judgment", "principle", "theory"].flatMap(type =>
+      els.filter(e => e.type === type).map(e => <ElementCard key={e.id} e={e} dim={dim} />)
+    );
+
+  const byType = (type) => (els) => els.filter(e => e.type === type);
+  const j  = byType("judgment");
+  const pr = byType("principle");
+  const th = byType("theory");
+
+  const addMenuItems = [
+    { label: "Add element",  action: () => { setShowAddMenu(false); onAddRequest("judgment"); } },
+    { label: "Add relation", action: () => { setShowAddMenu(false); onAddRelRequest(); } },
+  ];
+
+  const hasCoherence =
+    state.coherence.tensions.length > 0 ||
+    state.coherence.orphans.length > 0 ||
+    state.coherence.clusters.length > 0;
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div style={{
       overflowY: "auto", height: "100%", padding: "0 4px 24px",
       background: C.bg, color: C.text, fontFamily: "system-ui, sans-serif",
     }}>
-      {/* Topic / header */}
+
+      {/* ── Topic / header ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
         <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.5 }}>
           <span style={{ color: C.text, fontWeight: "bold" }}>{state.topic || "No topic set"}</span>
@@ -308,21 +334,13 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
           </button>
           {showAddMenu && (
             <>
-              {/* Backdrop to close on outside click */}
-              <div
-                onClick={() => setShowAddMenu(false)}
-                style={{ position: "fixed", inset: 0, zIndex: 99 }}
-              />
+              <div onClick={() => setShowAddMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />
               <div style={{
-                position: "absolute", right: 0, top: "calc(100% + 6px)",
+                position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 100,
                 background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.4)", zIndex: 100,
-                minWidth: 150, overflow: "hidden",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.4)", minWidth: 150, overflow: "hidden",
               }}>
-                {[
-                  { label: "Add element", action: () => { setShowAddMenu(false); onAddRequest("judgment"); } },
-                  { label: "Add relation", action: () => { setShowAddMenu(false); onAddRelRequest(); } },
-                ].map(({ label, action }) => (
+                {addMenuItems.map(({ label, action }) => (
                   <button key={label} onClick={action} style={{
                     display: "block", width: "100%", textAlign: "left",
                     background: "none", border: "none", color: C.text,
@@ -340,7 +358,7 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
         </div>
       </div>
 
-      {/* ── Highlighted section (node selected or relation selected) ── */}
+      {/* ── Highlighted section (node or relation selected) ── */}
       {highlightedIds && (
         <>
           {selectedRel ? (
@@ -348,52 +366,43 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
               <SectionHeader title={`${selectedRel.from} → ${selectedRel.to}`} />
               <RelationCard r={selectedRel} />
               {neighbourEls.length > 0 && <SectionHeader title="Elements" />}
-              {j(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
-              {pr(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
-              {th(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+              {renderElementCards(neighbourEls)}
             </>
           ) : (
             <>
               <SectionHeader title={selected} />
               {selectedEl && <ElementCard e={selectedEl} />}
               {neighbourEls.length > 0 && <SectionHeader title="Neighbours" />}
-              {j(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
-              {pr(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
-              {th(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+              {renderElementCards(neighbourEls)}
               {hlRels.length > 0 && (
                 <>
-                  <div style={{ fontSize: 10, fontWeight: "bold", letterSpacing: 1.5, color: C.dim, textTransform: "uppercase", marginBottom: 8 }}>Relations</div>
+                  <div style={{
+                    fontSize: 10, fontWeight: "bold", letterSpacing: 1.5,
+                    color: C.dim, textTransform: "uppercase", marginBottom: 8,
+                  }}>Relations</div>
                   {hlRels.map((r, i) => <RelationCard key={i} r={r} />)}
                 </>
               )}
             </>
           )}
-
-          {/* Divider before the rest */}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: "4px 0 0" }} />
           <SectionHeader title="All elements" />
+          {renderElementCards(restEls, true)}
+          {restRels.map((r, i) => <RelationCard key={i} r={r} dim />)}
         </>
       )}
 
-      {/* ── Elements ── */}
+      {/* ── Full element / relation listing (nothing selected) ── */}
       {!highlightedIds && (
         <>
-          <SectionHeader title={`Judgments (${j(visibleEls).length})`} onAdd={() => onAddRequest("judgment")} />
+          <SectionHeader title={`Judgments (${j(visibleEls).length})`}           onAdd={() => onAddRequest("judgment")} />
           {j(restEls).map(e => <ElementCard key={e.id} e={e} />)}
-          <SectionHeader title={`Principles (${pr(visibleEls).length})`} onAdd={() => onAddRequest("principle")} />
+          <SectionHeader title={`Principles (${pr(visibleEls).length})`}          onAdd={() => onAddRequest("principle")} />
           {pr(restEls).map(e => <ElementCard key={e.id} e={e} />)}
           <SectionHeader title={`Background Theories (${th(visibleEls).length})`} onAdd={() => onAddRequest("theory")} />
           {th(restEls).map(e => <ElementCard key={e.id} e={e} />)}
-          <SectionHeader title={`Relations (${visRels.length})`} onAdd={onAddRelRequest} />
+          <SectionHeader title={`Relations (${visRels.length})`}                  onAdd={onAddRelRequest} />
           {restRels.map((r, i) => <RelationCard key={i} r={r} />)}
-        </>
-      )}
-      {highlightedIds && (
-        <>
-          {j(restEls).map(e => <ElementCard key={e.id} e={e} dim />)}
-          {pr(restEls).map(e => <ElementCard key={e.id} e={e} dim />)}
-          {th(restEls).map(e => <ElementCard key={e.id} e={e} dim />)}
-          {restRels.map((r, i) => <RelationCard key={i} r={r} dim />)}
         </>
       )}
 
@@ -401,30 +410,9 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
       {hasCoherence && (
         <>
           <SectionHeader title="Coherence" />
-          {state.coherence.tensions.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: C.conflicts, fontWeight: "bold", letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Tensions</div>
-              {state.coherence.tensions.map((item, i) => (
-                <div key={i} style={{ fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.5, paddingLeft: 8, borderLeft: `2px solid ${C.conflicts}55` }}>{item}</div>
-              ))}
-            </div>
-          )}
-          {state.coherence.orphans.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: C.undermines, fontWeight: "bold", letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Orphans</div>
-              {state.coherence.orphans.map((item, i) => (
-                <div key={i} style={{ fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.5, paddingLeft: 8, borderLeft: `2px solid ${C.undermines}55` }}>{item}</div>
-              ))}
-            </div>
-          )}
-          {state.coherence.clusters.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: C.supports, fontWeight: "bold", letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Clusters</div>
-              {state.coherence.clusters.map((item, i) => (
-                <div key={i} style={{ fontSize: 11, color: C.dim, marginBottom: 6, lineHeight: 1.5, paddingLeft: 8, borderLeft: `2px solid ${C.supports}55` }}>{item}</div>
-              ))}
-            </div>
-          )}
+          <CoherenceGroup title="Tensions" color={C.conflicts}  items={state.coherence.tensions} />
+          <CoherenceGroup title="Orphans"  color={C.undermines} items={state.coherence.orphans} />
+          <CoherenceGroup title="Clusters" color={C.supports}   items={state.coherence.clusters} />
         </>
       )}
 
@@ -433,7 +421,7 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
         <>
           <SectionHeader title="Round Log" />
           {state.log.map(l => (
-            <div key={l.round} style={{ paddingBottom: 10, borderBottom: `1px solid ${C.border}66`, marginBottom: 10 }}>
+            <div key={l.round} style={{ ...CARD_STYLE, paddingBottom: 10, marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: "bold", color: C.text, marginBottom: 3 }}>Round {l.round}</div>
               <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>{l.changes}</div>
             </div>
