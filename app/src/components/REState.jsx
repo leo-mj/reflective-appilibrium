@@ -116,20 +116,6 @@ export default function REState() {
           <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{state.topic}</div>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {/* Show withdrawn toggle */}
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.dim, cursor: "pointer" }}>
-            <div onClick={() => setShowWithdrawn(!showWithdrawn)}
-              style={{
-                width: 32, height: 18, borderRadius: 9, position: "relative",
-                background: showWithdrawn ? "#7c3aed" : C.border, transition: "background 0.3s", cursor: "pointer",
-              }}>
-              <div style={{
-                width: 14, height: 14, borderRadius: 7, background: C.text,
-                position: "absolute", top: 2, left: showWithdrawn ? 16 : 2, transition: "left 0.3s ease",
-              }} />
-            </div>
-            Show withdrawn
-          </label>
           {/* Tab buttons + text-panel toggle */}
           <div style={{ display: "flex", gap: 2 }}>
             {["graph", "history"].map(t => (
@@ -158,6 +144,20 @@ export default function REState() {
         {/* Left / top: legend + graph or history tab */}
         <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
           <Legend />
+          {/* Show withdrawn toggle */}
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.dim, cursor: "pointer" }}>
+            <div onClick={() => setShowWithdrawn(!showWithdrawn)}
+              style={{
+                width: 32, height: 18, borderRadius: 9, position: "relative",
+                background: showWithdrawn ? "#7c3aed" : C.border, transition: "background 0.3s", cursor: "pointer",
+              }}>
+              <div style={{
+                width: 14, height: 14, borderRadius: 7, background: C.text,
+                position: "absolute", top: 2, left: showWithdrawn ? 16 : 2, transition: "left 0.3s ease",
+              }} />
+            </div>
+            Show withdrawn
+          </label>
           <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
             {tab === "graph" && (
               <Graph state={state} showWithdrawn={showWithdrawn} positions={positions}

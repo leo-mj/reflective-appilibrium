@@ -9,7 +9,6 @@ import { useState, useRef } from "react";
 import { C, confOp, TRANSITION, getColors } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { NodeShape } from "./NodeShape.jsx";
-import { ArrowDefs } from "./ArrowDefs.jsx";
 
 /**
  * Returns the set of element IDs that should remain highlighted when `selectedId`
@@ -136,7 +135,6 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
         <svg width={dims.w} height={dims.h}
           style={{ background: C.bg, borderRadius: 8, cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
           onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-          <ArrowDefs prefix="" />
           {/* All graph content is inside this <g> so that panning only requires a single transform. */}
           <g transform={`translate(${pan.x},${pan.y})`}>
             {visRels.map((r, i) => {
@@ -151,19 +149,30 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
               const tr = tEl?.type === "principle" ? 28 : tEl?.type === "theory" ? 22 : 18;
               const dx = tp.x - sp.x, dy = tp.y - sp.y;
               const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+              const color = isW ? C.withdrawn : C[r.type];
               const baseOp = isW ? 0.25 : 0.7;
               const opacity = dimEdge(r) ? baseOp * 0.12 : baseOp;
+              // Arrowhead: tip at the inset target edge, base 10px back along the edge direction.
+              const ahl = 10, ahw = 5;
+              const tipX = tp.x - (dx / dist) * tr;
+              const tipY = tp.y - (dy / dist) * tr;
+              const bx = tipX - (dx / dist) * ahl;
+              const by = tipY - (dy / dist) * ahl;
+              const px = -dy / dist, py = dx / dist; // perpendicular unit vector
               return (
-                <line key={i}
-                  x1={sp.x + (dx / dist) * sr} y1={sp.y + (dy / dist) * sr}
-                  x2={tp.x - (dx / dist) * tr} y2={tp.y - (dy / dist) * tr}
-                  stroke={isW ? C.withdrawn : C[r.type]}
-                  strokeWidth={dimEdge(r) ? 1.5 : 2}
-                  strokeDasharray={r.type === "conflicts" ? "8,4" : r.type === "undermines" ? "4,4" : "none"}
-                  markerEnd={`url(#a-${r.type}${isW ? "-w" : ""})`}
-                  opacity={opacity}
-                  style={{ transition: TRANSITION }}
-                />
+                <g key={i} opacity={opacity} style={{ transition: TRANSITION }}>
+                  <line
+                    x1={sp.x + (dx / dist) * sr} y1={sp.y + (dy / dist) * sr}
+                    x2={bx} y2={by}
+                    stroke={color}
+                    strokeWidth={dimEdge(r) ? 1.5 : 2}
+                    strokeDasharray={r.type === "conflicts" ? "8,4" : r.type === "undermines" ? "4,4" : "none"}
+                  />
+                  <polygon
+                    points={`${tipX},${tipY} ${bx + px * ahw},${by + py * ahw} ${bx - px * ahw},${by - py * ahw}`}
+                    fill={color}
+                  />
+                </g>
               );
             })}
             {visibleEls.map(e => {

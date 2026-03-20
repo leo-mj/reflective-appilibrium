@@ -9,7 +9,6 @@ import { useState, useEffect, useRef } from "react";
 import { C, confOp, getColors } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { NodeShape } from "./NodeShape.jsx";
-import { ArrowDefs } from "./ArrowDefs.jsx";
 
 /**
  * Renders the History tab: an animated, slider-controlled playback of the RE process
@@ -224,8 +223,6 @@ export function HistoryTab({ state, positions, onRoundChange }) {
           <svg width={dims.w} height={dims.h}
             style={{ background: C.bg, borderRadius: 8, cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-            {/* Use "h" prefix so marker IDs don't collide with the Graph SVG's markers. */}
-            <ArrowDefs prefix="h" />
             <g transform={`translate(${pan.x},${pan.y})`}>
             {visRels.map((r, i) => {
               const sp = positions[r.from], tp = positions[r.to];
@@ -237,16 +234,28 @@ export function HistoryTab({ state, positions, onRoundChange }) {
               const tr = tEl?.type === "principle" ? 28 : tEl?.type === "theory" ? 22 : 18;
               const dx = tp.x - sp.x, dy = tp.y - sp.y;
               const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+              const color = isW ? C.withdrawn : C[r.type];
+              // Arrowhead: tip at the inset target edge, base 10px back along the edge direction.
+              const ahl = 10, ahw = 5;
+              const tipX = tp.x - (dx / dist) * tr;
+              const tipY = tp.y - (dy / dist) * tr;
+              const bx = tipX - (dx / dist) * ahl;
+              const by = tipY - (dy / dist) * ahl;
+              const px = -dy / dist, py = dx / dist; // perpendicular unit vector
               return (
-                <line key={i}
-                  x1={sp.x + (dx / dist) * sr} y1={sp.y + (dy / dist) * sr}
-                  x2={tp.x - (dx / dist) * tr} y2={tp.y - (dy / dist) * tr}
-                  stroke={isW ? C.withdrawn : C[r.type]}
-                  strokeWidth={2}
-                  strokeDasharray={r.type === "conflicts" ? "8,4" : r.type === "undermines" ? "4,4" : "none"}
-                  markerEnd={`url(#ha-${r.type}${isW ? "-w" : ""})`}
-                  style={{ opacity: isW ? 0.25 : 0.7, transition: "opacity 1.4s ease-in-out" }}
-                />
+                <g key={i} style={{ opacity: isW ? 0.25 : 0.7, transition: "opacity 1.4s ease-in-out" }}>
+                  <line
+                    x1={sp.x + (dx / dist) * sr} y1={sp.y + (dy / dist) * sr}
+                    x2={bx} y2={by}
+                    stroke={color}
+                    strokeWidth={2}
+                    strokeDasharray={r.type === "conflicts" ? "8,4" : r.type === "undermines" ? "4,4" : "none"}
+                  />
+                  <polygon
+                    points={`${tipX},${tipY} ${bx + px * ahw},${by + py * ahw} ${bx - px * ahw},${by - py * ahw}`}
+                    fill={color}
+                  />
+                </g>
               );
             })}
             {allVis.map(e => {
