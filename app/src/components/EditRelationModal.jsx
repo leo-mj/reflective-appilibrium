@@ -61,10 +61,10 @@ export function EditRelationModal({ relation, currentRound, onSave, onCancel }) 
         }}
       >
         <div style={{ fontSize: 15, fontWeight: "bold", color: C.text, marginBottom: 4 }}>
-          Edit relation
+          Revise relation
         </div>
         <div style={{ fontSize: 11, color: C.dim, marginBottom: 24 }}>
-          {relation.from} → {relation.to} · Saving will create Round {currentRound + 1}
+          {relation.from} → {relation.to} · Saving will mark this relation as revised and create Round {currentRound + 1}
         </div>
 
         {/* ── Relation type ── */}
@@ -101,7 +101,7 @@ export function EditRelationModal({ relation, currentRound, onSave, onCancel }) 
             background: C.supports, color: "#fff", cursor: "pointer",
             fontSize: 12, fontWeight: "bold",
           }}>
-            Save as Round {currentRound + 1}
+            Save
           </button>
         </div>
       </div>

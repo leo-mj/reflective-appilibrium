@@ -70,11 +70,14 @@
  * A directional relation between two elements.
  *
  * @typedef {Object} RERelation
- * @property {string}       from        - ID of the source element.
- * @property {string}       to          - ID of the target element.
- * @property {RelationType} type        - The kind of relation.
- * @property {string}       explanation - Human-readable justification of why this relation holds.
- * @property {number}       addedRound  - Round number in which this relation was first recorded.
+ * @property {string}        from           - ID of the source element.
+ * @property {string}        to             - ID of the target element.
+ * @property {RelationType}  type           - The kind of relation.
+ * @property {string}        explanation    - Human-readable justification of why this relation holds.
+ * @property {number}        addedRound     - Round number in which this relation was first recorded.
+ * @property {ElementStatus} [status]        - Lifecycle status; absence or `"active"` means currently in play.
+ * @property {number}        [revisedRound]  - Round in which this relation was last revised.
+ * @property {number}        [withdrawnRound] - Round in which this relation was withdrawn.
  */
 
 /**

@@ -61,7 +61,7 @@ function getHighlightedIds(selected, visRels) {
  * @param {function(function): void} props.onSelectRel - Functional updater for selected relation.
  * @returns {React.ReactElement}
  */
-export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel, onSelectRel, onEditRequest, onEditRelRequest }) {
+export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel, onSelectRel, onEditRequest, onEditRelRequest, onWithdrawRequest, onWithdrawRelRequest }) {
   const visibleEls = showWithdrawn
     ? state.elements
     : state.elements.filter(e => e.status !== "withdrawn");
@@ -158,15 +158,28 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
               <span style={{ fontSize: 10, color: C.dim }}>covers: {pCovers[e.id].join(", ")}</span>
             )}
           </div>
-          <button
-            onClick={() => onEditRequest(e.id)}
-            style={{
-              flexShrink: 0, background: "none", border: `1px solid ${C.border}`,
-              borderRadius: 4, color: C.dim, cursor: "pointer", fontSize: 10,
-              padding: "1px 7px", lineHeight: 1.8,
-            }}>
-            Edit
-          </button>
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            <button
+              onClick={() => onEditRequest(e.id)}
+              style={{
+                background: "none", border: `1px solid ${C.border}`,
+                borderRadius: 4, color: C.dim, cursor: "pointer", fontSize: 10,
+                padding: "1px 7px", lineHeight: 1.8,
+              }}>
+              Revise
+            </button>
+            {!isW && (
+              <button
+                onClick={() => onWithdrawRequest(e.id)}
+                style={{
+                  background: "#dc262680", border: `1px solid ${C.border}`,
+                  borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: 10,
+                  padding: "1px 7px", lineHeight: 1.8,
+                }}>
+                Withdraw
+              </button>
+            )}
+          </div>
         </div>
         <div style={{
           fontSize: 12, color: isW ? C.dim : C.text, lineHeight: 1.65,
@@ -192,6 +205,7 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
     const fromEl = state.elements.find(e => e.id === r.from);
     const toEl = state.elements.find(e => e.id === r.to);
     const isSel = r === selectedRel;
+    const isRelR = r.status === "revised";
     return (
       <div style={{
         paddingBottom: 14, borderBottom: `1px solid ${C.border}66`, marginBottom: 14,
@@ -206,16 +220,30 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
             <Badge id={r.from} />
             <span style={{ color: C[r.type], fontSize: 11, fontWeight: "bold" }}>→ {r.type} →</span>
             <Badge id={r.to} />
+            {isRelR && <span style={{ fontSize: 10, color: C.revised, fontStyle: "italic" }}>revised</span>}
           </div>
-          <button
-            onClick={() => onEditRelRequest(r)}
-            style={{
-              flexShrink: 0, background: "none", border: `1px solid ${C.border}`,
-              borderRadius: 4, color: C.dim, cursor: "pointer", fontSize: 10,
-              padding: "1px 7px", lineHeight: 1.8,
-            }}>
-            Edit
-          </button>
+          <div onClick={e => e.stopPropagation()} style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            <button
+              onClick={() => onEditRelRequest(r)}
+              style={{
+                background: "none", border: `1px solid ${C.border}`,
+                borderRadius: 4, color: C.dim, cursor: "pointer", fontSize: 10,
+                padding: "1px 7px", lineHeight: 1.8,
+              }}>
+              Revise
+            </button>
+            {r.status !== "withdrawn" && (
+              <button
+                onClick={() => onWithdrawRelRequest(r)}
+                style={{
+                  background: "#dc262680", border: `1px solid ${C.border}`,
+                  borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: 10,
+                  padding: "1px 7px", lineHeight: 1.8,
+                }}>
+                Withdraw
+              </button>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 6, paddingLeft: 4 }}>
           {fromEl && (

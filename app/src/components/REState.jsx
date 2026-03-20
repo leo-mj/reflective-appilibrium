@@ -90,35 +90,19 @@ export default function REState() {
   };
 
   /**
-   * Applies edits from the modal as a new round.
-   *
-   * Status-specific fields are set automatically:
-   * - "revised"   → preserves old text in `previousText`, sets `revisedRound`
-   * - "withdrawn" → sets `withdrawnRound` and `reason`
-   * - "active"    → clears all revision/withdrawal metadata
+   * Applies edits from the Revise modal as a new round.
+   * Always marks the element as `"revised"`, preserving the old text in `previousText`.
    *
    * @param {import('./EditModal.jsx').EditFormData} formData
    */
   const handleEditSave = (formData) => {
     const newRound = state.round + 1;
     const oldEl = editingEl;
-    const newEl = { ...oldEl, ...formData };
-
-    if (formData.status === "revised") {
-      newEl.previousText = oldEl.text;
-      newEl.revisedRound = newRound;
-      delete newEl.withdrawnRound;
-      delete newEl.reason;
-    } else if (formData.status === "withdrawn") {
-      newEl.withdrawnRound = newRound;
-      delete newEl.previousText;
-      delete newEl.revisedRound;
-    } else {
-      delete newEl.previousText;
-      delete newEl.revisedRound;
-      delete newEl.withdrawnRound;
-      delete newEl.reason;
-    }
+    const newEl = { ...oldEl, ...formData, status: "revised" };
+    newEl.previousText = oldEl.text;
+    newEl.revisedRound = newRound;
+    delete newEl.withdrawnRound;
+    delete newEl.reason;
 
     const diffs = ["type", "confidence", "status", "origin", "text"]
       .filter(k => formData[k] !== oldEl[k])
@@ -154,7 +138,7 @@ export default function REState() {
     setState(prev => ({
       ...prev,
       round: newRound,
-      relations: prev.relations.map(r => r === editingRel ? { ...editingRel, ...formData } : r),
+      relations: prev.relations.map(r => r === editingRel ? { ...editingRel, ...formData, status: "revised", revisedRound: newRound } : r),
       log: [...prev.log, {
         round: newRound,
         findings: `Relation ${editingRel.from} → ${editingRel.to} was edited by the user.`,
@@ -164,6 +148,46 @@ export default function REState() {
       }],
     }));
     setEditingRel(null);
+  };
+
+  /** @param {string} elementId */
+  const handleWithdrawRequest = (elementId) => {
+    const newRound = state.round + 1;
+    setState(prev => ({
+      ...prev,
+      round: newRound,
+      elements: prev.elements.map(e => e.id === elementId
+        ? { ...e, status: "withdrawn", withdrawnRound: newRound, reason: "", previousText: undefined, revisedRound: undefined }
+        : e
+      ),
+      log: [...prev.log, {
+        round: newRound,
+        findings: `${elementId} was withdrawn by the user.`,
+        options: "",
+        decision: "Withdrawn",
+        changes: `${elementId}: status → withdrawn`,
+      }],
+    }));
+  };
+
+  /** @param {import('../types.js').RERelation} rel */
+  const handleWithdrawRelRequest = (rel) => {
+    const newRound = state.round + 1;
+    setState(prev => ({
+      ...prev,
+      round: newRound,
+      relations: prev.relations.map(r => r === rel
+        ? { ...r, status: "withdrawn", withdrawnRound: newRound }
+        : r
+      ),
+      log: [...prev.log, {
+        round: newRound,
+        findings: `Relation ${rel.from} → ${rel.to} was withdrawn by the user.`,
+        options: "",
+        decision: "Withdrawn",
+        changes: `${rel.from} → ${rel.to}: status → withdrawn`,
+      }],
+    }));
   };
 
   const dims = useWindowSize();
@@ -291,7 +315,8 @@ export default function REState() {
             <TextTab state={textState} showWithdrawn={showWithdrawn}
               selected={selected} onSelect={handleSelectNode}
               selectedRel={selectedRel} onSelectRel={handleSelectRel}
-              onEditRequest={handleEditRequest} onEditRelRequest={setEditingRel} />
+              onEditRequest={handleEditRequest} onEditRelRequest={setEditingRel}
+              onWithdrawRequest={handleWithdrawRequest} onWithdrawRelRequest={handleWithdrawRelRequest} />
           </div>
         )}
 

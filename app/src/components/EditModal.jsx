@@ -12,10 +12,8 @@ import { C } from "../constants/colors.js";
  * @typedef {Object} EditFormData
  * @property {'judgment'|'principle'|'theory'} type
  * @property {'high'|'moderate'|'low'}         confidence
- * @property {'active'|'revised'|'withdrawn'}  status
  * @property {string} origin
  * @property {string} text
- * @property {string} reason - Required when status is "withdrawn".
  */
 
 /**
@@ -42,10 +40,8 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
   const [form, setForm] = useState({
     type:       element.type,
     confidence: element.confidence,
-    status:     element.status,
     origin:     element.origin,
     text:       element.text,
-    reason:     element.reason || "",
   });
 
   const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
@@ -77,10 +73,10 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
         }}
       >
         <div style={{ fontSize: 15, fontWeight: "bold", color: C.text, marginBottom: 4 }}>
-          Edit {element.id}
+          Revise {element.id}
         </div>
         <div style={{ fontSize: 11, color: C.dim, marginBottom: 24 }}>
-          Saving will create Round {currentRound + 1}
+          Saving will mark this element as revised and create Round {currentRound + 1}
         </div>
 
         {/* ── Type ── */}
@@ -102,30 +98,6 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
             <option value="low">Low</option>
           </select>
         </div>
-
-        {/* ── Status ── */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Status</label>
-          <select value={form.status} onChange={e => set("status", e.target.value)} style={inputStyle}>
-            <option value="active">Active</option>
-            <option value="revised">Revised</option>
-            <option value="withdrawn">Withdrawn</option>
-          </select>
-        </div>
-
-        {/* ── Withdrawal reason (shown only when status = "withdrawn") ── */}
-        {form.status === "withdrawn" && (
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Reason for withdrawal</label>
-            <input
-              type="text"
-              value={form.reason}
-              onChange={e => set("reason", e.target.value)}
-              style={inputStyle}
-              placeholder="Briefly explain why this element is being withdrawn"
-            />
-          </div>
-        )}
 
         {/* ── Origin ── */}
         <div style={fieldStyle}>
@@ -161,7 +133,7 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
             background: C.supports, color: "#fff", cursor: "pointer",
             fontSize: 12, fontWeight: "bold",
           }}>
-            Save as Round {currentRound + 1}
+            Save
           </button>
         </div>
       </div>
