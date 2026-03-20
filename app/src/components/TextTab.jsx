@@ -5,6 +5,7 @@
 
 /** @import { REState, RERelation } from '../types.js' */
 
+import { useState } from "react";
 import { C, getColors } from "../constants/colors.js";
 
 /**
@@ -61,7 +62,7 @@ function getHighlightedIds(selected, visRels) {
  * @param {function(function): void} props.onSelectRel - Functional updater for selected relation.
  * @returns {React.ReactElement}
  */
-export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel, onSelectRel, onEditRequest, onEditRelRequest, onWithdrawRequest, onWithdrawRelRequest }) {
+export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel, onSelectRel, onEditRequest, onEditRelRequest, onWithdrawRequest, onWithdrawRelRequest, onAddRequest, onAddRelRequest }) {
   const visibleEls = showWithdrawn
     ? state.elements
     : state.elements.filter(e => e.status !== "withdrawn");
@@ -111,14 +112,23 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
     return el ? getColors({ ...el, status: "active" }).stroke : C.dim;
   };
 
-  function SectionHeader({ title }) {
+  function SectionHeader({ title, onAdd }) {
     return (
       <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
         fontSize: 10, fontWeight: "bold", letterSpacing: 1.5, color: C.dim,
         textTransform: "uppercase", padding: "14px 0 6px",
         borderBottom: `1px solid ${C.border}`, marginBottom: 10,
       }}>
-        {title}
+        <span>{title}</span>
+        {onAdd && (
+          <button onClick={onAdd} style={{
+            background: "none", border: `1px solid ${C.border}`, borderRadius: 4,
+            color: C.dim, cursor: "pointer", fontSize: 13, lineHeight: 1,
+            padding: "0 5px 1px", fontWeight: "bold", letterSpacing: 0,
+            textTransform: "none",
+          }}>+</button>
+        )}
       </div>
     );
   }
@@ -264,6 +274,8 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
     );
   }
 
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
   const hasCoherence = state.coherence.tensions.length > 0
     || state.coherence.orphans.length > 0
     || state.coherence.clusters.length > 0;
@@ -278,9 +290,54 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
       background: C.bg, color: C.text, fontFamily: "system-ui, sans-serif",
     }}>
       {/* Topic / header */}
-      <div style={{ fontSize: 12, color: C.dim, marginBottom: 4, lineHeight: 1.5 }}>
-        <span style={{ color: C.text, fontWeight: "bold" }}>{state.topic || "No topic set"}</span>
-        {state.round > 0 && <span style={{ marginLeft: 8 }}>Round {state.round}</span>}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.5 }}>
+          <span style={{ color: C.text, fontWeight: "bold" }}>{state.topic || "No topic set"}</span>
+          {state.round > 0 && <span style={{ marginLeft: 8 }}>Round {state.round}</span>}
+        </div>
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <button
+            onClick={() => setShowAddMenu(m => !m)}
+            style={{
+              background: C.supports, border: "none", borderRadius: 6,
+              color: "#fff", cursor: "pointer", fontSize: 18, fontWeight: "bold",
+              width: 28, height: 28, lineHeight: 1, padding: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+            +
+          </button>
+          {showAddMenu && (
+            <>
+              {/* Backdrop to close on outside click */}
+              <div
+                onClick={() => setShowAddMenu(false)}
+                style={{ position: "fixed", inset: 0, zIndex: 99 }}
+              />
+              <div style={{
+                position: "absolute", right: 0, top: "calc(100% + 6px)",
+                background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.4)", zIndex: 100,
+                minWidth: 150, overflow: "hidden",
+              }}>
+                {[
+                  { label: "Add element", action: () => { setShowAddMenu(false); onAddRequest("judgment"); } },
+                  { label: "Add relation", action: () => { setShowAddMenu(false); onAddRelRequest(); } },
+                ].map(({ label, action }) => (
+                  <button key={label} onClick={action} style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    background: "none", border: "none", color: C.text,
+                    cursor: "pointer", fontSize: 12, padding: "10px 14px",
+                    borderBottom: `1px solid ${C.border}`,
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.background = C.border; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "none"; }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Highlighted section (node selected or relation selected) ── */}
@@ -319,30 +376,24 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel,
       )}
 
       {/* ── Elements ── */}
-      {j(restEls).length > 0 && (
+      {!highlightedIds && (
         <>
-          {!highlightedIds && <SectionHeader title={`Judgments (${j(visibleEls).length})`} />}
-          {j(restEls).map(e => <ElementCard key={e.id} e={e} dim={!!highlightedIds} />)}
+          <SectionHeader title={`Judgments (${j(visibleEls).length})`} onAdd={() => onAddRequest("judgment")} />
+          {j(restEls).map(e => <ElementCard key={e.id} e={e} />)}
+          <SectionHeader title={`Principles (${pr(visibleEls).length})`} onAdd={() => onAddRequest("principle")} />
+          {pr(restEls).map(e => <ElementCard key={e.id} e={e} />)}
+          <SectionHeader title={`Background Theories (${th(visibleEls).length})`} onAdd={() => onAddRequest("theory")} />
+          {th(restEls).map(e => <ElementCard key={e.id} e={e} />)}
+          <SectionHeader title={`Relations (${visRels.length})`} onAdd={onAddRelRequest} />
+          {restRels.map((r, i) => <RelationCard key={i} r={r} />)}
         </>
       )}
-      {pr(restEls).length > 0 && (
+      {highlightedIds && (
         <>
-          {!highlightedIds && <SectionHeader title={`Principles (${pr(visibleEls).length})`} />}
-          {pr(restEls).map(e => <ElementCard key={e.id} e={e} dim={!!highlightedIds} />)}
-        </>
-      )}
-      {th(restEls).length > 0 && (
-        <>
-          {!highlightedIds && <SectionHeader title={`Background Theories (${th(visibleEls).length})`} />}
-          {th(restEls).map(e => <ElementCard key={e.id} e={e} dim={!!highlightedIds} />)}
-        </>
-      )}
-
-      {/* ── Relations ── */}
-      {(restRels.length > 0 || (!highlightedIds && visRels.length > 0)) && (
-        <>
-          {!highlightedIds && <SectionHeader title={`Relations (${visRels.length})`} />}
-          {restRels.map((r, i) => <RelationCard key={i} r={r} dim={!!highlightedIds} />)}
+          {j(restEls).map(e => <ElementCard key={e.id} e={e} dim />)}
+          {pr(restEls).map(e => <ElementCard key={e.id} e={e} dim />)}
+          {th(restEls).map(e => <ElementCard key={e.id} e={e} dim />)}
+          {restRels.map((r, i) => <RelationCard key={i} r={r} dim />)}
         </>
       )}
 

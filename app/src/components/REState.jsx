@@ -16,6 +16,8 @@ import { HistoryTab } from "./HistoryTab.jsx";
 import { Legend } from "./Legend.jsx";
 import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
+import { AddElementModal } from "./AddElementModal.jsx";
+import { AddRelationModal } from "./AddRelationModal.jsx";
 
 /**
  * Root component of the RE visualisation app.
@@ -190,6 +192,50 @@ export default function REState() {
     }));
   };
 
+  /** Type pre-selected when the Add Element modal is open, or null when closed. */
+  const [addingElType, setAddingElType] = useState(null);
+  /** True when the Add Relation modal is open. */
+  const [addingRel, setAddingRel] = useState(false);
+
+  /** @param {import('./AddElementModal.jsx').AddElementFormData} formData */
+  const handleAddElement = (formData) => {
+    const newRound = state.round + 1;
+    const prefix = formData.type === "judgment" ? "J" : formData.type === "principle" ? "P" : "T";
+    const nums = state.elements
+      .filter(e => e.id.startsWith(prefix))
+      .map(e => parseInt(e.id.slice(1)))
+      .filter(n => !isNaN(n));
+    const newId = `${prefix}${nums.length > 0 ? Math.max(...nums) + 1 : 1}`;
+    setState(prev => ({
+      ...prev,
+      round: newRound,
+      elements: [...prev.elements, { id: newId, status: "active", addedRound: newRound, ...formData }],
+      log: [...prev.log, {
+        round: newRound, findings: `${newId} was added by the user.`,
+        options: "", decision: "Added", changes: `${newId} added`,
+      }],
+    }));
+    setAddingElType(null);
+    handleSelectNode(() => newId);
+  };
+
+  /** @param {import('./AddRelationModal.jsx').AddRelationFormData} formData */
+  const handleAddRelation = (formData) => {
+    const newRound = state.round + 1;
+    const newRel = { ...formData, addedRound: newRound };
+    setState(prev => ({
+      ...prev,
+      round: newRound,
+      relations: [...prev.relations, newRel],
+      log: [...prev.log, {
+        round: newRound, findings: `Relation ${formData.from} → ${formData.to} was added by the user.`,
+        options: "", decision: "Added", changes: `${formData.from} → ${formData.to} (${formData.type}) added`,
+      }],
+    }));
+    setAddingRel(false);
+    handleSelectRel(() => newRel);
+  };
+
   const dims = useWindowSize();
   const isWide = dims.w > 768;
 
@@ -316,7 +362,8 @@ export default function REState() {
               selected={selected} onSelect={handleSelectNode}
               selectedRel={selectedRel} onSelectRel={handleSelectRel}
               onEditRequest={handleEditRequest} onEditRelRequest={setEditingRel}
-              onWithdrawRequest={handleWithdrawRequest} onWithdrawRelRequest={handleWithdrawRelRequest} />
+              onWithdrawRequest={handleWithdrawRequest} onWithdrawRelRequest={handleWithdrawRelRequest}
+              onAddRequest={setAddingElType} onAddRelRequest={() => setAddingRel(true)} />
           </div>
         )}
 
@@ -336,6 +383,22 @@ export default function REState() {
           currentRound={state.round}
           onSave={handleRelEditSave}
           onCancel={() => setEditingRel(null)}
+        />
+      )}
+      {addingElType && (
+        <AddElementModal
+          initialType={addingElType}
+          currentRound={state.round}
+          onSave={handleAddElement}
+          onCancel={() => setAddingElType(null)}
+        />
+      )}
+      {addingRel && (
+        <AddRelationModal
+          elements={state.elements.filter(e => e.status !== "withdrawn")}
+          currentRound={state.round}
+          onSave={handleAddRelation}
+          onCancel={() => setAddingRel(false)}
         />
       )}
     </div>
