@@ -60,7 +60,23 @@ function getNeighbours(selectedId, visRels) {
  *   Receives a functional update `prev => next` so it can toggle.
  * @returns {React.ReactElement}
  */
-export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
+/**
+ * Returns the shortest distance from point (px, py) to the line segment (ax,ay)→(bx,by).
+ * Used for edge hit-testing.
+ * @param {number} px @param {number} py
+ * @param {number} ax @param {number} ay
+ * @param {number} bx @param {number} by
+ * @returns {number}
+ */
+function distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+export function Graph({ state, showWithdrawn, positions, selected, onSelect, selectedRel, onSelectRel }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
@@ -109,15 +125,30 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
     const rect = e.currentTarget.getBoundingClientRect();
     const sx = e.clientX - rect.left - pan.x;
     const sy = e.clientY - rect.top - pan.y;
-    let hit = null;
+
+    // Node hit-test first.
+    let hitNode = null;
     for (const el of visibleEls) {
       const pos = positions[el.id];
       if (!pos) continue;
-      // Use a slightly larger hit radius than the visual radius for easier tapping.
       const hitR = el.type === "principle" ? 36 : el.type === "theory" ? 30 : 24;
-      if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitR ** 2) { hit = el.id; break; }
+      if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitR ** 2) { hitNode = el.id; break; }
     }
-    onSelect(prev => prev === hit ? null : hit);
+    if (hitNode !== null) {
+      onSelectRel(() => null);
+      onSelect(prev => prev === hitNode ? null : hitNode);
+      return;
+    }
+
+    // Edge hit-test (threshold 8px).
+    let hitRel = null;
+    for (const r of visRels) {
+      const sp = positions[r.from], tp = positions[r.to];
+      if (!sp || !tp) continue;
+      if (distToSegment(sx, sy, sp.x, sp.y, tp.x, tp.y) < 8) { hitRel = r; break; }
+    }
+    onSelect(() => null);
+    onSelectRel(prev => prev === hitRel ? null : hitRel);
   };
 
   const visibleEls = showWithdrawn ? state.elements : state.elements.filter(e => e.status !== "withdrawn");
@@ -125,9 +156,18 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
   const visRels = state.relations.filter(r => visIds.has(r.from) && visIds.has(r.to));
 
   // When a node is selected, everything outside its neighbourhood dims out.
-  const highlightedIds = selected ? getNeighbours(selected, visRels) : null;
+  // When a relation is selected, only that relation and its two endpoints are highlighted.
+  const highlightedIds = selected
+    ? getNeighbours(selected, visRels)
+    : selectedRel
+      ? new Set([selectedRel.from, selectedRel.to])
+      : null;
   const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
-  const dimEdge = (r) => highlightedIds && r.from !== selected && r.to !== selected;
+  const dimEdge = (r) => {
+    if (selectedRel) return r !== selectedRel;
+    if (highlightedIds) return r.from !== selected && r.to !== selected;
+    return false;
+  };
 
   return (
     <div ref={containerRef} style={{ position: "relative", width: "100%", height: "100%" }}>
@@ -150,6 +190,7 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
               const dx = tp.x - sp.x, dy = tp.y - sp.y;
               const dist = Math.sqrt(dx * dx + dy * dy) || 1;
               const color = isW ? C.withdrawn : C[r.type];
+              const isSel = r === selectedRel;
               const baseOp = isW ? 0.25 : 0.7;
               const opacity = dimEdge(r) ? baseOp * 0.12 : baseOp;
               // Arrowhead: tip at the inset target edge, base 10px back along the edge direction.
@@ -159,13 +200,20 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
               const bx = tipX - (dx / dist) * ahl;
               const by = tipY - (dy / dist) * ahl;
               const px = -dy / dist, py = dx / dist; // perpendicular unit vector
+              const strokeW = isSel ? 3.5 : dimEdge(r) ? 1.5 : 2;
               return (
                 <g key={i} opacity={opacity} style={{ transition: TRANSITION }}>
+                  {/* Wider invisible stroke for easier hit-testing */}
+                  <line
+                    x1={sp.x + (dx / dist) * sr} y1={sp.y + (dy / dist) * sr}
+                    x2={bx} y2={by}
+                    stroke="transparent" strokeWidth={16}
+                  />
                   <line
                     x1={sp.x + (dx / dist) * sr} y1={sp.y + (dy / dist) * sr}
                     x2={bx} y2={by}
                     stroke={color}
-                    strokeWidth={dimEdge(r) ? 1.5 : 2}
+                    strokeWidth={strokeW}
                     strokeDasharray={r.type === "conflicts" ? "8,4" : r.type === "undermines" ? "4,4" : "none"}
                   />
                   <polygon

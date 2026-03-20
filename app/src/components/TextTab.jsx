@@ -57,9 +57,11 @@ function getHighlightedIds(selected, visRels) {
  * @param {string|null} props.selected    - ID of the currently selected element, or `null`.
  * @param {function(function(string|null): string|null): void} props.onSelect
  *   Functional updater called when the user clicks an ID badge.
+ * @param {import('../types.js').RERelation|null} props.selectedRel - The currently selected relation, or `null`.
+ * @param {function(function): void} props.onSelectRel - Functional updater for selected relation.
  * @returns {React.ReactElement}
  */
-export function TextTab({ state, showWithdrawn, selected, onSelect, onEditRequest }) {
+export function TextTab({ state, showWithdrawn, selected, onSelect, selectedRel, onSelectRel, onEditRequest, onEditRelRequest }) {
   const visibleEls = showWithdrawn
     ? state.elements
     : state.elements.filter(e => e.status !== "withdrawn");
@@ -81,12 +83,27 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, onEditReques
   const visRels = state.relations.filter(r => visIds.has(r.from) && visIds.has(r.to));
 
   // Partition elements and relations into selected / neighbours / rest when a node is selected.
-  const highlightedIds = selected ? getHighlightedIds(selected, visRels) : null;
-  const selectedEl = highlightedIds ? visibleEls.find(e => e.id === selected) ?? null : null;
-  const neighbourEls = highlightedIds ? visibleEls.filter(e => highlightedIds.has(e.id) && e.id !== selected) : [];
+  // When a relation is selected, its two endpoint elements are treated as "neighbours".
+  const relHighlightedIds = selectedRel ? new Set([selectedRel.from, selectedRel.to]) : null;
+  const highlightedIds = selected
+    ? getHighlightedIds(selected, visRels)
+    : relHighlightedIds;
+
+  const selectedEl = selected ? (visibleEls.find(e => e.id === selected) ?? null) : null;
+  const neighbourEls = highlightedIds
+    ? visibleEls.filter(e => highlightedIds.has(e.id) && e.id !== selected)
+    : [];
   const restEls = highlightedIds ? visibleEls.filter(e => !highlightedIds.has(e.id)) : visibleEls;
-  const hlRels = highlightedIds ? visRels.filter(r => r.from === selected || r.to === selected) : [];
-  const restRels = highlightedIds ? visRels.filter(r => r.from !== selected && r.to !== selected) : visRels;
+  const hlRels = selected
+    ? visRels.filter(r => r.from === selected || r.to === selected)
+    : selectedRel
+      ? [selectedRel]
+      : [];
+  const restRels = selectedRel
+    ? visRels.filter(r => r !== selectedRel)
+    : highlightedIds
+      ? visRels.filter(r => r.from !== selected && r.to !== selected)
+      : visRels;
 
   // Resolve badge color from element ID (uses stroke = saturated type color).
   const badgeColor = (id) => {
@@ -174,15 +191,31 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, onEditReques
   function RelationCard({ r, dim }) {
     const fromEl = state.elements.find(e => e.id === r.from);
     const toEl = state.elements.find(e => e.id === r.to);
+    const isSel = r === selectedRel;
     return (
       <div style={{
         paddingBottom: 14, borderBottom: `1px solid ${C.border}66`, marginBottom: 14,
         opacity: dim ? 0.4 : 1,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8, flexWrap: "wrap" }}>
-          <Badge id={r.from} />
-          <span style={{ color: C[r.type], fontSize: 11, fontWeight: "bold" }}>→ {r.type} →</span>
-          <Badge id={r.to} />
+        <div
+          onClick={() => { onSelectRel(prev => prev === r ? null : r); onSelect(() => null); }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 5, marginBottom: 8, cursor: "pointer",
+            background: isSel ? `${C.border}44` : "transparent", borderRadius: 4, padding: "2px 4px", margin: "0 -4px 8px",
+          }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+            <Badge id={r.from} />
+            <span style={{ color: C[r.type], fontSize: 11, fontWeight: "bold" }}>→ {r.type} →</span>
+            <Badge id={r.to} />
+          </div>
+          <button
+            onClick={() => onEditRelRequest(r)}
+            style={{
+              flexShrink: 0, background: "none", border: `1px solid ${C.border}`,
+              borderRadius: 4, color: C.dim, cursor: "pointer", fontSize: 10,
+              padding: "1px 7px", lineHeight: 1.8,
+            }}>
+            Edit
+          </button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 6, paddingLeft: 4 }}>
           {fromEl && (
@@ -222,19 +255,32 @@ export function TextTab({ state, showWithdrawn, selected, onSelect, onEditReques
         {state.round > 0 && <span style={{ marginLeft: 8 }}>Round {state.round}</span>}
       </div>
 
-      {/* ── Highlighted section (only when a node is selected) ── */}
+      {/* ── Highlighted section (node selected or relation selected) ── */}
       {highlightedIds && (
         <>
-          <SectionHeader title={selected} />
-          {selectedEl && <ElementCard e={selectedEl} />}
-          {neighbourEls.length > 0 && <SectionHeader title="Neighbours" />}
-          {j(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
-          {pr(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
-          {th(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
-          {hlRels.length > 0 && (
+          {selectedRel ? (
             <>
-              <div style={{ fontSize: 10, fontWeight: "bold", letterSpacing: 1.5, color: C.dim, textTransform: "uppercase", marginBottom: 8 }}>Relations</div>
-              {hlRels.map((r, i) => <RelationCard key={i} r={r} />)}
+              <SectionHeader title={`${selectedRel.from} → ${selectedRel.to}`} />
+              <RelationCard r={selectedRel} />
+              {neighbourEls.length > 0 && <SectionHeader title="Elements" />}
+              {j(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+              {pr(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+              {th(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+            </>
+          ) : (
+            <>
+              <SectionHeader title={selected} />
+              {selectedEl && <ElementCard e={selectedEl} />}
+              {neighbourEls.length > 0 && <SectionHeader title="Neighbours" />}
+              {j(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+              {pr(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+              {th(neighbourEls).map(e => <ElementCard key={e.id} e={e} />)}
+              {hlRels.length > 0 && (
+                <>
+                  <div style={{ fontSize: 10, fontWeight: "bold", letterSpacing: 1.5, color: C.dim, textTransform: "uppercase", marginBottom: 8 }}>Relations</div>
+                  {hlRels.map((r, i) => <RelationCard key={i} r={r} />)}
+                </>
+              )}
             </>
           )}
 

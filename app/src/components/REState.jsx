@@ -15,6 +15,7 @@ import { TextTab } from "./TextTab.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
 import { Legend } from "./Legend.jsx";
 import { EditModal } from "./EditModal.jsx";
+import { EditRelationModal } from "./EditRelationModal.jsx";
 
 /**
  * Root component of the RE visualisation app.
@@ -59,6 +60,20 @@ export default function REState() {
   const [historyRound, setHistoryRound] = useState(0);
   /** ID of the selected graph node, or null. Shared between Graph (click) and TextTab (badge click). */
   const [selected, setSelected] = useState(null);
+  /** The selected relation object, or null. Mutually exclusive with `selected`. */
+  const [selectedRel, setSelectedRel] = useState(null);
+
+  /** Select a node; clears any selected relation. */
+  const handleSelectNode = (updater) => {
+    setSelectedRel(null);
+    setSelected(updater);
+  };
+
+  /** Select a relation; clears any selected node. */
+  const handleSelectRel = (updater) => {
+    setSelected(null);
+    setSelectedRel(updater);
+  };
 
   /** @type {REStateType} The mutable RE state; editing saves a new round into this. */
   const [state, setState] = useState(SAMPLE_STATE);
@@ -123,6 +138,34 @@ export default function REState() {
     }));
     setEditingEl(null);
   };
+
+  /** The relation currently open in the relation edit modal, or null. */
+  const [editingRel, setEditingRel] = useState(null);
+
+  /**
+   * @param {import('../types.js').RERelation} rel
+   */
+  const handleRelEditSave = (formData) => {
+    const newRound = state.round + 1;
+    const diffs = ["type", "explanation"]
+      .filter(k => formData[k] !== editingRel[k])
+      .map(k => `${k}: ${editingRel[k]} → ${formData[k]}`);
+
+    setState(prev => ({
+      ...prev,
+      round: newRound,
+      relations: prev.relations.map(r => r === editingRel ? { ...editingRel, ...formData } : r),
+      log: [...prev.log, {
+        round: newRound,
+        findings: `Relation ${editingRel.from} → ${editingRel.to} was edited by the user.`,
+        options: "",
+        decision: "Changes applied",
+        changes: diffs.length ? diffs.join("; ") : "No fields changed",
+      }],
+    }));
+    setEditingRel(null);
+  };
+
   const dims = useWindowSize();
   const isWide = dims.w > 768;
 
@@ -223,7 +266,8 @@ export default function REState() {
           <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
             {tab === "graph" && (
               <Graph state={state} showWithdrawn={showWithdrawn} positions={positions}
-                selected={selected} onSelect={setSelected} />
+                selected={selected} onSelect={handleSelectNode}
+                selectedRel={selectedRel} onSelectRel={handleSelectRel} />
             )}
             {tab === "history" && (
               <HistoryTab state={state} positions={positions} onRoundChange={setHistoryRound} />
@@ -245,7 +289,9 @@ export default function REState() {
             overflow: "hidden",
           }}>
             <TextTab state={textState} showWithdrawn={showWithdrawn}
-              selected={selected} onSelect={setSelected} onEditRequest={handleEditRequest} />
+              selected={selected} onSelect={handleSelectNode}
+              selectedRel={selectedRel} onSelectRel={handleSelectRel}
+              onEditRequest={handleEditRequest} onEditRelRequest={setEditingRel} />
           </div>
         )}
 
@@ -257,6 +303,14 @@ export default function REState() {
           currentRound={state.round}
           onSave={handleEditSave}
           onCancel={() => setEditingEl(null)}
+        />
+      )}
+      {editingRel && (
+        <EditRelationModal
+          relation={editingRel}
+          currentRound={state.round}
+          onSave={handleRelEditSave}
+          onCancel={() => setEditingRel(null)}
         />
       )}
     </div>
