@@ -1,6 +1,21 @@
+/**
+ * @fileoverview Legend bar shown above all graph tabs.
+ * @module components/Legend
+ */
+
 import { C } from "../constants/colors.js";
 
-// Renders the color/shape legend bar shown above all tabs.
+/**
+ * Renders a horizontal legend bar that explains the visual encoding used in the
+ * Graph and History tabs: node shapes/colours by element type and confidence,
+ * and edge colours/dash patterns by relation type.
+ *
+ * The bar wraps onto multiple lines on narrow screens (`flexWrap: "wrap"`).
+ * It takes no props — all values are derived from the {@link module:constants/colors}
+ * design tokens.
+ *
+ * @returns {React.ReactElement} A `<div>` containing small SVG/CSS shape swatches and labels.
+ */
 export function Legend() {
   const items = [
     { label: "Judgment (high)", shape: "circle", color: "#2563eb" },

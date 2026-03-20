@@ -1,40 +1,92 @@
+/**
+ * @fileoverview Animated round-by-round history playback tab.
+ * @module components/HistoryTab
+ */
+
+/** @import { REState, PositionMap } from '../types.js' */
+
 import { useState, useEffect, useRef } from "react";
 import { C, confOp, getColors } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { NodeShape } from "./NodeShape.jsx";
 import { ArrowDefs } from "./ArrowDefs.jsx";
 
-// Renders the History tab: a play/pause slider that animates the RE process round by round.
-// Elements and relations appear at the round they were added and disappear when withdrawn.
-// Newly added elements pulse briefly. A log entry summary is shown below the controls.
+/**
+ * Renders the History tab: an animated, slider-controlled playback of the RE process
+ * round by round.
+ *
+ * ### How rounds are displayed
+ * The `displayRound` state is a **floating-point** number that eases toward the integer
+ * `targetRound` using a `requestAnimationFrame` loop and exponential smoothing
+ * (`diff * 0.08` per frame).  The integer `snappedRound = Math.round(displayRound)`
+ * is what controls which elements and relations are actually shown.
+ * This gives a smooth slider animation without needing CSS transitions on every node.
+ *
+ * ### Element visibility at a round
+ * An element is **active** at `round` if `addedRound <= round` and it was not yet
+ * withdrawn (i.e. `withdrawnRound > round` or no `withdrawnRound`).
+ * An element is **withdrawn** at `round` if `addedRound <= round` and `withdrawnRound <= round`.
+ * Elements not yet added (`addedRound > round`) are invisible.
+ *
+ * ### Newly-added pulse
+ * Elements whose `addedRound` equals `snappedRound` receive a CSS SVG `<animate>`
+ * pulse ring so the user can immediately see what changed in the current round.
+ *
+ * ### Text panel synchronisation
+ * `onRoundChange(snappedRound)` is called whenever `snappedRound` changes so the
+ * parent `REState` can filter the text panel to match the displayed round.
+ *
+ * @param {Object}      props
+ * @param {REState}     props.state         - Full RE state (all rounds).
+ * @param {PositionMap} props.positions     - Force-simulation node positions from the parent.
+ * @param {function(number): void} props.onRoundChange
+ *   Called with the current `snappedRound` whenever it changes.
+ *   Used by the parent to synchronise the text panel.
+ * @returns {React.ReactElement}
+ */
 export function HistoryTab({ state, positions, onRoundChange }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
-  const [displayRound, setDisplayRound] = useState(0);
+
+  // ── Pan state (same Pointer Events approach as Graph) ───────────────────────
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef(null);
 
+  /** @param {React.PointerEvent<SVGSVGElement>} e */
   const onPointerDown = (e) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { px: e.clientX - pan.x, py: e.clientY - pan.y };
     setIsDragging(true);
     setTooltip(null);
   };
+  /** @param {React.PointerEvent<SVGSVGElement>} e */
   const onPointerMove = (e) => {
     if (!dragRef.current) return;
     setPan({ x: e.clientX - dragRef.current.px, y: e.clientY - dragRef.current.py });
   };
   const onPointerUp = () => { dragRef.current = null; setIsDragging(false); };
+
+  // ── Playback state ───────────────────────────────────────────────────────────
+  /** Floating-point round used for smooth slider animation. */
+  const [displayRound, setDisplayRound] = useState(0);
+  /** Integer target that the animation eases toward. */
   const [targetRound, setTargetRound] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [tooltip, setTooltip] = useState(null);
+  /** Ref copy of `playing` so the setInterval callback can read the latest value. */
   const playRef = useRef(false);
   const animRef = useRef(null);
   const maxRound = state.round;
 
+  // Keep playRef in sync with playing state so the interval callback always
+  // reads the latest value without being re-created on each state change.
   useEffect(() => { playRef.current = playing; }, [playing]);
 
+  /**
+   * Smooth animation loop: each frame eases `displayRound` toward `targetRound`
+   * using exponential smoothing (factor 0.08).  Stops once within 0.01 of target.
+   */
   useEffect(() => {
     if (animRef.current) cancelAnimationFrame(animRef.current);
     const animate = () => {
@@ -50,6 +102,10 @@ export function HistoryTab({ state, positions, onRoundChange }) {
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, [targetRound]);
 
+  /**
+   * Auto-advance the target round every 3.2 s while playing.
+   * Stops automatically when `targetRound` reaches `maxRound`.
+   */
   useEffect(() => {
     if (!playing) return;
     const iv = setInterval(() => {
@@ -62,10 +118,18 @@ export function HistoryTab({ state, positions, onRoundChange }) {
     return () => clearInterval(iv);
   }, [playing, maxRound]);
 
+  /** The integer round currently shown in the graph. */
   const snappedRound = Math.round(displayRound);
 
+  // Notify parent whenever the displayed round changes.
   useEffect(() => { onRoundChange?.(snappedRound); }, [snappedRound]);
 
+  /**
+   * Returns elements visible (active + withdrawn) at the given round.
+   *
+   * @param {number} round
+   * @returns {{ active: import('../types.js').REElement[], withdrawn: import('../types.js').REElement[] }}
+   */
   const visibleAtRound = (round) => {
     const els = state.elements.filter(e => {
       const added = e.addedRound || 1;
@@ -84,19 +148,23 @@ export function HistoryTab({ state, positions, onRoundChange }) {
   const { active, withdrawn } = visibleAtRound(snappedRound);
   const allVis = [...active, ...withdrawn];
   const visIds = new Set(allVis.map(e => e.id));
+  /** IDs of elements that have been withdrawn by this round. */
   const wIds = new Set(withdrawn.map(e => e.id));
   const visRels = state.relations.filter(r =>
     visIds.has(r.from) && visIds.has(r.to) && (r.addedRound || 1) <= snappedRound
   );
+  /** IDs of elements added in the current round — these receive a pulse ring. */
   const newIds = new Set(
     snappedRound > 0 ? state.elements.filter(e => e.addedRound === snappedRound).map(e => e.id) : []
   );
 
   const logEntry = state.log.find(l => l.round === snappedRound);
+  /** Progress percentage [0–100] for the custom slider track fill. */
   const sliderPct = maxRound > 0 ? (displayRound / maxRound) * 100 : 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* ── Playback controls ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0" }}>
         <button onClick={() => { setTargetRound(0); setDisplayRound(0); setPlaying(false); }}
           style={{ background: "none", border: `1px solid ${C.border}`, color: C.dim, borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 12 }}>
@@ -109,6 +177,8 @@ export function HistoryTab({ state, positions, onRoundChange }) {
           style={{ background: playing ? C.conflicts : C.supports, border: "none", color: "#fff", borderRadius: 4, padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>
           {playing ? "Pause" : "Play"}
         </button>
+
+        {/* Custom range slider: invisible <input type="range"> overlaid on a styled track. */}
         <div style={{ flex: 1, position: "relative", height: 20, display: "flex", alignItems: "center" }}>
           <div style={{ position: "absolute", left: 0, right: 0, height: 4, borderRadius: 2, background: C.border }}>
             <div style={{ width: `${sliderPct}%`, height: "100%", borderRadius: 2, background: C.supports, transition: "width 0.15s linear" }} />
@@ -116,6 +186,7 @@ export function HistoryTab({ state, positions, onRoundChange }) {
           <input type="range" min={0} max={maxRound} step={1} value={targetRound}
             onChange={e => { setTargetRound(Number(e.target.value)); setPlaying(false); }}
             style={{ position: "absolute", left: 0, right: 0, width: "100%", opacity: 0, cursor: "pointer", height: 20 }} />
+          {/* Tick marks — one per round. */}
           {Array.from({ length: maxRound + 1 }, (_, i) => (
             <div key={i} style={{
               position: "absolute", left: `${(i / maxRound) * 100}%`,
@@ -126,6 +197,8 @@ export function HistoryTab({ state, positions, onRoundChange }) {
             }} />
           ))}
         </div>
+
+        {/* Round counter display */}
         <div style={{
           minWidth: 80, textAlign: "center", padding: "4px 10px",
           background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6,
@@ -137,16 +210,21 @@ export function HistoryTab({ state, positions, onRoundChange }) {
           <div style={{ fontSize: 9, color: C.dim }}>of {maxRound}</div>
         </div>
       </div>
+
+      {/* Log entry for the current round */}
       {logEntry && (
         <div style={{ fontSize: 11, color: C.dim, padding: "4px 0 8px", lineHeight: 1.4, transition: "opacity 0.6s ease" }}>
           <span style={{ color: C.text, fontWeight: "bold" }}>Round {logEntry.round}:</span> {logEntry.changes}
         </div>
       )}
+
+      {/* ── Graph SVG ── */}
       <div ref={containerRef} style={{ flex: 1, minHeight: 0, position: "relative" }}>
         {dims.w > 0 && (
           <svg width={dims.w} height={dims.h}
             style={{ background: C.bg, borderRadius: 8, cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+            {/* Use "h" prefix so marker IDs don't collide with the Graph SVG's markers. */}
             <ArrowDefs prefix="h" />
             <g transform={`translate(${pan.x},${pan.y})`}>
             {visRels.map((r, i) => {
@@ -188,6 +266,7 @@ export function HistoryTab({ state, positions, onRoundChange }) {
                     setTooltip({ x: ev.clientX - rect.left, y: ev.clientY - rect.top - 10, el: e });
                   }}
                   onMouseLeave={() => setTooltip(null)}>
+                  {/* Pulse ring for newly-added elements — uses SVG SMIL animation. */}
                   {isNew && !isW && (
                     e.type === "principle" ? (
                       <rect width={r * 2.2 + 8} height={r * 1.5 + 8} x={-r * 1.1 - 4} y={-r * 0.75 - 4}

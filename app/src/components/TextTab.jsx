@@ -1,6 +1,23 @@
+/**
+ * @fileoverview Scrollable text panel showing the full RE state in readable form.
+ * @module components/TextTab
+ */
+
+/** @import { REState, RERelation } from '../types.js' */
+
 import { C, getColors } from "../constants/colors.js";
 
-// Returns the selected node ID plus all element IDs directly connected to it.
+/**
+ * Returns the set of element IDs that should be highlighted given a selected node:
+ * the selected node itself plus every element directly connected to it.
+ *
+ * Mirrors the same logic in {@link module:components/Graph~getNeighbours} — kept
+ * as a local copy so TextTab has no dependency on Graph.
+ *
+ * @param {string}       selected - ID of the selected element.
+ * @param {RERelation[]} visRels  - Currently visible relations.
+ * @returns {Set<string>}
+ */
 function getHighlightedIds(selected, visRels) {
   const ids = new Set([selected]);
   visRels.forEach(r => {
@@ -10,9 +27,38 @@ function getHighlightedIds(selected, visRels) {
   return ids;
 }
 
-// Renders the Text panel: structured, styled view of the full RE state — judgments,
-// principles, theories, relations, coherence summary, and round log. When a node is
-// selected in the graph, its neighbours and their relations float to the top.
+/**
+ * Scrollable text panel that renders the full RE state as structured, styled prose.
+ *
+ * ### Sections (top to bottom)
+ * 1. **Topic / round header**
+ * 2. **Highlighted** (only when a node is `selected`) — the selected element,
+ *    its neighbours, and their direct relations at full opacity.
+ * 3. **All elements** — judgments, principles, background theories.  When something
+ *    is selected these render at 40 % opacity below the highlighted section.
+ * 4. **Relations** — every visible relation with both element texts quoted.
+ * 5. **Coherence** — tensions, orphans, clusters from the latest coherence check.
+ * 6. **Round log** — one entry per round.
+ *
+ * ### Selection interaction
+ * Clicking a coloured ID badge (e.g. `J3`) calls `onSelect` with a functional
+ * updater that toggles the selection, exactly mirroring a node click in the Graph.
+ * The selected badge renders with a slightly stronger background to confirm the
+ * active state.
+ *
+ * ### History tab synchronisation
+ * When the History tab is active, the parent passes a round-filtered `state` so
+ * this component automatically shows only what was visible at the displayed round
+ * — no extra logic needed here.
+ *
+ * @param {Object}   props
+ * @param {REState}  props.state          - RE state to render (may be round-filtered by parent).
+ * @param {boolean}  props.showWithdrawn  - Whether to include withdrawn elements.
+ * @param {string|null} props.selected    - ID of the currently selected element, or `null`.
+ * @param {function(function(string|null): string|null): void} props.onSelect
+ *   Functional updater called when the user clicks an ID badge.
+ * @returns {React.ReactElement}
+ */
 export function TextTab({ state, showWithdrawn, selected, onSelect }) {
   const visibleEls = showWithdrawn
     ? state.elements

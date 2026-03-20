@@ -1,10 +1,25 @@
+/**
+ * @fileoverview Interactive force-directed graph for the main Graph tab.
+ * @module components/Graph
+ */
+
+/** @import { REState, PositionMap } from '../types.js' */
+
 import { useState, useRef } from "react";
 import { C, confOp, TRANSITION, getColors } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { NodeShape } from "./NodeShape.jsx";
 import { ArrowDefs } from "./ArrowDefs.jsx";
 
-// Returns all element IDs connected to `selectedId` via any visible relation.
+/**
+ * Returns the set of element IDs that should remain highlighted when `selectedId`
+ * is selected: the selected node itself plus every node directly connected to it
+ * by any visible relation (in either direction).
+ *
+ * @param {string}       selectedId - ID of the selected element.
+ * @param {import('../types.js').RERelation[]} visRels - Currently visible relations.
+ * @returns {Set<string>} IDs of the selected node and its immediate neighbours.
+ */
 function getNeighbours(selectedId, visRels) {
   const ids = new Set([selectedId]);
   visRels.forEach(r => {
@@ -14,11 +29,38 @@ function getNeighbours(selectedId, visRels) {
   return ids;
 }
 
-// Renders the main force-directed graph: directed edges with arrowheads, shaped nodes,
-// and a hover tooltip showing element detail. Withdrawn elements and edges are hidden
-// unless showWithdrawn is true, in which case they appear at reduced opacity.
-// Supports pan by dragging (mouse and touch via Pointer Events API).
-// Click a node to highlight it and its neighbours; click background to deselect.
+/**
+ * Renders the main force-directed graph for the Graph tab.
+ *
+ * ### Layout
+ * Node positions come from the shared `positions` prop produced by
+ * {@link module:hooks/useStablePositions} in the parent `REState` component.
+ * The graph itself does not run any simulation.
+ *
+ * ### Interaction
+ * - **Pan** — drag anywhere on the SVG to pan, using the Pointer Events API
+ *   (`setPointerCapture` ensures smooth dragging even if the pointer leaves the SVG).
+ * - **Click to highlight** — click a node to highlight it and its immediate neighbours;
+ *   all other nodes and edges dim to low opacity.  Click the same node again, or click
+ *   the background, to deselect.  A click is distinguished from a drag by comparing the
+ *   pointer-up position to the pointer-down position (threshold: 4 px).
+ * - **Hover tooltip** — hovering over a node shows a detail card above it.
+ *
+ * ### Withdrawn elements
+ * When `showWithdrawn` is `false`, withdrawn elements and any edges touching them
+ * are excluded from both rendering and hit-testing.  When `true` they appear at
+ * 25 % opacity with grey styling.
+ *
+ * @param {Object}      props
+ * @param {REState}     props.state          - Full RE state.
+ * @param {boolean}     props.showWithdrawn  - Whether to render withdrawn elements.
+ * @param {PositionMap} props.positions      - Force-simulation positions keyed by element ID.
+ * @param {string|null} props.selected       - ID of the currently selected element, or `null`.
+ * @param {function(function(string|null): string|null): void} props.onSelect
+ *   Updater function called when the user clicks a node or the background.
+ *   Receives a functional update `prev => next` so it can toggle.
+ * @returns {React.ReactElement}
+ */
 export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
@@ -26,8 +68,10 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef(null);
-  const clickOrigin = useRef(null); // pointer-down position, used to detect drag vs click
+  /** Pointer-down screen position; compared to pointer-up to detect drag vs click. */
+  const clickOrigin = useRef(null);
 
+  /** @param {React.PointerEvent<SVGSVGElement>} e */
   const onPointerDown = (e) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { px: e.clientX - pan.x, py: e.clientY - pan.y };
@@ -35,10 +79,24 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
     setIsDragging(true);
     setTooltip(null);
   };
+
+  /** @param {React.PointerEvent<SVGSVGElement>} e */
   const onPointerMove = (e) => {
     if (!dragRef.current) return;
     setPan({ x: e.clientX - dragRef.current.px, y: e.clientY - dragRef.current.py });
   };
+
+  /**
+   * On pointer-up, determine whether the gesture was a drag or a click.
+   * If it was a click, hit-test all visible nodes in simulation space and
+   * toggle selection on the one that was clicked, or deselect if background.
+   *
+   * Node positions from the simulation are in an unscaled coordinate system.
+   * The pan offset is subtracted from the cursor position so the hit-test
+   * is in the same space as the node coordinates.
+   *
+   * @param {React.PointerEvent<SVGSVGElement>} e
+   */
   const onPointerUp = (e) => {
     dragRef.current = null;
     setIsDragging(false);
@@ -48,7 +106,7 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
     clickOrigin.current = null;
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) return; // was a drag, not a click
 
-    // Hit-test all visible nodes in simulation space.
+    // Convert screen coords to simulation coords (accounting for pan offset).
     const rect = e.currentTarget.getBoundingClientRect();
     const sx = e.clientX - rect.left - pan.x;
     const sy = e.clientY - rect.top - pan.y;
@@ -56,6 +114,7 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
     for (const el of visibleEls) {
       const pos = positions[el.id];
       if (!pos) continue;
+      // Use a slightly larger hit radius than the visual radius for easier tapping.
       const hitR = el.type === "principle" ? 36 : el.type === "theory" ? 30 : 24;
       if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitR ** 2) { hit = el.id; break; }
     }
@@ -66,7 +125,7 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
   const visIds = new Set(visibleEls.map(e => e.id));
   const visRels = state.relations.filter(r => visIds.has(r.from) && visIds.has(r.to));
 
-  // When a node is selected, compute the set of highlighted IDs and dim everything else.
+  // When a node is selected, everything outside its neighbourhood dims out.
   const highlightedIds = selected ? getNeighbours(selected, visRels) : null;
   const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
   const dimEdge = (r) => highlightedIds && r.from !== selected && r.to !== selected;
@@ -78,6 +137,7 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
           style={{ background: C.bg, borderRadius: 8, cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
           onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
           <ArrowDefs prefix="" />
+          {/* All graph content is inside this <g> so that panning only requires a single transform. */}
           <g transform={`translate(${pan.x},${pan.y})`}>
             {visRels.map((r, i) => {
               const sp = positions[r.from], tp = positions[r.to];
@@ -85,6 +145,8 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
               const sEl = state.elements.find(e => e.id === r.from);
               const tEl = state.elements.find(e => e.id === r.to);
               const isW = sEl?.status === "withdrawn" || tEl?.status === "withdrawn";
+              // Edge endpoints are inset from each node's centre by the node radius so
+              // the arrowhead lands on the node border rather than inside the node.
               const sr = sEl?.type === "principle" ? 28 : sEl?.type === "theory" ? 22 : 18;
               const tr = tEl?.type === "principle" ? 28 : tEl?.type === "theory" ? 22 : 18;
               const dx = tp.x - sp.x, dy = tp.y - sp.y;
@@ -122,7 +184,7 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
                     setTooltip({ x: ev.clientX - rect.left, y: ev.clientY - rect.top - 10, el: e });
                   }}
                   onMouseLeave={() => setTooltip(null)}>
-                  {/* Selection ring around the clicked node */}
+                  {/* White ring drawn behind the node shape to indicate selection. */}
                   {isSel && (
                     <circle r={r + 8} fill="none" stroke="#fff" strokeWidth={2} opacity={0.45} />
                   )}
@@ -138,6 +200,7 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect }) {
           </g>
         </svg>
       )}
+      {/* Tooltip rendered as an HTML div (not SVG) so it can overflow the SVG bounds. */}
       {tooltip && (
         <div style={{
           position: "absolute", left: tooltip.x, top: tooltip.y,
