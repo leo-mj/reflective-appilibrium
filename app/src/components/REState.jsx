@@ -14,6 +14,7 @@ import { elementsAtRound, nextElementId, makeDiff, makeLogEntry } from "../utils
 import { Graph } from "./Graph.jsx";
 import { TextTab } from "./TextTab.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
+import { CoherenceMatrixTab } from "./CoherenceMatrixTab.jsx";
 import { Legend } from "./Legend.jsx";
 import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
@@ -270,14 +271,14 @@ export default function REState() {
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {/* Tab buttons + text-panel toggle */}
           <div style={{ display: "flex", gap: 2 }}>
-            {["graph", "history"].map(t => (
+            {["graph", "history", "matrix"].map(t => (
               <button key={t} onClick={() => setTab(t)} style={{
                 padding: "4px 12px", borderRadius: 4, border: "none", cursor: "pointer",
                 fontSize: 12, fontWeight: tab === t ? "bold" : "normal",
                 background: tab === t ? C.border : "transparent",
                 color: tab === t ? C.text : C.dim,
               }}>
-                {t === "graph" ? "Graph" : "History"}
+                {t === "graph" ? "Graph" : t === "history" ? "History" : "Matrix"}
               </button>
             ))}
             <button onClick={() => setShowText(s => !s)} style={{
@@ -318,6 +319,9 @@ export default function REState() {
             )}
             {tab === "history" && (
               <HistoryTab state={state} positions={positions} onRoundChange={setHistoryRound} />
+            )}
+            {tab === "matrix" && (
+              <CoherenceMatrixTab state={state} />
             )}
           </div>
         </div>
