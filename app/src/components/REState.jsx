@@ -5,26 +5,26 @@
 
 /** @import { REState as REStateType } from '../types.js' */
 
-import { useState, lazy, Suspense } from "react";
+import { useState, lazy, Suspense, useEffect } from "react";
 import { C } from "../constants/colors.js";
 import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
-import { SAMPLE_STATE } from "../state.js";
 import { elementsAtRound, nextElementId, makeDiff, makeLogEntry } from "../utils/stateUtils.js";
 import { Graph } from "./Graph.jsx";
 import { TextTab } from "./TextTab.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
 import { Legend } from "./Legend.jsx";
 
-// Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
-const CoherenceMatrixTab = LLM_ENABLED
-  ? lazy(() => import("./CoherenceMatrixTab.jsx").then(m => ({ default: m.CoherenceMatrixTab })))
-  : null;
 import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
 import { AddElementModal } from "./AddElementModal.jsx";
 import { AddRelationModal } from "./AddRelationModal.jsx";
+
+// Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
+const CoherenceMatrixTab = LLM_ENABLED
+  ? lazy(() => import("./CoherenceMatrixTab.jsx").then(m => ({ default: m.CoherenceMatrixTab })))
+  : null;
 
 /**
  * Root component of the RE visualisation app.
@@ -60,7 +60,13 @@ import { AddRelationModal } from "./AddRelationModal.jsx";
  *
  * @returns {React.ReactElement}
  */
-export default function REState() {
+/**
+ * @param {Object}      props
+ * @param {REStateType} props.initialState
+ * @param {Function}    props.onHome    - Called when the user navigates back to the home screen.
+ * @param {Function}    props.onReady   - Called once the force simulation has settled.
+ */
+export default function REState({ initialState, onHome, onReady }) {
   /** @type {'graph'|'history'} */
   const [tab, setTab] = useState("graph");
   const [showWithdrawn, setShowWithdrawn] = useState(false);
@@ -85,7 +91,7 @@ export default function REState() {
   };
 
   /** @type {REStateType} The mutable RE state; editing saves a new round into this. */
-  const [state, setState] = useState(SAMPLE_STATE);
+  const [state, setState] = useState(initialState);
   /** The element currently open in the edit modal, or null when the modal is closed. */
   const [editingEl, setEditingEl] = useState(null);
 
@@ -238,6 +244,7 @@ export default function REState() {
   const graphW = isWide && showText ? padded / 2 - 12 : padded;
   const simDims = { w: graphW, h: dims.h };
   const { positions, ready } = useStablePositions(state, simDims);
+  useEffect(() => { if (ready) onReady?.(); }, [ready]);
 
   /**
    * When the History tab is active, build a view of the state that contains only
@@ -269,9 +276,18 @@ export default function REState() {
     }}>
       {/* ── Header ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: "bold" }}>RE State — Round {state.round}</div>
-          <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{state.topic}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={onHome} style={{
+            background: "transparent", border: `1px solid ${C.border}`,
+            borderRadius: 4, padding: "3px 8px", fontSize: 11,
+            color: C.dim, cursor: "pointer",
+          }}>
+            ← Home
+          </button>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: "bold" }}>RE State — Round {state.round}</div>
+            <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{state.topic}</div>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {/* Tab buttons + text-panel toggle */}
