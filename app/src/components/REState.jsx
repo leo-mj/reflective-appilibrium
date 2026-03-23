@@ -5,8 +5,9 @@
 
 /** @import { REState as REStateType } from '../types.js' */
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { C } from "../constants/colors.js";
+import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
 import { SAMPLE_STATE } from "../state.js";
@@ -14,8 +15,12 @@ import { elementsAtRound, nextElementId, makeDiff, makeLogEntry } from "../utils
 import { Graph } from "./Graph.jsx";
 import { TextTab } from "./TextTab.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
-import { CoherenceMatrixTab } from "./CoherenceMatrixTab.jsx";
 import { Legend } from "./Legend.jsx";
+
+// Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
+const CoherenceMatrixTab = LLM_ENABLED
+  ? lazy(() => import("./CoherenceMatrixTab.jsx").then(m => ({ default: m.CoherenceMatrixTab })))
+  : null;
 import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
 import { AddElementModal } from "./AddElementModal.jsx";
@@ -271,7 +276,7 @@ export default function REState() {
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {/* Tab buttons + text-panel toggle */}
           <div style={{ display: "flex", gap: 2 }}>
-            {["graph", "history", "matrix"].map(t => (
+            {["graph", "history", ...(LLM_ENABLED ? ["matrix"] : [])].map(t => (
               <button key={t} onClick={() => setTab(t)} style={{
                 padding: "4px 12px", borderRadius: 4, border: "none", cursor: "pointer",
                 fontSize: 12, fontWeight: tab === t ? "bold" : "normal",
@@ -320,8 +325,10 @@ export default function REState() {
             {tab === "history" && (
               <HistoryTab state={state} positions={positions} onRoundChange={setHistoryRound} />
             )}
-            {tab === "matrix" && (
-              <CoherenceMatrixTab state={state} />
+            {tab === "matrix" && LLM_ENABLED && (
+              <Suspense fallback={null}>
+                <CoherenceMatrixTab state={state} />
+              </Suspense>
             )}
           </div>
         </div>

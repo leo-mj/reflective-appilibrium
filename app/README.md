@@ -1,16 +1,65 @@
-# React + Vite
+# Assistive Equilibrium — Web App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React + Vite visualisation tool for wide reflective equilibrium (RE) in ethics.
 
-Currently, two official plugins are available:
+## Getting started
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+## Builds
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The app has two build targets:
 
-## Expanding the ESLint configuration
+### Public build (no LLM)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run build
+```
+
+Produces a static site with the Graph, Text, and History tabs. The Matrix tab and
+chat panel are excluded entirely — the OpenAI SDK is tree-shaken out of the bundle.
+Deploy the `dist/` folder to any static host.
+
+### Local build (with LLM)
+
+```bash
+npm run build:local
+```
+
+Includes all LLM-dependent features (Matrix tab, chat panel). Intended for running
+locally, not for public deployment — the OpenAI API key must not be exposed in a
+publicly hosted build (see [Security](#security) below).
+
+## LLM feature flag
+
+LLM-dependent features are controlled by the `VITE_ENABLE_LLM` environment variable:
+
+| File | `VITE_ENABLE_LLM` | Used by |
+|---|---|---|
+| `.env` | `true` | `npm run dev` |
+| `.env.production` | `false` | `npm run build` (public) |
+| `.env.local` | `true` | `npm run build:local` (create this file if it doesn't exist) |
+
+To create `.env.local` for local builds:
+
+```bash
+echo "VITE_ENABLE_LLM=true" > .env.local
+```
+
+## Security
+
+The OpenAI API key is stored in `.env` and read at build time by Vite. Because `VITE_*`
+variables are inlined into the browser bundle, **never use `npm run build` (public) with
+a real API key** — `VITE_ENABLE_LLM=false` in `.env.production` ensures the key and the
+OpenAI SDK are excluded from the public build.
+
+For local use (`npm run dev` / `npm run build:local`), set your key in `.env`:
+
+```
+OPENAI_API_KEY=sk-...
+```
+
+`.env` is gitignored and never committed.
