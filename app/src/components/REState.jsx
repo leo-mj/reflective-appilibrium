@@ -20,6 +20,7 @@ import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
 import { AddElementModal } from "./AddElementModal.jsx";
 import { AddRelationModal } from "./AddRelationModal.jsx";
+import { NetworkIcon, HistoryIcon, MatrixIcon } from "./Icons.jsx";
 
 // Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
 const CoherenceMatrixTab = LLM_ENABLED
@@ -244,7 +245,7 @@ export default function REState({ initialState, onHome, onReady }) {
   const graphW = isWide && showText ? padded / 2 - 12 : padded;
   const simDims = { w: graphW, h: dims.h };
   const { positions, ready } = useStablePositions(state, simDims);
-  useEffect(() => { if (ready) onReady?.(); }, [ready]);
+  useEffect(() => { if (ready) onReady?.(); }, [ready, onReady]);
 
   /**
    * When the History tab is active, build a view of the state that contains only
@@ -277,29 +278,32 @@ export default function REState({ initialState, onHome, onReady }) {
       {/* ── Header ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={onHome} style={{
-            background: "transparent", border: `1px solid ${C.border}`,
-            borderRadius: 4, padding: "3px 8px", fontSize: 11,
-            color: C.dim, cursor: "pointer",
-          }}>
-            ← Home
-          </button>
           <div>
             <div style={{ fontSize: 14, fontWeight: "bold" }}>RE State — Round {state.round}</div>
             <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{state.topic}</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {/* Tab buttons + text-panel toggle */}
+          {/* Home + tab buttons + text-panel toggle */}
           <div style={{ display: "flex", gap: 2 }}>
+            <button onClick={onHome} style={{
+              background: "transparent", border: `1px solid ${C.border}`,
+              borderRadius: 4, padding: "3px 8px", fontSize: 12,
+              color: C.dim, cursor: "pointer",
+            }}>
+              ← Home
+            </button>
             {["graph", "history", ...(LLM_ENABLED ? ["matrix"] : [])].map(t => (
               <button key={t} onClick={() => setTab(t)} style={{
-                padding: "4px 12px", borderRadius: 4, border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "3px 8px", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer",
                 fontSize: 12, fontWeight: tab === t ? "bold" : "normal",
                 background: tab === t ? C.border : "transparent",
                 color: tab === t ? C.text : C.dim,
               }}>
-                {t === "graph" ? "Graph" : t === "history" ? "History" : "Matrix"}
+                {t === "graph" ? <><NetworkIcon />Graph</>
+                  : t === "history" ? <><HistoryIcon />History</>
+                  : <><MatrixIcon/>Matrix</>}
               </button>
             ))}
             <button onClick={() => setShowText(s => !s)} style={{

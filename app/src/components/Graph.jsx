@@ -6,12 +6,12 @@
 /** @import { REState, PositionMap } from '../types.js' */
 
 import { useState, useRef } from "react";
-import { C, confOp, TRANSITION, getColors } from "../constants/colors.js";
+
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
-import { nodeRadius, hitRadius, edgeDashArray, arrowGeometry, getNeighbours, distToSegment } from "../utils/graphHelpers.js";
-import { NodeShape } from "./NodeShape.jsx";
-import { NodeTooltip } from "./NodeTooltip.jsx";
+import { hitRadius, getNeighbours, distToSegment } from "../utils/graphHelpers.js";
+import { elementsAtRound } from "../utils/stateUtils.js";
+import { GraphCanvas, renderEdge, renderNode, graphEdgeVisuals, graphNodeVisuals } from "./GraphElements.jsx";
 
 /**
  * Renders the main force-directed graph for the Graph tab.
@@ -101,9 +101,9 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect, sel
 
   // ── Derived visibility and highlight sets ─────────────────────────────────
 
-  const visibleEls = showWithdrawn
-    ? state.elements
-    : state.elements.filter(e => e.status !== "withdrawn");
+  const { active, withdrawn } = elementsAtRound(state.elements, state.round);
+  const wIds = new Set(withdrawn.map(e => e.id));
+  const visibleEls = showWithdrawn ? [...active, ...withdrawn] : active;
   const visIds = new Set(visibleEls.map(e => e.id));
   const visRels = state.relations.filter(r => visIds.has(r.from) && visIds.has(r.to));
 
@@ -123,76 +123,17 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect, sel
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={containerRef} style={{ position: "relative", width: "100%", height: "100%" }}>
-      {dims.w > 0 && (
-        <svg width={dims.w} height={dims.h}
-          style={{ background: C.bg, borderRadius: 8, cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
-          onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-          <g transform={`translate(${pan.x},${pan.y})`}>
+    <GraphCanvas
+      containerRef={containerRef} dims={dims} pan={pan} isDragging={isDragging}
+      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+      tooltip={tooltip} containerStyle={{ width: "100%", height: "100%" }}>
 
-            {/* ── Edges ── */}
-            {visRels.map((r, i) => {
-              const sp = positions[r.from], tp = positions[r.to];
-              if (!sp || !tp) return null;
-              const sEl = state.elements.find(e => e.id === r.from);
-              const tEl = state.elements.find(e => e.id === r.to);
-              const isW  = sEl?.status === "withdrawn" || tEl?.status === "withdrawn";
-              const isSel = r === selectedRel;
-              const color  = isW ? C.withdrawn : C[r.type];
-              const baseOp = isW ? 0.25 : 0.7;
-              const opacity   = dimEdge(r) ? baseOp * 0.12 : baseOp;
-              const strokeW   = isSel ? 3.5 : dimEdge(r) ? 1.5 : 2;
-              const { x1, y1, x2, y2, tipX, tipY, perpX, perpY } = arrowGeometry(
-                sp, tp, nodeRadius(sEl?.type), nodeRadius(tEl?.type)
-              );
-              return (
-                <g key={i} opacity={opacity} style={{ transition: TRANSITION }}>
-                  {/* Wide transparent stroke for easier hit-testing */}
-                  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={16} />
-                  <line x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke={color} strokeWidth={strokeW}
-                    strokeDasharray={edgeDashArray(r.type)} />
-                  <polygon
-                    points={`${tipX},${tipY} ${x2 + perpX * 5},${y2 + perpY * 5} ${x2 - perpX * 5},${y2 - perpY * 5}`}
-                    fill={color} />
-                </g>
-              );
-            })}
+      {/* ── Edges ── */}
+      {visRels.map((r, i) => renderEdge(r, i, positions, state.elements, graphEdgeVisuals(r, wIds, dimEdge, selectedRel)))}
 
-            {/* ── Nodes ── */}
-            {visibleEls.map(e => {
-              const pos = positions[e.id];
-              if (!pos) return null;
-              const isW  = e.status === "withdrawn";
-              const isSel = e.id === selected;
-              const { fill, stroke } = getColors(e);
-              const op     = isW ? 0.25 : confOp[e.confidence];
-              const nodeOp = dimNode(e.id) ? 0.12 : op;
-              const r = nodeRadius(e.type);
-              return (
-                <g key={e.id} transform={`translate(${pos.x},${pos.y})`}
-                  style={{ cursor: isDragging ? "grabbing" : "pointer", transition: TRANSITION, opacity: nodeOp }}
-                  onMouseEnter={(ev) => {
-                    if (isDragging) return;
-                    const rect = ev.currentTarget.closest("svg").getBoundingClientRect();
-                    setTooltip({ x: ev.clientX - rect.left, y: ev.clientY - rect.top - 10, el: e });
-                  }}
-                  onMouseLeave={() => setTooltip(null)}>
-                  {isSel && <circle r={r + 8} fill="none" stroke="#fff" strokeWidth={2} opacity={0.45} />}
-                  <NodeShape e={e} r={r} fill={fill} stroke={stroke} op={1} />
-                  <text textAnchor="middle" dy="0.35em" fill={isW ? "#666" : "#fff"}
-                    fontSize={e.type === "principle" ? 13 : 11} fontWeight="bold"
-                    style={{ textDecoration: isW ? "line-through" : "none", pointerEvents: "none" }}>
-                    {e.id}
-                  </text>
-                </g>
-              );
-            })}
+      {/* ── Nodes ── */}
+      {visibleEls.map(el => renderNode(el, positions, graphNodeVisuals(el, wIds, dimNode, selected), isDragging, setTooltip))}
 
-          </g>
-        </svg>
-      )}
-      <NodeTooltip tooltip={tooltip} />
-    </div>
+    </GraphCanvas>
   );
 }

@@ -6,13 +6,98 @@
 /** @import { REState, PositionMap } from '../types.js' */
 
 import { useState, useEffect, useRef } from "react";
-import { C, confOp, getColors } from "../constants/colors.js";
+import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
-import { nodeRadius, edgeDashArray, arrowGeometry } from "../utils/graphHelpers.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
-import { NodeShape } from "./NodeShape.jsx";
-import { NodeTooltip } from "./NodeTooltip.jsx";
+import { GraphCanvas, renderEdge, renderNode, historyEdgeVisuals, historyNodeVisuals } from "./GraphElements.jsx";
+
+// ─── PlaybackSlider ───────────────────────────────────────────────────────────
+
+/**
+ * Styled range slider with tick marks and a filled progress track.
+ * The invisible `<input type="range">` is overlaid on the visual track so
+ * native drag/keyboard behaviour is preserved.
+ *
+ * @param {Object}   props
+ * @param {number}   props.maxRound
+ * @param {number}   props.targetRound
+ * @param {number}   props.displayRound  - Floating-point animated value (for track fill).
+ * @param {number}   props.snappedRound  - Integer round (for tick highlight).
+ * @param {Function} props.setTargetRound
+ * @param {Function} props.setPlaying
+ */
+function PlaybackSlider({ maxRound, targetRound, displayRound, snappedRound, setTargetRound, setPlaying }) {
+  const sliderPct = maxRound > 0 ? (displayRound / maxRound) * 100 : 0;
+  return (
+    <div style={{ flex: 1, position: "relative", height: 20, display: "flex", alignItems: "center" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, height: 4, borderRadius: 2, background: C.border }}>
+        <div style={{ width: `${sliderPct}%`, height: "100%", borderRadius: 2, background: C.supports, transition: "width 0.15s linear" }} />
+      </div>
+      <input type="range" min={0} max={maxRound} step={1} value={targetRound}
+        onChange={e => { setTargetRound(Number(e.target.value)); setPlaying(false); }}
+        style={{ position: "absolute", left: 0, right: 0, width: "100%", opacity: 0, cursor: "pointer", height: 20 }} />
+      {Array.from({ length: maxRound + 1 }, (_, i) => (
+        <div key={i} style={{
+          position: "absolute", left: `${(i / maxRound) * 100}%`,
+          width: 2, height: snappedRound === i ? 12 : 6,
+          background: snappedRound === i ? C.supports : C.dim,
+          borderRadius: 1, transform: "translateX(-1px)",
+          transition: "height 0.3s ease, background 0.3s ease",
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ─── LogOverlay ───────────────────────────────────────────────────────────────
+
+/**
+ * Absolutely-positioned overlay showing all log entries up to `snappedRound`.
+ * Future entries are hidden (opacity 0, no pointer events) and fade in as
+ * playback advances. Auto-scrolls the current entry into view via `currentLogRef`.
+ *
+ * @param {Object}      props
+ * @param {Array}       props.sortedLog     - Log entries sorted ascending by round.
+ * @param {number}      props.snappedRound
+ * @param {React.Ref}   props.logRef        - Ref on the scrollable container.
+ * @param {React.Ref}   props.currentLogRef - Ref on the current-round entry.
+ */
+function LogOverlay({ sortedLog, snappedRound, logRef, currentLogRef }) {
+  if (snappedRound === 0 || sortedLog.length === 0) return null;
+  return (
+    <div ref={logRef} className="history-log" style={{
+      position: "absolute", top: 10, left: 10,
+      width: 260, maxHeight: 130, overflowY: "auto",
+      background: `${C.panel}cc`, backdropFilter: "blur(4px)",
+      border: `1px solid ${C.border}`, borderRadius: 8,
+      padding: "6px 8px",
+      display: "flex", flexDirection: "column", gap: 4,
+    }}>
+      {sortedLog.map(entry => {
+        const isCurrent = entry.round === snappedRound;
+        const isFuture  = entry.round > snappedRound;
+        return (
+          <div key={entry.round} ref={isCurrent ? currentLogRef : null} style={{
+            flexShrink: 0, fontSize: 11, lineHeight: 1.6,
+            padding: "4px 6px", borderRadius: 5,
+            background: isCurrent ? `${C.supports}22` : "transparent",
+            border: isCurrent ? `1px solid ${C.supports}55` : "1px solid transparent",
+            color: isCurrent ? C.text : C.dim,
+            opacity: isFuture ? 0 : 1,
+            transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
+            pointerEvents: isFuture ? "none" : "auto",
+          }}>
+            <span style={{ fontWeight: "bold", color: isCurrent ? C.supports : C.dim }}>
+              Round {entry.round}:
+            </span>{" "}
+            {entry.changes}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 /**
  * Renders the History tab: animated, slider-controlled playback of the RE process
@@ -119,7 +204,6 @@ export function HistoryTab({ state, positions, onRoundChange }) {
 
   // Ascending order: past entries at top, future entries (opacity 0) at bottom.
   const sortedLog = [...state.log].sort((a, b) => a.round - b.round);
-  const sliderPct = maxRound > 0 ? (displayRound / maxRound) * 100 : 0;
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -159,24 +243,9 @@ export function HistoryTab({ state, positions, onRoundChange }) {
           ))}
         </div>
 
-        {/* Slider: invisible <input type="range"> overlaid on a styled track. */}
-        <div style={{ flex: 1, position: "relative", height: 20, display: "flex", alignItems: "center" }}>
-          <div style={{ position: "absolute", left: 0, right: 0, height: 4, borderRadius: 2, background: C.border }}>
-            <div style={{ width: `${sliderPct}%`, height: "100%", borderRadius: 2, background: C.supports, transition: "width 0.15s linear" }} />
-          </div>
-          <input type="range" min={0} max={maxRound} step={1} value={targetRound}
-            onChange={e => { setTargetRound(Number(e.target.value)); setPlaying(false); }}
-            style={{ position: "absolute", left: 0, right: 0, width: "100%", opacity: 0, cursor: "pointer", height: 20 }} />
-          {Array.from({ length: maxRound + 1 }, (_, i) => (
-            <div key={i} style={{
-              position: "absolute", left: `${(i / maxRound) * 100}%`,
-              width: 2, height: snappedRound === i ? 12 : 6,
-              background: snappedRound === i ? C.supports : C.dim,
-              borderRadius: 1, transform: "translateX(-1px)",
-              transition: "height 0.3s ease, background 0.3s ease",
-            }} />
-          ))}
-        </div>
+        <PlaybackSlider
+          maxRound={maxRound} targetRound={targetRound} displayRound={displayRound}
+          snappedRound={snappedRound} setTargetRound={setTargetRound} setPlaying={setPlaying} />
 
         <div style={{ minWidth: 80, textAlign: "center", padding: "4px 10px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6 }}>
           <div style={{ fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 1 }}>Round</div>
@@ -188,118 +257,19 @@ export function HistoryTab({ state, positions, onRoundChange }) {
       </div>
 
       {/* ── Graph SVG ── */}
-      <div ref={containerRef} style={{ flex: 1, minHeight: 0, position: "relative" }}>
-        {dims.w > 0 && (
-          <svg width={dims.w} height={dims.h}
-            style={{ background: C.bg, borderRadius: 8, cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
-            onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-            <g transform={`translate(${pan.x},${pan.y})`}>
+      <GraphCanvas
+        containerRef={containerRef} dims={dims} pan={pan} isDragging={isDragging}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+        tooltip={tooltip} containerStyle={{ flex: 1, minHeight: 0 }}
+        overlay={<LogOverlay sortedLog={sortedLog} snappedRound={snappedRound} logRef={logRef} currentLogRef={currentLogRef} />}>
 
-              {/* ── Edges ── */}
-              {allRels.map((r, i) => {
-                const sp = positions[r.from], tp = positions[r.to];
-                if (!sp || !tp) return null;
-                const sEl    = state.elements.find(e => e.id === r.from);
-                const tEl    = state.elements.find(e => e.id === r.to);
-                const future = (r.addedRound || 1) > snappedRound;
-                const isW    = wIds.has(r.from) || wIds.has(r.to);
-                const color  = isW ? C.withdrawn : C[r.type];
-                const { x1, y1, x2, y2, tipX, tipY, perpX, perpY } = arrowGeometry(
-                  sp, tp, nodeRadius(sEl?.type), nodeRadius(tEl?.type)
-                );
-                return (
-                  <g key={i} style={{ opacity: future ? 0 : isW ? 0.25 : 0.7, transition: future ? "none" : "opacity 2.2s ease-in-out" }}>
-                    <line x1={x1} y1={y1} x2={x2} y2={y2}
-                      stroke={color} strokeWidth={2}
-                      strokeDasharray={edgeDashArray(r.type)} />
-                    <polygon
-                      points={`${tipX},${tipY} ${x2 + perpX * 5},${y2 + perpY * 5} ${x2 - perpX * 5},${y2 - perpY * 5}`}
-                      fill={color} />
-                  </g>
-                );
-              })}
+        {/* ── Edges ── */}
+        {allRels.map((r, i) => renderEdge(r, i, positions, state.elements, historyEdgeVisuals(r, wIds, snappedRound)))}
 
-              {/* ── Nodes ── */}
-              {allElements.map(e => {
-                const pos = positions[e.id];
-                if (!pos) return null;
-                const future = e.addedRound > snappedRound;
-                const isW    = wIds.has(e.id);
-                const isNew  = newIds.has(e.id);
-                const { fill, stroke } = getColors(isW ? { ...e, status: "withdrawn" } : e);
-                const op = future ? 0 : isW ? 0.25 : confOp[e.confidence];
-                const r  = nodeRadius(e.type);
-                return (
-                  <g key={e.id} transform={`translate(${pos.x},${pos.y})`}
-                    style={{ opacity: op, transition: future ? "none" : "opacity 2.2s ease-in-out", cursor: isDragging ? "grabbing" : "pointer" }}
-                    onMouseEnter={(ev) => {
-                      if (isDragging) return;
-                      const rect = ev.currentTarget.closest("svg").getBoundingClientRect();
-                      setTooltip({ x: ev.clientX - rect.left, y: ev.clientY - rect.top - 10, el: e });
-                    }}
-                    onMouseLeave={() => setTooltip(null)}>
-                    {/* Pulse ring for newly-added elements (SVG SMIL animation). */}
-                    {isNew && !isW && (
-                      e.type === "principle" ? (
-                        <rect width={r * 2.2 + 8} height={r * 1.5 + 8} x={-r * 1.1 - 4} y={-r * 0.75 - 4}
-                          rx={10} fill="none" stroke={C.added} strokeWidth={2}>
-                          <animate attributeName="opacity" values="0.7;0.15;0.7" dur="2.5s" repeatCount="indefinite" />
-                        </rect>
-                      ) : (
-                        <circle r={r + 5} fill="none" stroke={C.added} strokeWidth={2}>
-                          <animate attributeName="opacity" values="0.7;0.15;0.7" dur="2.5s" repeatCount="indefinite" />
-                        </circle>
-                      )
-                    )}
-                    <NodeShape e={e} r={r} fill={fill} stroke={stroke} op={1} />
-                    <text textAnchor="middle" dy="0.35em" fill={isW ? "#666" : "#fff"}
-                      fontSize={e.type === "principle" ? 13 : 11} fontWeight="bold"
-                      style={{ textDecoration: isW ? "line-through" : "none", pointerEvents: "none" }}>
-                      {e.id}
-                    </text>
-                  </g>
-                );
-              })}
+        {/* ── Nodes ── */}
+        {allElements.map(el => renderNode(el, positions, historyNodeVisuals(el, wIds, newIds, snappedRound), isDragging, setTooltip))}
 
-            </g>
-          </svg>
-        )}
-        <NodeTooltip tooltip={tooltip} />
-
-        {/* Log overlay — absolutely positioned so the graph layout is unaffected. */}
-        {snappedRound > 0 && sortedLog.length > 0 && (
-          <div ref={logRef} className="history-log" style={{
-            position: "absolute", top: 10, left: 10,
-            width: 260, maxHeight: 130, overflowY: "auto",
-            background: `${C.panel}cc`, backdropFilter: "blur(4px)",
-            border: `1px solid ${C.border}`, borderRadius: 8,
-            padding: "6px 8px",
-            display: "flex", flexDirection: "column", gap: 4,
-          }}>
-            {sortedLog.map(entry => {
-              const isCurrent = entry.round === snappedRound;
-              const isFuture  = entry.round > snappedRound;
-              return (
-                <div key={entry.round} ref={isCurrent ? currentLogRef : null} style={{
-                  flexShrink: 0, fontSize: 11, lineHeight: 1.6,
-                  padding: "4px 6px", borderRadius: 5,
-                  background: isCurrent ? `${C.supports}22` : "transparent",
-                  border: isCurrent ? `1px solid ${C.supports}55` : "1px solid transparent",
-                  color: isCurrent ? C.text : C.dim,
-                  opacity: isFuture ? 0 : 1,
-                  transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
-                  pointerEvents: isFuture ? "none" : "auto",
-                }}>
-                  <span style={{ fontWeight: "bold", color: isCurrent ? C.supports : C.dim }}>
-                    Round {entry.round}:
-                  </span>{" "}
-                  {entry.changes}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      </GraphCanvas>
     </div>
   );
 }
