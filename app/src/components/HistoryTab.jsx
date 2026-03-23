@@ -38,6 +38,8 @@ export function HistoryTab({ state, positions, onRoundChange }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
+  const logRef        = useRef();
+  const currentLogRef = useRef();
 
   // ── Pan ───────────────────────────────────────────────────────────────────
 
@@ -48,10 +50,14 @@ export function HistoryTab({ state, positions, onRoundChange }) {
   const [displayRound, setDisplayRound] = useState(0);
   const [targetRound,  setTargetRound]  = useState(0);
   const [playing,      setPlaying]      = useState(false);
+  const [speed,        setSpeed]        = useState(1);
   /** Ref copy of `playing` so the interval callback reads the latest value. */
   const playRef  = useRef(false);
   const animRef  = useRef(null);
   const maxRound = state.round;
+
+  /** Available speed multipliers with display labels. */
+  const SPEEDS = [0.5, 1, 2, 4];
 
   useEffect(() => { playRef.current = playing; }, [playing]);
 
@@ -73,7 +79,7 @@ export function HistoryTab({ state, positions, onRoundChange }) {
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, [targetRound]);
 
-  /** Auto-advances `targetRound` every 3.2 s while playing. */
+  /** Auto-advances `targetRound` at the current speed while playing. */
   useEffect(() => {
     if (!playing) return;
     const iv = setInterval(() => {
@@ -82,28 +88,37 @@ export function HistoryTab({ state, positions, onRoundChange }) {
         if (prev >= maxRound) { setPlaying(false); return prev; }
         return prev + 1;
       });
-    }, 3200);
+    }, 3200 / speed);
     return () => clearInterval(iv);
-  }, [playing, maxRound]);
+  }, [playing, maxRound, speed]);
 
   const snappedRound = Math.round(displayRound);
   useEffect(() => { onRoundChange?.(snappedRound); }, [snappedRound]);
 
+  /** Scroll the log container so the current round entry stays in view. */
+  useEffect(() => {
+    if (currentLogRef.current && logRef.current) {
+      currentLogRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [snappedRound]);
+
   // ── Derived round data ────────────────────────────────────────────────────
 
-  const { active, withdrawn } = elementsAtRound(state.elements, snappedRound);
-  const allVis = [...active, ...withdrawn];
-  const visIds = new Set(allVis.map(e => e.id));
-  const wIds   = new Set(withdrawn.map(e => e.id));
+  const { withdrawn } = elementsAtRound(state.elements, snappedRound);
+  const wIds = new Set(withdrawn.map(e => e.id));
   const newIds = new Set(
     snappedRound > 0
       ? state.elements.filter(e => e.addedRound === snappedRound).map(e => e.id)
       : []
   );
-  const visRels = state.relations.filter(r =>
-    visIds.has(r.from) && visIds.has(r.to) && (r.addedRound || 1) <= snappedRound
-  );
-  const logEntry  = state.log.find(l => l.round === snappedRound);
+
+  // Always render ALL elements and relations; control visibility via opacity so
+  // CSS transitions fire smoothly when elements enter or leave the current round.
+  const allElements = state.elements;
+  const allRels = state.relations;
+
+  // Ascending order: past entries at top, future entries (opacity 0) at bottom.
+  const sortedLog = [...state.log].sort((a, b) => a.round - b.round);
   const sliderPct = maxRound > 0 ? (displayRound / maxRound) * 100 : 0;
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -131,6 +146,18 @@ export function HistoryTab({ state, positions, onRoundChange }) {
           color: "#fff", borderRadius: 4, padding: "4px 12px",
           cursor: "pointer", fontSize: 12, fontWeight: "bold",
         }}>{playing ? "Pause" : "Play"}</button>
+
+        <div style={{ display: "flex", gap: 2 }}>
+          {SPEEDS.map(s => (
+            <button key={s} onClick={() => setSpeed(s)} style={{
+              background: speed === s ? C.border : "transparent",
+              border: `1px solid ${speed === s ? C.dim : C.border}`,
+              color: speed === s ? C.text : C.dim,
+              borderRadius: 4, padding: "2px 6px",
+              cursor: "pointer", fontSize: 11,
+            }}>{s}×</button>
+          ))}
+        </div>
 
         {/* Slider: invisible <input type="range"> overlaid on a styled track. */}
         <div style={{ flex: 1, position: "relative", height: 20, display: "flex", alignItems: "center" }}>
@@ -160,12 +187,6 @@ export function HistoryTab({ state, positions, onRoundChange }) {
         </div>
       </div>
 
-      {logEntry && (
-        <div style={{ fontSize: 11, color: C.dim, padding: "4px 0 8px", lineHeight: 1.4, transition: "opacity 0.6s ease" }}>
-          <span style={{ color: C.text, fontWeight: "bold" }}>Round {logEntry.round}:</span> {logEntry.changes}
-        </div>
-      )}
-
       {/* ── Graph SVG ── */}
       <div ref={containerRef} style={{ flex: 1, minHeight: 0, position: "relative" }}>
         {dims.w > 0 && (
@@ -175,18 +196,19 @@ export function HistoryTab({ state, positions, onRoundChange }) {
             <g transform={`translate(${pan.x},${pan.y})`}>
 
               {/* ── Edges ── */}
-              {visRels.map((r, i) => {
+              {allRels.map((r, i) => {
                 const sp = positions[r.from], tp = positions[r.to];
                 if (!sp || !tp) return null;
-                const sEl  = state.elements.find(e => e.id === r.from);
-                const tEl  = state.elements.find(e => e.id === r.to);
-                const isW  = wIds.has(r.from) || wIds.has(r.to);
-                const color = isW ? C.withdrawn : C[r.type];
+                const sEl    = state.elements.find(e => e.id === r.from);
+                const tEl    = state.elements.find(e => e.id === r.to);
+                const future = (r.addedRound || 1) > snappedRound;
+                const isW    = wIds.has(r.from) || wIds.has(r.to);
+                const color  = isW ? C.withdrawn : C[r.type];
                 const { x1, y1, x2, y2, tipX, tipY, perpX, perpY } = arrowGeometry(
                   sp, tp, nodeRadius(sEl?.type), nodeRadius(tEl?.type)
                 );
                 return (
-                  <g key={i} style={{ opacity: isW ? 0.25 : 0.7, transition: "opacity 1.4s ease-in-out" }}>
+                  <g key={i} style={{ opacity: future ? 0 : isW ? 0.25 : 0.7, transition: future ? "none" : "opacity 2.2s ease-in-out" }}>
                     <line x1={x1} y1={y1} x2={x2} y2={y2}
                       stroke={color} strokeWidth={2}
                       strokeDasharray={edgeDashArray(r.type)} />
@@ -198,17 +220,18 @@ export function HistoryTab({ state, positions, onRoundChange }) {
               })}
 
               {/* ── Nodes ── */}
-              {allVis.map(e => {
+              {allElements.map(e => {
                 const pos = positions[e.id];
                 if (!pos) return null;
-                const isW  = wIds.has(e.id);
-                const isNew = newIds.has(e.id);
+                const future = e.addedRound > snappedRound;
+                const isW    = wIds.has(e.id);
+                const isNew  = newIds.has(e.id);
                 const { fill, stroke } = getColors(isW ? { ...e, status: "withdrawn" } : e);
-                const op = isW ? 0.25 : confOp[e.confidence];
+                const op = future ? 0 : isW ? 0.25 : confOp[e.confidence];
                 const r  = nodeRadius(e.type);
                 return (
                   <g key={e.id} transform={`translate(${pos.x},${pos.y})`}
-                    style={{ opacity: op, transition: "opacity 1.4s ease-in-out", cursor: isDragging ? "grabbing" : "pointer" }}
+                    style={{ opacity: op, transition: future ? "none" : "opacity 2.2s ease-in-out", cursor: isDragging ? "grabbing" : "pointer" }}
                     onMouseEnter={(ev) => {
                       if (isDragging) return;
                       const rect = ev.currentTarget.closest("svg").getBoundingClientRect();
@@ -242,6 +265,40 @@ export function HistoryTab({ state, positions, onRoundChange }) {
           </svg>
         )}
         <NodeTooltip tooltip={tooltip} />
+
+        {/* Log overlay — absolutely positioned so the graph layout is unaffected. */}
+        {snappedRound > 0 && sortedLog.length > 0 && (
+          <div ref={logRef} className="history-log" style={{
+            position: "absolute", top: 10, left: 10,
+            width: 260, maxHeight: 130, overflowY: "auto",
+            background: `${C.panel}cc`, backdropFilter: "blur(4px)",
+            border: `1px solid ${C.border}`, borderRadius: 8,
+            padding: "6px 8px",
+            display: "flex", flexDirection: "column", gap: 4,
+          }}>
+            {sortedLog.map(entry => {
+              const isCurrent = entry.round === snappedRound;
+              const isFuture  = entry.round > snappedRound;
+              return (
+                <div key={entry.round} ref={isCurrent ? currentLogRef : null} style={{
+                  flexShrink: 0, fontSize: 11, lineHeight: 1.6,
+                  padding: "4px 6px", borderRadius: 5,
+                  background: isCurrent ? `${C.supports}22` : "transparent",
+                  border: isCurrent ? `1px solid ${C.supports}55` : "1px solid transparent",
+                  color: isCurrent ? C.text : C.dim,
+                  opacity: isFuture ? 0 : 1,
+                  transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
+                  pointerEvents: isFuture ? "none" : "auto",
+                }}>
+                  <span style={{ fontWeight: "bold", color: isCurrent ? C.supports : C.dim }}>
+                    Round {entry.round}:
+                  </span>{" "}
+                  {entry.changes}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
