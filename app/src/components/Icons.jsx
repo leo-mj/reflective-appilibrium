@@ -102,3 +102,22 @@ export function MatrixIcon({ size = "2em" }) {
     </svg>
   );
 }
+
+export function AddIcon({ size = "2em" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 512 512" style={{ display: "block" }}>
+              <defs>
+        <linearGradient id="bgGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#2ec4b6" />
+          <stop offset="100%" stopColor="#7b2cbf" />
+        </linearGradient>
+      </defs>
+
+      <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#bgGradient)" />
+      <g stroke="currentColor" strokeWidth="60" strokeLinecap="round">
+        <line x1="256" y1="100"  x2="256" y2="412" />
+        <line x1="100"  y1="256" x2="412" y2="256" />
+      </g>
+    </svg>
+  );
+}

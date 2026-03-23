@@ -7,11 +7,15 @@
 
 import { useState, useRef } from "react";
 
+import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { hitRadius, getNeighbours, distToSegment } from "../utils/graphHelpers.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
-import { GraphCanvas, renderEdge, renderNode, graphEdgeVisuals, graphNodeVisuals } from "./GraphElements.jsx";
+import { GraphCanvas } from "./GraphElements.jsx";
+import { renderEdge, renderNode, graphEdgeVisuals, graphNodeVisuals } from "../utils/graphRender.jsx";
+import { AddElementModal } from "./AddElementModal.jsx";
+import { AddRelationModal } from "./AddRelationModal.jsx";
 
 /**
  * Renders the main force-directed graph for the Graph tab.
@@ -42,10 +46,12 @@ import { GraphCanvas, renderEdge, renderNode, graphEdgeVisuals, graphNodeVisuals
  * @param {function(function): void} props.onSelectRel
  * @returns {React.ReactElement}
  */
-export function Graph({ state, showWithdrawn, positions, selected, onSelect, selectedRel, onSelectRel }) {
+export function Graph({ state, showWithdrawn, positions, selected, onSelect, selectedRel, onSelectRel, onAddElement, onAddRelation }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
+  const [addingElType, setAddingElType] = useState(null);
+  const [addingRel, setAddingRel] = useState(false);
 
   // ── Pan + click detection ─────────────────────────────────────────────────
 
@@ -122,18 +128,56 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect, sel
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const activeEls = state.elements.filter(e => e.status !== "withdrawn");
+
+  const typeColor = { judgment: C.judgment.high, principle: C.principle.high, theory: C.theory.high };
+  const addOverlay = (
+    <div style={{ position: "absolute", bottom: 12, right: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+      {[["judgment", "J"], ["principle", "P"], ["theory", "T"]].map(([type, label]) => (
+        <button key={type} onClick={() => setAddingElType(type)} style={{
+          background: typeColor[type], border: "none", color: "#fff",
+          borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer",
+        }}>+ {label}</button>
+      ))}
+      <button onClick={() => setAddingRel(true)} style={{
+        background: C.border, border: "none", color: C.text,
+        borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer",
+      }}>+ Rel</button>
+    </div>
+  );
+
   return (
-    <GraphCanvas
-      containerRef={containerRef} dims={dims} pan={pan} isDragging={isDragging}
-      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-      tooltip={tooltip} containerStyle={{ width: "100%", height: "100%" }}>
+    <>
+      <GraphCanvas
+        containerRef={containerRef} dims={dims} pan={pan} isDragging={isDragging}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+        tooltip={tooltip} containerStyle={{ width: "100%", height: "100%" }}
+        overlay={addOverlay}>
 
-      {/* ── Edges ── */}
-      {visRels.map((r, i) => renderEdge(r, i, positions, state.elements, graphEdgeVisuals(r, wIds, dimEdge, selectedRel)))}
+        {/* ── Edges ── */}
+        {visRels.map((r, i) => renderEdge(r, i, positions, state.elements, graphEdgeVisuals(r, wIds, dimEdge, selectedRel)))}
 
-      {/* ── Nodes ── */}
-      {visibleEls.map(el => renderNode(el, positions, graphNodeVisuals(el, wIds, dimNode, selected), isDragging, setTooltip))}
+        {/* ── Nodes ── */}
+        {visibleEls.map(el => renderNode(el, positions, graphNodeVisuals(el, wIds, dimNode, selected), isDragging, setTooltip))}
 
-    </GraphCanvas>
+      </GraphCanvas>
+
+      {addingElType && (
+        <AddElementModal
+          initialType={addingElType}
+          currentRound={state.round}
+          onSave={(formData) => { onAddElement(formData); setAddingElType(null); }}
+          onCancel={() => setAddingElType(null)}
+        />
+      )}
+      {addingRel && (
+        <AddRelationModal
+          elements={activeEls}
+          currentRound={state.round}
+          onSave={(formData) => { onAddRelation(formData); setAddingRel(false); }}
+          onCancel={() => setAddingRel(false)}
+        />
+      )}
+    </>
   );
 }

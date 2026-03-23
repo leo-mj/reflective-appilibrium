@@ -10,7 +10,8 @@ import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
-import { GraphCanvas, renderEdge, renderNode, historyEdgeVisuals, historyNodeVisuals } from "./GraphElements.jsx";
+import { GraphCanvas } from "./GraphElements.jsx";
+import { renderEdge, renderNode, historyEdgeVisuals, historyNodeVisuals } from "../utils/graphRender.jsx";
 
 // ─── PlaybackSlider ───────────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ export function HistoryTab({ state, positions, onRoundChange }) {
   }, [playing, maxRound, speed]);
 
   const snappedRound = Math.round(displayRound);
-  useEffect(() => { onRoundChange?.(snappedRound); }, [snappedRound]);
+  useEffect(() => { onRoundChange?.(snappedRound); }, [snappedRound, onRoundChange]);
 
   /** Scroll the log container so the current round entry stays in view. */
   useEffect(() => {

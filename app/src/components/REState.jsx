@@ -18,8 +18,6 @@ import { Legend } from "./Legend.jsx";
 
 import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
-import { AddElementModal } from "./AddElementModal.jsx";
-import { AddRelationModal } from "./AddRelationModal.jsx";
 import { NetworkIcon, HistoryIcon, MatrixIcon } from "./Icons.jsx";
 
 // Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
@@ -198,11 +196,6 @@ export default function REState({ initialState, onHome, onReady }) {
     }));
   };
 
-  /** Type pre-selected when the Add Element modal is open, or null when closed. */
-  const [addingElType, setAddingElType] = useState(null);
-  /** True when the Add Relation modal is open. */
-  const [addingRel, setAddingRel] = useState(false);
-
   /** @param {import('./AddElementModal.jsx').AddElementFormData} formData */
   const handleAddElement = (formData) => {
     const newRound = state.round + 1;
@@ -213,7 +206,6 @@ export default function REState({ initialState, onHome, onReady }) {
       elements: [...prev.elements, { id: newId, status: "active", addedRound: newRound, ...formData }],
       log: [...prev.log, makeLogEntry(newRound, `${newId} was added by the user.`, "Added", `${newId} added`)],
     }));
-    setAddingElType(null);
     handleSelectNode(() => newId);
   };
 
@@ -232,7 +224,6 @@ export default function REState({ initialState, onHome, onReady }) {
         `${formData.from} → ${formData.to} (${formData.type}) added`,
       )],
     }));
-    setAddingRel(false);
     handleSelectRel(() => newRel);
   };
 
@@ -276,50 +267,71 @@ export default function REState({ initialState, onHome, onReady }) {
       opacity: ready ? 1 : 0, transition: "opacity 0.6s ease",
     }}>
       {/* ── Header ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: "bold" }}>RE State — Round {state.round}</div>
-            <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{state.topic}</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {/* Home + tab buttons + text-panel toggle */}
-          <div style={{ display: "flex", gap: 2 }}>
-            <button onClick={onHome} style={{
-              background: "transparent", border: `1px solid ${C.border}`,
-              borderRadius: 4, padding: "3px 8px", fontSize: 12,
-              color: C.dim, cursor: "pointer",
-            }}>
-              ← Home
-            </button>
-            {["graph", "history", ...(LLM_ENABLED ? ["matrix"] : [])].map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                display: "flex", alignItems: "center", gap: 4,
-                padding: "3px 8px", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer",
-                fontSize: 12, fontWeight: tab === t ? "bold" : "normal",
-                background: tab === t ? C.border : "transparent",
-                color: tab === t ? C.text : C.dim,
-              }}>
-                {t === "graph" ? <><NetworkIcon />Graph</>
-                  : t === "history" ? <><HistoryIcon />History</>
-                  : <><MatrixIcon/>Matrix</>}
+      {(() => {
+        const btn = (active) => ({
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+          height: 36, padding: "0 12px", boxSizing: "border-box",
+          borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer",
+          fontSize: 12,
+          background: active ? C.border : "transparent",
+          color: active ? C.text : C.dim,
+        });
+        return (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            {/* Left: title */}
+            <div>
+              <div style={{ fontSize: 16, fontWeight: "bold" }}>Reflective Equilibrium — Round {state.round}</div>
+              <div style={{ fontSize: 14, color: C.dim, marginTop: 2 }}>{state.topic}</div>
+            </div>
+            {/* Right: tab buttons + text toggle + home */}
+            <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+              {["graph", "history", ...(LLM_ENABLED ? ["matrix"] : [])].map(t => (
+                <button key={t} onClick={() => setTab(t)} style={btn(tab === t)}>
+                  {t === "graph" ? <><NetworkIcon />Graph</>
+                    : t === "history" ? <><HistoryIcon />History</>
+                    : <><MatrixIcon />Matrix</>}
+                </button>
+              ))}
+              <button onClick={() => setShowText(s => !s)} style={{ ...btn(false), position: "relative" }}>
+                <span style={{ visibility: "hidden" }}>Hide text</span>
+                <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {showText ? "Hide text" : "Show text"}
+                </span>
               </button>
-            ))}
-            <button onClick={() => setShowText(s => !s)} style={{
-              padding: "4px 12px", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer",
-              fontSize: 12, background: "transparent", color: showText ? C.text : C.dim, marginLeft: 4,
-            }}>
-              {showText ? "Hide text" : "Show text"}
-            </button>
+              <button onClick={onHome} style={{ ...btn(false), marginLeft: 50 }}>
+              ← Home
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* ── Body: split panel ── */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: isWide ? "row" : "column", gap: 12 }}>
 
-        {/* Left / top: legend + graph or history tab */}
+        {/* Left / top: persistent text panel */}
+        {showText && (
+          <div style={{
+            width: isWide ? "50%" : "100%",
+            height: isWide ? "auto" : 280,
+            flexShrink: 0,
+            borderRight: isWide ? `1px solid ${C.border}` : "none",
+            borderBottom: isWide ? "none" : `1px solid ${C.border}`,
+            paddingRight: isWide ? 12 : 0,
+            paddingBottom: isWide ? 0 : 8,
+            minHeight: 0,
+            overflow: "hidden",
+          }}>
+            <TextTab state={textState} showWithdrawn={showWithdrawn}
+              selected={selected} onSelect={handleSelectNode}
+              selectedRel={selectedRel} onSelectRel={handleSelectRel}
+              onEditRequest={handleEditRequest} onEditRelRequest={setEditingRel}
+              onWithdrawRequest={handleWithdrawRequest} onWithdrawRelRequest={handleWithdrawRelRequest}
+              onAddElement={handleAddElement} onAddRelation={handleAddRelation} />
+          </div>
+        )}
+
+        {/* Right / bottom: legend + graph or history tab */}
         <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
           <Legend />
           {/* Show withdrawn toggle */}
@@ -340,7 +352,8 @@ export default function REState({ initialState, onHome, onReady }) {
             {tab === "graph" && (
               <Graph state={state} showWithdrawn={showWithdrawn} positions={positions}
                 selected={selected} onSelect={handleSelectNode}
-                selectedRel={selectedRel} onSelectRel={handleSelectRel} />
+                selectedRel={selectedRel} onSelectRel={handleSelectRel}
+                onAddElement={handleAddElement} onAddRelation={handleAddRelation} />
             )}
             {tab === "history" && (
               <HistoryTab state={state} positions={positions} onRoundChange={setHistoryRound} />
@@ -353,27 +366,6 @@ export default function REState({ initialState, onHome, onReady }) {
           </div>
         </div>
 
-        {/* Right / bottom: persistent text panel */}
-        {showText && (
-          <div style={{
-            width: isWide ? "50%" : "100%",
-            height: isWide ? "auto" : 280,
-            flexShrink: 0,
-            borderLeft: isWide ? `1px solid ${C.border}` : "none",
-            borderTop: isWide ? "none" : `1px solid ${C.border}`,
-            paddingLeft: isWide ? 12 : 0,
-            paddingTop: isWide ? 0 : 8,
-            minHeight: 0,
-            overflow: "hidden",
-          }}>
-            <TextTab state={textState} showWithdrawn={showWithdrawn}
-              selected={selected} onSelect={handleSelectNode}
-              selectedRel={selectedRel} onSelectRel={handleSelectRel}
-              onEditRequest={handleEditRequest} onEditRelRequest={setEditingRel}
-              onWithdrawRequest={handleWithdrawRequest} onWithdrawRelRequest={handleWithdrawRelRequest}
-              onAddRequest={setAddingElType} onAddRelRequest={() => setAddingRel(true)} />
-          </div>
-        )}
 
       </div>
 
@@ -391,22 +383,6 @@ export default function REState({ initialState, onHome, onReady }) {
           currentRound={state.round}
           onSave={handleRelEditSave}
           onCancel={() => setEditingRel(null)}
-        />
-      )}
-      {addingElType && (
-        <AddElementModal
-          initialType={addingElType}
-          currentRound={state.round}
-          onSave={handleAddElement}
-          onCancel={() => setAddingElType(null)}
-        />
-      )}
-      {addingRel && (
-        <AddRelationModal
-          elements={state.elements.filter(e => e.status !== "withdrawn")}
-          currentRound={state.round}
-          onSave={handleAddRelation}
-          onCancel={() => setAddingRel(false)}
         />
       )}
     </div>

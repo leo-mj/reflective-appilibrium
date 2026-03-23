@@ -154,7 +154,7 @@ export function HomePage({ onStartFresh, onLoadSample }) {
       {/* Header */}
       <div style={{ textAlign: "center", marginBottom: 48 }}>
         <div style={{ fontSize: 28, fontWeight: "bold", marginBottom: 10 }}>
-          Assistive Equilibrium
+          Reflective APPilibrium
         </div>
         <div style={{ fontSize: 13, color: C.dim, maxWidth: 480, lineHeight: 1.7 }}>
           A structured tool for conducting wide reflective equilibrium in ethics —
