@@ -5,7 +5,7 @@
 
 /** @import { REState as REStateType } from '../types.js' */
 
-import { useState, lazy, Suspense, useEffect } from "react";
+import { useState, useRef, lazy, Suspense, useEffect } from "react";
 import { C } from "../constants/colors.js";
 import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
@@ -17,7 +17,8 @@ import { HistoryTab } from "./HistoryTab.jsx";
 import { Legend } from "./Legend.jsx";
 import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
-import { NetworkIcon, HistoryIcon, MatrixIcon } from "./Icons.jsx";
+import { NetworkIcon, HistoryIcon, MatrixIcon, ClusterIcon } from "./Icons.jsx";
+import { ClusterTab } from "./ClusterTab.jsx";
 
 // Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
 const CoherenceMatrixTab = LLM_ENABLED
@@ -163,8 +164,8 @@ function useREActions(initialState) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const TAB_ICONS = { graph: <NetworkIcon />, history: <HistoryIcon />, matrix: <MatrixIcon /> };
-const TAB_LABELS = { graph: "Graph", history: "History", matrix: "Matrix" };
+const TAB_ICONS  = { graph: <NetworkIcon />, history: <HistoryIcon />, matrix: <MatrixIcon />, clusters: <ClusterIcon /> };
+const TAB_LABELS = { graph: "Graph", history: "History", matrix: "Matrix", clusters: "Clusters" };
 
 function AppHeader({ round, topic, tab, setTab, showText, setShowText, onHome }) {
   const btn = (active) => ({
@@ -175,7 +176,7 @@ function AppHeader({ round, topic, tab, setTab, showText, setShowText, onHome })
     background: active ? C.border : "transparent",
     color: active ? C.text : C.dim,
   });
-  const tabs = ["graph", "history", ...(LLM_ENABLED ? ["matrix"] : [])];
+  const tabs = ["graph", "history", "clusters", ...(LLM_ENABLED ? ["matrix"] : [])];
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
       <div>
@@ -200,7 +201,7 @@ function AppHeader({ round, topic, tab, setTab, showText, setShowText, onHome })
   );
 }
 
-function TextPanel({ isWide, ...textTabProps }) {
+function TextPanel({ isWide, clusterSectionRef, ...textTabProps }) {
   return (
     <div style={{
       width: isWide ? "50%" : "100%",
@@ -212,7 +213,7 @@ function TextPanel({ isWide, ...textTabProps }) {
       paddingBottom: isWide ? 0 : 8,
       minHeight: 0, overflow: "hidden",
     }}>
-      <TextTab {...textTabProps} />
+      <TextTab {...textTabProps} clusterSectionRef={clusterSectionRef} />
     </div>
   );
 }
@@ -245,6 +246,7 @@ function GraphPanel({ tab, state, positions, showWithdrawn, setShowWithdrawn,
         {tab === "history" && (
           <HistoryTab state={state} positions={positions} onRoundChange={onRoundChange} />
         )}
+        {tab === "clusters" && <ClusterTab state={state} positions={positions} showWithdrawn={showWithdrawn} />}
         {tab === "matrix" && LLM_ENABLED && (
           <Suspense fallback={null}><CoherenceMatrixTab state={state} /></Suspense>
         )}
@@ -294,6 +296,17 @@ export default function REState({ initialState, onHome, onReady }) {
           handleEditRequest, handleWithdrawRequest, handleWithdrawRelRequest,
           handleAddElement, handleAddRelation } = actions;
 
+  const clusterSectionRef = useRef(null);
+  const handleSetTab = (t) => {
+    setTab(t);
+    if (t === "clusters") {
+      setShowText(true);
+      requestAnimationFrame(() =>
+        clusterSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      );
+    }
+  };
+
   const dims = useWindowSize();
   const isWide = dims.w > 768;
   const graphW = isWide && showText ? (dims.w - 32) / 2 - 12 : dims.w - 32;
@@ -309,11 +322,11 @@ export default function REState({ initialState, onHome, onReady }) {
       opacity: ready ? 1 : 0, transition: "opacity 0.6s ease",
     }}>
       <AppHeader round={state.round} topic={state.topic}
-        tab={tab} setTab={setTab} showText={showText} setShowText={setShowText} onHome={onHome} />
+        tab={tab} setTab={handleSetTab} showText={showText} setShowText={setShowText} onHome={onHome} />
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: isWide ? "row" : "column", gap: 12 }}>
         {showText && (
-          <TextPanel isWide={isWide} state={textState} showWithdrawn={showWithdrawn}
+          <TextPanel isWide={isWide} clusterSectionRef={clusterSectionRef} state={textState} showWithdrawn={showWithdrawn}
             selected={selected} onSelect={handleSelectNode}
             selectedRel={selectedRel} onSelectRel={handleSelectRel}
             onEditRequest={handleEditRequest} onEditRelRequest={setEditingRel}

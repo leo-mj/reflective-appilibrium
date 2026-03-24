@@ -103,6 +103,24 @@ export function MatrixIcon({ size = "2em" }) {
   );
 }
 
+export function ClusterIcon({ size = "2em" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 512 512" style={{ display: "block" }}>
+      <g stroke="currentColor" strokeWidth="22" fill="none">
+        <circle cx="190" cy="256" r="148" />
+        <circle cx="322" cy="256" r="148" />
+      </g>
+      <g fill="currentColor">
+        <circle cx="130" cy="210" r="26" />
+        <circle cx="130" cy="302" r="26" />
+        <circle cx="382" cy="210" r="26" />
+        <circle cx="382" cy="302" r="26" />
+        <circle cx="256" cy="256" r="26" />
+      </g>
+    </svg>
+  );
+}
+
 export function AddIcon({ size = "2em" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 512 512" style={{ display: "block" }}>
