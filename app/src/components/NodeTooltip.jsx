@@ -9,6 +9,7 @@
 
 /** @import { REElement } from '../types.js' */
 
+import { createPortal } from "react-dom";
 import { C } from "../constants/colors.js";
 
 /**
@@ -29,12 +30,12 @@ import { C } from "../constants/colors.js";
 export function NodeTooltip({ tooltip }) {
   if (!tooltip) return null;
   const { x, y, el } = tooltip;
-  return (
+  return createPortal(
     <div
       style={{
-        position: "absolute",
-        left: x,
-        top: y,
+        position: "fixed",
+        left: Math.round(x),
+        top: Math.round(y),
         transform: "translate(-50%, -100%)",
         background: C.panel,
         border: `1px solid ${C.border}`,
@@ -43,6 +44,7 @@ export function NodeTooltip({ tooltip }) {
         maxWidth: 300,
         pointerEvents: "none",
         zIndex: 10,
+        fontFamily: "system-ui, sans-serif",
       }}
     >
       <div
@@ -55,7 +57,7 @@ export function NodeTooltip({ tooltip }) {
       >
         {el.id} ({el.type}) — {el.status}
       </div>
-      <div style={{ color: C.dim, fontSize: 11, lineHeight: 1.4 }}>
+      <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.4 }}>
         {el.text}
       </div>
       {el.previousText && (
@@ -86,6 +88,7 @@ export function NodeTooltip({ tooltip }) {
         Confidence: {el.confidence} · Origin: {el.origin}
         {el.addedRound && ` · Added: Round ${el.addedRound}`}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

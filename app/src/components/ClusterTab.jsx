@@ -6,7 +6,7 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
@@ -25,11 +25,14 @@ import { findCoherentClusters, clusterColor } from "../utils/clusterUtils.js";
  * Mini pannable graph showing only the elements of one cluster,
  * centred in whatever space the parent gives it.
  */
+// Padding around the bounding box (accounts for node radius + label).
+const FIT_PADDING = 80;
+
 function ClusterGraph({ cluster, state, positions }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
-  const { pan, isDragging, onPointerDown, onPointerMove, onPointerUp } =
+  const { pan, zoom, isDragging, onPointerDown, onPointerMove, onPointerUp, applyWheel, zoomIn, zoomOut, resetView } =
     usePan();
 
   const members = useMemo(() => new Set(cluster.members), [cluster]);
@@ -39,21 +42,28 @@ function ClusterGraph({ cluster, state, positions }) {
   );
   const ids = visibleEls.map((e) => e.id);
 
-  // Translate nodes so their centroid sits at the canvas centre.
-  const localPositions = useMemo(() => {
+  // Stable key for the cluster membership — triggers re-fit when members change.
+  const memberKey = useMemo(() => [...cluster.members].sort().join(","), [cluster]);
+
+  // Auto-fit: compute zoom + pan so all nodes are visible, then snap the view.
+  useEffect(() => {
+    if (!dims.w) return;
     const pts = ids.map((id) => positions[id]).filter(Boolean);
-    if (!pts.length || !dims.w) return positions;
-    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-    const dx = dims.w / 2 - cx;
-    const dy = dims.h / 2 - cy;
-    const shifted = {};
-    ids.forEach((id) => {
-      if (positions[id])
-        shifted[id] = { x: positions[id].x + dx, y: positions[id].y + dy };
-    });
-    return { ...positions, ...shifted };
-  }, [positions, ids, dims]);
+    if (!pts.length) return;
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const bboxW = x1 - x0, bboxH = y1 - y0;
+    const fitZoom = (bboxW < 10 && bboxH < 10)
+      ? 1
+      : Math.min(
+          (dims.w - FIT_PADDING) / bboxW,
+          (dims.h - FIT_PADDING) / bboxH,
+          2,
+        );
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    resetView({ x: dims.w / 2 - cx * fitZoom, y: dims.h / 2 - cy * fitZoom }, fitZoom);
+  }, [dims.w, dims.h, memberKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visRels = state.relations.filter(
     (r) => members.has(r.from) && members.has(r.to),
@@ -66,11 +76,12 @@ function ClusterGraph({ cluster, state, positions }) {
     <GraphCanvas
       containerRef={containerRef}
       dims={dims}
-      pan={pan}
+      pan={pan} zoom={zoom}
       isDragging={isDragging}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      applyWheel={applyWheel} zoomIn={zoomIn} zoomOut={zoomOut}
       tooltip={tooltip}
       containerStyle={{ width: "100%", height: "100%" }}
     >
@@ -78,7 +89,7 @@ function ClusterGraph({ cluster, state, positions }) {
         renderEdge(
           r,
           i,
-          localPositions,
+          positions,
           state.elements,
           graphEdgeVisuals(r, wIds, () => false, null),
         ),
@@ -86,7 +97,7 @@ function ClusterGraph({ cluster, state, positions }) {
       {visibleEls.map((el) =>
         renderNode(
           el,
-          localPositions,
+          positions,
           graphNodeVisuals(el, wIds, () => false, null),
           isDragging,
           setTooltip,

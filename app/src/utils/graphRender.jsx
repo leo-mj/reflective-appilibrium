@@ -33,12 +33,7 @@ export function makeTooltipHandlers(isDragging, setTooltip, element) {
   return {
     onMouseEnter: (ev) => {
       if (isDragging) return;
-      const rect = ev.currentTarget.closest("svg").getBoundingClientRect();
-      setTooltip({
-        x: ev.clientX - rect.left,
-        y: ev.clientY - rect.top - 10,
-        el: element,
-      });
+      setTooltip({ x: ev.clientX, y: ev.clientY - 10, el: element });
     },
     onMouseLeave: () => setTooltip(null),
   };

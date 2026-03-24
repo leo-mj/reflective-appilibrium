@@ -16,6 +16,7 @@ import {
   findMergeCandidates,
   clusterColor,
 } from "../utils/clusterUtils.js";
+import { sortElementIds } from "../utils/stateUtils.js";
 
 // ─── Module-level helpers ────────────────────────────────────────────────────
 
@@ -359,7 +360,7 @@ function ClusterSection({ state, clusterSectionRef }) {
       <SectionHeader title={`Clusters (${clusters.length})`} />
       {clusters.map((cluster, i) => {
         const color = clusterColor(i);
-        const members = [...cluster.members];
+        const members = [...cluster.members].sort(sortElementIds);
         return (
           <div key={i} style={{ ...CARD_STYLE }}>
             <div
@@ -372,7 +373,7 @@ function ClusterSection({ state, clusterSectionRef }) {
             >
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: "bold",
                   padding: "1px 7px",
                   borderRadius: 4,
@@ -411,11 +412,8 @@ function ClusterSection({ state, clusterSectionRef }) {
                     {el && (
                       <span
                         style={{
-                          fontSize: 11,
+                          fontSize: 12,
                           color: C.dim,
-                          maxWidth: 200,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -434,7 +432,7 @@ function ClusterSection({ state, clusterSectionRef }) {
         <>
           <div
             style={{
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: "bold",
               letterSpacing: 1,
               textTransform: "uppercase",

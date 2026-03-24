@@ -10,6 +10,7 @@
 
 /** @import { REElement, RERelation } from '../types.js' */
 
+import { useEffect, useRef } from "react";
 import { C, getColors } from "../constants/colors.js";
 import {
   nodeRadius,
@@ -202,23 +203,51 @@ export function GraphNode({
  * @param {React.ReactNode}     [props.overlay]
  * @param {React.ReactNode}     [props.children]
  */
+const ZOOM_BTN = {
+  width: 24, height: 24, borderRadius: 4,
+  border: `1px solid ${C.border}`, background: C.panel,
+  color: C.dim, cursor: "pointer", fontSize: 14,
+  display: "flex", alignItems: "center", justifyContent: "center",
+  lineHeight: 1, padding: 0,
+};
+
 export function GraphCanvas({
   containerRef,
   dims,
   pan,
+  zoom = 1,
   isDragging,
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  applyWheel,
+  zoomIn,
+  zoomOut,
   tooltip,
   containerStyle,
   overlay,
   children,
 }) {
+  const svgRef = useRef(null);
+
+  // Non-passive wheel listener so e.preventDefault() suppresses page scroll.
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el || !applyWheel) return;
+    const handler = (e) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      applyWheel(e.deltaY, e.clientX - rect.left, e.clientY - rect.top);
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [applyWheel]);
+
   return (
     <div ref={containerRef} style={{ position: "relative", ...containerStyle }}>
       {dims.w > 0 && (
         <svg
+          ref={svgRef}
           width={dims.w}
           height={dims.h}
           style={{
@@ -231,8 +260,14 @@ export function GraphCanvas({
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
         >
-          <g transform={`translate(${pan.x},${pan.y})`}>{children}</g>
+          <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>{children}</g>
         </svg>
+      )}
+      {(zoomIn || zoomOut) && (
+        <div style={{ position: "absolute", bottom: 8, right: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+          <button style={ZOOM_BTN} onClick={zoomIn}>+</button>
+          <button style={ZOOM_BTN} onClick={zoomOut}>−</button>
+        </div>
       )}
       <NodeTooltip tooltip={tooltip} />
       {overlay}

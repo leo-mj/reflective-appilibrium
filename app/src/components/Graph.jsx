@@ -39,7 +39,7 @@ function AddButtonsOverlay({ onAddEl, onAddRel }) {
     <div
       style={{
         position: "absolute",
-        bottom: 12,
+        top: 12,
         right: 12,
         display: "flex",
         flexDirection: "column",
@@ -136,6 +136,7 @@ function useGraphClick({
   visRels,
   positions,
   pan,
+  zoom,
   onSelect,
   onSelectRel,
   setTooltip,
@@ -157,10 +158,10 @@ function useGraphClick({
     clickOrigin.current = null;
     if (Math.abs(e.clientX - ox) > 4 || Math.abs(e.clientY - oy) > 4) return; // drag
 
-    // Convert screen → simulation coordinates.
+    // Convert screen → simulation coordinates (accounting for pan and zoom).
     const rect = e.currentTarget.getBoundingClientRect();
-    const sx = e.clientX - rect.left - pan.x;
-    const sy = e.clientY - rect.top - pan.y;
+    const sx = (e.clientX - rect.left - pan.x) / zoom;
+    const sy = (e.clientY - rect.top - pan.y) / zoom;
 
     // Node hit-test first.
     for (const el of visibleEls) {
@@ -270,10 +271,14 @@ export function Graph({
 
   const {
     pan,
+    zoom,
     isDragging,
     onPointerDown: panDown,
     onPointerMove,
     onPointerUp: panUp,
+    applyWheel,
+    zoomIn,
+    zoomOut,
   } = usePan();
   const { onPointerDown, onPointerUp } = useGraphClick({
     panDown,
@@ -282,6 +287,7 @@ export function Graph({
     visRels,
     positions,
     pan,
+    zoom,
     onSelect,
     onSelectRel,
     setTooltip,
@@ -297,10 +303,14 @@ export function Graph({
         containerRef={containerRef}
         dims={dims}
         pan={pan}
+        zoom={zoom}
         isDragging={isDragging}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        applyWheel={applyWheel}
+        zoomIn={zoomIn}
+        zoomOut={zoomOut}
         tooltip={tooltip}
         containerStyle={{ width: "100%", height: "100%" }}
         overlay={

@@ -5,11 +5,11 @@
 
 import { useState } from "react";
 import {
-  ModalShell,
   INPUT_STYLE,
   LABEL_STYLE,
   FIELD_STYLE,
-} from "./ModalShell.jsx";
+} from "../constants/modalConstants.js";
+import { ModalShell } from "./ModalShell.jsx";
 
 /**
  * @typedef {Object} AddElementFormData

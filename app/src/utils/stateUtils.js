@@ -89,3 +89,27 @@ export function makeDiff(fields, oldObj, newObj) {
 export function makeLogEntry(round, findings, decision, changes) {
   return { round, findings, options: "", decision, changes };
 }
+
+
+/**
+ * Helps compare element IDs for sorting.
+ *
+ * @param {string} id1 - An element ID consisting of J, P, or T and a number string.
+ * @param {string} id2 - An element ID consisting of J, P, or T and a number string.
+ * @returns {number} - A number value indicating which element ID comes first.
+ */
+export function sortElementIds(id1, id2) {
+  const typeOrder = {
+    "J": 0,
+    "P": 1,
+    "T": 2
+  }
+  const [ elTypeAbbreviation1, elTypeAbbreviation2 ] = [id1[0], id2[0]];
+  if (elTypeAbbreviation1 != elTypeAbbreviation2) {
+    const t1 = typeOrder[elTypeAbbreviation1] ?? 99;
+    const t2 = typeOrder[elTypeAbbreviation2] ?? 99;
+    return t1 - t2;  
+  }
+  const [ elNumber1, elNumber2 ] =  [ id1.slice(1), id2.slice(1)]
+  return Number(elNumber1) - Number(elNumber2)
+}
