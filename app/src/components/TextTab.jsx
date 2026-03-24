@@ -5,7 +5,14 @@
 
 /** @import { REState, RERelation, REElement } from '../types.js' */
 
-import { useState, useRef, createContext, useContext, useMemo } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  createContext,
+  useContext,
+  useMemo,
+} from "react";
 import { C, getColors } from "../constants/colors.js";
 import { getNeighbours } from "../utils/graphHelpers.js";
 import { AddElementForm } from "./AddElementModal.jsx";
@@ -47,6 +54,45 @@ function buildPrincipleCovers(principles, relations, visIds, elements) {
   return covers;
 }
 
+// ─── Module-level search helper ──────────────────────────────────────────────
+
+function matchesSearch(el, q) {
+  const lq = q.toLowerCase();
+  return (
+    el.id.toLowerCase().includes(lq) ||
+    el.text.toLowerCase().includes(lq) ||
+    el.type.toLowerCase().includes(lq)
+  );
+}
+
+/**
+ * Wraps occurrences of `query` in `text` with a highlighted `<mark>`.
+ * Returns the bare string when there is nothing to highlight.
+ */
+function Highlight({ text, query }) {
+  if (!query || !text) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark
+        key={i}
+        style={{
+          background: C.supports + "44",
+          color: "inherit",
+          borderRadius: 2,
+          padding: "0 1px",
+        }}
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
+
 // ─── Shared styles ───────────────────────────────────────────────────────────
 
 const GHOST_BTN_STYLE = {
@@ -79,6 +125,29 @@ const META_LABEL_STYLE = {
   lineHeight: 1.5,
 };
 
+const CONTENT_FONT_SIZE = 14;
+
+const DEFAULT_COLLAPSED_SECTIONS = {
+  judgments: true,
+  principles: true,
+  theories: true,
+  relations: true,
+  coherence: true,
+  clusters: false,
+  log: true,
+};
+
+/** Static nav config: keys and labels only. Counts and visibility are computed at runtime. */
+const NAV_SECTIONS = [
+  { key: "judgments", label: "J" },
+  { key: "principles", label: "P" },
+  { key: "theories", label: "T" },
+  { key: "relations", label: "Relations" },
+  { key: "coherence", label: "Coherence" },
+  { key: "clusters", label: "Clusters" },
+  { key: "log", label: "Log" },
+];
+
 // ─── Context ─────────────────────────────────────────────────────────────────
 
 /** Shared values threaded to all sub-components without prop drilling. */
@@ -86,10 +155,15 @@ const Ctx = createContext(null);
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function SectionHeader({ title, onAdd }) {
+function SectionHeader({ title, onAdd, collapsed, onToggle }) {
   return (
     <div
+      onClick={onToggle}
       style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 1,
+        background: C.bg,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -100,13 +174,32 @@ function SectionHeader({ title, onAdd }) {
         textTransform: "uppercase",
         padding: "14px 0 6px",
         borderBottom: `1px solid ${C.border}`,
-        marginBottom: 10,
+        marginBottom: collapsed ? 0 : 10,
+        cursor: onToggle ? "pointer" : "default",
+        userSelect: "none",
       }}
     >
-      <span>{title}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {onToggle && (
+          <span
+            style={{
+              fontSize: 10,
+              transition: "transform 0.15s",
+              display: "inline-block",
+              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+            }}
+          >
+            ▼
+          </span>
+        )}
+        {title}
+      </span>
       {onAdd && (
         <button
-          onClick={onAdd}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAdd();
+          }}
           style={{
             ...GHOST_BTN_STYLE,
             fontSize: 13,
@@ -182,10 +275,19 @@ function ActionButtons({ onRevise, onWithdraw }) {
 }
 
 function ElementCard({ e, dim }) {
-  const { pCovers, onEditRequest, onWithdrawRequest } = useContext(Ctx);
+  const { pCovers, onEditRequest, onWithdrawRequest, badgeColor, search } =
+    useContext(Ctx);
   const isW = e.status === "withdrawn";
+  const color = badgeColor(e.id);
   return (
-    <div style={{ ...CARD_STYLE, opacity: dim ? 0.4 : isW ? 0.55 : 1 }}>
+    <div
+      style={{
+        ...CARD_STYLE,
+        opacity: dim ? 0.4 : isW ? 0.55 : 1,
+        borderLeft: `3px solid ${color}`,
+        paddingLeft: 10,
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -219,13 +321,13 @@ function ElementCard({ e, dim }) {
       </div>
       <div
         style={{
-          fontSize: 14,
+          fontSize: CONTENT_FONT_SIZE,
           color: isW ? C.dim : C.text,
           lineHeight: 1.65,
           textDecoration: isW ? "line-through" : "none",
         }}
       >
-        {e.text}
+        <Highlight text={e.text} query={search} />
       </div>
       {e.previousText && (
         <div style={{ ...META_LABEL_STYLE, color: C.dim }}>
@@ -250,6 +352,7 @@ function RelationCard({ r, dim }) {
     onEditRelRequest,
     onWithdrawRelRequest,
     badgeColor,
+    search,
   } = useContext(Ctx);
   const fromEl = state.elements.find((e) => e.id === r.from);
   const toEl = state.elements.find((e) => e.id === r.to);
@@ -311,7 +414,11 @@ function RelationCard({ r, dim }) {
           return (
             <div
               key={id}
-              style={{ fontSize: 11, color: C.text, lineHeight: 1.5 }}
+              style={{
+                fontSize: CONTENT_FONT_SIZE,
+                color: C.text,
+                lineHeight: 1.5,
+              }}
             >
               <span
                 style={{
@@ -322,26 +429,26 @@ function RelationCard({ r, dim }) {
               >
                 {id}:
               </span>
-              {el.text}
+              <Highlight text={el.text} query={search} />
             </div>
           );
         })}
       </div>
       <div
         style={{
-          fontSize: 11,
+          fontSize: CONTENT_FONT_SIZE,
           color: C.dim,
           lineHeight: 1.5,
           fontStyle: "italic",
         }}
       >
-        {r.explanation}
+        <Highlight text={r.explanation} query={search} />
       </div>
     </div>
   );
 }
 
-function ClusterSection({ state, clusterSectionRef }) {
+function ClusterSection({ state, clusterSectionRef, collapsed, onToggle }) {
   const clusters = useMemo(() => findCoherentClusters(state), [state]);
   const tensions = useMemo(
     () => findCrossClusterTensions(clusters, state),
@@ -351,84 +458,89 @@ function ClusterSection({ state, clusterSectionRef }) {
     () => findMergeCandidates(clusters, state),
     [clusters, state],
   );
-  const { badgeColor } = useContext(Ctx);
+  const { badgeColor, search } = useContext(Ctx);
 
   if (!clusters.length) return null;
 
   return (
     <div ref={clusterSectionRef}>
-      <SectionHeader title={`Clusters (${clusters.length})`} />
-      {clusters.map((cluster, i) => {
-        const color = clusterColor(i);
-        const members = [...cluster.members].sort(sortElementIds);
-        return (
-          <div key={i} style={{ ...CARD_STYLE }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 6,
-              }}
-            >
-              <span
+      <SectionHeader
+        title={`Clusters (${clusters.length})`}
+        collapsed={collapsed}
+        onToggle={onToggle}
+      />
+      {!collapsed &&
+        clusters.map((cluster, i) => {
+          const color = clusterColor(i);
+          const members = [...cluster.members].sort(sortElementIds);
+          return (
+            <div key={i} style={{ ...CARD_STYLE }}>
+              <div
                 style={{
-                  fontSize: 12,
-                  fontWeight: "bold",
-                  padding: "1px 7px",
-                  borderRadius: 4,
-                  background: color + "22",
-                  color,
-                  border: `1px solid ${color}55`,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginBottom: 6,
                 }}
               >
-                Cluster {i + 1}
-              </span>
-              <span style={{ fontSize: 11, color: C.dim }}>
-                {cluster.size} members
-              </span>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {members.map((id) => {
-                const el = state.elements.find((e) => e.id === id);
-                return (
-                  <span
-                    key={id}
-                    style={{ display: "flex", alignItems: "center", gap: 4 }}
-                  >
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    padding: "1px 7px",
+                    borderRadius: 4,
+                    background: color + "22",
+                    color,
+                    border: `1px solid ${color}55`,
+                  }}
+                >
+                  Cluster {i + 1}
+                </span>
+                <span style={{ fontSize: 11, color: C.dim }}>
+                  {cluster.size} members
+                </span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {members.map((id) => {
+                  const el = state.elements.find((e) => e.id === id);
+                  return (
                     <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: "bold",
-                        padding: "1px 7px",
-                        borderRadius: 4,
-                        background: badgeColor(id) + "22",
-                        color: badgeColor(id),
-                        border: `1px solid ${badgeColor(id)}55`,
-                      }}
+                      key={id}
+                      style={{ display: "flex", alignItems: "center", gap: 4 }}
                     >
-                      {id}
-                    </span>
-                    {el && (
                       <span
                         style={{
                           fontSize: 12,
-                          color: C.dim,
-                          whiteSpace: "nowrap",
+                          fontWeight: "bold",
+                          padding: "1px 7px",
+                          borderRadius: 4,
+                          background: badgeColor(id) + "22",
+                          color: badgeColor(id),
+                          border: `1px solid ${badgeColor(id)}55`,
                         }}
                       >
-                        {el.text}
+                        {id}
                       </span>
-                    )}
-                  </span>
-                );
-              })}
+                      {el && (
+                        <span
+                          style={{
+                            fontSize: CONTENT_FONT_SIZE,
+                            color: C.dim,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          <Highlight text={el.text} query={search} />
+                        </span>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
 
-      {tensions.length > 0 && (
+      {!collapsed && tensions.length > 0 && (
         <>
           <div
             style={{
@@ -446,7 +558,7 @@ function ClusterSection({ state, clusterSectionRef }) {
             <div
               key={i}
               style={{
-                fontSize: 12,
+                fontSize: CONTENT_FONT_SIZE,
                 color: C.dim,
                 marginBottom: 6,
                 lineHeight: 1.5,
@@ -472,7 +584,7 @@ function ClusterSection({ state, clusterSectionRef }) {
         </>
       )}
 
-      {merges.length > 0 && (
+      {!collapsed && merges.length > 0 && (
         <>
           <div
             style={{
@@ -491,7 +603,7 @@ function ClusterSection({ state, clusterSectionRef }) {
             <div
               key={i}
               style={{
-                fontSize: 12,
+                fontSize: CONTENT_FONT_SIZE,
                 color: C.dim,
                 marginBottom: 6,
                 lineHeight: 1.5,
@@ -579,6 +691,14 @@ export function TextTab({
   clusterSectionRef,
 }) {
   const scrollRef = useRef(null);
+  const refJudgments = useRef(null);
+  const refPrinciples = useRef(null);
+  const refTheories = useRef(null);
+  const refRelations = useRef(null);
+  const refCoherence = useRef(null);
+  const refLog = useRef(null);
+  const [activeSection, setActiveSection] = useState(null);
+
   const ELEMENT_DEFAULTS = {
     type: "judgment",
     confidence: "moderate",
@@ -599,6 +719,13 @@ export function TextTab({
   const [addTab, setAddTab] = useState("element");
   const [elementForm, setElementForm] = useState(ELEMENT_DEFAULTS);
   const [relationForm, setRelationForm] = useState(relationDefaults);
+  const [search, setSearch] = useState("");
+  const [collapsed, setCollapsed] = useState(DEFAULT_COLLAPSED_SECTIONS);
+  const toggle = (key) =>
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+  const isCollapsed = (key) =>
+    // Force-expand any section that has search results
+    search ? false : !!collapsed[key];
 
   const openAddElement = (type) => {
     setAddTab("element");
@@ -632,6 +759,20 @@ export function TextTab({
     const el = state.elements.find((e) => e.id === id);
     return el ? getColors({ ...el, status: "active" }).stroke : C.dim;
   };
+
+  // ── Search filter (non-selection view only) ───────────────────────────────
+
+  const displayEls = search
+    ? visibleEls.filter((e) => matchesSearch(e, search))
+    : visibleEls;
+  const displayRels = search
+    ? visRels.filter(
+        (r) =>
+          r.from.toLowerCase().includes(search.toLowerCase()) ||
+          r.to.toLowerCase().includes(search.toLowerCase()) ||
+          (r.explanation ?? "").toLowerCase().includes(search.toLowerCase()),
+      )
+    : visRels;
 
   // ── Selection partitions ──────────────────────────────────────────────────
 
@@ -680,6 +821,98 @@ export function TextTab({
     state.coherence.orphans.length > 0 ||
     state.coherence.clusters.length > 0;
 
+  const clusterCount = useMemo(
+    () => findCoherentClusters(state).length,
+    [state],
+  );
+
+  // ── Navigation ───────────────────────────────────────────────────────────
+
+  const getSectionRef = (key) => {
+    const map = {
+      judgments: refJudgments,
+      principles: refPrinciples,
+      theories: refTheories,
+      relations: refRelations,
+      coherence: refCoherence,
+      clusters: clusterSectionRef,
+      log: refLog,
+    };
+    return map[key];
+  };
+
+  const navigateTo = (key) => {
+    setCollapsed((prev) => ({ ...prev, [key]: false }));
+    requestAnimationFrame(() => {
+      getSectionRef(key).current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const keys = [
+      "judgments",
+      "principles",
+      "theories",
+      "relations",
+      "coherence",
+      "clusters",
+      "log",
+    ];
+    // Track which section keys are currently in the intersection zone so that
+    // when multiple are visible at once we always activate the topmost one
+    // (first in `keys` order) rather than whichever the browser happens to
+    // emit last in the entries array.
+    const intersecting = new Set();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const key = keys.find(
+            (k) => getSectionRef(k).current === entry.target,
+          );
+          if (!key) return;
+          if (entry.isIntersecting) intersecting.add(key);
+          else intersecting.delete(key);
+        });
+        const first = keys.find((k) => intersecting.has(k));
+        if (first) setActiveSection(first);
+      },
+      { root: container, rootMargin: "-10px 0px -80% 0px", threshold: 0 },
+    );
+    let firstKey = null;
+    keys.forEach((k) => {
+      const el = getSectionRef(k).current;
+      if (el) {
+        observer.observe(el);
+        if (!firstKey) firstKey = k;
+      }
+    });
+    // Eagerly highlight the first visible section — the observer callback is
+    // async so without this there is no highlight until the user scrolls.
+    if (firstKey) requestAnimationFrame(() => setActiveSection(firstKey));
+    return () => observer.disconnect();
+  }, [selected, selectedRel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sectionMeta = {
+    judgments: { count: j(displayEls).length, show: !highlightedIds },
+    principles: { count: pr(displayEls).length, show: !highlightedIds },
+    theories: { count: th(displayEls).length, show: !highlightedIds },
+    relations: { count: displayRels.length, show: !highlightedIds },
+    coherence: { count: null, show: !highlightedIds && hasCoherence },
+    clusters: { count: clusterCount || null, show: clusterCount > 0 },
+    log: { count: state.log.length || null, show: state.log.length > 0 },
+  };
+
+  const navItems = NAV_SECTIONS.map(({ key, label }) => ({
+    key,
+    label,
+    ...sectionMeta[key],
+  })).filter((item) => item.show);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -696,6 +929,7 @@ export function TextTab({
         onWithdrawRelRequest,
         badgeColor,
         pCovers,
+        search,
       }}
     >
       <div
@@ -706,6 +940,71 @@ export function TextTab({
           flexDirection: "column",
         }}
       >
+        {/* ── Section nav bar ── */}
+        {navItems.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              height: "2em",
+              padding: "1 5px",
+              borderBottom: `1px solid ${C.border}`,
+              marginBottom: "5px",
+              background: C.bg,
+              flexShrink: 0,
+            }}
+          >
+            {navItems.map((item) => {
+              const isActive =
+                activeSection === item.key && !isCollapsed(item.key);
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => navigateTo(item.key)}
+                  style={{
+                    height: "2em",
+                    boxSizing: "border-box",
+                    padding: "0 8px",
+                    lineHeight: "2em",
+                    borderRadius: 10,
+                    fontSize: 11,
+                    cursor: "pointer",
+                    border: `1px solid ${isActive ? C.text : C.border}`,
+                    background: isActive ? C.border : "transparent",
+                    color: isActive ? C.text : C.dim,
+                    fontWeight: isActive ? "bold" : "normal",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {item.label}
+                  {item.count != null ? ` ${item.count}` : ""}
+                </button>
+              );
+            })}
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search…"
+              style={{
+                marginLeft: "auto",
+                height: "2em",
+                boxSizing: "border-box",
+                padding: "0 7px",
+                lineHeight: "2em",
+                borderRadius: 10,
+                fontSize: 13,
+                border: `1px solid ${search ? C.text : C.border}`,
+                background: "transparent",
+                color: C.text,
+                outline: "none",
+                width: "30%",
+              }}
+            />
+          </div>
+        )}
+
         <div
           ref={scrollRef}
           style={{
@@ -853,87 +1152,123 @@ export function TextTab({
           {/* ── Full element / relation listing (nothing selected) ── */}
           {!highlightedIds && (
             <>
-              <SectionHeader
-                title={`Judgments (${j(visibleEls).length})`}
-                onAdd={() => openAddElement("judgment")}
-              />
-              {j(restEls).map((e) => (
-                <ElementCard key={e.id} e={e} />
-              ))}
-              <SectionHeader
-                title={`Principles (${pr(visibleEls).length})`}
-                onAdd={() => openAddElement("principle")}
-              />
-              {pr(restEls).map((e) => (
-                <ElementCard key={e.id} e={e} />
-              ))}
-              <SectionHeader
-                title={`Background Theories (${th(visibleEls).length})`}
-                onAdd={() => openAddElement("theory")}
-              />
-              {th(restEls).map((e) => (
-                <ElementCard key={e.id} e={e} />
-              ))}
-              <SectionHeader
-                title={`Relations (${visRels.length})`}
-                onAdd={openAddRelation}
-              />
-              {restRels.map((r, i) => (
-                <RelationCard key={i} r={r} />
-              ))}
+              <div ref={refJudgments}>
+                <SectionHeader
+                  title={`Judgments (${j(displayEls).length})`}
+                  onAdd={() => openAddElement("judgment")}
+                  collapsed={isCollapsed("judgments")}
+                  onToggle={() => toggle("judgments")}
+                />
+                {!isCollapsed("judgments") &&
+                  j(displayEls).map((e) => <ElementCard key={e.id} e={e} />)}
+              </div>
+              <div ref={refPrinciples}>
+                <SectionHeader
+                  title={`Principles (${pr(displayEls).length})`}
+                  onAdd={() => openAddElement("principle")}
+                  collapsed={isCollapsed("principles")}
+                  onToggle={() => toggle("principles")}
+                />
+                {!isCollapsed("principles") &&
+                  pr(displayEls).map((e) => <ElementCard key={e.id} e={e} />)}
+              </div>
+              <div ref={refTheories}>
+                <SectionHeader
+                  title={`Background Theories (${th(displayEls).length})`}
+                  onAdd={() => openAddElement("theory")}
+                  collapsed={isCollapsed("theories")}
+                  onToggle={() => toggle("theories")}
+                />
+                {!isCollapsed("theories") &&
+                  th(displayEls).map((e) => <ElementCard key={e.id} e={e} />)}
+              </div>
+              <div ref={refRelations}>
+                <SectionHeader
+                  title={`Relations (${displayRels.length})`}
+                  onAdd={openAddRelation}
+                  collapsed={isCollapsed("relations")}
+                  onToggle={() => toggle("relations")}
+                />
+                {!isCollapsed("relations") &&
+                  displayRels.map((r, i) => <RelationCard key={i} r={r} />)}
+              </div>
             </>
           )}
 
           {/* ── Coherence ── */}
           {hasCoherence && (
-            <>
-              <SectionHeader title="Coherence" />
-              <CoherenceGroup
-                title="Tensions"
-                color={C.conflicts}
-                items={state.coherence.tensions}
+            <div ref={refCoherence}>
+              <SectionHeader
+                title="Coherence"
+                collapsed={isCollapsed("coherence")}
+                onToggle={() => toggle("coherence")}
               />
-              <CoherenceGroup
-                title="Orphans"
-                color={C.undermines}
-                items={state.coherence.orphans}
-              />
-              <CoherenceGroup
-                title="Clusters"
-                color={C.supports}
-                items={state.coherence.clusters}
-              />
-            </>
+              {!isCollapsed("coherence") && (
+                <>
+                  <CoherenceGroup
+                    title="Tensions"
+                    color={C.conflicts}
+                    items={state.coherence.tensions}
+                  />
+                  <CoherenceGroup
+                    title="Orphans"
+                    color={C.undermines}
+                    items={state.coherence.orphans}
+                  />
+                  <CoherenceGroup
+                    title="Clusters"
+                    color={C.supports}
+                    items={state.coherence.clusters}
+                  />
+                </>
+              )}
+            </div>
           )}
 
           {/* ── Clusters ── */}
-          <ClusterSection state={state} clusterSectionRef={clusterSectionRef} />
+          <ClusterSection
+            state={state}
+            clusterSectionRef={clusterSectionRef}
+            collapsed={isCollapsed("clusters")}
+            onToggle={() => toggle("clusters")}
+          />
 
           {/* ── Round log ── */}
           {state.log.length > 0 && (
-            <>
-              <SectionHeader title="Round Log" />
-              {state.log.map((l) => (
-                <div
-                  key={l.round}
-                  style={{ ...CARD_STYLE, paddingBottom: 10, marginBottom: 10 }}
-                >
+            <div ref={refLog}>
+              <SectionHeader
+                title="Round Log"
+                collapsed={isCollapsed("log")}
+                onToggle={() => toggle("log")}
+              />
+              {!isCollapsed("log") &&
+                state.log.map((l) => (
                   <div
+                    key={l.round}
                     style={{
-                      fontSize: 11,
-                      fontWeight: "bold",
-                      color: C.text,
-                      marginBottom: 3,
+                      ...CARD_STYLE,
+                      paddingBottom: 10,
+                      marginBottom: 10,
                     }}
                   >
-                    Round {l.round}
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "bold",
+                        color: C.text,
+                        marginBottom: 3,
+                      }}
+                    >
+                      Round {l.round}
+                    </div>
+                    <div
+                      style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}
+                    >
+                      <Highlight text={l.changes} query={search} />
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
-                    {l.changes}
-                  </div>
-                </div>
-              ))}
-            </>
+                ))}
+            </div>
           )}
         </div>
         <button
