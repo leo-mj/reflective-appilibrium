@@ -45,7 +45,10 @@ export function useContainerDims(ref) {
     const timer = setTimeout(measure, 50);
     const ro = new ResizeObserver(measure);
     if (ref.current) ro.observe(ref.current);
-    return () => { clearTimeout(timer); ro.disconnect(); };
+    return () => {
+      clearTimeout(timer);
+      ro.disconnect();
+    };
   }, [ref]);
   return dims;
 }

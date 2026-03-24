@@ -65,7 +65,9 @@ const _inlineState = {
  *
  * @type {REState}
  */
-export const SAMPLE_STATE = import.meta.env.VITE_USE_DUMMY_STATE ? _dummyState : _inlineState;
+export const SAMPLE_STATE = import.meta.env.VITE_USE_DUMMY_STATE
+  ? _dummyState
+  : _inlineState;
 
 /**
  * Factory that returns a blank RE state for a given topic.

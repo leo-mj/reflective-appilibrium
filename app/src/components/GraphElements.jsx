@@ -11,7 +11,11 @@
 /** @import { REElement, RERelation } from '../types.js' */
 
 import { C, getColors } from "../constants/colors.js";
-import { nodeRadius, edgeDashArray, arrowGeometry } from "../utils/graphHelpers.js";
+import {
+  nodeRadius,
+  edgeDashArray,
+  arrowGeometry,
+} from "../utils/graphHelpers.js";
 import { NodeShape } from "./NodeShape.jsx";
 import { NodeTooltip } from "./NodeTooltip.jsx";
 
@@ -32,22 +36,50 @@ import { NodeTooltip } from "./NodeTooltip.jsx";
  * @param {string}     [props.transition]
  * @param {boolean}    [props.hitArea=false] - Render a wide transparent stroke for hit-testing.
  */
-export function GraphEdge({ relation, sourcePos, targetPos, sourceEl, targetEl, isWithdrawn, opacity, strokeWidth = 2, transition, hitArea = false }) {
+export function GraphEdge({
+  relation,
+  sourcePos,
+  targetPos,
+  sourceEl,
+  targetEl,
+  isWithdrawn,
+  opacity,
+  strokeWidth = 2,
+  transition,
+  hitArea = false,
+}) {
   const color = isWithdrawn ? C.withdrawn : C[relation.type];
   const { x1, y1, x2, y2, tipX, tipY, perpX, perpY } = arrowGeometry(
-    sourcePos, targetPos, nodeRadius(sourceEl?.type), nodeRadius(targetEl?.type)
+    sourcePos,
+    targetPos,
+    nodeRadius(sourceEl?.type),
+    nodeRadius(targetEl?.type),
   );
   return (
     <g opacity={opacity} style={{ transition }}>
       {hitArea && (
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={16} />
+        <line
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke="transparent"
+          strokeWidth={16}
+        />
       )}
-      <line x1={x1} y1={y1} x2={x2} y2={y2}
-        stroke={color} strokeWidth={strokeWidth}
-        strokeDasharray={edgeDashArray(relation.type)} />
+      <line
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeDasharray={edgeDashArray(relation.type)}
+      />
       <polygon
         points={`${tipX},${tipY} ${x2 + perpX * 5},${y2 + perpY * 5} ${x2 - perpX * 5},${y2 - perpY * 5}`}
-        fill={color} />
+        fill={color}
+      />
     </g>
   );
 }
@@ -63,13 +95,26 @@ export function GraphEdge({ relation, sourcePos, targetPos, sourceEl, targetEl, 
  * @param {number}  props.radius - Node radius.
  */
 export function PulseRing({ type, radius }) {
-  const animation = <animate attributeName="opacity" values="0.7;0.15;0.7" dur="2.5s" repeatCount="indefinite" />;
+  const animation = (
+    <animate
+      attributeName="opacity"
+      values="0.7;0.15;0.7"
+      dur="2.5s"
+      repeatCount="indefinite"
+    />
+  );
   if (type === "principle") {
     return (
       <rect
-        width={radius * 2.2 + 8} height={radius * 1.5 + 8}
-        x={-radius * 1.1 - 4}   y={-radius * 0.75 - 4}
-        rx={10} fill="none" stroke={C.added} strokeWidth={2}>
+        width={radius * 2.2 + 8}
+        height={radius * 1.5 + 8}
+        x={-radius * 1.1 - 4}
+        y={-radius * 0.75 - 4}
+        rx={10}
+        fill="none"
+        stroke={C.added}
+        strokeWidth={2}
+      >
         {animation}
       </rect>
     );
@@ -98,21 +143,41 @@ export function PulseRing({ type, radius }) {
  * @param {Function}        [props.onMouseLeave]
  * @param {React.ReactNode} [props.children]
  */
-export function GraphNode({ element, position, isWithdrawn, opacity, transition, cursor, onMouseEnter, onMouseLeave, children }) {
-  const { fill, stroke } = getColors(isWithdrawn ? { ...element, status: "withdrawn" } : element);
+export function GraphNode({
+  element,
+  position,
+  isWithdrawn,
+  opacity,
+  transition,
+  cursor,
+  onMouseEnter,
+  onMouseLeave,
+  children,
+}) {
+  const { fill, stroke } = getColors(
+    isWithdrawn ? { ...element, status: "withdrawn" } : element,
+  );
   const radius = nodeRadius(element.type);
   return (
-    <g transform={`translate(${position.x},${position.y})`}
+    <g
+      transform={`translate(${position.x},${position.y})`}
       style={{ opacity, transition, cursor }}
       onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}>
+      onMouseLeave={onMouseLeave}
+    >
       {children}
       <NodeShape e={element} r={radius} fill={fill} stroke={stroke} op={1} />
-      <text textAnchor="middle" dy="0.35em"
+      <text
+        textAnchor="middle"
+        dy="0.35em"
         fill={isWithdrawn ? "#666" : "#fff"}
         fontSize={element.type === "principle" ? 13 : 11}
         fontWeight="bold"
-        style={{ textDecoration: isWithdrawn ? "line-through" : "none", pointerEvents: "none" }}>
+        style={{
+          textDecoration: isWithdrawn ? "line-through" : "none",
+          pointerEvents: "none",
+        }}
+      >
         {element.id}
       </text>
     </g>
@@ -137,16 +202,36 @@ export function GraphNode({ element, position, isWithdrawn, opacity, transition,
  * @param {React.ReactNode}     [props.overlay]
  * @param {React.ReactNode}     [props.children]
  */
-export function GraphCanvas({ containerRef, dims, pan, isDragging, onPointerDown, onPointerMove, onPointerUp, tooltip, containerStyle, overlay, children }) {
+export function GraphCanvas({
+  containerRef,
+  dims,
+  pan,
+  isDragging,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  tooltip,
+  containerStyle,
+  overlay,
+  children,
+}) {
   return (
     <div ref={containerRef} style={{ position: "relative", ...containerStyle }}>
       {dims.w > 0 && (
-        <svg width={dims.w} height={dims.h}
-          style={{ background: C.bg, borderRadius: 8, cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
-          onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-          <g transform={`translate(${pan.x},${pan.y})`}>
-            {children}
-          </g>
+        <svg
+          width={dims.w}
+          height={dims.h}
+          style={{
+            background: C.bg,
+            borderRadius: 8,
+            cursor: isDragging ? "grabbing" : "grab",
+            touchAction: "none",
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        >
+          <g transform={`translate(${pan.x},${pan.y})`}>{children}</g>
         </svg>
       )}
       <NodeTooltip tooltip={tooltip} />

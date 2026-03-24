@@ -12,7 +12,11 @@
 
 import { confOp, TRANSITION } from "../constants/colors.js";
 import { nodeRadius } from "./graphHelpers.js";
-import { GraphEdge, GraphNode, PulseRing } from "../components/GraphElements.jsx";
+import {
+  GraphEdge,
+  GraphNode,
+  PulseRing,
+} from "../components/GraphElements.jsx";
 
 // ─── Tooltip handler factory ──────────────────────────────────────────────────
 
@@ -30,7 +34,11 @@ export function makeTooltipHandlers(isDragging, setTooltip, element) {
     onMouseEnter: (ev) => {
       if (isDragging) return;
       const rect = ev.currentTarget.closest("svg").getBoundingClientRect();
-      setTooltip({ x: ev.clientX - rect.left, y: ev.clientY - rect.top - 10, el: element });
+      setTooltip({
+        x: ev.clientX - rect.left,
+        y: ev.clientY - rect.top - 10,
+        el: element,
+      });
     },
     onMouseLeave: () => setTooltip(null),
   };
@@ -51,8 +59,8 @@ export function resolveEdge(relation, positions, elements) {
   const sourcePos = positions[relation.from];
   const targetPos = positions[relation.to];
   if (!sourcePos || !targetPos) return null;
-  const sourceEl = elements.find(el => el.id === relation.from);
-  const targetEl = elements.find(el => el.id === relation.to);
+  const sourceEl = elements.find((el) => el.id === relation.from);
+  const targetEl = elements.find((el) => el.id === relation.to);
   return { sourcePos, targetPos, sourceEl, targetEl };
 }
 
@@ -70,10 +78,10 @@ export function resolveEdge(relation, positions, elements) {
  */
 export function historyEdgeVisuals(relation, wIds, snappedRound) {
   const isWithdrawn = wIds.has(relation.from) || wIds.has(relation.to);
-  const isFuture    = (relation.addedRound || 1) > snappedRound;
+  const isFuture = (relation.addedRound || 1) > snappedRound;
   return {
     isWithdrawn,
-    opacity:    isFuture ? 0 : isWithdrawn ? 0.25 : 0.7,
+    opacity: isFuture ? 0 : isWithdrawn ? 0.25 : 0.7,
     transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
   };
 }
@@ -93,10 +101,10 @@ export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRel) {
   const baseOpacity = isWithdrawn ? 0.25 : 0.7;
   return {
     isWithdrawn,
-    opacity:     dimEdge(relation) ? baseOpacity * 0.12 : baseOpacity,
+    opacity: dimEdge(relation) ? baseOpacity * 0.12 : baseOpacity,
     strokeWidth: relation === selectedRel ? 3.5 : dimEdge(relation) ? 1.5 : 2,
-    transition:  TRANSITION,
-    hitArea:     true,
+    transition: TRANSITION,
+    hitArea: true,
   };
 }
 
@@ -112,16 +120,17 @@ export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRel) {
  * @returns {{ isWithdrawn: boolean, opacity: number, transition: string, children: React.ReactNode }}
  */
 export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
-  const isFuture    = element.addedRound > snappedRound;
+  const isFuture = element.addedRound > snappedRound;
   const isWithdrawn = wIds.has(element.id);
-  const isNew       = newIds.has(element.id);
+  const isNew = newIds.has(element.id);
   return {
     isWithdrawn,
-    opacity:    isFuture ? 0 : isWithdrawn ? 0.25 : confOp[element.confidence],
+    opacity: isFuture ? 0 : isWithdrawn ? 0.25 : confOp[element.confidence],
     transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
-    children:   isNew && !isWithdrawn
-      ? <PulseRing type={element.type} radius={nodeRadius(element.type)} />
-      : null,
+    children:
+      isNew && !isWithdrawn ? (
+        <PulseRing type={element.type} radius={nodeRadius(element.type)} />
+      ) : null,
   };
 }
 
@@ -137,15 +146,21 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
  */
 export function graphNodeVisuals(element, wIds, dimNode, selected) {
   const isWithdrawn = wIds.has(element.id);
-  const isSelected  = element.id === selected;
+  const isSelected = element.id === selected;
   const baseOpacity = isWithdrawn ? 0.25 : confOp[element.confidence];
   return {
     isWithdrawn,
-    opacity:    dimNode(element.id) ? 0.12 : baseOpacity,
+    opacity: dimNode(element.id) ? 0.12 : baseOpacity,
     transition: TRANSITION,
-    children:   isSelected
-      ? <circle r={nodeRadius(element.type) + 8} fill="none" stroke="#fff" strokeWidth={2} opacity={0.45} />
-      : null,
+    children: isSelected ? (
+      <circle
+        r={nodeRadius(element.type) + 8}
+        fill="none"
+        stroke="#fff"
+        strokeWidth={2}
+        opacity={0.45}
+      />
+    ) : null,
   };
 }
 
@@ -167,10 +182,15 @@ export function renderEdge(relation, i, positions, elements, visuals) {
   if (!resolved) return null;
   const { sourcePos, targetPos, sourceEl, targetEl } = resolved;
   return (
-    <GraphEdge key={i}
-      relation={relation} sourcePos={sourcePos} targetPos={targetPos}
-      sourceEl={sourceEl} targetEl={targetEl}
-      {...visuals} />
+    <GraphEdge
+      key={i}
+      relation={relation}
+      sourcePos={sourcePos}
+      targetPos={targetPos}
+      sourceEl={sourceEl}
+      targetEl={targetEl}
+      {...visuals}
+    />
   );
 }
 
@@ -185,16 +205,25 @@ export function renderEdge(relation, i, positions, elements, visuals) {
  * @param {Function}    setTooltip
  * @returns {React.ReactElement|null}
  */
-export function renderNode(element, positions, visuals, isDragging, setTooltip) {
+export function renderNode(
+  element,
+  positions,
+  visuals,
+  isDragging,
+  setTooltip,
+) {
   const position = positions[element.id];
   if (!position) return null;
   const { children = null, ...nodeProps } = visuals;
   return (
-    <GraphNode key={element.id}
-      element={element} position={position}
+    <GraphNode
+      key={element.id}
+      element={element}
+      position={position}
       cursor={isDragging ? "grabbing" : "pointer"}
       {...makeTooltipHandlers(isDragging, setTooltip, element)}
-      {...nodeProps}>
+      {...nodeProps}
+    >
       {children}
     </GraphNode>
   );

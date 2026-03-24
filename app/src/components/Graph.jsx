@@ -10,42 +10,101 @@ import { useState, useRef } from "react";
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
-import { hitRadius, getNeighbours, distToSegment } from "../utils/graphHelpers.js";
+import {
+  hitRadius,
+  getNeighbours,
+  distToSegment,
+} from "../utils/graphHelpers.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
 import { GraphCanvas } from "./GraphElements.jsx";
-import { renderEdge, renderNode, graphEdgeVisuals, graphNodeVisuals } from "../utils/graphRender.jsx";
+import {
+  renderEdge,
+  renderNode,
+  graphEdgeVisuals,
+  graphNodeVisuals,
+} from "../utils/graphRender.jsx";
 import { AddElementModal } from "./AddElementModal.jsx";
 import { AddRelationModal } from "./AddRelationModal.jsx";
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 
-const TYPE_COLORS = { judgment: C.judgment.high, principle: C.principle.high, theory: C.theory.high };
+const TYPE_COLORS = {
+  judgment: C.judgment.high,
+  principle: C.principle.high,
+  theory: C.theory.high,
+};
 
 function AddButtonsOverlay({ onAddEl, onAddRel }) {
   return (
-    <div style={{ position: "absolute", bottom: 12, right: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-      {[["judgment", "J"], ["principle", "P"], ["theory", "T"]].map(([type, label]) => (
-        <button key={type} onClick={() => onAddEl(type)} style={{
-          background: TYPE_COLORS[type], border: "none", color: "#fff",
-          borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer",
-        }}>+ {label}</button>
+    <div
+      style={{
+        position: "absolute",
+        bottom: 12,
+        right: 12,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      {[
+        ["judgment", "J"],
+        ["principle", "P"],
+        ["theory", "T"],
+      ].map(([type, label]) => (
+        <button
+          key={type}
+          onClick={() => onAddEl(type)}
+          style={{
+            background: TYPE_COLORS[type],
+            border: "none",
+            color: "#fff",
+            borderRadius: 6,
+            padding: "4px 10px",
+            fontSize: 12,
+            cursor: "pointer",
+          }}
+        >
+          + {label}
+        </button>
       ))}
-      <button onClick={onAddRel} style={{
-        background: C.border, border: "none", color: C.text,
-        borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer",
-      }}>+ Rel</button>
+      <button
+        onClick={onAddRel}
+        style={{
+          background: C.border,
+          border: "none",
+          color: C.text,
+          borderRadius: 6,
+          padding: "4px 10px",
+          fontSize: 12,
+          cursor: "pointer",
+        }}
+      >
+        + Rel
+      </button>
     </div>
   );
 }
 
-function GraphModals({ addingElType, setAddingElType, addingRel, setAddingRel, activeEls, round, onAddElement, onAddRelation }) {
+function GraphModals({
+  addingElType,
+  setAddingElType,
+  addingRel,
+  setAddingRel,
+  activeEls,
+  round,
+  onAddElement,
+  onAddRelation,
+}) {
   return (
     <>
       {addingElType && (
         <AddElementModal
           initialType={addingElType}
           currentRound={round}
-          onSave={(formData) => { onAddElement(formData); setAddingElType(null); }}
+          onSave={(formData) => {
+            onAddElement(formData);
+            setAddingElType(null);
+          }}
           onCancel={() => setAddingElType(null)}
         />
       )}
@@ -53,7 +112,10 @@ function GraphModals({ addingElType, setAddingElType, addingRel, setAddingRel, a
         <AddRelationModal
           elements={activeEls}
           currentRound={round}
-          onSave={(formData) => { onAddRelation(formData); setAddingRel(false); }}
+          onSave={(formData) => {
+            onAddRelation(formData);
+            setAddingRel(false);
+          }}
           onCancel={() => setAddingRel(false)}
         />
       )}
@@ -67,7 +129,17 @@ function GraphModals({ addingElType, setAddingElType, addingRel, setAddingRel, a
  * Wraps `usePan` with click-vs-drag detection and graph hit-testing.
  * Returns merged pointer handlers plus the pan state from `usePan`.
  */
-function useGraphClick({ panDown, panUp, visibleEls, visRels, positions, pan, onSelect, onSelectRel, setTooltip }) {
+function useGraphClick({
+  panDown,
+  panUp,
+  visibleEls,
+  visRels,
+  positions,
+  pan,
+  onSelect,
+  onSelectRel,
+  setTooltip,
+}) {
   const clickOrigin = useRef(null);
 
   /** @param {React.PointerEvent} e */
@@ -88,7 +160,7 @@ function useGraphClick({ panDown, panUp, visibleEls, visRels, positions, pan, on
     // Convert screen → simulation coordinates.
     const rect = e.currentTarget.getBoundingClientRect();
     const sx = e.clientX - rect.left - pan.x;
-    const sy = e.clientY - rect.top  - pan.y;
+    const sy = e.clientY - rect.top - pan.y;
 
     // Node hit-test first.
     for (const el of visibleEls) {
@@ -96,18 +168,19 @@ function useGraphClick({ panDown, panUp, visibleEls, visRels, positions, pan, on
       if (!pos) continue;
       if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitRadius(el.type) ** 2) {
         onSelectRel(() => null);
-        onSelect(prev => prev === el.id ? null : el.id);
+        onSelect((prev) => (prev === el.id ? null : el.id));
         return;
       }
     }
 
     // Edge hit-test (threshold 8 px).
     for (const r of visRels) {
-      const sp = positions[r.from], tp = positions[r.to];
+      const sp = positions[r.from],
+        tp = positions[r.to];
       if (!sp || !tp) continue;
       if (distToSegment(sx, sy, sp.x, sp.y, tp.x, tp.y) < 8) {
         onSelect(() => null);
-        onSelectRel(prev => prev === r ? null : r);
+        onSelectRel((prev) => (prev === r ? null : r));
         return;
       }
     }
@@ -153,7 +226,17 @@ function useGraphClick({ panDown, panUp, visibleEls, visRels, positions, pan, on
  * @param {function}    props.onAddRelation
  * @returns {React.ReactElement}
  */
-export function Graph({ state, showWithdrawn, positions, selected, onSelect, selectedRel, onSelectRel, onAddElement, onAddRelation }) {
+export function Graph({
+  state,
+  showWithdrawn,
+  positions,
+  selected,
+  onSelect,
+  selectedRel,
+  onSelectRel,
+  onAddElement,
+  onAddRelation,
+}) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
@@ -163,10 +246,12 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect, sel
   // ── Derived visibility and highlight sets ─────────────────────────────────
 
   const { active, withdrawn } = elementsAtRound(state.elements, state.round);
-  const wIds = new Set(withdrawn.map(e => e.id));
+  const wIds = new Set(withdrawn.map((e) => e.id));
   const visibleEls = showWithdrawn ? [...active, ...withdrawn] : active;
-  const visIds = new Set(visibleEls.map(e => e.id));
-  const visRels = state.relations.filter(r => visIds.has(r.from) && visIds.has(r.to));
+  const visIds = new Set(visibleEls.map((e) => e.id));
+  const visRels = state.relations.filter(
+    (r) => visIds.has(r.from) && visIds.has(r.to),
+  );
 
   const highlightedIds = selected
     ? getNeighbours(selected, visRels)
@@ -176,43 +261,87 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect, sel
 
   const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
   const dimEdge = (r) => {
-    if (selectedRel)    return r !== selectedRel;
+    if (selectedRel) return r !== selectedRel;
     if (highlightedIds) return r.from !== selected && r.to !== selected;
     return false;
   };
 
   // ── Pan + click ───────────────────────────────────────────────────────────
 
-  const { pan, isDragging, onPointerDown: panDown, onPointerMove, onPointerUp: panUp } = usePan();
+  const {
+    pan,
+    isDragging,
+    onPointerDown: panDown,
+    onPointerMove,
+    onPointerUp: panUp,
+  } = usePan();
   const { onPointerDown, onPointerUp } = useGraphClick({
-    panDown, panUp, visibleEls, visRels, positions, pan, onSelect, onSelectRel, setTooltip,
+    panDown,
+    panUp,
+    visibleEls,
+    visRels,
+    positions,
+    pan,
+    onSelect,
+    onSelectRel,
+    setTooltip,
   });
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const activeEls = state.elements.filter(e => e.status !== "withdrawn");
+  const activeEls = state.elements.filter((e) => e.status !== "withdrawn");
 
   return (
     <>
       <GraphCanvas
-        containerRef={containerRef} dims={dims} pan={pan} isDragging={isDragging}
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-        tooltip={tooltip} containerStyle={{ width: "100%", height: "100%" }}
-        overlay={<AddButtonsOverlay onAddEl={setAddingElType} onAddRel={() => setAddingRel(true)} />}>
-
+        containerRef={containerRef}
+        dims={dims}
+        pan={pan}
+        isDragging={isDragging}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        tooltip={tooltip}
+        containerStyle={{ width: "100%", height: "100%" }}
+        overlay={
+          <AddButtonsOverlay
+            onAddEl={setAddingElType}
+            onAddRel={() => setAddingRel(true)}
+          />
+        }
+      >
         {/* ── Edges ── */}
-        {visRels.map((r, i) => renderEdge(r, i, positions, state.elements, graphEdgeVisuals(r, wIds, dimEdge, selectedRel)))}
+        {visRels.map((r, i) =>
+          renderEdge(
+            r,
+            i,
+            positions,
+            state.elements,
+            graphEdgeVisuals(r, wIds, dimEdge, selectedRel),
+          ),
+        )}
 
         {/* ── Nodes ── */}
-        {visibleEls.map(el => renderNode(el, positions, graphNodeVisuals(el, wIds, dimNode, selected), isDragging, setTooltip))}
-
+        {visibleEls.map((el) =>
+          renderNode(
+            el,
+            positions,
+            graphNodeVisuals(el, wIds, dimNode, selected),
+            isDragging,
+            setTooltip,
+          ),
+        )}
       </GraphCanvas>
 
       <GraphModals
-        addingElType={addingElType} setAddingElType={setAddingElType}
-        addingRel={addingRel} setAddingRel={setAddingRel}
-        activeEls={activeEls} round={state.round}
-        onAddElement={onAddElement} onAddRelation={onAddRelation}
+        addingElType={addingElType}
+        setAddingElType={setAddingElType}
+        addingRel={addingRel}
+        setAddingRel={setAddingRel}
+        activeEls={activeEls}
+        round={state.round}
+        onAddElement={onAddElement}
+        onAddRelation={onAddRelation}
       />
     </>
   );

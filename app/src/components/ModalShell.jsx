@@ -13,14 +13,23 @@ import { C } from "../constants/colors.js";
 
 /** Input / select / textarea style shared across all modals. */
 export const INPUT_STYLE = {
-  background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4,
-  color: C.text, padding: "6px 10px", fontSize: 12, width: "100%",
-  boxSizing: "border-box", fontFamily: "inherit",
+  background: C.bg,
+  border: `1px solid ${C.border}`,
+  borderRadius: 4,
+  color: C.text,
+  padding: "6px 10px",
+  fontSize: 12,
+  width: "100%",
+  boxSizing: "border-box",
+  fontFamily: "inherit",
 };
 
 /** Label style shared across all modals. */
 export const LABEL_STYLE = {
-  fontSize: 11, color: C.dim, display: "block", marginBottom: 4,
+  fontSize: 11,
+  color: C.dim,
+  display: "block",
+  marginBottom: 4,
 };
 
 /** Wrapper style for each form field (label + input pair). */
@@ -44,24 +53,50 @@ export const FIELD_STYLE = { marginBottom: 16 };
  * @param {boolean}          [props.saveDisabled] - Disables the save button when `true`.
  * @returns {React.ReactElement}
  */
-export function ModalShell({ title, subtitle, children, onCancel, onSave, saveLabel = "Save", saveDisabled = false }) {
+export function ModalShell({
+  title,
+  subtitle,
+  children,
+  onCancel,
+  onSave,
+  saveLabel = "Save",
+  saveDisabled = false,
+}) {
   return (
     <div
       onClick={onCancel}
       style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)",
-        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200,
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.65)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 200,
       }}
     >
       <div
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
         style={{
-          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10,
-          padding: 28, width: 500, maxWidth: "92vw", maxHeight: "88vh",
-          overflowY: "auto", boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+          background: C.panel,
+          border: `1px solid ${C.border}`,
+          borderRadius: 10,
+          padding: 28,
+          width: 500,
+          maxWidth: "92vw",
+          maxHeight: "88vh",
+          overflowY: "auto",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
         }}
       >
-        <div style={{ fontSize: 15, fontWeight: "bold", color: C.text, marginBottom: 4 }}>
+        <div
+          style={{
+            fontSize: 15,
+            fontWeight: "bold",
+            color: C.text,
+            marginBottom: 4,
+          }}
+        >
           {title}
         </div>
         <div style={{ fontSize: 11, color: C.dim, marginBottom: 24 }}>
@@ -70,19 +105,42 @@ export function ModalShell({ title, subtitle, children, onCancel, onSave, saveLa
 
         {children}
 
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-          <button onClick={onCancel} style={{
-            padding: "7px 18px", borderRadius: 4, border: `1px solid ${C.border}`,
-            background: "transparent", color: C.dim, cursor: "pointer", fontSize: 12,
-          }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            justifyContent: "flex-end",
+            marginTop: 8,
+          }}
+        >
+          <button
+            onClick={onCancel}
+            style={{
+              padding: "7px 18px",
+              borderRadius: 4,
+              border: `1px solid ${C.border}`,
+              background: "transparent",
+              color: C.dim,
+              cursor: "pointer",
+              fontSize: 12,
+            }}
+          >
             Cancel
           </button>
-          <button onClick={onSave} disabled={saveDisabled} style={{
-            padding: "7px 18px", borderRadius: 4, border: "none",
-            background: saveDisabled ? C.border : C.supports,
-            color: "#fff", cursor: saveDisabled ? "default" : "pointer",
-            fontSize: 12, fontWeight: "bold",
-          }}>
+          <button
+            onClick={onSave}
+            disabled={saveDisabled}
+            style={{
+              padding: "7px 18px",
+              borderRadius: 4,
+              border: "none",
+              background: saveDisabled ? C.border : C.supports,
+              color: "#fff",
+              cursor: saveDisabled ? "default" : "pointer",
+              fontSize: 12,
+              fontWeight: "bold",
+            }}
+          >
             {saveLabel}
           </button>
         </div>

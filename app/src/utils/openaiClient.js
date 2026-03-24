@@ -15,7 +15,10 @@ const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 export const OPENAI_MODEL = "gpt-5.4-mini";
 
 /** OpenAI client instance. */
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY, dangerouslyAllowBrowser: true }); 
+const openai = new OpenAI({
+  apiKey: OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true,
+});
 // DO NOT use this outside of local development, as it will expose your API key in the browser.
 
 // ─── Transport ────────────────────────────────────────────────────────────────

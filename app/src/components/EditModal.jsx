@@ -6,7 +6,12 @@
 /** @import { REElement } from '../types.js' */
 
 import { useState } from "react";
-import { ModalShell, INPUT_STYLE, LABEL_STYLE, FIELD_STYLE } from "./ModalShell.jsx";
+import {
+  ModalShell,
+  INPUT_STYLE,
+  LABEL_STYLE,
+  FIELD_STYLE,
+} from "./ModalShell.jsx";
 
 /**
  * @typedef {Object} EditFormData
@@ -29,13 +34,14 @@ import { ModalShell, INPUT_STYLE, LABEL_STYLE, FIELD_STYLE } from "./ModalShell.
  */
 export function EditModal({ element, currentRound, onSave, onCancel }) {
   const [form, setForm] = useState({
-    type:       element.type,
+    type: element.type,
     confidence: element.confidence,
-    origin:     element.origin,
-    text:       element.text,
+    origin: element.origin,
+    text: element.text,
   });
 
-  const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+  const set = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
 
   return (
     <ModalShell
@@ -46,7 +52,11 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
     >
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Type</label>
-        <select value={form.type} onChange={e => set("type", e.target.value)} style={INPUT_STYLE}>
+        <select
+          value={form.type}
+          onChange={(e) => set("type", e.target.value)}
+          style={INPUT_STYLE}
+        >
           <option value="judgment">Judgment</option>
           <option value="principle">Principle</option>
           <option value="theory">Background Theory</option>
@@ -55,7 +65,11 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
 
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Confidence</label>
-        <select value={form.confidence} onChange={e => set("confidence", e.target.value)} style={INPUT_STYLE}>
+        <select
+          value={form.confidence}
+          onChange={(e) => set("confidence", e.target.value)}
+          style={INPUT_STYLE}
+        >
           <option value="high">High</option>
           <option value="moderate">Moderate</option>
           <option value="low">Low</option>
@@ -64,13 +78,21 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
 
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Origin</label>
-        <input type="text" value={form.origin} onChange={e => set("origin", e.target.value)} style={INPUT_STYLE} />
+        <input
+          type="text"
+          value={form.origin}
+          onChange={(e) => set("origin", e.target.value)}
+          style={INPUT_STYLE}
+        />
       </div>
 
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Text</label>
-        <textarea value={form.text} onChange={e => set("text", e.target.value)}
-          style={{ ...INPUT_STYLE, height: 110, resize: "vertical" }} />
+        <textarea
+          value={form.text}
+          onChange={(e) => set("text", e.target.value)}
+          style={{ ...INPUT_STYLE, height: 110, resize: "vertical" }}
+        />
       </div>
     </ModalShell>
   );

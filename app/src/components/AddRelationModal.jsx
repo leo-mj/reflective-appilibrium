@@ -5,7 +5,12 @@
 
 import { useState } from "react";
 import { C } from "../constants/colors.js";
-import { ModalShell, INPUT_STYLE, LABEL_STYLE, FIELD_STYLE } from "./ModalShell.jsx";
+import {
+  ModalShell,
+  INPUT_STYLE,
+  LABEL_STYLE,
+  FIELD_STYLE,
+} from "./ModalShell.jsx";
 
 /**
  * @typedef {Object} AddRelationFormData
@@ -27,27 +32,52 @@ import { ModalShell, INPUT_STYLE, LABEL_STYLE, FIELD_STYLE } from "./ModalShell.
  */
 /** Inline form fields for adding a relation — used by both AddRelationModal and the TextTab panel. */
 export function AddRelationForm({ form, setForm, elements }) {
-  const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
-  const ids = elements.map(e => e.id);
+  const set = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
+  const ids = elements.map((e) => e.id);
   const selfLoop = form.from === form.to;
   return (
     <>
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>From</label>
-        <select value={form.from} onChange={e => set("from", e.target.value)} style={INPUT_STYLE}>
-          {ids.map(id => <option key={id} value={id}>{id}</option>)}
+        <select
+          value={form.from}
+          onChange={(e) => set("from", e.target.value)}
+          style={INPUT_STYLE}
+        >
+          {ids.map((id) => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
         </select>
       </div>
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>To</label>
-        <select value={form.to} onChange={e => set("to", e.target.value)} style={INPUT_STYLE}>
-          {ids.map(id => <option key={id} value={id}>{id}</option>)}
+        <select
+          value={form.to}
+          onChange={(e) => set("to", e.target.value)}
+          style={INPUT_STYLE}
+        >
+          {ids.map((id) => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
         </select>
-        {selfLoop && <div style={{ fontSize: 10, color: C.conflicts, marginTop: 4 }}>From and To must be different.</div>}
+        {selfLoop && (
+          <div style={{ fontSize: 10, color: C.conflicts, marginTop: 4 }}>
+            From and To must be different.
+          </div>
+        )}
       </div>
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Relation type</label>
-        <select value={form.type} onChange={e => set("type", e.target.value)} style={INPUT_STYLE}>
+        <select
+          value={form.type}
+          onChange={(e) => set("type", e.target.value)}
+          style={INPUT_STYLE}
+        >
           <option value="supports">Supports</option>
           <option value="conflicts">Conflicts</option>
           <option value="undermines">Undermines</option>
@@ -56,20 +86,33 @@ export function AddRelationForm({ form, setForm, elements }) {
       </div>
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Explanation</label>
-        <textarea value={form.explanation} onChange={e => set("explanation", e.target.value)}
-          style={{ ...INPUT_STYLE, height: 80, resize: "vertical" }} />
+        <textarea
+          value={form.explanation}
+          onChange={(e) => set("explanation", e.target.value)}
+          style={{ ...INPUT_STYLE, height: 80, resize: "vertical" }}
+        />
       </div>
     </>
   );
 }
 
 export function AddRelationModal({ elements, currentRound, onSave, onCancel }) {
-  const ids = elements.map(e => e.id);
-  const [form, setForm] = useState({ from: ids[0] ?? "", to: ids[1] ?? "", type: "supports", explanation: "" });
+  const ids = elements.map((e) => e.id);
+  const [form, setForm] = useState({
+    from: ids[0] ?? "",
+    to: ids[1] ?? "",
+    type: "supports",
+    explanation: "",
+  });
   const selfLoop = form.from === form.to;
   return (
-    <ModalShell title="Add relation" subtitle={`Will be added in Round ${currentRound + 1}`}
-      onCancel={onCancel} onSave={() => onSave(form)} saveDisabled={!form.from || !form.to || selfLoop}>
+    <ModalShell
+      title="Add relation"
+      subtitle={`Will be added in Round ${currentRound + 1}`}
+      onCancel={onCancel}
+      onSave={() => onSave(form)}
+      saveDisabled={!form.from || !form.to || selfLoop}
+    >
       <AddRelationForm form={form} setForm={setForm} elements={elements} />
     </ModalShell>
   );

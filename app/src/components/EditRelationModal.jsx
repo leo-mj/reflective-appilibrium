@@ -6,7 +6,12 @@
 /** @import { RERelation } from '../types.js' */
 
 import { useState } from "react";
-import { ModalShell, INPUT_STYLE, LABEL_STYLE, FIELD_STYLE } from "./ModalShell.jsx";
+import {
+  ModalShell,
+  INPUT_STYLE,
+  LABEL_STYLE,
+  FIELD_STYLE,
+} from "./ModalShell.jsx";
 
 /**
  * @typedef {Object} EditRelationFormData
@@ -25,13 +30,19 @@ import { ModalShell, INPUT_STYLE, LABEL_STYLE, FIELD_STYLE } from "./ModalShell.
  * @param {function(): void}                     props.onCancel
  * @returns {React.ReactElement}
  */
-export function EditRelationModal({ relation, currentRound, onSave, onCancel }) {
+export function EditRelationModal({
+  relation,
+  currentRound,
+  onSave,
+  onCancel,
+}) {
   const [form, setForm] = useState({
-    type:        relation.type,
+    type: relation.type,
     explanation: relation.explanation,
   });
 
-  const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+  const set = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
 
   return (
     <ModalShell
@@ -42,7 +53,11 @@ export function EditRelationModal({ relation, currentRound, onSave, onCancel }) 
     >
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Relation type</label>
-        <select value={form.type} onChange={e => set("type", e.target.value)} style={INPUT_STYLE}>
+        <select
+          value={form.type}
+          onChange={(e) => set("type", e.target.value)}
+          style={INPUT_STYLE}
+        >
           <option value="supports">Supports</option>
           <option value="conflicts">Conflicts</option>
           <option value="undermines">Undermines</option>
@@ -52,8 +67,11 @@ export function EditRelationModal({ relation, currentRound, onSave, onCancel }) 
 
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Explanation</label>
-        <textarea value={form.explanation} onChange={e => set("explanation", e.target.value)}
-          style={{ ...INPUT_STYLE, height: 110, resize: "vertical" }} />
+        <textarea
+          value={form.explanation}
+          onChange={(e) => set("explanation", e.target.value)}
+          style={{ ...INPUT_STYLE, height: 110, resize: "vertical" }}
+        />
       </div>
     </ModalShell>
   );

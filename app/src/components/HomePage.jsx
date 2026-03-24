@@ -76,15 +76,15 @@ function NewProcessCard({ onStart }) {
     <div style={CARD_STYLE}>
       <div style={TITLE_STYLE}>Start your own RE process</div>
       <div style={DESC_STYLE}>
-        Begin a new wide reflective equilibrium process from scratch.
-        Enter a topic and start adding your moral judgments and principles.
+        Begin a new wide reflective equilibrium process from scratch. Enter a
+        topic and start adding your moral judgments and principles.
       </div>
       <label style={{ fontSize: 11, color: C.dim }}>Topic</label>
       <input
         style={INPUT_STYLE}
         placeholder="e.g. obligations to future generations"
         value={topic}
-        onChange={e => setTopic(e.target.value)}
+        onChange={(e) => setTopic(e.target.value)}
         onKeyDown={handleKeyDown}
         autoFocus
       />
@@ -96,7 +96,8 @@ function NewProcessCard({ onStart }) {
           cursor: trimmed ? "pointer" : "not-allowed",
         }}
         disabled={!trimmed}
-        onClick={() => onStart(trimmed)}>
+        onClick={() => onStart(trimmed)}
+      >
         Start
       </button>
     </div>
@@ -120,7 +121,8 @@ function SampleProcessCard({ onLoad }) {
       </div>
       <button
         style={{ ...BTN_STYLE, background: C.principle.high, color: "#fff" }}
-        onClick={onLoad}>
+        onClick={onLoad}
+      >
         Load sample
       </button>
     </div>
@@ -138,39 +140,44 @@ function SampleProcessCard({ onLoad }) {
  */
 export function HomePage({ onStartFresh, onLoadSample }) {
   return (
-    <div style={{
-      height: "100vh",
-      background: C.bg,
-      color: C.text,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "32px 24px",
-      boxSizing: "border-box",
-      fontFamily: "monospace",
-    }}>
-
+    <div
+      style={{
+        height: "100vh",
+        background: C.bg,
+        color: C.text,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "32px 24px",
+        boxSizing: "border-box",
+        fontFamily: "monospace",
+      }}
+    >
       {/* Header */}
       <div style={{ textAlign: "center", marginBottom: 48 }}>
         <div style={{ fontSize: 28, fontWeight: "bold", marginBottom: 10 }}>
           Reflective APPilibrium
         </div>
-        <div style={{ fontSize: 13, color: C.dim, maxWidth: 480, lineHeight: 1.7 }}>
-          A structured tool for conducting wide reflective equilibrium in ethics —
-          iteratively building coherent moral positions by working between
+        <div
+          style={{ fontSize: 13, color: C.dim, maxWidth: 480, lineHeight: 1.7 }}
+        >
+          A structured tool for conducting wide reflective equilibrium in ethics
+          — iteratively building coherent moral positions by working between
           judgments, principles, and background theories.
         </div>
       </div>
 
       {/* Cards */}
-      <div style={{
-        display: "flex",
-        gap: 20,
-        width: "100%",
-        maxWidth: 760,
-        flexWrap: "wrap",
-      }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 20,
+          width: "100%",
+          maxWidth: 760,
+          flexWrap: "wrap",
+        }}
+      >
         <NewProcessCard onStart={onStartFresh} />
         <SampleProcessCard onLoad={onLoadSample} />
       </div>

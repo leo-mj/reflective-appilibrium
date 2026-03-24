@@ -40,7 +40,10 @@ export function usePan() {
   /** @param {React.PointerEvent} e */
   const onPointerMove = (e) => {
     if (!dragRef.current) return;
-    setPan({ x: e.clientX - dragRef.current.px, y: e.clientY - dragRef.current.py });
+    setPan({
+      x: e.clientX - dragRef.current.px,
+      y: e.clientY - dragRef.current.py,
+    });
   };
 
   const onPointerUp = () => {

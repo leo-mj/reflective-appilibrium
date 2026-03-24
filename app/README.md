@@ -37,11 +37,11 @@ publicly hosted build (see [Security](#security) below).
 
 LLM-dependent features are controlled by the `VITE_ENABLE_LLM` environment variable:
 
-| File | `VITE_ENABLE_LLM` | Used by |
-|---|---|---|
-| `.env` | `true` | `npm run dev` |
-| `.env.production` | `false` | `npm run build` (public) |
-| `.env.local` | `true` | `npm run build:local` (create this file if it doesn't exist) |
+| File              | `VITE_ENABLE_LLM` | Used by                                                      |
+| ----------------- | ----------------- | ------------------------------------------------------------ |
+| `.env`            | `true`            | `npm run dev`                                                |
+| `.env.production` | `false`           | `npm run build` (public)                                     |
+| `.env.local`      | `true`            | `npm run build:local` (create this file if it doesn't exist) |
 
 To create `.env.local` for local builds:
 

@@ -20,7 +20,7 @@
  */
 export function nodeRadius(type) {
   if (type === "principle") return 28;
-  if (type === "theory")    return 22;
+  if (type === "theory") return 22;
   return 18; // judgment
 }
 
@@ -33,7 +33,7 @@ export function nodeRadius(type) {
  */
 export function hitRadius(type) {
   if (type === "principle") return 36;
-  if (type === "theory")    return 30;
+  if (type === "theory") return 30;
   return 24;
 }
 
@@ -46,7 +46,7 @@ export function hitRadius(type) {
  * @returns {string} CSS stroke-dasharray value.
  */
 export function edgeDashArray(relationType) {
-  if (relationType === "conflicts")  return "8,4";
+  if (relationType === "conflicts") return "8,4";
   if (relationType === "undermines") return "4,4";
   return "none";
 }
@@ -70,16 +70,22 @@ export function edgeDashArray(relationType) {
  *   `tipX,tipY` → arrowhead tip; `perpX,perpY` → perpendicular unit vector.
  */
 export function arrowGeometry(sp, tp, sr, tr) {
-  const dx = tp.x - sp.x, dy = tp.y - sp.y;
+  const dx = tp.x - sp.x,
+    dy = tp.y - sp.y;
   const dist = Math.hypot(dx, dy) || 1;
-  const ux = dx / dist, uy = dy / dist; // unit vector along the edge
+  const ux = dx / dist,
+    uy = dy / dist; // unit vector along the edge
   const tipX = tp.x - ux * tr;
   const tipY = tp.y - uy * tr;
   return {
-    x1: sp.x + ux * sr, y1: sp.y + uy * sr,
-    x2: tipX - ux * 10, y2: tipY - uy * 10,
-    tipX, tipY,
-    perpX: -uy, perpY: ux, // perpendicular unit vector (for arrowhead width)
+    x1: sp.x + ux * sr,
+    y1: sp.y + uy * sr,
+    x2: tipX - ux * 10,
+    y2: tipY - uy * 10,
+    tipX,
+    tipY,
+    perpX: -uy,
+    perpY: ux, // perpendicular unit vector (for arrowhead width)
   };
 }
 
@@ -98,9 +104,9 @@ export function arrowGeometry(sp, tp, sr, tr) {
  */
 export function getNeighbours(selectedId, visRels) {
   const ids = new Set([selectedId]);
-  visRels.forEach(r => {
+  visRels.forEach((r) => {
     if (r.from === selectedId) ids.add(r.to);
-    if (r.to === selectedId)   ids.add(r.from);
+    if (r.to === selectedId) ids.add(r.from);
   });
   return ids;
 }
@@ -117,7 +123,8 @@ export function getNeighbours(selectedId, visRels) {
  * @returns {number}
  */
 export function distToSegment(px, py, ax, ay, bx, by) {
-  const dx = bx - ax, dy = by - ay;
+  const dx = bx - ax,
+    dy = by - ay;
   const lenSq = dx * dx + dy * dy;
   if (lenSq === 0) return Math.hypot(px - ax, py - ay);
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));

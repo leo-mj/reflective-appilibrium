@@ -3,17 +3,28 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .history-log {
   scrollbar-width: thin;
   scrollbar-color: #334155 transparent;
 }
-.history-log::-webkit-scrollbar       { width: 6px; }
-.history-log::-webkit-scrollbar-track { background: transparent; }
-.history-log::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-.history-log::-webkit-scrollbar-thumb:hover { background: #475569; }
+.history-log::-webkit-scrollbar {
+  width: 6px;
+}
+.history-log::-webkit-scrollbar-track {
+  background: transparent;
+}
+.history-log::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+.history-log::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
 
 body {
   margin: 0;

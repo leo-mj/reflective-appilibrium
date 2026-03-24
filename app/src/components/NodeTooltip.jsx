@@ -30,24 +30,55 @@ export function NodeTooltip({ tooltip }) {
   if (!tooltip) return null;
   const { x, y, el } = tooltip;
   return (
-    <div style={{
-      position: "absolute", left: x, top: y,
-      transform: "translate(-50%, -100%)",
-      background: C.panel, border: `1px solid ${C.border}`,
-      borderRadius: 6, padding: "8px 12px", maxWidth: 300,
-      pointerEvents: "none", zIndex: 10,
-    }}>
-      <div style={{ color: C.text, fontSize: 12, fontWeight: "bold", marginBottom: 4 }}>
+    <div
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        transform: "translate(-50%, -100%)",
+        background: C.panel,
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "8px 12px",
+        maxWidth: 300,
+        pointerEvents: "none",
+        zIndex: 10,
+      }}
+    >
+      <div
+        style={{
+          color: C.text,
+          fontSize: 12,
+          fontWeight: "bold",
+          marginBottom: 4,
+        }}
+      >
         {el.id} ({el.type}) — {el.status}
       </div>
-      <div style={{ color: C.dim, fontSize: 11, lineHeight: 1.4 }}>{el.text}</div>
+      <div style={{ color: C.dim, fontSize: 11, lineHeight: 1.4 }}>
+        {el.text}
+      </div>
       {el.previousText && (
-        <div style={{ color: C.revised, fontSize: 10, marginTop: 4, fontStyle: "italic" }}>
+        <div
+          style={{
+            color: C.revised,
+            fontSize: 10,
+            marginTop: 4,
+            fontStyle: "italic",
+          }}
+        >
           Previously: {el.previousText}
         </div>
       )}
       {el.reason && (
-        <div style={{ color: C.withdrawnMark, fontSize: 10, marginTop: 4, fontStyle: "italic" }}>
+        <div
+          style={{
+            color: C.withdrawnMark,
+            fontSize: 10,
+            marginTop: 4,
+            fontStyle: "italic",
+          }}
+        >
           Withdrawn: {el.reason}
         </div>
       )}

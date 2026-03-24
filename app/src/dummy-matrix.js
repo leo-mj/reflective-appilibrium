@@ -385,4 +385,4 @@ const _dummyMatrix = `
     }
 `;
 
-export default _dummyMatrix
+export default _dummyMatrix;

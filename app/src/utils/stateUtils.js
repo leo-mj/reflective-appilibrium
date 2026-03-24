@@ -29,8 +29,8 @@ export function elementsAtRound(elements, round) {
   const withdrawnBy = (e) =>
     e.status === "withdrawn" && e.withdrawnRound && e.withdrawnRound <= round;
 
-  const active    = elements.filter(e => addedBy(e) && !withdrawnBy(e));
-  const withdrawn = elements.filter(e => addedBy(e) &&  withdrawnBy(e));
+  const active = elements.filter((e) => addedBy(e) && !withdrawnBy(e));
+  const withdrawn = elements.filter((e) => addedBy(e) && withdrawnBy(e));
   return { active, withdrawn };
 }
 
@@ -52,9 +52,9 @@ const TYPE_PREFIX = { judgment: "J", principle: "P", theory: "T" };
 export function nextElementId(elements, type) {
   const prefix = TYPE_PREFIX[type] ?? "J";
   const nums = elements
-    .filter(e => e.id.startsWith(prefix))
-    .map(e => parseInt(e.id.slice(prefix.length)))
-    .filter(n => !isNaN(n));
+    .filter((e) => e.id.startsWith(prefix))
+    .map((e) => parseInt(e.id.slice(prefix.length)))
+    .filter((n) => !isNaN(n));
   return `${prefix}${nums.length > 0 ? Math.max(...nums) + 1 : 1}`;
 }
 
@@ -73,8 +73,8 @@ export function nextElementId(elements, type) {
  */
 export function makeDiff(fields, oldObj, newObj) {
   return fields
-    .filter(k => oldObj[k] !== newObj[k])
-    .map(k => `${k}: ${oldObj[k]} → ${newObj[k]}`);
+    .filter((k) => oldObj[k] !== newObj[k])
+    .map((k) => `${k}: ${oldObj[k]} → ${newObj[k]}`);
 }
 
 /**

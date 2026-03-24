@@ -6,17 +6,26 @@ import { C } from "./constants/colors.js";
 
 function Spinner() {
   return (
-    <div style={{
-      position: "fixed", inset: 0,
-      background: C.bg,
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: "50%",
-        border: `3px solid ${C.border}`,
-        borderTopColor: C.supports,
-        animation: "spin 0.8s linear infinite",
-      }} />
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: C.bg,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: "50%",
+          border: `3px solid ${C.border}`,
+          borderTopColor: C.supports,
+          animation: "spin 0.8s linear infinite",
+        }}
+      />
     </div>
   );
 }
@@ -33,7 +42,7 @@ export default function App() {
   if (!initialState) {
     return (
       <HomePage
-        onStartFresh={topic => navigate(makeEmptyState(topic))}
+        onStartFresh={(topic) => navigate(makeEmptyState(topic))}
         onLoadSample={() => navigate(SAMPLE_STATE)}
       />
     );

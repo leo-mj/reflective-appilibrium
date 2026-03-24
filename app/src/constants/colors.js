@@ -58,8 +58,8 @@ export const C = {
   conflicts: "#f97316",
   undermines: "#eab308",
   depends: "#6b7280",
-  added: "#06b6d4",     // pulse ring colour for newly-added nodes in the History tab
-  revised: "#eab308",   // label colour for "revised" annotations
+  added: "#06b6d4", // pulse ring colour for newly-added nodes in the History tab
+  revised: "#eab308", // label colour for "revised" annotations
   withdrawnMark: "#f97316", // label colour for "withdrawn" annotations
 };
 
@@ -100,7 +100,9 @@ export const TRANSITION = "opacity 1.2s ease-in-out";
 export function getColors(e) {
   const isW = e.status === "withdrawn";
   if (isW) return { fill: C.withdrawn, stroke: C.withdrawn };
-  if (e.type === "judgment") return { fill: C.judgment[e.confidence], stroke: C.judgment.high };
-  if (e.type === "principle") return { fill: C.principle[e.confidence], stroke: C.principle.high };
+  if (e.type === "judgment")
+    return { fill: C.judgment[e.confidence], stroke: C.judgment.high };
+  if (e.type === "principle")
+    return { fill: C.principle[e.confidence], stroke: C.principle.high };
   return { fill: C.theory[e.confidence], stroke: C.theory.high };
 }

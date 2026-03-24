@@ -70,28 +70,41 @@ export function useStablePositions(state, dims) {
     const allRels = state.relations;
 
     // Build D3 node objects, reusing previous positions where available.
-    const nodes = allEls.map(e => {
+    const nodes = allEls.map((e) => {
       const prev = posRef.current[e.id];
       return {
-        id: e.id, type: e.type,
+        id: e.id,
+        type: e.type,
         // Node radius used for collision detection — matches the radii in Graph.jsx / HistoryTab.jsx.
         r: e.type === "principle" ? 28 : e.type === "theory" ? 22 : 18,
         x: prev?.x ?? dims.w / 2 + (Math.random() - 0.5) * 200,
         y: prev?.y ?? dims.h / 2 + (Math.random() - 0.5) * 200,
-        vx: 0, vy: 0,
+        vx: 0,
+        vy: 0,
       };
     });
 
-    const links = allRels.map(r => ({ source: r.from, target: r.to }));
+    const links = allRels.map((r) => ({ source: r.from, target: r.to }));
 
     // Stop any previous simulation before creating a new one.
     if (simRef.current) simRef.current.stop();
 
-    const sim = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink(links).id(d => d.id).distance(110).strength(0.4))
+    const sim = d3
+      .forceSimulation(nodes)
+      .force(
+        "link",
+        d3
+          .forceLink(links)
+          .id((d) => d.id)
+          .distance(110)
+          .strength(0.4),
+      )
       .force("charge", d3.forceManyBody().strength(-320))
       .force("center", d3.forceCenter(dims.w / 2, dims.h / 2))
-      .force("collision", d3.forceCollide().radius(d => d.r + 12))
+      .force(
+        "collision",
+        d3.forceCollide().radius((d) => d.r + 12),
+      )
       // Weak restoring forces keep isolated nodes from drifting off-screen.
       .force("x", d3.forceX(dims.w / 2).strength(0.04))
       .force("y", d3.forceY(dims.h / 2).strength(0.04))
@@ -100,7 +113,9 @@ export function useStablePositions(state, dims) {
     // On every tick, snapshot positions into both the ref (stable) and state (triggers re-render).
     sim.on("tick", () => {
       const p = {};
-      nodes.forEach(n => { p[n.id] = { x: n.x, y: n.y }; });
+      nodes.forEach((n) => {
+        p[n.id] = { x: n.x, y: n.y };
+      });
       posRef.current = p;
       setPositions({ ...p });
     });
