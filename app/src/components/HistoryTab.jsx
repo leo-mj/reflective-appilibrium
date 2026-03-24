@@ -13,12 +13,77 @@ import { elementsAtRound } from "../utils/stateUtils.js";
 import { GraphCanvas } from "./GraphElements.jsx";
 import { renderEdge, renderNode, historyEdgeVisuals, historyNodeVisuals } from "../utils/graphRender.jsx";
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Available playback speed multipliers. */
+const SPEEDS = [0.5, 1, 2, 4];
+
+// ─── usePlayback ──────────────────────────────────────────────────────────────
+
+/**
+ * Manages all playback state and side-effects for the History tab.
+ *
+ * @param {number} maxRound
+ * @returns {{ displayRound, targetRound, setTargetRound, playing, setPlaying,
+ *             speed, setSpeed, snappedRound, resetPlayback, togglePlay }}
+ */
+function usePlayback(maxRound) {
+  const [displayRound, setDisplayRound] = useState(0);
+  const [targetRound,  setTargetRound]  = useState(0);
+  const [playing,      setPlaying]      = useState(false);
+  const [speed,        setSpeed]        = useState(1);
+  /** Ref copy of `playing` so the interval callback reads the latest value. */
+  const playRef = useRef(false);
+  const animRef = useRef(null);
+
+  useEffect(() => { playRef.current = playing; }, [playing]);
+
+  /**
+   * Smooth animation loop: eases `displayRound` toward `targetRound`
+   * using exponential smoothing (factor 0.08 per frame).
+   */
+  useEffect(() => {
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    const animate = () => {
+      setDisplayRound(prev => {
+        const diff = targetRound - prev;
+        if (Math.abs(diff) < 0.01) return targetRound;
+        animRef.current = requestAnimationFrame(animate);
+        return prev + diff * 0.08;
+      });
+    };
+    animRef.current = requestAnimationFrame(animate);
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, [targetRound]);
+
+  /** Auto-advances `targetRound` at the current speed while playing. */
+  useEffect(() => {
+    if (!playing) return;
+    const iv = setInterval(() => {
+      if (!playRef.current) return;
+      setTargetRound(prev => {
+        if (prev >= maxRound) { setPlaying(false); return prev; }
+        return prev + 1;
+      });
+    }, 3200 / speed);
+    return () => clearInterval(iv);
+  }, [playing, maxRound, speed]);
+
+  const snappedRound = Math.round(displayRound);
+
+  const resetPlayback = () => { setTargetRound(0); setDisplayRound(0); setPlaying(false); };
+  const togglePlay = () => {
+    if (targetRound >= maxRound) resetPlayback();
+    setPlaying(p => !p);
+  };
+
+  return { displayRound, targetRound, setTargetRound, playing, setPlaying, speed, setSpeed, snappedRound, resetPlayback, togglePlay };
+}
+
 // ─── PlaybackSlider ───────────────────────────────────────────────────────────
 
 /**
  * Styled range slider with tick marks and a filled progress track.
- * The invisible `<input type="range">` is overlaid on the visual track so
- * native drag/keyboard behaviour is preserved.
  *
  * @param {Object}   props
  * @param {number}   props.maxRound
@@ -47,6 +112,56 @@ function PlaybackSlider({ maxRound, targetRound, displayRound, snappedRound, set
           transition: "height 0.3s ease, background 0.3s ease",
         }} />
       ))}
+    </div>
+  );
+}
+
+// ─── PlaybackControls ─────────────────────────────────────────────────────────
+
+/**
+ * Toolbar row: Reset, Play/Pause, speed buttons, slider, round display.
+ *
+ * @param {Object} props
+ * @param {ReturnType<typeof usePlayback>} props.playback
+ * @param {number} props.maxRound
+ */
+function PlaybackControls({ playback, maxRound }) {
+  const { resetPlayback, togglePlay, playing, speed, setSpeed,
+          displayRound, targetRound, snappedRound, setTargetRound, setPlaying } = playback;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0" }}>
+      <button onClick={resetPlayback} style={{
+        background: "none", border: `1px solid ${C.border}`, color: C.dim,
+        borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 12,
+      }}>Reset</button>
+
+      <button onClick={togglePlay} style={{
+        background: playing ? C.conflicts : C.supports, border: "none",
+        color: "#fff", borderRadius: 4, padding: "4px 12px",
+        cursor: "pointer", fontSize: 12, fontWeight: "bold",
+      }}>{playing ? "Pause" : "Play"}</button>
+
+      <div style={{ display: "flex", gap: 2 }}>
+        {SPEEDS.map(s => (
+          <button key={s} onClick={() => setSpeed(s)} style={{
+            background: speed === s ? C.border : "transparent",
+            border: `1px solid ${speed === s ? C.dim : C.border}`,
+            color: speed === s ? C.text : C.dim,
+            borderRadius: 4, padding: "2px 6px", cursor: "pointer", fontSize: 11,
+          }}>{s}×</button>
+        ))}
+      </div>
+
+      <PlaybackSlider maxRound={maxRound} targetRound={targetRound} displayRound={displayRound}
+        snappedRound={snappedRound} setTargetRound={setTargetRound} setPlaying={setPlaying} />
+
+      <div style={{ minWidth: 80, textAlign: "center", padding: "4px 10px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6 }}>
+        <div style={{ fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 1 }}>Round</div>
+        <div style={{ fontSize: 20, fontWeight: "bold", color: C.text, lineHeight: 1.2 }}>
+          {snappedRound === 0 ? "—" : snappedRound}
+        </div>
+        <div style={{ fontSize: 9, color: C.dim }}>of {maxRound}</div>
+      </div>
     </div>
   );
 }
@@ -100,19 +215,11 @@ function LogOverlay({ sortedLog, snappedRound, logRef, currentLogRef }) {
   );
 }
 
+// ─── HistoryTab ───────────────────────────────────────────────────────────────
+
 /**
  * Renders the History tab: animated, slider-controlled playback of the RE process
  * round by round.
- *
- * ### How rounds are displayed
- * `displayRound` is a floating-point number that eases toward the integer
- * `targetRound` via a `requestAnimationFrame` loop (exponential smoothing,
- * factor 0.08).  The integer `snappedRound = Math.round(displayRound)` controls
- * which elements and relations are shown.
- *
- * ### Newly-added pulse
- * Elements whose `addedRound` equals `snappedRound` receive a SVG `<animate>`
- * pulse ring so the user can immediately see what changed in the current round.
  *
  * @param {Object}      props
  * @param {REState}     props.state
@@ -124,151 +231,36 @@ export function HistoryTab({ state, positions, onRoundChange }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
-  const logRef        = useRef();
+  const logRef = useRef();
   const currentLogRef = useRef();
 
-  // ── Pan ───────────────────────────────────────────────────────────────────
-
   const { pan, isDragging, onPointerDown, onPointerMove, onPointerUp } = usePan();
+  const playback = usePlayback(state.round);
+  const { snappedRound } = playback;
 
-  // ── Playback state ────────────────────────────────────────────────────────
-
-  const [displayRound, setDisplayRound] = useState(0);
-  const [targetRound,  setTargetRound]  = useState(0);
-  const [playing,      setPlaying]      = useState(false);
-  const [speed,        setSpeed]        = useState(1);
-  /** Ref copy of `playing` so the interval callback reads the latest value. */
-  const playRef  = useRef(false);
-  const animRef  = useRef(null);
-  const maxRound = state.round;
-
-  /** Available speed multipliers with display labels. */
-  const SPEEDS = [0.5, 1, 2, 4];
-
-  useEffect(() => { playRef.current = playing; }, [playing]);
-
-  /**
-   * Smooth animation loop: eases `displayRound` toward `targetRound`
-   * using exponential smoothing (factor 0.08 per frame).
-   */
-  useEffect(() => {
-    if (animRef.current) cancelAnimationFrame(animRef.current);
-    const animate = () => {
-      setDisplayRound(prev => {
-        const diff = targetRound - prev;
-        if (Math.abs(diff) < 0.01) return targetRound;
-        animRef.current = requestAnimationFrame(animate);
-        return prev + diff * 0.08;
-      });
-    };
-    animRef.current = requestAnimationFrame(animate);
-    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
-  }, [targetRound]);
-
-  /** Auto-advances `targetRound` at the current speed while playing. */
-  useEffect(() => {
-    if (!playing) return;
-    const iv = setInterval(() => {
-      if (!playRef.current) return;
-      setTargetRound(prev => {
-        if (prev >= maxRound) { setPlaying(false); return prev; }
-        return prev + 1;
-      });
-    }, 3200 / speed);
-    return () => clearInterval(iv);
-  }, [playing, maxRound, speed]);
-
-  const snappedRound = Math.round(displayRound);
   useEffect(() => { onRoundChange?.(snappedRound); }, [snappedRound, onRoundChange]);
-
-  /** Scroll the log container so the current round entry stays in view. */
   useEffect(() => {
-    if (currentLogRef.current && logRef.current) {
-      currentLogRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
+    currentLogRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [snappedRound]);
 
-  // ── Derived round data ────────────────────────────────────────────────────
-
   const { withdrawn } = elementsAtRound(state.elements, snappedRound);
-  const wIds = new Set(withdrawn.map(e => e.id));
-  const newIds = new Set(
-    snappedRound > 0
-      ? state.elements.filter(e => e.addedRound === snappedRound).map(e => e.id)
-      : []
-  );
-
-  // Always render ALL elements and relations; control visibility via opacity so
-  // CSS transitions fire smoothly when elements enter or leave the current round.
-  const allElements = state.elements;
-  const allRels = state.relations;
-
-  // Ascending order: past entries at top, future entries (opacity 0) at bottom.
+  const wIds   = new Set(withdrawn.map(e => e.id));
+  const newIds = new Set(snappedRound > 0
+    ? state.elements.filter(e => e.addedRound === snappedRound).map(e => e.id)
+    : []);
   const sortedLog = [...state.log].sort((a, b) => a.round - b.round);
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  const resetPlayback = () => { setTargetRound(0); setDisplayRound(0); setPlaying(false); };
-  const togglePlay = () => {
-    if (targetRound >= maxRound) resetPlayback();
-    setPlaying(p => !p);
-  };
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-
-      {/* ── Playback controls ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0" }}>
-        <button onClick={resetPlayback} style={{
-          background: "none", border: `1px solid ${C.border}`, color: C.dim,
-          borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 12,
-        }}>Reset</button>
-
-        <button onClick={togglePlay} style={{
-          background: playing ? C.conflicts : C.supports, border: "none",
-          color: "#fff", borderRadius: 4, padding: "4px 12px",
-          cursor: "pointer", fontSize: 12, fontWeight: "bold",
-        }}>{playing ? "Pause" : "Play"}</button>
-
-        <div style={{ display: "flex", gap: 2 }}>
-          {SPEEDS.map(s => (
-            <button key={s} onClick={() => setSpeed(s)} style={{
-              background: speed === s ? C.border : "transparent",
-              border: `1px solid ${speed === s ? C.dim : C.border}`,
-              color: speed === s ? C.text : C.dim,
-              borderRadius: 4, padding: "2px 6px",
-              cursor: "pointer", fontSize: 11,
-            }}>{s}×</button>
-          ))}
-        </div>
-
-        <PlaybackSlider
-          maxRound={maxRound} targetRound={targetRound} displayRound={displayRound}
-          snappedRound={snappedRound} setTargetRound={setTargetRound} setPlaying={setPlaying} />
-
-        <div style={{ minWidth: 80, textAlign: "center", padding: "4px 10px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6 }}>
-          <div style={{ fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 1 }}>Round</div>
-          <div style={{ fontSize: 20, fontWeight: "bold", color: C.text, lineHeight: 1.2 }}>
-            {snappedRound === 0 ? "—" : snappedRound}
-          </div>
-          <div style={{ fontSize: 9, color: C.dim }}>of {maxRound}</div>
-        </div>
-      </div>
-
-      {/* ── Graph SVG ── */}
+      <PlaybackControls playback={playback} maxRound={state.round} />
       <GraphCanvas
         containerRef={containerRef} dims={dims} pan={pan} isDragging={isDragging}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
         tooltip={tooltip} containerStyle={{ flex: 1, minHeight: 0 }}
         overlay={<LogOverlay sortedLog={sortedLog} snappedRound={snappedRound} logRef={logRef} currentLogRef={currentLogRef} />}>
 
-        {/* ── Edges ── */}
-        {allRels.map((r, i) => renderEdge(r, i, positions, state.elements, historyEdgeVisuals(r, wIds, snappedRound)))}
-
-        {/* ── Nodes ── */}
-        {allElements.map(el => renderNode(el, positions, historyNodeVisuals(el, wIds, newIds, snappedRound), isDragging, setTooltip))}
+        {state.relations.map((r, i) => renderEdge(r, i, positions, state.elements, historyEdgeVisuals(r, wIds, snappedRound)))}
+        {state.elements.map(el => renderNode(el, positions, historyNodeVisuals(el, wIds, newIds, snappedRound), isDragging, setTooltip))}
 
       </GraphCanvas>
     </div>

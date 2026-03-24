@@ -17,45 +17,57 @@ import { renderEdge, renderNode, graphEdgeVisuals, graphNodeVisuals } from "../u
 import { AddElementModal } from "./AddElementModal.jsx";
 import { AddRelationModal } from "./AddRelationModal.jsx";
 
+// ─── Subcomponents ────────────────────────────────────────────────────────────
+
+const TYPE_COLORS = { judgment: C.judgment.high, principle: C.principle.high, theory: C.theory.high };
+
+function AddButtonsOverlay({ onAddEl, onAddRel }) {
+  return (
+    <div style={{ position: "absolute", bottom: 12, right: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+      {[["judgment", "J"], ["principle", "P"], ["theory", "T"]].map(([type, label]) => (
+        <button key={type} onClick={() => onAddEl(type)} style={{
+          background: TYPE_COLORS[type], border: "none", color: "#fff",
+          borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer",
+        }}>+ {label}</button>
+      ))}
+      <button onClick={onAddRel} style={{
+        background: C.border, border: "none", color: C.text,
+        borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer",
+      }}>+ Rel</button>
+    </div>
+  );
+}
+
+function GraphModals({ addingElType, setAddingElType, addingRel, setAddingRel, activeEls, round, onAddElement, onAddRelation }) {
+  return (
+    <>
+      {addingElType && (
+        <AddElementModal
+          initialType={addingElType}
+          currentRound={round}
+          onSave={(formData) => { onAddElement(formData); setAddingElType(null); }}
+          onCancel={() => setAddingElType(null)}
+        />
+      )}
+      {addingRel && (
+        <AddRelationModal
+          elements={activeEls}
+          currentRound={round}
+          onSave={(formData) => { onAddRelation(formData); setAddingRel(false); }}
+          onCancel={() => setAddingRel(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
 /**
- * Renders the main force-directed graph for the Graph tab.
- *
- * ### Layout
- * Node positions come from the shared `positions` prop produced by
- * {@link module:hooks/useStablePositions} in the parent `REState` component.
- * The graph itself does not run any simulation.
- *
- * ### Interaction
- * - **Pan** — drag anywhere on the SVG via {@link module:hooks/usePan}.
- * - **Click to highlight** — click a node to highlight it and its immediate
- *   neighbours; all other nodes and edges dim to low opacity.  Click the same
- *   node again, or click the background, to deselect.
- * - **Click an edge** — selects the relation; its two endpoint nodes highlight.
- * - **Hover tooltip** — hovering over a node shows a {@link module:components/NodeTooltip}.
- *
- * A click is distinguished from a drag by comparing pointer-up to pointer-down
- * positions (threshold: 4 px).
- *
- * @param {Object}      props
- * @param {REState}     props.state
- * @param {boolean}     props.showWithdrawn
- * @param {PositionMap} props.positions
- * @param {string|null} props.selected
- * @param {function(function): void} props.onSelect
- * @param {import('../types.js').RERelation|null} props.selectedRel
- * @param {function(function): void} props.onSelectRel
- * @returns {React.ReactElement}
+ * Wraps `usePan` with click-vs-drag detection and graph hit-testing.
+ * Returns merged pointer handlers plus the pan state from `usePan`.
  */
-export function Graph({ state, showWithdrawn, positions, selected, onSelect, selectedRel, onSelectRel, onAddElement, onAddRelation }) {
-  const containerRef = useRef();
-  const dims = useContainerDims(containerRef);
-  const [tooltip, setTooltip] = useState(null);
-  const [addingElType, setAddingElType] = useState(null);
-  const [addingRel, setAddingRel] = useState(false);
-
-  // ── Pan + click detection ─────────────────────────────────────────────────
-
-  const { pan, isDragging, onPointerDown: panDown, onPointerMove, onPointerUp: panUp } = usePan();
+function useGraphClick({ panDown, panUp, visibleEls, visRels, positions, pan, onSelect, onSelectRel, setTooltip }) {
   const clickOrigin = useRef(null);
 
   /** @param {React.PointerEvent} e */
@@ -105,6 +117,49 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect, sel
     onSelectRel(() => null);
   };
 
+  return { onPointerDown, onPointerUp };
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+/**
+ * Renders the main force-directed graph for the Graph tab.
+ *
+ * ### Layout
+ * Node positions come from the shared `positions` prop produced by
+ * {@link module:hooks/useStablePositions} in the parent `REState` component.
+ * The graph itself does not run any simulation.
+ *
+ * ### Interaction
+ * - **Pan** — drag anywhere on the SVG via {@link module:hooks/usePan}.
+ * - **Click to highlight** — click a node to highlight it and its immediate
+ *   neighbours; all other nodes and edges dim to low opacity.  Click the same
+ *   node again, or click the background, to deselect.
+ * - **Click an edge** — selects the relation; its two endpoint nodes highlight.
+ * - **Hover tooltip** — hovering over a node shows a {@link module:components/NodeTooltip}.
+ *
+ * A click is distinguished from a drag by comparing pointer-up to pointer-down
+ * positions (threshold: 4 px).
+ *
+ * @param {Object}      props
+ * @param {REState}     props.state
+ * @param {boolean}     props.showWithdrawn
+ * @param {PositionMap} props.positions
+ * @param {string|null} props.selected
+ * @param {function(function): void} props.onSelect
+ * @param {import('../types.js').RERelation|null} props.selectedRel
+ * @param {function(function): void} props.onSelectRel
+ * @param {function}    props.onAddElement
+ * @param {function}    props.onAddRelation
+ * @returns {React.ReactElement}
+ */
+export function Graph({ state, showWithdrawn, positions, selected, onSelect, selectedRel, onSelectRel, onAddElement, onAddRelation }) {
+  const containerRef = useRef();
+  const dims = useContainerDims(containerRef);
+  const [tooltip, setTooltip] = useState(null);
+  const [addingElType, setAddingElType] = useState(null);
+  const [addingRel, setAddingRel] = useState(false);
+
   // ── Derived visibility and highlight sets ─────────────────────────────────
 
   const { active, withdrawn } = elementsAtRound(state.elements, state.round);
@@ -126,25 +181,16 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect, sel
     return false;
   };
 
+  // ── Pan + click ───────────────────────────────────────────────────────────
+
+  const { pan, isDragging, onPointerDown: panDown, onPointerMove, onPointerUp: panUp } = usePan();
+  const { onPointerDown, onPointerUp } = useGraphClick({
+    panDown, panUp, visibleEls, visRels, positions, pan, onSelect, onSelectRel, setTooltip,
+  });
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   const activeEls = state.elements.filter(e => e.status !== "withdrawn");
-
-  const typeColor = { judgment: C.judgment.high, principle: C.principle.high, theory: C.theory.high };
-  const addOverlay = (
-    <div style={{ position: "absolute", bottom: 12, right: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-      {[["judgment", "J"], ["principle", "P"], ["theory", "T"]].map(([type, label]) => (
-        <button key={type} onClick={() => setAddingElType(type)} style={{
-          background: typeColor[type], border: "none", color: "#fff",
-          borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer",
-        }}>+ {label}</button>
-      ))}
-      <button onClick={() => setAddingRel(true)} style={{
-        background: C.border, border: "none", color: C.text,
-        borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer",
-      }}>+ Rel</button>
-    </div>
-  );
 
   return (
     <>
@@ -152,7 +198,7 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect, sel
         containerRef={containerRef} dims={dims} pan={pan} isDragging={isDragging}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
         tooltip={tooltip} containerStyle={{ width: "100%", height: "100%" }}
-        overlay={addOverlay}>
+        overlay={<AddButtonsOverlay onAddEl={setAddingElType} onAddRel={() => setAddingRel(true)} />}>
 
         {/* ── Edges ── */}
         {visRels.map((r, i) => renderEdge(r, i, positions, state.elements, graphEdgeVisuals(r, wIds, dimEdge, selectedRel)))}
@@ -162,22 +208,12 @@ export function Graph({ state, showWithdrawn, positions, selected, onSelect, sel
 
       </GraphCanvas>
 
-      {addingElType && (
-        <AddElementModal
-          initialType={addingElType}
-          currentRound={state.round}
-          onSave={(formData) => { onAddElement(formData); setAddingElType(null); }}
-          onCancel={() => setAddingElType(null)}
-        />
-      )}
-      {addingRel && (
-        <AddRelationModal
-          elements={activeEls}
-          currentRound={state.round}
-          onSave={(formData) => { onAddRelation(formData); setAddingRel(false); }}
-          onCancel={() => setAddingRel(false)}
-        />
-      )}
+      <GraphModals
+        addingElType={addingElType} setAddingElType={setAddingElType}
+        addingRel={addingRel} setAddingRel={setAddingRel}
+        activeEls={activeEls} round={state.round}
+        onAddElement={onAddElement} onAddRelation={onAddRelation}
+      />
     </>
   );
 }
