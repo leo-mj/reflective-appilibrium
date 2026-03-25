@@ -566,7 +566,7 @@ export default function REState({ initialState, onHome, onReady }) {
   const graphW = isWide && showText ? (dims.w - 32) / 2 - 12 : dims.w - 32;
   const { positions, ready } = useStablePositions(state, {
     w: graphW,
-    h: dims.h,
+    h: dims.h * 0.8, // subtract the 20vh AddBar at the bottom
   });
   useEffect(() => {
     if (ready) onReady?.();

@@ -10,7 +10,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
-import { GraphCanvas } from "./GraphElements.jsx";
+import { GraphCanvas, OffscreenIndicators } from "./GraphElements.jsx";
 import {
   renderEdge,
   renderNode,
@@ -26,9 +26,9 @@ import { findCoherentClusters, clusterColor } from "../utils/clusterUtils.js";
  * centred in whatever space the parent gives it.
  */
 // Padding around the bounding box (accounts for node radius + label).
-const FIT_PADDING = 80;
+const FIT_PADDING = 120;
 
-function ClusterGraph({ cluster, state, positions }) {
+function ClusterGraph({ cluster, color, state, positions }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
@@ -77,7 +77,7 @@ function ClusterGraph({ cluster, state, positions }) {
         : Math.min(
             (dims.w - FIT_PADDING) / bboxW,
             (dims.h - FIT_PADDING) / bboxH,
-            2,
+            0.8,
           );
     const cx = (x0 + x1) / 2,
       cy = (y0 + y1) / 2;
@@ -109,6 +109,16 @@ function ClusterGraph({ cluster, state, positions }) {
       zoomOut={zoomOut}
       tooltip={tooltip}
       containerStyle={{ width: "100%", height: "100%" }}
+      overlay={
+        <OffscreenIndicators
+          els={visibleEls}
+          positions={positions}
+          pan={pan}
+          zoom={zoom}
+          dims={dims}
+          color={color}
+        />
+      }
     >
       {visRels.map((r, i) =>
         renderEdge(
@@ -201,6 +211,7 @@ export function ClusterTab({ state, positions }) {
           <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
             <ClusterGraph
               cluster={cluster}
+              color={clusterColor(i)}
               state={state}
               positions={positions}
             />

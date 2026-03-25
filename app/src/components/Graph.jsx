@@ -16,7 +16,7 @@ import {
   distToSegment,
 } from "../utils/graphHelpers.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
-import { GraphCanvas } from "./GraphElements.jsx";
+import { GraphCanvas, OffscreenIndicators } from "./GraphElements.jsx";
 import {
   renderEdge,
   renderNode,
@@ -314,10 +314,20 @@ export function Graph({
         tooltip={tooltip}
         containerStyle={{ width: "100%", height: "100%" }}
         overlay={
-          <AddButtonsOverlay
-            onAddEl={setAddingElType}
-            onAddRel={() => setAddingRel(true)}
-          />
+          <>
+            <AddButtonsOverlay
+              onAddEl={setAddingElType}
+              onAddRel={() => setAddingRel(true)}
+            />
+            <OffscreenIndicators
+              els={visibleEls}
+              positions={positions}
+              pan={pan}
+              zoom={zoom}
+              dims={dims}
+              color={C.dim}
+            />
+          </>
         }
       >
         {/* ── Edges ── */}

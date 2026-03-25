@@ -10,7 +10,7 @@ import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
-import { GraphCanvas } from "./GraphElements.jsx";
+import { GraphCanvas, OffscreenIndicators } from "./GraphElements.jsx";
 import {
   renderEdge,
   renderNode,
@@ -472,12 +472,22 @@ export function HistoryTab({ state, positions, onRoundChange }) {
         tooltip={tooltip}
         containerStyle={{ flex: 1, minHeight: 0 }}
         overlay={
-          <LogOverlay
-            sortedLog={sortedLog}
-            snappedRound={snappedRound}
-            logRef={logRef}
-            currentLogRef={currentLogRef}
-          />
+          <>
+            <LogOverlay
+              sortedLog={sortedLog}
+              snappedRound={snappedRound}
+              logRef={logRef}
+              currentLogRef={currentLogRef}
+            />
+            <OffscreenIndicators
+              els={state.elements}
+              positions={positions}
+              pan={pan}
+              zoom={zoom}
+              dims={dims}
+              color={C.dim}
+            />
+          </>
         }
       >
         {state.relations.map((r, i) =>

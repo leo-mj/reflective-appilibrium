@@ -297,3 +297,77 @@ export function GraphCanvas({
     </div>
   );
 }
+
+// ─── OffscreenIndicators ──────────────────────────────────────────────────────
+
+const ARROW = { left: "◀", right: "▶", top: "▲", bottom: "▼" };
+
+/**
+ * Renders directional arrow badges at container edges for any nodes whose
+ * screen position falls outside the visible area. Place as the `overlay` prop
+ * of `GraphCanvas` (or composed alongside other overlays in a fragment).
+ *
+ * @param {Object}      props
+ * @param {REElement[]} props.els       - Elements to check.
+ * @param {PositionMap} props.positions - World-space positions keyed by element ID.
+ * @param {{ x: number, y: number }} props.pan
+ * @param {number}      props.zoom
+ * @param {{ w: number, h: number }} props.dims
+ * @param {string}      props.color     - Badge accent color.
+ */
+export function OffscreenIndicators({
+  els,
+  positions,
+  pan,
+  zoom,
+  dims,
+  color,
+}) {
+  const hidden = { left: false, right: false, top: false, bottom: false };
+  els.forEach((el) => {
+    const pos = positions[el.id];
+    if (!pos) return;
+    const r = nodeRadius(el.type) * zoom;
+    const sx = pos.x * zoom + pan.x;
+    const sy = pos.y * zoom + pan.y;
+    if (sx - r < 0) hidden.left = true;
+    if (sx + r > dims.w) hidden.right = true;
+    if (sy - r < 0) hidden.top = true;
+    if (sy + r > dims.h) hidden.bottom = true;
+  });
+
+  const sides = Object.keys(hidden).filter((s) => hidden[s]);
+  if (!sides.length) return null;
+
+  const badgePos = (side) =>
+    ({
+      left: { left: 4, top: "50%", transform: "translateY(-50%)" },
+      right: { right: 4, top: "50%", transform: "translateY(-50%)" },
+      top: { top: 4, left: "50%", transform: "translateX(-50%)" },
+      bottom: { bottom: 4, left: "50%", transform: "translateX(-50%)" },
+    })[side];
+
+  return (
+    <>
+      {sides.map((side) => (
+        <div
+          key={side}
+          style={{
+            position: "absolute",
+            pointerEvents: "none",
+            ...badgePos(side),
+            fontSize: 10,
+            lineHeight: 1,
+            padding: "2px 5px",
+            borderRadius: 4,
+            background: color + "33",
+            border: `1px solid ${color}66`,
+            color,
+          }}
+        >
+          {ARROW[side]}
+        </div>
+      ))}
+    </>
+  );
+}

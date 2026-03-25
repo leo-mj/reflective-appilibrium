@@ -37,7 +37,7 @@ export function useContainerDims(ref) {
     const measure = () => {
       if (ref.current) {
         const { clientWidth, clientHeight } = ref.current;
-        setDims({ w: clientWidth || 700, h: Math.max(400, clientHeight) });
+        setDims({ w: clientWidth || 700, h: clientHeight || 400 });
       }
     };
     measure();
