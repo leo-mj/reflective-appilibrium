@@ -108,10 +108,17 @@ export function TextTab({
     visIds,
     state.elements,
   );
-  const badgeColor = (id) => {
-    const el = state.elements.find((e) => e.id === id);
-    return el ? getColors({ ...el, status: "active" }).stroke : C.dim;
-  };
+  const colorById = useMemo(
+    () =>
+      new Map(
+        state.elements.map((e) => [
+          e.id,
+          getColors({ ...e, status: "active" }).stroke,
+        ]),
+      ),
+    [state.elements],
+  );
+  const badgeColor = (id) => colorById.get(id) ?? C.dim;
 
   const displayEls = search
     ? visibleEls.filter((e) => matchesSearch(e, search))
@@ -121,11 +128,10 @@ export function TextTab({
     : visRels;
 
   // ── Selection partitions ─────────────────────────────────────────────────
-  const highlightedIds = selected
-    ? getNeighbours(selected, visRels)
-    : selectedRel
-      ? new Set([selectedRel.from, selectedRel.to])
-      : null;
+  let highlightedIds = null;
+  if (selected) highlightedIds = getNeighbours(selected, visRels);
+  else if (selectedRel)
+    highlightedIds = new Set([selectedRel.from, selectedRel.to]);
 
   const selectedEl = selected
     ? (visibleEls.find((e) => e.id === selected) ?? null)
@@ -136,25 +142,23 @@ export function TextTab({
   const restEls = highlightedIds
     ? visibleEls.filter((e) => !highlightedIds.has(e.id))
     : visibleEls;
-  const hlRels = selected
-    ? visRels.filter((r) => r.from === selected || r.to === selected)
-    : selectedRel
-      ? [selectedRel]
-      : [];
-  const restRels = selectedRel
-    ? visRels.filter((r) => r !== selectedRel)
-    : selected
-      ? visRels.filter((r) => r.from !== selected && r.to !== selected)
-      : visRels;
+
+  let hlRels = [];
+  if (selected)
+    hlRels = visRels.filter((r) => r.from === selected || r.to === selected);
+  else if (selectedRel) hlRels = [selectedRel];
+
+  let restRels = visRels;
+  if (selectedRel) restRels = visRels.filter((r) => r !== selectedRel);
+  else if (selected)
+    restRels = visRels.filter((r) => r.from !== selected && r.to !== selected);
 
   const hasCoherence =
     state.coherence.tensions.length > 0 ||
     state.coherence.orphans.length > 0 ||
     state.coherence.clusters.length > 0;
-  const clusterCount = useMemo(
-    () => findCoherentClusters(state).length,
-    [state],
-  );
+  const clusters = useMemo(() => findCoherentClusters(state), [state]);
+  const clusterCount = clusters.length;
 
   // ── Navigation ───────────────────────────────────────────────────────────
   const getSectionRef = (key) =>
@@ -344,6 +348,7 @@ export function TextTab({
 
           <ClusterSection
             state={state}
+            clusters={clusters}
             clusterSectionRef={clusterSectionRef}
             collapsed={isCollapsed("clusters")}
             onToggle={() => toggle("clusters")}

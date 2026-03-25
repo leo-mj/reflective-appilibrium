@@ -26,6 +26,14 @@ import { useState, useRef, useCallback } from "react";
  *   zoomOut:      function(): void,
  * }}
  */
+/** Zoom multiplier per scroll tick or button press. */
+const ZOOM_STEP = 1.1;
+/** Coarser zoom multiplier for the +/− buttons. */
+const ZOOM_BTN_STEP = 1.25;
+/** Zoom range clamp. */
+const ZOOM_MIN = 0.2;
+const ZOOM_MAX = 4;
+
 export function usePan() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -67,10 +75,17 @@ export function usePan() {
     setIsDragging(false);
   };
 
-  /** Called by GraphCanvas's non-passive wheel listener. `mx`/`my` are SVG-relative px. */
+  /**
+   * Called by GraphCanvas's non-passive wheel listener. `mx`/`my` are SVG-relative px.
+   * Empty deps intentional: panRef/zoomRef are refs read at call time to avoid
+   * stale closures during rapid wheel events.
+   */
   const applyWheel = useCallback((deltaY, mx, my) => {
-    const factor = deltaY < 0 ? 1.1 : 1 / 1.1;
-    const newZoom = Math.max(0.2, Math.min(4, zoomRef.current * factor));
+    const factor = deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+    const newZoom = Math.max(
+      ZOOM_MIN,
+      Math.min(ZOOM_MAX, zoomRef.current * factor),
+    );
     const scale = newZoom / zoomRef.current;
     const newPan = {
       x: mx - (mx - panRef.current.x) * scale,
@@ -80,10 +95,15 @@ export function usePan() {
     _setZoom(newZoom);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const zoomIn = () => _setZoom(Math.min(4, zoomRef.current * 1.25));
-  const zoomOut = () => _setZoom(Math.max(0.2, zoomRef.current / 1.25));
+  const zoomIn = () =>
+    _setZoom(Math.min(ZOOM_MAX, zoomRef.current * ZOOM_BTN_STEP));
+  const zoomOut = () =>
+    _setZoom(Math.max(ZOOM_MIN, zoomRef.current / ZOOM_BTN_STEP));
 
-  /** Snap the view to an exact pan + zoom, e.g. for auto-fit. */
+  /**
+   * Snaps the view to an exact pan + zoom, e.g. for auto-fit.
+   * Empty deps intentional: _setPan/_setZoom are stable ref wrappers.
+   */
   const resetView = useCallback((newPan, newZoom = 1) => {
     _setPan(newPan);
     _setZoom(newZoom);

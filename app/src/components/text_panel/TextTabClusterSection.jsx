@@ -8,7 +8,6 @@
 import { useContext, useMemo } from "react";
 import { C } from "../../constants/colors.js";
 import {
-  findCoherentClusters,
   findCrossClusterTensions,
   findMergeCandidates,
   clusterColor,
@@ -24,17 +23,18 @@ import { SectionHeader, Highlight } from "./TextTabCards.jsx";
 /**
  * @param {Object}   props
  * @param {REState}  props.state
+ * @param {Array}    props.clusters - Pre-computed coherent clusters from the parent.
  * @param {React.RefObject} props.clusterSectionRef
  * @param {boolean}  props.collapsed
  * @param {function} props.onToggle
  */
 export function ClusterSection({
   state,
+  clusters,
   clusterSectionRef,
   collapsed,
   onToggle,
 }) {
-  const clusters = useMemo(() => findCoherentClusters(state), [state]);
   const tensions = useMemo(
     () => findCrossClusterTensions(clusters, state),
     [clusters, state],

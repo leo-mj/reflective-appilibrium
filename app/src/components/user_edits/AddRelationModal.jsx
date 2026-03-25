@@ -11,6 +11,7 @@ import {
   FIELD_STYLE,
 } from "../../constants/modalConstants.js";
 import { ModalShell } from "./ModalShell.jsx";
+import { sortElementIds } from "../../utils/stateUtils.js";
 
 /**
  * @typedef {Object} AddRelationFormData
@@ -45,7 +46,7 @@ export function AddRelationForm({ form, setForm, elements }) {
           onChange={(e) => set("from", e.target.value)}
           style={INPUT_STYLE}
         >
-          {ids.map((id) => (
+          {ids.sort(sortElementIds).map((id) => (
             <option key={id} value={id}>
               {id}
             </option>
@@ -59,7 +60,7 @@ export function AddRelationForm({ form, setForm, elements }) {
           onChange={(e) => set("to", e.target.value)}
           style={INPUT_STYLE}
         >
-          {ids.map((id) => (
+          {ids.sort(sortElementIds).map((id) => (
             <option key={id} value={id}>
               {id}
             </option>

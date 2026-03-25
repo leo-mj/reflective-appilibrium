@@ -3,7 +3,7 @@
  * @module components/REState
  */
 
-/** @import { REState as REStateType } from '../types.js' */
+/** @import { REState as REStateType } from '../types.js' */ // aliased to avoid clash with the component name
 
 import { useState, useRef, lazy, Suspense, useEffect } from "react";
 import { C } from "../constants/colors.js";
@@ -94,15 +94,16 @@ function useREActions(initialState) {
   const handleEditSave = (formData) => {
     const newRound = state.round + 1;
     const oldEl = editingEl;
+    // Destructure to explicitly exclude withdrawn-only fields from the revised element.
+    // eslint-disable-next-line no-unused-vars
+    const { withdrawnRound, reason, ...oldElBase } = oldEl;
     const newEl = {
-      ...oldEl,
+      ...oldElBase,
       ...formData,
       status: "revised",
       previousText: oldEl.text,
       revisedRound: newRound,
     };
-    delete newEl.withdrawnRound;
-    delete newEl.reason;
     const diffs = makeDiff(
       ["type", "confidence", "status", "origin", "text"],
       oldEl,

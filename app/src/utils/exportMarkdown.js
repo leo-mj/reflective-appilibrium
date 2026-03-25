@@ -18,9 +18,14 @@ import { generateGraphSVG, svgToDataUrl } from "./generateSVG.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Escapes markdown special characters in free text. */
+/** Escapes free text for safe embedding in a markdown document. */
 function esc(text) {
-  return (text ?? "").replace(/([*_`#|[\]\\])/g, "\\$1");
+  return (text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/^([ \t]*)(\d+)[.)]/gm, "$1$2\\.") // numbered lists
+    .replace(/([*_`#|[\]\\])/g, "\\$1");
 }
 
 // ─── Sections ─────────────────────────────────────────────────────────────────

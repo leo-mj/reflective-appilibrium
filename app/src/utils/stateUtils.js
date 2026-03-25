@@ -104,7 +104,7 @@ export function sortElementIds(id1, id2) {
     T: 2,
   };
   const [elTypeAbbreviation1, elTypeAbbreviation2] = [id1[0], id2[0]];
-  if (elTypeAbbreviation1 != elTypeAbbreviation2) {
+  if (elTypeAbbreviation1 !== elTypeAbbreviation2) {
     const t1 = typeOrder[elTypeAbbreviation1] ?? 99;
     const t2 = typeOrder[elTypeAbbreviation2] ?? 99;
     return t1 - t2;

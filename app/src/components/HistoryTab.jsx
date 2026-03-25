@@ -25,6 +25,10 @@ import {
 
 /** Available playback speed multipliers. */
 const SPEEDS = [0.5, 1, 2, 4];
+/** Base interval between rounds at 1× speed, in milliseconds. */
+const BASE_ROUND_INTERVAL_MS = 3200;
+/** Exponential easing factor per animation frame (0–1; lower = slower). */
+const EASING_FACTOR = 0.08;
 
 // ─── usePlayback ──────────────────────────────────────────────────────────────
 
@@ -59,7 +63,7 @@ function usePlayback(maxRound) {
         const diff = targetRound - prev;
         if (Math.abs(diff) < 0.01) return targetRound;
         animRef.current = requestAnimationFrame(animate);
-        return prev + diff * 0.08;
+        return prev + diff * EASING_FACTOR;
       });
     };
     animRef.current = requestAnimationFrame(animate);
@@ -80,7 +84,7 @@ function usePlayback(maxRound) {
         }
         return prev + 1;
       });
-    }, 3200 / speed);
+    }, BASE_ROUND_INTERVAL_MS / speed);
     return () => clearInterval(iv);
   }, [playing, maxRound, speed]);
 

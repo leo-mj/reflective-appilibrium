@@ -120,9 +120,11 @@ export function useStablePositions(state, dims) {
       setPositions({ ...p });
     });
 
-    // Mark ready when the simulation finishes — or after a guaranteed 1.5 s timeout.
+    // Mark ready when the simulation finishes — or after a guaranteed timeout so
+    // the UI never stays invisible indefinitely on slow machines or large graphs.
+    const READY_TIMEOUT_MS = 1500;
     sim.on("end", () => setReady(true));
-    setTimeout(() => setReady(true), 1500);
+    setTimeout(() => setReady(true), READY_TIMEOUT_MS);
 
     simRef.current = sim;
     return () => sim.stop();

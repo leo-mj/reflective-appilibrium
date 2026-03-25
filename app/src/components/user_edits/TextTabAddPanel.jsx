@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
+import { sortElementIds } from "../../utils/stateUtils.js";
 
 const ELEMENT_DEFAULTS = {
   type: "judgment",
@@ -15,7 +16,7 @@ const ELEMENT_DEFAULTS = {
 };
 
 function makeRelationDefaults(elements) {
-  const ids = elements.map((e) => e.id);
+  const ids = elements.map((e) => e.id).sort(sortElementIds);
   return {
     from: ids[0] ?? "",
     to: ids[1] ?? "",
@@ -52,7 +53,7 @@ export function AddBar({ elements, onAddElement, onAddRelation }) {
   const setRel = (field, value) =>
     setRelationForm((prev) => ({ ...prev, [field]: value }));
 
-  const ids = elements.map((e) => e.id);
+  const ids = elements.map((e) => e.id).sort(sortElementIds);
   const isElementValid = elementForm.text.trim().length > 0;
   const isRelationValid =
     relationForm.from &&

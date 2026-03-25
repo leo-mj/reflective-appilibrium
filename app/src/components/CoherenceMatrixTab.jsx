@@ -353,7 +353,7 @@ function HeatmapTable({ elements, result, hovered, onCellEnter, onCellLeave }) {
  * @param {Object|null} props.hovered - `{ rowId, colId, desc }` or null.
  */
 function PairDescription({ hovered }) {
-  if (hovered == null) return;
+  if (hovered === null || hovered === undefined) return;
   const desc =
     hovered.rowId === hovered.colId
       ? "Element compared with itself."
