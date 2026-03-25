@@ -15,15 +15,26 @@ import { C } from "../constants/colors.js";
  * @param {function} props.onSearch      - Called with the new query string.
  * @param {function} props.onNavigate    - Called with the section key when a pill is clicked.
  */
-export function NavBar({ navItems, activeSection, isCollapsed, search, onSearch, onNavigate }) {
+export function NavBar({
+  navItems,
+  activeSection,
+  isCollapsed,
+  search,
+  onSearch,
+  onNavigate,
+}) {
   if (!navItems.length) return null;
   return (
     <div
       style={{
-        display: "flex", alignItems: "center", gap: 4,
-        height: "2em", padding: "0 4px",
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        height: "2em",
+        padding: "0 4px",
         borderBottom: `1px solid ${C.border}`,
-        background: C.bg, flexShrink: 0,
+        background: C.bg,
+        flexShrink: 0,
       }}
     >
       {navItems.map((item) => {
@@ -33,8 +44,13 @@ export function NavBar({ navItems, activeSection, isCollapsed, search, onSearch,
             key={item.key}
             onClick={() => onNavigate(item.key)}
             style={{
-              height: "2em", boxSizing: "border-box", padding: "0 8px", lineHeight: "2em",
-              borderRadius: 10, fontSize: 11, cursor: "pointer",
+              height: "2em",
+              boxSizing: "border-box",
+              padding: "0 8px",
+              lineHeight: "2em",
+              borderRadius: 10,
+              fontSize: 11,
+              cursor: "pointer",
               border: `1px solid ${isActive ? C.text : C.border}`,
               background: isActive ? C.border : "transparent",
               color: isActive ? C.text : C.dim,
@@ -42,7 +58,8 @@ export function NavBar({ navItems, activeSection, isCollapsed, search, onSearch,
               transition: "all 0.15s",
             }}
           >
-            {item.label}{item.count != null ? ` ${item.count}` : ""}
+            {item.label}
+            {item.count != null ? ` ${item.count}` : ""}
           </button>
         );
       })}
@@ -52,10 +69,18 @@ export function NavBar({ navItems, activeSection, isCollapsed, search, onSearch,
         onChange={(e) => onSearch(e.target.value)}
         placeholder="Search…"
         style={{
-          marginLeft: "auto", height: "2em", boxSizing: "border-box",
-          padding: "0 7px", lineHeight: "2em", borderRadius: 10, fontSize: 13,
+          marginLeft: "auto",
+          height: "2em",
+          boxSizing: "border-box",
+          padding: "0 7px",
+          lineHeight: "2em",
+          borderRadius: 10,
+          fontSize: 13,
           border: `1px solid ${search ? C.text : C.border}`,
-          background: "transparent", color: C.text, outline: "none", width: "30%",
+          background: "transparent",
+          color: C.text,
+          outline: "none",
+          width: "30%",
         }}
       />
     </div>

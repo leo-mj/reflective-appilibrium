@@ -24,6 +24,7 @@ import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
 import { NetworkIcon, HistoryIcon, MatrixIcon, ClusterIcon } from "./Icons.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
+import { AddBar } from "./TextTabAddPanel.jsx";
 
 // Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
 const CoherenceMatrixTab = LLM_ENABLED
@@ -621,8 +622,6 @@ export default function REState({ initialState, onHome, onReady }) {
             onEditRelRequest={setEditingRel}
             onWithdrawRequest={handleWithdrawRequest}
             onWithdrawRelRequest={handleWithdrawRelRequest}
-            onAddElement={handleAddElement}
-            onAddRelation={handleAddRelation}
           />
         )}
         <GraphPanel
@@ -640,6 +639,12 @@ export default function REState({ initialState, onHome, onReady }) {
           onRoundChange={setHistoryRound}
         />
       </div>
+
+      <AddBar
+        elements={state.elements.filter((e) => e.status !== "withdrawn")}
+        onAddElement={handleAddElement}
+        onAddRelation={handleAddRelation}
+      />
 
       <EditModals
         editingEl={editingEl}

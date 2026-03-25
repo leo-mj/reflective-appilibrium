@@ -90,7 +90,6 @@ export function makeLogEntry(round, findings, decision, changes) {
   return { round, findings, options: "", decision, changes };
 }
 
-
 /**
  * Helps compare element IDs for sorting.
  *
@@ -100,16 +99,16 @@ export function makeLogEntry(round, findings, decision, changes) {
  */
 export function sortElementIds(id1, id2) {
   const typeOrder = {
-    "J": 0,
-    "P": 1,
-    "T": 2
-  }
-  const [ elTypeAbbreviation1, elTypeAbbreviation2 ] = [id1[0], id2[0]];
+    J: 0,
+    P: 1,
+    T: 2,
+  };
+  const [elTypeAbbreviation1, elTypeAbbreviation2] = [id1[0], id2[0]];
   if (elTypeAbbreviation1 != elTypeAbbreviation2) {
     const t1 = typeOrder[elTypeAbbreviation1] ?? 99;
     const t2 = typeOrder[elTypeAbbreviation2] ?? 99;
-    return t1 - t2;  
+    return t1 - t2;
   }
-  const [ elNumber1, elNumber2 ] =  [ id1.slice(1), id2.slice(1)]
-  return Number(elNumber1) - Number(elNumber2)
+  const [elNumber1, elNumber2] = [id1.slice(1), id2.slice(1)];
+  return Number(elNumber1) - Number(elNumber2);
 }

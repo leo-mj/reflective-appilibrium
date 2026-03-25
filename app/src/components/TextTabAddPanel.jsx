@@ -1,13 +1,11 @@
 /**
- * @fileoverview Add-element / add-relation panel shown at the top of TextTab.
- * Manages its own form state; calls parent callbacks on submit.
+ * @fileoverview Bottom bar for adding elements and relations.
+ * Spans the full width at ~20vh, always visible.
  * @module components/TextTabAddPanel
  */
 
 import { useState } from "react";
 import { C } from "../constants/colors.js";
-import { AddElementForm } from "./AddElementModal.jsx";
-import { AddRelationForm } from "./AddRelationModal.jsx";
 
 const ELEMENT_DEFAULTS = {
   type: "judgment",
@@ -18,70 +16,230 @@ const ELEMENT_DEFAULTS = {
 
 function makeRelationDefaults(elements) {
   const ids = elements.map((e) => e.id);
-  return { from: ids[0] ?? "", to: ids[1] ?? "", type: "supports", explanation: "" };
+  return {
+    from: ids[0] ?? "",
+    to: ids[1] ?? "",
+    type: "supports",
+    explanation: "",
+  };
 }
+
+const SELECT_STYLE = {
+  background: C.bg,
+  border: `1px solid ${C.border}`,
+  borderRadius: 4,
+  color: C.text,
+  padding: "3px 6px",
+  fontSize: 12,
+  fontFamily: "inherit",
+};
 
 /**
  * @param {Object}      props
- * @param {string|null} props.forceType  - When set, switches form to "element" with this type.
- * @param {boolean}     props.forceRelation - When true, switches form to "relation".
- * @param {REElement[]} props.elements   - Active (non-withdrawn) elements for the relation picker.
+ * @param {REElement[]} props.elements   - Active (non-withdrawn) elements.
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
  */
-export function AddPanel({ activeTab, setActiveTab, elements, onAddElement, onAddRelation }) {
+export function AddBar({ elements, onAddElement, onAddRelation }) {
+  const [activeTab, setActiveTab] = useState("element");
   const [elementForm, setElementForm] = useState(ELEMENT_DEFAULTS);
-  const [relationForm, setRelationForm] = useState(() => makeRelationDefaults(elements));
+  const [relationForm, setRelationForm] = useState(() =>
+    makeRelationDefaults(elements),
+  );
+
+  const setEl = (field, value) =>
+    setElementForm((prev) => ({ ...prev, [field]: value }));
+  const setRel = (field, value) =>
+    setRelationForm((prev) => ({ ...prev, [field]: value }));
+
+  const ids = elements.map((e) => e.id);
+  const isElementValid = elementForm.text.trim().length > 0;
+  const isRelationValid =
+    relationForm.from &&
+    relationForm.to &&
+    relationForm.from !== relationForm.to;
+  const canSubmit = activeTab === "element" ? isElementValid : isRelationValid;
+
+  const handleSubmit = () => {
+    if (activeTab === "element") {
+      onAddElement(elementForm);
+      setElementForm(ELEMENT_DEFAULTS);
+    } else {
+      onAddRelation(relationForm);
+      setRelationForm(makeRelationDefaults(elements));
+    }
+  };
+
+  const tabBtn = (t) => ({
+    padding: "2px 10px",
+    borderRadius: 10,
+    fontSize: 11,
+    cursor: "pointer",
+    border: `1px solid ${C.border}`,
+    background: activeTab === t ? C.border : "transparent",
+    color: activeTab === t ? C.text : C.dim,
+    fontFamily: "inherit",
+  });
 
   return (
-    <div style={{ marginBottom: 12, padding: "10px 10px 12px", borderRadius: 8, background: C.panel, border: `1px solid ${C.border}` }}>
-      {/* Tab switcher */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
-        {["element", "relation"].map((t) => (
-          <button
-            key={t}
-            onClick={() => setActiveTab(t)}
-            style={{
-              flex: 1, padding: "4px 0", borderRadius: 4, cursor: "pointer", fontSize: 12,
-              border: `1px solid ${C.border}`,
-              background: activeTab === t ? C.border : "transparent",
-              color: activeTab === t ? C.text : C.dim,
-            }}
-          >
-            {t === "element" ? "Element" : "Relation"}
-          </button>
-        ))}
+    <div
+      style={{
+        height: "20vh",
+        flexShrink: 0,
+        borderTop: `1px solid ${C.border}`,
+        background: C.panel,
+        display: "flex",
+        flexDirection: "column",
+        padding: "8px 16px",
+      }}
+    >
+      {/* ── Controls row ── */}
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}
+      >
+        <button
+          style={tabBtn("element")}
+          onClick={() => setActiveTab("element")}
+        >
+          Element
+        </button>
+        <button
+          style={tabBtn("relation")}
+          onClick={() => setActiveTab("relation")}
+        >
+          Relation
+        </button>
+        <div
+          style={{ width: 1, height: 16, background: C.border, flexShrink: 0 }}
+        />
+
+        {activeTab === "element" ? (
+          <>
+            <select
+              value={elementForm.type}
+              onChange={(e) => setEl("type", e.target.value)}
+              style={SELECT_STYLE}
+            >
+              <option value="judgment">Judgment</option>
+              <option value="principle">Principle</option>
+              <option value="theory">Theory</option>
+            </select>
+            <select
+              value={elementForm.confidence}
+              onChange={(e) => setEl("confidence", e.target.value)}
+              style={SELECT_STYLE}
+            >
+              <option value="high">High</option>
+              <option value="moderate">Moderate</option>
+              <option value="low">Low</option>
+            </select>
+            <input
+              value={elementForm.origin}
+              onChange={(e) => setEl("origin", e.target.value)}
+              placeholder="Origin"
+              style={{ ...SELECT_STYLE, width: 90 }}
+            />
+          </>
+        ) : (
+          <>
+            <select
+              value={relationForm.from}
+              onChange={(e) => setRel("from", e.target.value)}
+              style={SELECT_STYLE}
+            >
+              {ids.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            </select>
+            <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
+              →
+            </span>
+            <select
+              value={relationForm.type}
+              onChange={(e) => setRel("type", e.target.value)}
+              style={{ ...SELECT_STYLE, color: C[relationForm.type] }}
+            >
+              <option value="supports">supports</option>
+              <option value="conflicts">conflicts</option>
+              <option value="undermines">undermines</option>
+              <option value="depends">depends</option>
+            </select>
+            <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
+              →
+            </span>
+            <select
+              value={relationForm.to}
+              onChange={(e) => setRel("to", e.target.value)}
+              style={SELECT_STYLE}
+            >
+              {ids.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            </select>
+            {relationForm.from === relationForm.to && ids.length >= 2 && (
+              <span style={{ fontSize: 10, color: C.conflicts }}>
+                From ≠ To
+              </span>
+            )}
+          </>
+        )}
+
+        <button
+          disabled={!canSubmit}
+          onClick={handleSubmit}
+          style={{
+            marginLeft: "auto",
+            padding: "3px 14px",
+            borderRadius: 4,
+            fontSize: 12,
+            fontWeight: "bold",
+            cursor: canSubmit ? "pointer" : "default",
+            border: "none",
+            background: C.supports,
+            color: "#fff",
+            opacity: canSubmit ? 1 : 0.4,
+            fontFamily: "inherit",
+          }}
+        >
+          Add {activeTab}
+        </button>
       </div>
 
-      {activeTab === "element" ? (
-        <AddElementForm form={elementForm} setForm={setElementForm} />
-      ) : (
-        <AddRelationForm form={relationForm} setForm={setRelationForm} elements={elements} />
-      )}
-
-      <button
-        disabled={
-          activeTab === "element"
-            ? !elementForm.text.trim()
-            : !relationForm.from || !relationForm.to || relationForm.from === relationForm.to
+      {/* ── Text / explanation ── */}
+      <textarea
+        value={
+          activeTab === "element" ? elementForm.text : relationForm.explanation
         }
-        onClick={() => {
-          if (activeTab === "element") {
-            onAddElement(elementForm);
-            setElementForm(ELEMENT_DEFAULTS);
-          } else {
-            onAddRelation(relationForm);
-            setRelationForm(makeRelationDefaults(elements));
-          }
-        }}
+        onChange={(e) =>
+          activeTab === "element"
+            ? setEl("text", e.target.value)
+            : setRel("explanation", e.target.value)
+        }
+        placeholder={
+          activeTab === "element"
+            ? "Enter statement…"
+            : "Explanation (optional)…"
+        }
         style={{
-          width: "100%", marginTop: 4, padding: "6px 0", borderRadius: 4,
-          border: "none", cursor: "pointer", fontSize: 12, fontWeight: "bold",
-          background: C.supports, color: "#fff",
+          flex: 1,
+          marginTop: 8,
+          resize: "none",
+          width: "100%",
+          boxSizing: "border-box",
+          background: C.bg,
+          border: `1px solid ${C.border}`,
+          borderRadius: 4,
+          color: C.text,
+          padding: "6px 10px",
+          fontSize: 13,
+          fontFamily: "inherit",
+          outline: "none",
         }}
-      >
-        Add {activeTab}
-      </button>
+      />
     </div>
   );
 }

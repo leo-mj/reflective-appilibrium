@@ -18,13 +18,18 @@
  */
 export function buildPrincipleCovers(principles, relations, visIds, elements) {
   const covers = {};
-  principles.forEach((p) => { covers[p.id] = []; });
+  principles.forEach((p) => {
+    covers[p.id] = [];
+  });
   relations.forEach((r) => {
-    if (!visIds.has(r.from) || !visIds.has(r.to) || r.type !== "supports") return;
+    if (!visIds.has(r.from) || !visIds.has(r.to) || r.type !== "supports")
+      return;
     const f = elements.find((e) => e.id === r.from);
     const t = elements.find((e) => e.id === r.to);
-    if (f?.type === "principle" && t?.type === "judgment") covers[f.id]?.push(t.id);
-    if (t?.type === "principle" && f?.type === "judgment") covers[t.id]?.push(f.id);
+    if (f?.type === "principle" && t?.type === "judgment")
+      covers[f.id]?.push(t.id);
+    if (t?.type === "principle" && f?.type === "judgment")
+      covers[t.id]?.push(f.id);
   });
   return covers;
 }

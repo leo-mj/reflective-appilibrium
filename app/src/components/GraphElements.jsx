@@ -204,11 +204,19 @@ export function GraphNode({
  * @param {React.ReactNode}     [props.children]
  */
 const ZOOM_BTN = {
-  width: 24, height: 24, borderRadius: 4,
-  border: `1px solid ${C.border}`, background: C.panel,
-  color: C.dim, cursor: "pointer", fontSize: 14,
-  display: "flex", alignItems: "center", justifyContent: "center",
-  lineHeight: 1, padding: 0,
+  width: 24,
+  height: 24,
+  borderRadius: 4,
+  border: `1px solid ${C.border}`,
+  background: C.panel,
+  color: C.dim,
+  cursor: "pointer",
+  fontSize: 14,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1,
+  padding: 0,
 };
 
 export function GraphCanvas({
@@ -260,13 +268,28 @@ export function GraphCanvas({
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
         >
-          <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>{children}</g>
+          <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
+            {children}
+          </g>
         </svg>
       )}
       {(zoomIn || zoomOut) && (
-        <div style={{ position: "absolute", bottom: 8, right: 8, display: "flex", flexDirection: "column", gap: 3 }}>
-          <button style={ZOOM_BTN} onClick={zoomIn}>+</button>
-          <button style={ZOOM_BTN} onClick={zoomOut}>−</button>
+        <div
+          style={{
+            position: "absolute",
+            bottom: 8,
+            right: 8,
+            display: "flex",
+            flexDirection: "column",
+            gap: 3,
+          }}
+        >
+          <button style={ZOOM_BTN} onClick={zoomIn}>
+            +
+          </button>
+          <button style={ZOOM_BTN} onClick={zoomOut}>
+            −
+          </button>
         </div>
       )}
       <NodeTooltip tooltip={tooltip} />

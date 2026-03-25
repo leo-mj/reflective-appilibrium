@@ -419,8 +419,17 @@ export function HistoryTab({ state, positions, onRoundChange }) {
   const logRef = useRef();
   const currentLogRef = useRef();
 
-  const { pan, zoom, isDragging, onPointerDown, onPointerMove, onPointerUp, applyWheel, zoomIn, zoomOut } =
-    usePan();
+  const {
+    pan,
+    zoom,
+    isDragging,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    applyWheel,
+    zoomIn,
+    zoomOut,
+  } = usePan();
   const playback = usePlayback(state.round);
   const { snappedRound } = playback;
 
@@ -451,12 +460,15 @@ export function HistoryTab({ state, positions, onRoundChange }) {
       <GraphCanvas
         containerRef={containerRef}
         dims={dims}
-        pan={pan} zoom={zoom}
+        pan={pan}
+        zoom={zoom}
         isDragging={isDragging}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        applyWheel={applyWheel} zoomIn={zoomIn} zoomOut={zoomOut}
+        applyWheel={applyWheel}
+        zoomIn={zoomIn}
+        zoomOut={zoomOut}
         tooltip={tooltip}
         containerStyle={{ flex: 1, minHeight: 0 }}
         overlay={
