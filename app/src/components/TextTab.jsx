@@ -216,7 +216,7 @@ export function TextTab({
     });
     if (firstKey) requestAnimationFrame(() => setActiveSection(firstKey));
     return () => observer.disconnect();
-  }, [selected, selectedRel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected, selectedRel, clusterCount, state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sectionMeta = {
     judgments: {
@@ -392,6 +392,7 @@ export function TextTab({
             scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
           }
           style={{
+            zIndex: 99,
             position: "absolute",
             bottom: 10,
             left: 10,
