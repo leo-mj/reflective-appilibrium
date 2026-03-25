@@ -25,6 +25,7 @@ import { EditRelationModal } from "./EditRelationModal.jsx";
 import { NetworkIcon, HistoryIcon, MatrixIcon, ClusterIcon } from "./Icons.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { AddBar } from "./TextTabAddPanel.jsx";
+import { downloadMarkdown } from "../utils/exportMarkdown.js";
 
 // Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
 const CoherenceMatrixTab = LLM_ENABLED
@@ -287,6 +288,7 @@ function AppHeader({
   setTab,
   showText,
   setShowText,
+  onDownload,
   onHome,
 }) {
   const btn = (active) => ({
@@ -319,11 +321,25 @@ function AppHeader({
         marginBottom: 6,
       }}
     >
-      <div>
-        <div style={{ fontSize: 16, fontWeight: "bold" }}>
-          Reflective Equilibrium — Round {round}
+      <div style={{ display: "flex", width: "50%" }}>
+        <button
+          onClick={onDownload}
+          style={{
+            marginRight: "2em",
+            ...btn(true),
+            background: C.theory.high,
+          }}
+        >
+          ↓ Export
+        </button>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: "bold" }}>
+            Reflective Equilibrium — Round {round}
+          </div>
+          <div style={{ fontSize: 14, color: C.dim, marginTop: 2 }}>
+            {topic}
+          </div>
         </div>
-        <div style={{ fontSize: 14, color: C.dim, marginTop: 2 }}>{topic}</div>
       </div>
       <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
         {tabs.map((t) => (
@@ -596,6 +612,7 @@ export default function REState({ initialState, onHome, onReady }) {
         setTab={handleSetTab}
         showText={showText}
         setShowText={setShowText}
+        onDownload={() => downloadMarkdown(state, positions)}
         onHome={onHome}
       />
 
