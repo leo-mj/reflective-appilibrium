@@ -15,16 +15,16 @@ import {
   matchesSearchRel,
 } from "../utils/textTabHelpers.js";
 import { CARD_STYLE } from "../constants/textTabStyles.js";
-import { Ctx } from "./TextTabContext.js";
+import { Ctx } from "./text_panel/TextTabContext.js";
 import {
   SectionHeader,
   CoherenceGroup,
   Highlight,
   HighlightedSection,
   SectionListing,
-} from "./TextTabCards.jsx";
-import { ClusterSection } from "./TextTabClusterSection.jsx";
-import { NavBar } from "./TextTabNavBar.jsx";
+} from "./text_panel/TextTabCards.jsx";
+import { ClusterSection } from "./text_panel/TextTabClusterSection.jsx";
+import { NavBar } from "./text_panel/TextTabNavBar.jsx";
 
 // ─── Module-level constants ───────────────────────────────────────────────────
 

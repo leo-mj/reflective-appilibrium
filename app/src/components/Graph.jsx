@@ -16,15 +16,18 @@ import {
   distToSegment,
 } from "../utils/graphHelpers.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
-import { GraphCanvas, OffscreenIndicators } from "./GraphElements.jsx";
+import {
+  GraphCanvas,
+  OffscreenIndicators,
+} from "./graphs_shared/GraphElements.jsx";
 import {
   renderEdge,
   renderNode,
   graphEdgeVisuals,
   graphNodeVisuals,
-} from "../utils/graphRender.jsx";
-import { AddElementModal } from "./AddElementModal.jsx";
-import { AddRelationModal } from "./AddRelationModal.jsx";
+} from "./graphs_shared/graphRender.jsx";
+import { AddElementModal } from "./user_edits/AddElementModal.jsx";
+import { AddRelationModal } from "./user_edits/AddRelationModal.jsx";
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 

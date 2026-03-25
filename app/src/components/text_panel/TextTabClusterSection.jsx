@@ -3,18 +3,21 @@
  * @module components/TextTabClusterSection
  */
 
-/** @import { REState } from '../types.js' */
+/** @import { REState } from '../../types.js' */
 
 import { useContext, useMemo } from "react";
-import { C } from "../constants/colors.js";
+import { C } from "../../constants/colors.js";
 import {
   findCoherentClusters,
   findCrossClusterTensions,
   findMergeCandidates,
   clusterColor,
-} from "../utils/clusterUtils.js";
-import { sortElementIds } from "../utils/stateUtils.js";
-import { CARD_STYLE, CONTENT_FONT_SIZE } from "../constants/textTabStyles.js";
+} from "../../utils/clusterUtils.js";
+import { sortElementIds } from "../../utils/stateUtils.js";
+import {
+  CARD_STYLE,
+  CONTENT_FONT_SIZE,
+} from "../../constants/textTabStyles.js";
 import { Ctx } from "./TextTabContext.js";
 import { SectionHeader, Highlight } from "./TextTabCards.jsx";
 

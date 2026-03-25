@@ -5,7 +5,7 @@
  */
 
 import { useState } from "react";
-import { C } from "../constants/colors.js";
+import { C } from "../../constants/colors.js";
 
 const ELEMENT_DEFAULTS = {
   type: "judgment",

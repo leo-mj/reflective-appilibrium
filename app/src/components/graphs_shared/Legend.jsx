@@ -3,7 +3,7 @@
  * @module components/Legend
  */
 
-import { C } from "../constants/colors.js";
+import { C } from "../../constants/colors.js";
 
 /**
  * Renders a horizontal legend bar that explains the visual encoding used in the

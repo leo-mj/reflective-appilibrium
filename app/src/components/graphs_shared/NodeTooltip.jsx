@@ -7,10 +7,10 @@
  * @module components/NodeTooltip
  */
 
-/** @import { REElement } from '../types.js' */
+/** @import { REElement } from '../../types.js' */
 
 import { createPortal } from "react-dom";
-import { C } from "../constants/colors.js";
+import { C } from "../../constants/colors.js";
 
 /**
  * @typedef {Object} TooltipState

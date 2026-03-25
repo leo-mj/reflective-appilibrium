@@ -4,7 +4,7 @@
  * @module components/TextTabNavBar
  */
 
-import { C } from "../constants/colors.js";
+import { C } from "../../constants/colors.js";
 
 /**
  * @param {Object}   props

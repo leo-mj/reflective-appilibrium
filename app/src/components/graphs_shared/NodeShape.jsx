@@ -3,7 +3,7 @@
  * @module components/NodeShape
  */
 
-/** @import { REElement } from '../types.js' */
+/** @import { REElement } from '../../types.js' */
 
 /**
  * Renders the correct SVG primitive for an element's type, centred on the

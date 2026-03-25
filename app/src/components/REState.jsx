@@ -19,12 +19,12 @@ import {
 import { Graph } from "./Graph.jsx";
 import { TextTab } from "./TextTab.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
-import { Legend } from "./Legend.jsx";
-import { EditModal } from "./EditModal.jsx";
-import { EditRelationModal } from "./EditRelationModal.jsx";
+import { Legend } from "./graphs_shared/Legend.jsx";
+import { EditModal } from "./user_edits/EditModal.jsx";
+import { EditRelationModal } from "./user_edits/EditRelationModal.jsx";
 import { NetworkIcon, HistoryIcon, MatrixIcon, ClusterIcon } from "./Icons.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
-import { AddBar } from "./TextTabAddPanel.jsx";
+import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
 
 // Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.

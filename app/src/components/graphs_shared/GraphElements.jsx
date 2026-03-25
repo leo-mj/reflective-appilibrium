@@ -8,15 +8,15 @@
  * @module components/GraphElements
  */
 
-/** @import { REElement, RERelation } from '../types.js' */
+/** @import { REElement, RERelation } from '../../types.js' */
 
 import { useEffect, useRef } from "react";
-import { C, getColors } from "../constants/colors.js";
+import { C, getColors } from "../../constants/colors.js";
 import {
   nodeRadius,
   edgeDashArray,
   arrowGeometry,
-} from "../utils/graphHelpers.js";
+} from "../../utils/graphHelpers.js";
 import { NodeShape } from "./NodeShape.jsx";
 import { NodeTooltip } from "./NodeTooltip.jsx";
 

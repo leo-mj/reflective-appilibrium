@@ -10,13 +10,16 @@ import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
-import { GraphCanvas, OffscreenIndicators } from "./GraphElements.jsx";
+import {
+  GraphCanvas,
+  OffscreenIndicators,
+} from "./graphs_shared/GraphElements.jsx";
 import {
   renderEdge,
   renderNode,
   historyEdgeVisuals,
   historyNodeVisuals,
-} from "../utils/graphRender.jsx";
+} from "./graphs_shared/graphRender.jsx";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

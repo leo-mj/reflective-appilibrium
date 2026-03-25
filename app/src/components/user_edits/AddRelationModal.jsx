@@ -4,12 +4,12 @@
  */
 
 import { useState } from "react";
-import { C } from "../constants/colors.js";
+import { C } from "../../constants/colors.js";
 import {
   INPUT_STYLE,
   LABEL_STYLE,
   FIELD_STYLE,
-} from "../constants/modalConstants.js";
+} from "../../constants/modalConstants.js";
 import { ModalShell } from "./ModalShell.jsx";
 
 /**
@@ -24,7 +24,7 @@ import { ModalShell } from "./ModalShell.jsx";
  * Modal for adding a new directed relation between two existing elements.
  *
  * @param {Object}      props
- * @param {import('../types.js').REElement[]} props.elements - Non-withdrawn elements to choose from.
+ * @param {import('../../types.js').REElement[]} props.elements - Non-withdrawn elements to choose from.
  * @param {number}      props.currentRound
  * @param {function(AddRelationFormData): void} props.onSave
  * @param {function(): void} props.onCancel

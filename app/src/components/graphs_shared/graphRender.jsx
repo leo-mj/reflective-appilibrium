@@ -8,15 +8,11 @@
  * @module utils/graphRender
  */
 
-/** @import { REElement, RERelation, PositionMap } from '../types.js' */
+/** @import { REElement, RERelation, PositionMap } from '../../types.js' */
 
-import { confOp, TRANSITION } from "../constants/colors.js";
-import { nodeRadius } from "./graphHelpers.js";
-import {
-  GraphEdge,
-  GraphNode,
-  PulseRing,
-} from "../components/GraphElements.jsx";
+import { confOp, TRANSITION } from "../../constants/colors.js";
+import { nodeRadius } from "../../utils/graphHelpers.js";
+import { GraphEdge, GraphNode, PulseRing } from "./GraphElements.jsx";
 
 // ─── Tooltip handler factory ──────────────────────────────────────────────────
 

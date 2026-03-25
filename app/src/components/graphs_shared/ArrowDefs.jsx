@@ -3,7 +3,7 @@
  * @module components/ArrowDefs
  */
 
-import { C } from "../constants/colors.js";
+import { C } from "../../constants/colors.js";
 
 /**
  * Renders an SVG `<defs>` block containing `<marker>` arrowhead definitions

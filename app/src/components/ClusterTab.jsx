@@ -10,13 +10,16 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
-import { GraphCanvas, OffscreenIndicators } from "./GraphElements.jsx";
+import {
+  GraphCanvas,
+  OffscreenIndicators,
+} from "./graphs_shared/GraphElements.jsx";
 import {
   renderEdge,
   renderNode,
   graphEdgeVisuals,
   graphNodeVisuals,
-} from "../utils/graphRender.jsx";
+} from "./graphs_shared/graphRender.jsx";
 import { findCoherentClusters, clusterColor } from "../utils/clusterUtils.js";
 
 // ─── ClusterGraph ─────────────────────────────────────────────────────────────

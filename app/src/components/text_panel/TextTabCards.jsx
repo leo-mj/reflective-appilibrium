@@ -5,14 +5,14 @@
  */
 
 import { useContext } from "react";
-import { C } from "../constants/colors.js";
+import { C } from "../../constants/colors.js";
 import {
   GHOST_BTN_STYLE,
   WITHDRAW_BTN_STYLE,
   CARD_STYLE,
   META_LABEL_STYLE,
   CONTENT_FONT_SIZE,
-} from "../constants/textTabStyles.js";
+} from "../../constants/textTabStyles.js";
 import { Ctx } from "./TextTabContext.js";
 
 // ─── Highlight ────────────────────────────────────────────────────────────────

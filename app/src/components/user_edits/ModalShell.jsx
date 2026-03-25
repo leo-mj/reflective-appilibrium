@@ -7,7 +7,7 @@
  * @module components/ModalShell
  */
 
-import { C } from "../constants/colors.js";
+import { C } from "../../constants/colors.js";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 

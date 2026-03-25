@@ -8,7 +8,7 @@ import {
   INPUT_STYLE,
   LABEL_STYLE,
   FIELD_STYLE,
-} from "../constants/modalConstants.js";
+} from "../../constants/modalConstants.js";
 import { ModalShell } from "./ModalShell.jsx";
 
 /**
