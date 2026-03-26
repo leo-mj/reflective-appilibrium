@@ -158,7 +158,7 @@ export function HomePage({ onStartFresh, onLoadSample }) {
       <div style={{ textAlign: "center", marginBottom: 48 }}>
         <div>
           <img
-            src={"../public/favicon.svg"}
+            src={"favicon.svg"}
             alt="RE Logo"
             style={{ height: "20%", width: "20%" }}
           />
