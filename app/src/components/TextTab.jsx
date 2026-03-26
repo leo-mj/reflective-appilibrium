@@ -25,6 +25,8 @@ import {
 } from "./text_panel/TextTabCards.jsx";
 import { ClusterSection } from "./text_panel/TextTabClusterSection.jsx";
 import { NavBar } from "./text_panel/TextTabNavBar.jsx";
+import { AddElementModal } from "./user_edits/AddElementModal.jsx";
+import { AddRelationModal } from "./user_edits/AddRelationModal.jsx";
 
 // ─── Module-level constants ───────────────────────────────────────────────────
 
@@ -74,10 +76,17 @@ export function TextTab({
   onEditRelRequest,
   onWithdrawRequest,
   onWithdrawRelRequest,
+  onAddElement,
+  onAddRelation,
+  isWide,
   clusterSectionRef,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   const scrollRef = useRef(null);
+
+  // ── Mobile add menu/modal ─────────────────────────────────────────────────
+  const [addMenu, setAddMenu] = useState(false);
+  const [adding, setAdding] = useState(null); // 'element' | 'relation' | null
   const refJudgments = useRef(null);
   const refPrinciples = useRef(null);
   const refTheories = useRef(null);
@@ -412,6 +421,83 @@ export function TextTab({
         >
           ↑ Top
         </button>
+
+        {!isWide && (
+          <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 99 }}>
+            {addMenu && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 44,
+                  right: 0,
+                  background: C.panel,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }}
+              >
+                {[["element", "Element"], ["relation", "Relation"]].map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => { setAdding(key); setAddMenu(false); }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      borderBottom: key === "element" ? `1px solid ${C.border}` : "none",
+                      color: C.text,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      padding: "10px 18px",
+                      textAlign: "left",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setAddMenu((m) => !m)}
+              style={{
+                background: C.supports,
+                border: "none",
+                borderRadius: 6,
+                color: "#fff",
+                cursor: "pointer",
+                fontSize: 20,
+                lineHeight: 1,
+                width: 36,
+                height: 36,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              +
+            </button>
+          </div>
+        )}
+
+        {adding === "element" && (
+          <AddElementModal
+            initialType="judgment"
+            currentRound={state.round}
+            onSave={(formData) => { onAddElement(formData); setAdding(null); }}
+            onCancel={() => setAdding(null)}
+          />
+        )}
+
+        {adding === "relation" && (
+          <AddRelationModal
+            elements={state.elements.filter((e) => e.status !== "withdrawn")}
+            currentRound={state.round}
+            onSave={(formData) => { onAddRelation(formData); setAdding(null); }}
+            onCancel={() => setAdding(null)}
+          />
+        )}
       </div>
     </Ctx.Provider>
   );

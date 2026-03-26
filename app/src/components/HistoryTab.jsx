@@ -454,6 +454,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
     onPointerDown,
     onPointerMove,
     onPointerUp,
+    onPointerCancel,
     applyWheel,
     zoomIn,
     zoomOut,
@@ -496,6 +497,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         applyWheel={applyWheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}

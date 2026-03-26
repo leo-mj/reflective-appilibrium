@@ -14,8 +14,8 @@ export const GHOST_BTN_STYLE = {
   color: C.dim,
   cursor: "pointer",
   fontSize: 12,
-  padding: "1px 7px",
-  lineHeight: 1.8,
+  padding: "4px 9px",
+  lineHeight: 1.6,
 };
 
 export const WITHDRAW_BTN_STYLE = {

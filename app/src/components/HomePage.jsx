@@ -142,14 +142,14 @@ export function HomePage({ onStartFresh, onLoadSample }) {
   return (
     <div
       style={{
-        height: "100vh",
+        minHeight: "100vh",
         background: C.bg,
         color: C.text,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "32px 24px",
+        padding: "10px 10px",
         boxSizing: "border-box",
         fontFamily: "monospace",
       }}
@@ -160,7 +160,7 @@ export function HomePage({ onStartFresh, onLoadSample }) {
           <img
             src={"favicon.svg"}
             alt="RE Logo"
-            style={{ height: "20%", width: "20%" }}
+            style={{ width: 96, height: "auto" }}
           />
         </div>
         <div style={{ fontSize: 28, fontWeight: "bold", marginBottom: 10 }}>

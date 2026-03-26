@@ -76,7 +76,7 @@ export function NavBar({
           padding: "0 7px",
           lineHeight: "2em",
           borderRadius: 10,
-          fontSize: 13,
+          fontSize: 16,
           border: `1px solid ${search ? C.text : C.border}`,
           background: "transparent",
           color: C.text,

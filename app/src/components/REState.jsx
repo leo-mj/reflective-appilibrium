@@ -590,7 +590,7 @@ function TextPanel({ isWide, clusterSectionRef, ...textTabProps }) {
         overflow: "hidden",
       }}
     >
-      <TextTab {...textTabProps} clusterSectionRef={clusterSectionRef} />
+      <TextTab {...textTabProps} clusterSectionRef={clusterSectionRef} isWide={isWide} />
     </div>
   );
 }
@@ -848,6 +848,8 @@ export default function REState({ initialState, onHome, onReady }) {
             onEditRelRequest={setEditingRel}
             onWithdrawRequest={handleWithdrawRequest}
             onWithdrawRelRequest={handleWithdrawRelRequest}
+            onAddElement={handleAddElement}
+            onAddRelation={handleAddRelation}
           />
         )}
         {(isWide || tab !== "text") && (

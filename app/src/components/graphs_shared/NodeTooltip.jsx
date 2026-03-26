@@ -30,13 +30,17 @@ import { C } from "../../constants/colors.js";
 export function NodeTooltip({ tooltip }) {
   if (!tooltip) return null;
   const { x, y, el } = tooltip;
+  // Clamp x so the tooltip (maxWidth 300 → half = 150) stays within the viewport.
+  const clampedX = Math.max(150, Math.min(window.innerWidth - 150, x));
+  // If near the top edge, show below the cursor instead of above.
+  const nearTop = y < 120;
   return createPortal(
     <div
       style={{
         position: "fixed",
-        left: Math.round(x),
+        left: Math.round(clampedX),
         top: Math.round(y),
-        transform: "translate(-50%, -100%)",
+        transform: nearTop ? "translate(-50%, 10px)" : "translate(-50%, -100%)",
         background: C.panel,
         border: `1px solid ${C.border}`,
         borderRadius: 6,

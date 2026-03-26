@@ -31,7 +31,7 @@ const SELECT_STYLE = {
   borderRadius: 4,
   color: C.text,
   padding: "3px 6px",
-  fontSize: 12,
+  fontSize: 14,
   fontFamily: "inherit",
 };
 
@@ -265,7 +265,7 @@ export function AddBar({ elements, onAddElement, onAddRelation }) {
           borderRadius: 4,
           color: C.text,
           padding: "6px 10px",
-          fontSize: 13,
+          fontSize: 14,
           fontFamily: "inherit",
           outline: "none",
         }}

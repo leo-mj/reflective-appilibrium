@@ -1,31 +1,14 @@
 /**
  * @fileoverview React hook that manages SVG pan + zoom state via the Pointer Events API.
  *
+ * Supports mouse/stylus drag-to-pan, scroll-wheel zoom, button zoom, and
+ * two-finger pinch-to-zoom on touch devices.
+ *
  * @module hooks/usePan
  */
 
 import { useState, useRef, useCallback } from "react";
 
-/**
- * Manages pan and zoom state for an SVG canvas.
- *
- * Zoom is applied by `GraphCanvas` via a non-passive wheel listener so that
- * `e.preventDefault()` can suppress page scroll.  The hook exposes
- * `applyWheel(deltaY, mx, my)` for that listener, plus `zoomIn`/`zoomOut` for
- * button-based zooming.
- *
- * @returns {{
- *   pan:          { x: number, y: number },
- *   zoom:         number,
- *   isDragging:   boolean,
- *   onPointerDown: function(React.PointerEvent): void,
- *   onPointerMove: function(React.PointerEvent): void,
- *   onPointerUp:   function(React.PointerEvent): void,
- *   applyWheel:   function(deltaY: number, mx: number, my: number): void,
- *   zoomIn:       function(): void,
- *   zoomOut:      function(): void,
- * }}
- */
 /** Zoom multiplier per scroll tick or button press. */
 const ZOOM_STEP = 1.1;
 /** Coarser zoom multiplier for the +/− buttons. */
@@ -39,10 +22,15 @@ export function usePan() {
   const [zoom, setZoom] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Refs so wheel/zoom callbacks always see the latest values without stale closures.
+  // Refs so callbacks always see latest values without stale closures.
   const panRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1);
-  const dragRef = useRef(null);
+  const dragRef = useRef(null); // { px, py } — pan origin offset
+
+  // All active pointers: pointerId → { x, y }
+  const activePointersRef = useRef(new Map());
+  // Pinch state (touch only): { prevDist, midX, midY } — SVG-relative, updated each move frame
+  const pinchRef = useRef(null);
 
   const _setPan = (p) => {
     panRef.current = p;
@@ -53,27 +41,89 @@ export function usePan() {
     setZoom(z);
   };
 
+  /** Zoom to `newZoom` keeping the SVG-relative point (mx, my) fixed on screen. */
+  const _applyZoomAt = (newZoom, mx, my) => {
+    const scale = newZoom / zoomRef.current;
+    _setPan({
+      x: mx - (mx - panRef.current.x) * scale,
+      y: my - (my - panRef.current.y) * scale,
+    });
+    _setZoom(newZoom);
+  };
+
   const onPointerDown = (e) => {
     e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = {
-      px: e.clientX - panRef.current.x,
-      py: e.clientY - panRef.current.y,
-    };
-    setIsDragging(true);
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const pts = [...activePointersRef.current.values()];
+
+    if (pts.length === 2 && e.pointerType === "touch") {
+      // Second touch finger — switch from pan to pinch.
+      const [p1, p2] = pts;
+      const rect = e.currentTarget.getBoundingClientRect();
+      pinchRef.current = {
+        prevDist: Math.hypot(p2.x - p1.x, p2.y - p1.y),
+        midX: (p1.x + p2.x) / 2 - rect.left,
+        midY: (p1.y + p2.y) / 2 - rect.top,
+      };
+      dragRef.current = null;
+      setIsDragging(false);
+    } else if (pts.length === 1) {
+      dragRef.current = {
+        px: e.clientX - panRef.current.x,
+        py: e.clientY - panRef.current.y,
+      };
+      setIsDragging(true);
+    }
   };
 
   const onPointerMove = (e) => {
-    if (!dragRef.current) return;
-    _setPan({
-      x: e.clientX - dragRef.current.px,
-      y: e.clientY - dragRef.current.py,
-    });
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = [...activePointersRef.current.values()];
+
+    if (pts.length === 2 && pinchRef.current) {
+      // Pinch zoom: apply delta-based zoom at current midpoint.
+      const [p1, p2] = pts;
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const midX = (p1.x + p2.x) / 2 - rect.left;
+      const midY = (p1.y + p2.y) / 2 - rect.top;
+      const newZoom = Math.max(
+        ZOOM_MIN,
+        Math.min(ZOOM_MAX, zoomRef.current * (dist / pinchRef.current.prevDist)),
+      );
+      _applyZoomAt(newZoom, midX, midY);
+      pinchRef.current = { prevDist: dist, midX, midY };
+    } else if (pts.length === 1 && dragRef.current) {
+      _setPan({
+        x: e.clientX - dragRef.current.px,
+        y: e.clientY - dragRef.current.py,
+      });
+    }
   };
 
-  const onPointerUp = () => {
-    dragRef.current = null;
-    setIsDragging(false);
+  const _endPointer = (e) => {
+    activePointersRef.current.delete(e.pointerId);
+    const remaining = activePointersRef.current.size;
+
+    if (remaining === 0) {
+      pinchRef.current = null;
+      dragRef.current = null;
+      setIsDragging(false);
+    } else if (remaining === 1 && pinchRef.current) {
+      // One finger lifted — transition back to single-finger pan.
+      pinchRef.current = null;
+      const [, pos] = [...activePointersRef.current.entries()][0];
+      dragRef.current = {
+        px: pos.x - panRef.current.x,
+        py: pos.y - panRef.current.y,
+      };
+      setIsDragging(true);
+    }
   };
+
+  const onPointerUp = (e) => _endPointer(e);
+  const onPointerCancel = (e) => _endPointer(e);
 
   /**
    * Called by GraphCanvas's non-passive wheel listener. `mx`/`my` are SVG-relative px.
@@ -87,11 +137,10 @@ export function usePan() {
       Math.min(ZOOM_MAX, zoomRef.current * factor),
     );
     const scale = newZoom / zoomRef.current;
-    const newPan = {
+    _setPan({
       x: mx - (mx - panRef.current.x) * scale,
       y: my - (my - panRef.current.y) * scale,
-    };
-    _setPan(newPan);
+    });
     _setZoom(newZoom);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -116,6 +165,7 @@ export function usePan() {
     onPointerDown,
     onPointerMove,
     onPointerUp,
+    onPointerCancel,
     applyWheel,
     zoomIn,
     zoomOut,

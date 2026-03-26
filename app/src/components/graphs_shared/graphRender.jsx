@@ -19,6 +19,7 @@ import { GraphEdge, GraphNode, PulseRing } from "./GraphElements.jsx";
 /**
  * Returns `onMouseEnter` / `onMouseLeave` handlers that update a tooltip state.
  * The handler is a no-op while the user is dragging.
+ * On touch devices, tooltips are shown on tap via `useGraphClick` instead.
  *
  * @param {boolean}   isDragging
  * @param {Function}  setTooltip - State setter for `{ x, y, el } | null`.

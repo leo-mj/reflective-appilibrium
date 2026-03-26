@@ -198,14 +198,15 @@ export function GraphNode({
  * @param {Function}            props.onPointerDown
  * @param {Function}            props.onPointerMove
  * @param {Function}            props.onPointerUp
+ * @param {Function}            [props.onPointerCancel]
  * @param {Object|null}         props.tooltip
  * @param {React.CSSProperties} [props.containerStyle]
  * @param {React.ReactNode}     [props.overlay]
  * @param {React.ReactNode}     [props.children]
  */
 const ZOOM_BTN = {
-  width: 24,
-  height: 24,
+  width: 44,
+  height: 44,
   borderRadius: 4,
   border: `1px solid ${C.border}`,
   background: C.panel,
@@ -228,6 +229,7 @@ export function GraphCanvas({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onPointerCancel,
   applyWheel,
   zoomIn,
   zoomOut,
@@ -267,6 +269,7 @@ export function GraphCanvas({
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
         >
           <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
             {children}

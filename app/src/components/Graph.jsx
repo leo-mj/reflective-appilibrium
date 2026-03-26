@@ -150,24 +150,45 @@ function useGraphClick({
   /** @param {React.PointerEvent} e */
   const onPointerDown = (e) => {
     panDown(e);
-    clickOrigin.current = { x: e.clientX, y: e.clientY };
-    setTooltip(null);
+    clickOrigin.current = { x: e.clientX, y: e.clientY, pointerType: e.pointerType };
+    // On touch, keep the existing tooltip visible until pointerUp resolves the tap.
+    if (e.pointerType !== "touch") setTooltip(null);
   };
 
   /** @param {React.PointerEvent} e */
   const onPointerUp = (e) => {
     panUp(e);
     if (!clickOrigin.current) return;
-    const { x: ox, y: oy } = clickOrigin.current;
+    const { x: ox, y: oy, pointerType } = clickOrigin.current;
     clickOrigin.current = null;
-    if (Math.abs(e.clientX - ox) > 4 || Math.abs(e.clientY - oy) > 4) return; // drag
+    const threshold = pointerType === "touch" ? 10 : 4;
+    if (Math.abs(e.clientX - ox) > threshold || Math.abs(e.clientY - oy) > threshold) return; // drag
 
     // Convert screen → simulation coordinates (accounting for pan and zoom).
     const rect = e.currentTarget.getBoundingClientRect();
     const sx = (e.clientX - rect.left - pan.x) / zoom;
     const sy = (e.clientY - rect.top - pan.y) / zoom;
 
-    // Node hit-test first.
+    if (pointerType === "touch") {
+      // Touch: tap shows/dismisses tooltip only — no focus/selection.
+      for (const el of visibleEls) {
+        const pos = positions[el.id];
+        if (!pos) continue;
+        if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitRadius(el.type) ** 2) {
+          setTooltip((prev) =>
+            prev?.el?.id === el.id
+              ? null
+              : { x: e.clientX, y: e.clientY - 10, el },
+          );
+          return;
+        }
+      }
+      // Tapped background — clear tooltip.
+      setTooltip(null);
+      return;
+    }
+
+    // Mouse: node hit-test → focus/selection.
     for (const el of visibleEls) {
       const pos = positions[el.id];
       if (!pos) continue;
@@ -280,6 +301,7 @@ export function Graph({
     onPointerDown: panDown,
     onPointerMove,
     onPointerUp: panUp,
+    onPointerCancel,
     applyWheel,
     zoomIn,
     zoomOut,
@@ -316,6 +338,7 @@ export function Graph({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         applyWheel={applyWheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}

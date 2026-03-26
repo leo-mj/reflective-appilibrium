@@ -90,7 +90,7 @@ export function ClusterSection({
               <div
                 style={{
                   display: "flex",
-                  flexWrap: "wrap",
+                  flexDirection: "column",
                   gap: 4,
                 }}
               >
@@ -101,6 +101,7 @@ export function ClusterSection({
                       key={id}
                       style={{
                         ...CLUSTER_CARD_STYLE,
+                        minWidth: 0,
                       }}
                     >
                       <Badge id={id} />
@@ -117,7 +118,7 @@ export function ClusterSection({
         <>
           <div
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: "bold",
               letterSpacing: 1,
               textTransform: "uppercase",
@@ -161,7 +162,7 @@ export function ClusterSection({
         <>
           <div
             style={{
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: "bold",
               letterSpacing: 1,
               textTransform: "uppercase",
