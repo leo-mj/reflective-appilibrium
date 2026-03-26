@@ -439,6 +439,7 @@ function LogOverlay({ sortedLog, snappedRound, logRef, currentLogRef }) {
  * @param {REState}     props.state
  * @param {PositionMap} props.positions
  * @param {function(number): void} props.onRoundChange - Notifies parent of the current round.
+ * @param {boolean}     props.isWide
  * @returns {React.ReactElement}
  */
 export function HistoryTab({ state, positions, onRoundChange, isWide }) {
@@ -525,10 +526,9 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
           </>
         }
       >
-        {state.relations.map((r, i) =>
+        {state.relations.map((r) =>
           renderEdge(
             r,
-            i,
             positions,
             state.elements,
             historyEdgeVisuals(r, wIds, snappedRound),

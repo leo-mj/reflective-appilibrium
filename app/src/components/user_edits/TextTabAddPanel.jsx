@@ -4,7 +4,10 @@
  * @module components/TextTabAddPanel
  */
 
+/** @import { REElement } from '../../types.js' */
+
 import { useState } from "react";
+
 import { C } from "../../constants/colors.js";
 import { sortElementIds } from "../../utils/stateUtils.js";
 
@@ -15,6 +18,10 @@ const ELEMENT_DEFAULTS = {
   text: "",
 };
 
+/**
+ * @param {REElement[]} elements
+ * @returns {{ from: string, to: string, type: string, explanation: string }}
+ */
 function makeRelationDefaults(elements) {
   const ids = elements.map((e) => e.id).sort(sortElementIds);
   return {

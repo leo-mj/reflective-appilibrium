@@ -3,6 +3,8 @@
  * @module components/AddRelationModal
  */
 
+/** @import { REElement } from '../../types.js' */
+
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import {
@@ -22,17 +24,15 @@ import { sortElementIds } from "../../utils/stateUtils.js";
  */
 
 /**
- * Modal for adding a new directed relation between two existing elements.
+ * Inline form fields for adding a relation — used by both AddRelationModal and the TextTab panel.
  *
- * @param {Object}      props
- * @param {import('../../types.js').REElement[]} props.elements - Non-withdrawn elements to choose from.
- * @param {number}      props.currentRound
- * @param {function(AddRelationFormData): void} props.onSave
- * @param {function(): void} props.onCancel
- * @returns {React.ReactElement}
+ * @param {Object} props
+ * @param {AddRelationFormData} props.form
+ * @param {import('react').Dispatch<import('react').SetStateAction<AddRelationFormData>>} props.setForm
+ * @param {REElement[]} props.elements - Non-withdrawn elements to choose from.
  */
-/** Inline form fields for adding a relation — used by both AddRelationModal and the TextTab panel. */
 export function AddRelationForm({ form, setForm, elements }) {
+  /** @param {string} field @param {string} value */
   const set = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
   const ids = elements.map((e) => e.id);
@@ -97,14 +97,24 @@ export function AddRelationForm({ form, setForm, elements }) {
   );
 }
 
+/**
+ * Modal for adding a new directed relation between two existing elements.
+ *
+ * @param {Object}      props
+ * @param {REElement[]} props.elements - Non-withdrawn elements to choose from.
+ * @param {number}      props.currentRound
+ * @param {function(AddRelationFormData): void} props.onSave
+ * @param {function(): void} props.onCancel
+ * @returns {React.ReactElement}
+ */
 export function AddRelationModal({ elements, currentRound, onSave, onCancel }) {
   const ids = elements.map((e) => e.id);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(/** @type {AddRelationFormData} */ ({
     from: ids[0] ?? "",
     to: ids[1] ?? "",
     type: "supports",
     explanation: "",
-  });
+  }));
   const selfLoop = form.from === form.to;
   return (
     <ModalShell

@@ -112,7 +112,7 @@ export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRel) {
  * @returns {{ isWithdrawn: boolean, opacity: number, transition: string, children: React.ReactNode }}
  */
 export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
-  const isFuture = element.addedRound > snappedRound;
+  const isFuture = (element.addedRound || 1) > snappedRound;
   const isWithdrawn = wIds.has(element.id);
   const isNew = newIds.has(element.id);
   return {
@@ -163,19 +163,18 @@ export function graphNodeVisuals(element, wIds, dimNode, selected) {
  * Returns `null` when either endpoint position is missing.
  *
  * @param {RERelation}  relation
- * @param {number}      i         - Array index (used as React key).
  * @param {PositionMap} positions
  * @param {REElement[]} elements
  * @param {Object}      visuals   - Output of `historyEdgeVisuals` or `graphEdgeVisuals`.
  * @returns {React.ReactElement|null}
  */
-export function renderEdge(relation, i, positions, elements, visuals) {
+export function renderEdge(relation, positions, elements, visuals) {
   const resolved = resolveEdge(relation, positions, elements);
   if (!resolved) return null;
   const { sourcePos, targetPos, sourceEl, targetEl } = resolved;
   return (
     <GraphEdge
-      key={i}
+      key={`${relation.from}-${relation.to}-${relation.type}-${relation.addedRound ?? 1}`}
       relation={relation}
       sourcePos={sourcePos}
       targetPos={targetPos}

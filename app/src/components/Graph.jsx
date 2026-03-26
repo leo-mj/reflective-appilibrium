@@ -362,10 +362,9 @@ export function Graph({
         }
       >
         {/* ── Edges ── */}
-        {visRels.map((r, i) =>
+        {visRels.map((r) =>
           renderEdge(
             r,
-            i,
             positions,
             state.elements,
             graphEdgeVisuals(r, wIds, dimEdge, selectedRel),

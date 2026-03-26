@@ -63,6 +63,13 @@ const NAV_SECTIONS = [
  * @param {function}        props.onSelect
  * @param {RERelation|null} props.selectedRel
  * @param {function}        props.onSelectRel
+ * @param {function}        props.onEditRequest
+ * @param {function}        props.onEditRelRequest
+ * @param {function}        props.onWithdrawRequest
+ * @param {function}        props.onWithdrawRelRequest
+ * @param {function}        props.onAddElement
+ * @param {function}        props.onAddRelation
+ * @param {boolean}         props.isWide
  * @param {React.RefObject} props.clusterSectionRef
  */
 export function TextTab({

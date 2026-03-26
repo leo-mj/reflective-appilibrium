@@ -367,9 +367,9 @@ export function CoherenceGroup({ title, color, items }) {
       >
         {title}
       </div>
-      {items.map((item, i) => (
+      {items.map((item) => (
         <div
-          key={i}
+          key={item}
           style={{
             fontSize: 12,
             color: C.dim,
@@ -441,8 +441,8 @@ export function HighlightedSection({
               >
                 Relations
               </div>
-              {hlRels.map((r, i) => (
-                <RelationCard key={i} r={r} />
+              {hlRels.map((r) => (
+                <RelationCard key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`} r={r} />
               ))}
             </>
           )}
@@ -451,8 +451,8 @@ export function HighlightedSection({
       <div style={{ borderTop: `1px solid ${C.border}`, margin: "4px 0 0" }} />
       <SectionHeader title="All elements" />
       <ElementCards els={restEls} dim />
-      {restRels.map((r, i) => (
-        <RelationCard key={i} r={r} dim />
+      {restRels.map((r) => (
+        <RelationCard key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`} r={r} dim />
       ))}
     </>
   );
@@ -507,7 +507,7 @@ export function SectionListing({
           onToggle={() => toggle("relations")}
         />
         {!isCollapsed("relations") &&
-          displayRels.map((r, i) => <RelationCard key={i} r={r} />)}
+          displayRels.map((r) => <RelationCard key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`} r={r} />)}
       </div>
     </>
   );

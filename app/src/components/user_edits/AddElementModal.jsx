@@ -20,18 +20,14 @@ import { ModalShell } from "./ModalShell.jsx";
  */
 
 /**
- * Modal for adding a new RE element.
- * The element ID is assigned automatically by the parent on save.
+ * Inline form fields for adding an element — used by both AddElementModal and the TextTab panel.
  *
- * @param {Object}   props
- * @param {'judgment'|'principle'|'theory'} props.initialType - Pre-selected element type.
- * @param {number}   props.currentRound
- * @param {function(AddElementFormData): void} props.onSave
- * @param {function(): void} props.onCancel
- * @returns {React.ReactElement}
+ * @param {Object} props
+ * @param {AddElementFormData} props.form
+ * @param {import('react').Dispatch<import('react').SetStateAction<AddElementFormData>>} props.setForm
  */
-/** Inline form fields for adding an element — used by both AddElementModal and the TextTab panel. */
 export function AddElementForm({ form, setForm }) {
+  /** @param {string} field @param {string} value */
   const set = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
   return (
@@ -81,18 +77,29 @@ export function AddElementForm({ form, setForm }) {
   );
 }
 
+/**
+ * Modal for adding a new RE element.
+ * The element ID is assigned automatically by the parent on save.
+ *
+ * @param {Object}   props
+ * @param {'judgment'|'principle'|'theory'} props.initialType - Pre-selected element type.
+ * @param {number}   props.currentRound
+ * @param {function(AddElementFormData): void} props.onSave
+ * @param {function(): void} props.onCancel
+ * @returns {React.ReactElement}
+ */
 export function AddElementModal({
   initialType,
   currentRound,
   onSave,
   onCancel,
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(/** @type {AddElementFormData} */ ({
     type: initialType,
     confidence: "moderate",
     origin: "user",
     text: "",
-  });
+  }));
   return (
     <ModalShell
       title="Add element"

@@ -61,7 +61,7 @@ export function ClusterSection({
           const color = clusterColor(i);
           const members = [...cluster.members].sort(sortElementIds);
           return (
-            <div key={i} style={{ ...CARD_STYLE }}>
+            <div key={members.join(",")} style={{ ...CARD_STYLE }}>
               <div
                 style={{
                   display: "flex",
@@ -128,9 +128,9 @@ export function ClusterSection({
           >
             Cross-cluster tensions
           </div>
-          {tensions.map((t, i) => (
+          {tensions.map((t) => (
             <div
-              key={i}
+              key={`${t.edge.from}-${t.edge.to}-${t.edge.type}-${t.clusterIndices.join("-")}`}
               style={{
                 fontSize: CONTENT_FONT_SIZE,
                 color: C.dim,
@@ -173,9 +173,9 @@ export function ClusterSection({
           >
             Merge candidates
           </div>
-          {merges.map((m, i) => (
+          {merges.map((m) => (
             <div
-              key={i}
+              key={m.clusterIndices.join("-")}
               style={{
                 fontSize: CONTENT_FONT_SIZE,
                 color: C.dim,
