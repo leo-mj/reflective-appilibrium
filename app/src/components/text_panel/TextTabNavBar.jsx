@@ -45,10 +45,9 @@ export function NavBar({
             key={item.key}
             onClick={() => onNavigate(item.key)}
             style={{
-              height: "2em",
+              minHeight: 36,
               boxSizing: "border-box",
-              padding: "0 8px",
-              lineHeight: "2em",
+              padding: "4px 8px",
               borderRadius: 10,
               fontSize: 11,
               cursor: "pointer",
@@ -71,10 +70,9 @@ export function NavBar({
         placeholder="Search…"
         style={{
           marginLeft: "auto",
-          height: "2em",
+          minHeight: 36,
           boxSizing: "border-box",
-          padding: "0 7px",
-          lineHeight: "2em",
+          padding: "4px 7px",
           borderRadius: 10,
           fontSize: 16,
           border: `1px solid ${search ? C.text : C.border}`,
@@ -82,6 +80,7 @@ export function NavBar({
           color: C.text,
           outline: "none",
           width: "30%",
+          minWidth: 70,
         }}
       />
     </div>

@@ -295,6 +295,54 @@ const TAB_LABELS = {
   clusters: "Clusters",
 };
 
+/** Topic text with hover tooltip (desktop) and tap tooltip (mobile). */
+function TopicLabel({ topic, style }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      style={{ position: "relative", minWidth: 0, ...style }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onPointerUp={(e) => {
+        if (e.pointerType === "touch") setOpen((s) => !s);
+      }}
+    >
+      <div
+        style={{
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {topic}
+      </div>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            marginTop: 4,
+            zIndex: 200,
+            background: C.panel,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            padding: "8px 12px",
+            fontSize: 12,
+            color: C.text,
+            whiteSpace: "normal",
+            maxWidth: 320,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            pointerEvents: "none",
+          }}
+        >
+          {topic}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AppHeader({
   round,
   topic,
@@ -393,17 +441,7 @@ function AppHeader({
             >
               Round {round}
             </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: C.dim,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {topic}
-            </div>
+            <TopicLabel topic={topic} style={{ fontSize: 12, color: C.dim }} />
           </div>
           <button
             onClick={() => setMenuOpen((m) => !m)}
@@ -524,18 +562,7 @@ function AppHeader({
           >
             Reflective Equilibrium — Round {round}
           </div>
-          <div
-            style={{
-              fontSize: 14,
-              color: C.dim,
-              marginTop: 2,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {topic}
-          </div>
+          <TopicLabel topic={topic} style={{ fontSize: 14, color: C.dim, marginTop: 2 }} />
         </div>
       </div>
       <div

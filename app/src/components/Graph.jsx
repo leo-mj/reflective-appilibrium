@@ -63,8 +63,8 @@ function AddButtonsOverlay({ onAddEl, onAddRel }) {
             border: "none",
             color: "#fff",
             borderRadius: 6,
-            padding: "4px 10px",
-            fontSize: 12,
+            padding: "8px 12px",
+            fontSize: 13,
             cursor: "pointer",
           }}
         >
@@ -78,8 +78,8 @@ function AddButtonsOverlay({ onAddEl, onAddRel }) {
           border: "none",
           color: C.text,
           borderRadius: 6,
-          padding: "4px 10px",
-          fontSize: 12,
+          padding: "8px 12px",
+          fontSize: 13,
           cursor: "pointer",
         }}
       >
