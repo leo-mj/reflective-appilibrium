@@ -869,11 +869,13 @@ export default function REState({ initialState, onHome, onReady }) {
         )}
       </div>
 
-      <AddBar
-        elements={state.elements.filter((e) => e.status !== "withdrawn")}
-        onAddElement={handleAddElement}
-        onAddRelation={handleAddRelation}
-      />
+      {isWide && (
+        <AddBar
+          elements={state.elements.filter((e) => e.status !== "withdrawn")}
+          onAddElement={handleAddElement}
+          onAddRelation={handleAddRelation}
+        />
+      )}
 
       <EditModals
         editingEl={editingEl}
