@@ -26,6 +26,7 @@ import { NetworkIcon, HistoryIcon, MatrixIcon, ClusterIcon } from "./Icons.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
+import { importStateFromFile } from "../utils/importMarkdown.js";
 
 // Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
 const CoherenceMatrixTab = LLM_ENABLED
@@ -247,6 +248,17 @@ function useREActions(initialState) {
     handleSelectRel(() => newRel);
   };
 
+  const handleImportFile = async (file) => {
+    try {
+      const newState = await importStateFromFile(file);
+      setState(newState);
+      setSelected(null);
+      setSelectedRel(null);
+    } catch (e) {
+      window.alert(`Import failed: ${e.message}`);
+    }
+  };
+
   return {
     state,
     selected,
@@ -264,6 +276,7 @@ function useREActions(initialState) {
     handleWithdrawRelRequest,
     handleAddElement,
     handleAddRelation,
+    handleImportFile,
   };
 }
 
@@ -290,8 +303,19 @@ function AppHeader({
   showText,
   setShowText,
   onDownload,
+  onImportFile,
+  hasExistingState,
   onHome,
 }) {
+  const fileInputRef = useRef(null);
+  const handleImportClick = () => {
+    if (
+      hasExistingState &&
+      !window.confirm("Importing will replace your current session. Continue?")
+    )
+      return;
+    fileInputRef.current.click();
+  };
   const btn = (active) => ({
     display: "flex",
     alignItems: "center",
@@ -323,6 +347,23 @@ function AppHeader({
       }}
     >
       <div style={{ display: "flex", width: "50%" }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".md"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onImportFile(file);
+            e.target.value = "";
+          }}
+        />
+        <button
+          onClick={handleImportClick}
+          style={{ marginRight: 6, ...btn(false) }}
+        >
+          ↑ Import
+        </button>
         <button
           onClick={onDownload}
           style={{
@@ -562,6 +603,7 @@ export default function REState({ initialState, onHome, onReady }) {
     handleWithdrawRelRequest,
     handleAddElement,
     handleAddRelation,
+    handleImportFile,
   } = actions;
 
   const clusterSectionRef = useRef(null);
@@ -614,6 +656,8 @@ export default function REState({ initialState, onHome, onReady }) {
         showText={showText}
         setShowText={setShowText}
         onDownload={() => downloadMarkdown(state, positions)}
+        onImportFile={handleImportFile}
+        hasExistingState={state.elements.length > 0}
         onHome={onHome}
       />
 

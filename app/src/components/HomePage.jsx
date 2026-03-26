@@ -156,6 +156,13 @@ export function HomePage({ onStartFresh, onLoadSample }) {
     >
       {/* Header */}
       <div style={{ textAlign: "center", marginBottom: 48 }}>
+        <div>
+          <img
+            src={"../public/favicon.svg"}
+            alt="RE Logo"
+            style={{ height: "20%", width: "20%" }}
+          />
+        </div>
         <div style={{ fontSize: 28, fontWeight: "bold", marginBottom: 10 }}>
           Reflective APPilibrium
         </div>

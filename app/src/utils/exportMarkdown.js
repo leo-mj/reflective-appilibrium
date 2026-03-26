@@ -178,6 +178,9 @@ export function downloadMarkdown(state, positions) {
     elementsSection(state.elements, "principle", "Principles", pCovers) +
     elementsSection(state.elements, "theory", "Background Theories", pCovers);
 
+  // Machine-readable state block — used by the import feature to restore this session.
+  const stateBlock = "```re-state\n" + JSON.stringify(state, null, 2) + "\n```";
+
   const parts = [
     header,
     elementsBlock,
@@ -186,6 +189,7 @@ export function downloadMarkdown(state, positions) {
     clustersSection(state, positions),
     coherenceSection(state.coherence),
     logSection(state.log),
+    stateBlock,
   ].filter(Boolean);
 
   const markdown = parts.join("\n\n---\n\n");
