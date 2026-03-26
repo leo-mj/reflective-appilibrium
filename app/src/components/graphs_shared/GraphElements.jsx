@@ -187,25 +187,9 @@ export function GraphNode({
 
 // ─── GraphCanvas ──────────────────────────────────────────────────────────────
 
-/**
- * Shared SVG container used by both Graph and HistoryTab.
- *
- * @param {Object}              props
- * @param {React.Ref}           props.containerRef
- * @param {{ w: number, h: number }} props.dims
- * @param {{ x: number, y: number }} props.pan
- * @param {boolean}             props.isDragging
- * @param {Function}            props.onPointerDown
- * @param {Function}            props.onPointerMove
- * @param {Function}            props.onPointerUp
- * @param {Object|null}         props.tooltip
- * @param {React.CSSProperties} [props.containerStyle]
- * @param {React.ReactNode}     [props.overlay]
- * @param {React.ReactNode}     [props.children]
- */
 const ZOOM_BTN = {
-  width: 24,
-  height: 24,
+  width: 44,
+  height: 44,
   borderRadius: 4,
   border: `1px solid ${C.border}`,
   background: C.panel,
@@ -219,6 +203,27 @@ const ZOOM_BTN = {
   padding: 0,
 };
 
+/**
+ * Shared SVG container used by both Graph and HistoryTab.
+ *
+ * @param {Object}              props
+ * @param {React.Ref}           props.containerRef
+ * @param {{ w: number, h: number }} props.dims
+ * @param {{ x: number, y: number }} props.pan
+ * @param {number}              [props.zoom=1]
+ * @param {boolean}             props.isDragging
+ * @param {Function}            props.onPointerDown
+ * @param {Function}            props.onPointerMove
+ * @param {Function}            props.onPointerUp
+ * @param {Function}            [props.onPointerCancel]
+ * @param {Function}            [props.applyWheel]   - Non-passive wheel handler for zoom.
+ * @param {Function}            [props.zoomIn]
+ * @param {Function}            [props.zoomOut]
+ * @param {Object|null}         props.tooltip
+ * @param {React.CSSProperties} [props.containerStyle]
+ * @param {React.ReactNode}     [props.overlay]
+ * @param {React.ReactNode}     [props.children]
+ */
 export function GraphCanvas({
   containerRef,
   dims,
@@ -228,6 +233,7 @@ export function GraphCanvas({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onPointerCancel,
   applyWheel,
   zoomIn,
   zoomOut,
@@ -267,6 +273,7 @@ export function GraphCanvas({
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
         >
           <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
             {children}

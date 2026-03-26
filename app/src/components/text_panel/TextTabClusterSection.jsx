@@ -16,9 +16,10 @@ import { sortElementIds } from "../../utils/stateUtils.js";
 import {
   CARD_STYLE,
   CONTENT_FONT_SIZE,
+  CLUSTER_CARD_STYLE,
 } from "../../constants/textTabStyles.js";
 import { Ctx } from "./TextTabContext.js";
-import { SectionHeader, Highlight } from "./TextTabCards.jsx";
+import { Badge, SectionHeader, Highlight } from "./TextTabCards.jsx";
 
 /**
  * @param {Object}   props
@@ -60,7 +61,7 @@ export function ClusterSection({
           const color = clusterColor(i);
           const members = [...cluster.members].sort(sortElementIds);
           return (
-            <div key={i} style={{ ...CARD_STYLE }}>
+            <div key={members.join(",")} style={{ ...CARD_STYLE }}>
               <div
                 style={{
                   display: "flex",
@@ -86,39 +87,26 @@ export function ClusterSection({
                   {cluster.size} members
                 </span>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                }}
+              >
                 {members.map((id) => {
                   const el = state.elements.find((e) => e.id === id);
                   return (
-                    <span
+                    <div
                       key={id}
-                      style={{ display: "flex", alignItems: "center", gap: 4 }}
+                      style={{
+                        ...CLUSTER_CARD_STYLE,
+                        minWidth: 0,
+                      }}
                     >
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: "bold",
-                          padding: "1px 7px",
-                          borderRadius: 4,
-                          background: badgeColor(id) + "22",
-                          color: badgeColor(id),
-                          border: `1px solid ${badgeColor(id)}55`,
-                        }}
-                      >
-                        {id}
-                      </span>
-                      {el && (
-                        <span
-                          style={{
-                            fontSize: CONTENT_FONT_SIZE,
-                            color: C.dim,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          <Highlight text={el.text} query={search} />
-                        </span>
-                      )}
-                    </span>
+                      <Badge id={id} />
+                      <Highlight text={el.text} query={search} />
+                    </div>
                   );
                 })}
               </div>
@@ -130,7 +118,7 @@ export function ClusterSection({
         <>
           <div
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: "bold",
               letterSpacing: 1,
               textTransform: "uppercase",
@@ -140,9 +128,9 @@ export function ClusterSection({
           >
             Cross-cluster tensions
           </div>
-          {tensions.map((t, i) => (
+          {tensions.map((t) => (
             <div
-              key={i}
+              key={`${t.edge.from}-${t.edge.to}-${t.edge.type}-${t.clusterIndices.join("-")}`}
               style={{
                 fontSize: CONTENT_FONT_SIZE,
                 color: C.dim,
@@ -174,7 +162,7 @@ export function ClusterSection({
         <>
           <div
             style={{
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: "bold",
               letterSpacing: 1,
               textTransform: "uppercase",
@@ -185,9 +173,9 @@ export function ClusterSection({
           >
             Merge candidates
           </div>
-          {merges.map((m, i) => (
+          {merges.map((m) => (
             <div
-              key={i}
+              key={m.clusterIndices.join("-")}
               style={{
                 fontSize: CONTENT_FONT_SIZE,
                 color: C.dim,

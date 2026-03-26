@@ -1,8 +1,8 @@
 import { C } from "./colors.js";
 // ─── Shared form styles (exported for use in modal form fields) ───────────────
 
-/** Input / select / textarea style shared across all modals. */
-export const INPUT_STYLE = {
+/** @type {import('react').CSSProperties} Input / select / textarea style shared across all modals. */
+export const INPUT_STYLE = /** @type {import('react').CSSProperties} */ ({
   background: C.bg,
   border: `1px solid ${C.border}`,
   borderRadius: 4,
@@ -12,7 +12,7 @@ export const INPUT_STYLE = {
   width: "100%",
   boxSizing: "border-box",
   fontFamily: "inherit",
-};
+});
 
 /** Label style shared across all modals. */
 export const LABEL_STYLE = {

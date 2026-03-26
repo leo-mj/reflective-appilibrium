@@ -100,10 +100,9 @@ function ClusterGraph({ cluster, color, state, positions }) {
         />
       }
     >
-      {visRels.map((r, i) =>
+      {visRels.map((r) =>
         renderEdge(
           r,
-          i,
           positions,
           state.elements,
           graphEdgeVisuals(r, wIds, () => false, null),
@@ -165,7 +164,7 @@ export function ClusterTab({ state, positions }) {
     >
       {clusters.map((cluster, i) => (
         <div
-          key={i}
+          key={[...cluster.members].sort().join(",")}
           style={{
             height: "100%",
             border: `1px solid ${clusterColor(i)}44`,

@@ -247,7 +247,7 @@ function PlaybackControls({ playback, maxRound }) {
             border: `1px solid ${C.border}`,
             color: C.dim,
             borderRadius: 4,
-            padding: "2px 8px",
+            padding: "6px 10px",
             cursor: "pointer",
             fontSize: 12,
           }}
@@ -262,7 +262,7 @@ function PlaybackControls({ playback, maxRound }) {
             border: "none",
             color: "#fff",
             borderRadius: 4,
-            padding: "4px 12px",
+            padding: "6px 14px",
             cursor: "pointer",
             fontSize: 12,
             fontWeight: "bold",
@@ -287,10 +287,10 @@ function PlaybackControls({ playback, maxRound }) {
                 border: `1px solid ${speed === s ? C.dim : C.border}`,
                 color: speed === s ? C.text : C.dim,
                 borderRadius: 4,
-                padding: "2px 6px",
+                padding: "6px 8px",
                 cursor: "pointer",
-                fontSize: 11,
-                minWidth: "3em",
+                fontSize: 12,
+                minWidth: "2.5em",
               }}
             >
               {s}×
@@ -305,6 +305,7 @@ function PlaybackControls({ playback, maxRound }) {
           gap: 3,
           alignItems: "center",
           flex: "auto",
+          flexBasis: "100%",
         }}
       >
         <PlaybackSlider
@@ -438,6 +439,7 @@ function LogOverlay({ sortedLog, snappedRound, logRef, currentLogRef }) {
  * @param {REState}     props.state
  * @param {PositionMap} props.positions
  * @param {function(number): void} props.onRoundChange - Notifies parent of the current round.
+ * @param {boolean}     props.isWide
  * @returns {React.ReactElement}
  */
 export function HistoryTab({ state, positions, onRoundChange, isWide }) {
@@ -454,6 +456,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
     onPointerDown,
     onPointerMove,
     onPointerUp,
+    onPointerCancel,
     applyWheel,
     zoomIn,
     zoomOut,
@@ -496,6 +499,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         applyWheel={applyWheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}
@@ -522,10 +526,9 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
           </>
         }
       >
-        {state.relations.map((r, i) =>
+        {state.relations.map((r) =>
           renderEdge(
             r,
-            i,
             positions,
             state.elements,
             historyEdgeVisuals(r, wIds, snappedRound),

@@ -295,6 +295,74 @@ const TAB_LABELS = {
   clusters: "Clusters",
 };
 
+/**
+ * Topic text with hover tooltip (desktop) and tap tooltip (mobile).
+ *
+ * @param {Object} props
+ * @param {string} props.topic
+ * @param {import('react').CSSProperties} [props.style]
+ */
+function TopicLabel({ topic, style }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      style={{ position: "relative", minWidth: 0, ...style }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onPointerUp={(e) => {
+        if (e.pointerType === "touch") setOpen((s) => !s);
+      }}
+    >
+      <div
+        style={{
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {topic}
+      </div>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            marginTop: 4,
+            zIndex: 200,
+            background: C.panel,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            padding: "8px 12px",
+            fontSize: 12,
+            color: C.text,
+            whiteSpace: "normal",
+            maxWidth: 320,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            pointerEvents: "none",
+          }}
+        >
+          {topic}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * @param {Object}   props
+ * @param {number}   props.round
+ * @param {string}   props.topic
+ * @param {string}   props.tab
+ * @param {function(string): void} props.setTab
+ * @param {boolean}  props.showText
+ * @param {import('react').Dispatch<import('react').SetStateAction<boolean>>} props.setShowText
+ * @param {function(): void} props.onDownload
+ * @param {function(File): void} props.onImportFile
+ * @param {boolean}  props.hasExistingState
+ * @param {function(): void} props.onHome
+ * @param {boolean}  props.isWide
+ */
 function AppHeader({
   round,
   topic,
@@ -393,17 +461,7 @@ function AppHeader({
             >
               Round {round}
             </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: C.dim,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {topic}
-            </div>
+            <TopicLabel topic={topic} style={{ fontSize: 12, color: C.dim }} />
           </div>
           <button
             onClick={() => setMenuOpen((m) => !m)}
@@ -421,8 +479,6 @@ function AppHeader({
           <div
             style={{
               position: "absolute",
-              // top: "calc(100% + 4px)",
-              // right: 0,
               zIndex: 100,
               background: C.panel,
               border: `1px solid ${C.border}`,
@@ -431,7 +487,6 @@ function AppHeader({
               display: "flex",
               flexDirection: "column",
               gap: 2,
-              // minWidth: 180,
               width: "100%",
               boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
             }}
@@ -524,18 +579,10 @@ function AppHeader({
           >
             Reflective Equilibrium — Round {round}
           </div>
-          <div
-            style={{
-              fontSize: 14,
-              color: C.dim,
-              marginTop: 2,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {topic}
-          </div>
+          <TopicLabel
+            topic={topic}
+            style={{ fontSize: 14, color: C.dim, marginTop: 2 }}
+          />
         </div>
       </div>
       <div
@@ -590,7 +637,11 @@ function TextPanel({ isWide, clusterSectionRef, ...textTabProps }) {
         overflow: "hidden",
       }}
     >
-      <TextTab {...textTabProps} clusterSectionRef={clusterSectionRef} />
+      <TextTab
+        {...textTabProps}
+        clusterSectionRef={clusterSectionRef}
+        isWide={isWide}
+      />
     </div>
   );
 }
@@ -670,7 +721,6 @@ function GraphPanel({
             onSelectRel={onSelectRel}
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
-            isWide={isWide}
           />
         )}
         {tab === "history" && (
@@ -739,8 +789,8 @@ function EditModals({
  *
  * @param {Object}      props
  * @param {REStateType} props.initialState
- * @param {Function}    props.onHome    - Called when the user navigates back to the home screen.
- * @param {Function}    props.onReady   - Called once the force simulation has settled.
+ * @param {() => void}  props.onHome    - Called when the user navigates back to the home screen.
+ * @param {() => void}  props.onReady   - Called once the force simulation has settled.
  */
 export default function REState({ initialState, onHome, onReady }) {
   const [tab, setTab] = useState("graph");
@@ -848,6 +898,26 @@ export default function REState({ initialState, onHome, onReady }) {
             onEditRelRequest={setEditingRel}
             onWithdrawRequest={handleWithdrawRequest}
             onWithdrawRelRequest={handleWithdrawRelRequest}
+            onAddElement={
+              isWide
+                ? handleAddElement
+                : /** @param {import('./user_edits/AddElementModal.jsx').AddElementFormData} d */ (
+                    d,
+                  ) => {
+                    handleAddElement(d);
+                    handleSelectNode(() => null);
+                  }
+            }
+            onAddRelation={
+              isWide
+                ? handleAddRelation
+                : /** @param {import('./user_edits/AddRelationModal.jsx').AddRelationFormData} d */ (
+                    d,
+                  ) => {
+                    handleAddRelation(d);
+                    handleSelectRel(() => null);
+                  }
+            }
           />
         )}
         {(isWide || tab !== "text") && (

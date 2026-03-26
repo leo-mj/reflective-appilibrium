@@ -14,8 +14,8 @@ export const GHOST_BTN_STYLE = {
   color: C.dim,
   cursor: "pointer",
   fontSize: 12,
-  padding: "1px 7px",
-  lineHeight: 1.8,
+  padding: "4px 9px",
+  lineHeight: 1.6,
 };
 
 export const WITHDRAW_BTN_STYLE = {
@@ -38,3 +38,12 @@ export const META_LABEL_STYLE = {
 };
 
 export const CONTENT_FONT_SIZE = 14;
+
+export const CLUSTER_CARD_STYLE = {
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  fontSize: 12,
+  paddingBottom: 3,
+  borderBottom: `1px solid ${C.border}66`,
+};
