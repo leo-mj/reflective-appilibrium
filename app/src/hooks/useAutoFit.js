@@ -37,7 +37,7 @@ export function useAutoFit({
 }) {
   const fittedRef = useRef(false);
   const prevFitRef = useRef({ refitKey: Symbol(), w: -1, h: -1 });
-  
+
   useEffect(() => {
     if (!positions) return;
     if (!enabled) return;

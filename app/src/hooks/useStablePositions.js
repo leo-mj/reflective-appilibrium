@@ -8,7 +8,6 @@
 import { useState, useEffect, useRef } from "react";
 import * as d3 from "d3";
 
-
 /**
  * Runs a D3 force-directed simulation over **all** elements in `state` (including withdrawn
  * ones) and returns stable `{x, y}` positions keyed by element ID.
@@ -64,8 +63,8 @@ export function useStablePositions(state, dims) {
   const simRef = useRef(null);
   const [positions, setPositions] = useState({});
   const [ready, setReady] = useState(false);
-  const halfWidth = dims.w/2;
-  const halfHeight = dims.h/2;
+  const halfWidth = dims.w / 2;
+  const halfHeight = dims.h / 2;
 
   useEffect(() => {
     if (!dims.w || !dims.h) return;
@@ -80,8 +79,8 @@ export function useStablePositions(state, dims) {
         type: e.type,
         // Node radius used for collision detection — matches the radii in Graph.jsx / HistoryTab.jsx.
         r: e.type === "principle" ? 28 : e.type === "theory" ? 22 : 18,
-        x: prev?.x ?? halfWidth + (Math.random() - 0.5) * halfWidth/10,
-        y: prev?.y ?? halfHeight + (Math.random() - 0.5) * halfHeight/10,
+        x: prev?.x ?? halfWidth + ((Math.random() - 0.5) * halfWidth) / 10,
+        y: prev?.y ?? halfHeight + ((Math.random() - 0.5) * halfHeight) / 10,
         vx: 0,
         vy: 0,
       };
@@ -132,7 +131,6 @@ export function useStablePositions(state, dims) {
     simRef.current = sim;
     return () => sim.stop();
   }, [state.elements.length, state.relations.length, dims.w, dims.h]);
-
 
   return { positions, ready };
 }
