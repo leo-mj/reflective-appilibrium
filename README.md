@@ -1,6 +1,6 @@
 # assistive-equilibrium
 
-A structured tool for conducting reflective equilibrium (RE) in ethics — iteratively building coherent moral positions by working between judgments, principles, and background theories. The aim of this tool is not to be a standalone moral reasoner. 
+A structured tool for conducting reflective equilibrium (RE) in ethics — iteratively building coherent moral positions by working between judgments, principles, and background theories. The aim of this tool is not to be a standalone moral reasoner.
 It is part of a research project exploring in how far LLMs can assist in RE processes.
 
 ## Current Status
@@ -20,7 +20,7 @@ A React SPA with LLM API integration, persistent visualization, pluggable cohere
 
 ---
 
-## Quick Start (Phase 2 — Web App, planned)
+## Quick Start (Phase 2 — Frontend Web App)
 
 ```bash
 cd app
@@ -28,7 +28,9 @@ npm install
 npm run dev
 ```
 
-Configure your LLM backend in the settings panel.
+## Quick Start (Phase 3 — Full Stack Web App - Planned)
+
+To come: Backend for running more thorough coherence checks and interacting with LLM APIs.
 
 ---
 
