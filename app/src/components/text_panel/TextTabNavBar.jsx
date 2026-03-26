@@ -30,11 +30,12 @@ export function NavBar({
         display: "flex",
         alignItems: "center",
         gap: 4,
-        height: "2em",
-        padding: "0 4px",
+        minHeight: "2em",
+        padding: "4px",
         borderBottom: `1px solid ${C.border}`,
         background: C.bg,
         flexShrink: 0,
+        flexWrap: "wrap",
       }}
     >
       {navItems.map((item) => {

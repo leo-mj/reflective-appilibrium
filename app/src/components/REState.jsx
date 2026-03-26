@@ -306,8 +306,10 @@ function AppHeader({
   onImportFile,
   hasExistingState,
   onHome,
+  isWide,
 }) {
   const fileInputRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const handleImportClick = () => {
     if (
       hasExistingState &&
@@ -330,6 +332,7 @@ function AppHeader({
     fontSize: 12,
     background: active ? C.border : "transparent",
     color: active ? C.text : C.dim,
+    fontFamily: "inherit",
   });
   const tabs = [
     "graph",
@@ -337,6 +340,150 @@ function AppHeader({
     "clusters",
     ...(LLM_ENABLED ? ["matrix"] : []),
   ];
+
+  const hiddenInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept=".md"
+      style={{ display: "none" }}
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) onImportFile(file);
+        e.target.value = "";
+      }}
+    />
+  );
+
+  // ── Narrow (phone): title + hamburger menu ─────────────────────────────────
+  if (!isWide) {
+    const menuBtn = (active = false) => ({
+      ...btn(active),
+      width: "100%",
+      justifyContent: "flex-start",
+      gap: 8,
+    });
+    const divider = (
+      <div style={{ height: 1, background: C.border, margin: "2px 0" }} />
+    );
+    const close = (fn) => () => {
+      fn();
+      setMenuOpen(false);
+    };
+
+    return (
+      <div style={{ position: "relative", marginBottom: 6 }}>
+        {hiddenInput}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ minWidth: 0, overflow: "hidden" }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: "bold",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              Round {round}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: C.dim,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {topic}
+            </div>
+          </div>
+          <button
+            onClick={() => setMenuOpen((m) => !m)}
+            style={{
+              ...btn(menuOpen),
+              flexShrink: 0,
+              marginLeft: 8,
+              border: `1px solid ${C.text}`,
+            }}
+          >
+            ☰
+          </button>
+        </div>
+        {menuOpen && (
+          <div
+            style={{
+              position: "absolute",
+              // top: "calc(100% + 4px)",
+              // right: 0,
+              zIndex: 100,
+              background: C.panel,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              padding: 6,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              // minWidth: 180,
+              width: "100%",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            }}
+          >
+            <button onClick={close(onHome)} style={menuBtn()}>
+              ← Home
+            </button>
+            {divider}
+            {tabs.map((t) => (
+              <button
+                key={t}
+                onClick={close(() => setTab(t))}
+                style={menuBtn(tab === t)}
+              >
+                {TAB_ICONS[t]}
+                {TAB_LABELS[t]}
+              </button>
+            ))}
+            <button
+              onClick={close(() => setTab("text"))}
+              style={menuBtn(tab === "text")}
+            >
+              Text
+            </button>
+            {divider}
+            <button
+              onClick={() => {
+                handleImportClick();
+                setMenuOpen(false);
+              }}
+              style={menuBtn()}
+            >
+              ↑ Import
+            </button>
+            <button
+              onClick={close(onDownload)}
+              style={{
+                ...menuBtn(),
+                background: C.theory.high,
+                color: C.text,
+                border: "none",
+              }}
+            >
+              ↓ Export
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Wide (desktop): existing layout ───────────────────────────────────────
   return (
     <div
       style={{
@@ -346,21 +493,11 @@ function AppHeader({
         marginBottom: 6,
       }}
     >
-      <div style={{ display: "flex", width: "50%" }}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".md"
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onImportFile(file);
-            e.target.value = "";
-          }}
-        />
+      <div style={{ display: "flex", flex: "1 1 0", minWidth: 0 }}>
+        {hiddenInput}
         <button
           onClick={handleImportClick}
-          style={{ marginRight: 6, ...btn(false) }}
+          style={{ marginRight: 6, flexShrink: 0, ...btn(false) }}
         >
           ↑ Import
         </button>
@@ -368,22 +505,42 @@ function AppHeader({
           onClick={onDownload}
           style={{
             marginRight: "2em",
+            flexShrink: 0,
             ...btn(true),
             background: C.theory.high,
           }}
         >
           ↓ Export
         </button>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: "bold" }}>
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 16,
+              fontWeight: "bold",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             Reflective Equilibrium — Round {round}
           </div>
-          <div style={{ fontSize: 14, color: C.dim, marginTop: 2 }}>
+          <div
+            style={{
+              fontSize: 14,
+              color: C.dim,
+              marginTop: 2,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {topic}
           </div>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+      <div
+        style={{ display: "flex", gap: 2, alignItems: "center", flexShrink: 0 }}
+      >
         {tabs.map((t) => (
           <button key={t} onClick={() => setTab(t)} style={btn(tab === t)}>
             {TAB_ICONS[t]}
@@ -394,7 +551,9 @@ function AppHeader({
           onClick={() => setShowText((s) => !s)}
           style={{ ...btn(false), position: "relative" }}
         >
-          <span style={{ visibility: "hidden" }}>Hide text</span>
+          <span style={{ visibility: "hidden" }}>
+            {showText ? "Hide text" : "Show text"}
+          </span>
           <span
             style={{
               position: "absolute",
@@ -420,8 +579,9 @@ function TextPanel({ isWide, clusterSectionRef, ...textTabProps }) {
     <div
       style={{
         width: isWide ? "50%" : "100%",
-        height: isWide ? "auto" : 280,
-        flexShrink: 0,
+        flex: isWide ? undefined : 1,
+        height: isWide ? "auto" : undefined,
+        flexShrink: isWide ? 0 : undefined,
         borderRight: isWide ? `1px solid ${C.border}` : "none",
         borderBottom: isWide ? "none" : `1px solid ${C.border}`,
         paddingRight: isWide ? 12 : 0,
@@ -448,6 +608,7 @@ function GraphPanel({
   onAddElement,
   onAddRelation,
   onRoundChange,
+  isWide,
 }) {
   return (
     <div
@@ -509,6 +670,7 @@ function GraphPanel({
             onSelectRel={onSelectRel}
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
+            isWide={isWide}
           />
         )}
         {tab === "history" && (
@@ -516,6 +678,7 @@ function GraphPanel({
             state={state}
             positions={positions}
             onRoundChange={onRoundChange}
+            isWide={isWide}
           />
         )}
         {tab === "clusters" && (
@@ -609,7 +772,7 @@ export default function REState({ initialState, onHome, onReady }) {
   const clusterSectionRef = useRef(null);
   const handleSetTab = (t) => {
     setTab(t);
-    if (t === "clusters") {
+    if (t === "clusters" && isWide) {
       setShowText(true);
       requestAnimationFrame(() =>
         clusterSectionRef.current?.scrollIntoView({
@@ -621,7 +784,7 @@ export default function REState({ initialState, onHome, onReady }) {
   };
 
   const dims = useWindowSize();
-  const isWide = dims.w > 768;
+  const isWide = dims.w > 768 && dims.h > 500;
   const graphW = isWide && showText ? (dims.w - 32) / 2 - 12 : dims.w - 32;
   const { positions, ready } = useStablePositions(state, {
     w: graphW,
@@ -659,6 +822,7 @@ export default function REState({ initialState, onHome, onReady }) {
         onImportFile={handleImportFile}
         hasExistingState={state.elements.length > 0}
         onHome={onHome}
+        isWide={isWide}
       />
 
       <div
@@ -670,7 +834,7 @@ export default function REState({ initialState, onHome, onReady }) {
           gap: 12,
         }}
       >
-        {showText && (
+        {(isWide ? showText : tab === "text") && (
           <TextPanel
             isWide={isWide}
             clusterSectionRef={clusterSectionRef}
@@ -686,20 +850,23 @@ export default function REState({ initialState, onHome, onReady }) {
             onWithdrawRelRequest={handleWithdrawRelRequest}
           />
         )}
-        <GraphPanel
-          tab={tab}
-          state={state}
-          positions={positions}
-          showWithdrawn={showWithdrawn}
-          setShowWithdrawn={setShowWithdrawn}
-          selected={selected}
-          onSelect={handleSelectNode}
-          selectedRel={selectedRel}
-          onSelectRel={handleSelectRel}
-          onAddElement={handleAddElement}
-          onAddRelation={handleAddRelation}
-          onRoundChange={setHistoryRound}
-        />
+        {(isWide || tab !== "text") && (
+          <GraphPanel
+            tab={tab}
+            state={state}
+            positions={positions}
+            showWithdrawn={showWithdrawn}
+            setShowWithdrawn={setShowWithdrawn}
+            selected={selected}
+            onSelect={handleSelectNode}
+            selectedRel={selectedRel}
+            onSelectRel={handleSelectRel}
+            onAddElement={handleAddElement}
+            onAddRelation={handleAddRelation}
+            onRoundChange={setHistoryRound}
+            isWide={isWide}
+          />
+        )}
       </div>
 
       <AddBar

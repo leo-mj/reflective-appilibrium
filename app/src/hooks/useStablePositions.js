@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from "react";
 import * as d3 from "d3";
 
+
 /**
  * Runs a D3 force-directed simulation over **all** elements in `state` (including withdrawn
  * ones) and returns stable `{x, y}` positions keyed by element ID.
@@ -63,6 +64,8 @@ export function useStablePositions(state, dims) {
   const simRef = useRef(null);
   const [positions, setPositions] = useState({});
   const [ready, setReady] = useState(false);
+  const halfWidth = dims.w/2;
+  const halfHeight = dims.h/2;
 
   useEffect(() => {
     if (!dims.w || !dims.h) return;
@@ -77,8 +80,8 @@ export function useStablePositions(state, dims) {
         type: e.type,
         // Node radius used for collision detection — matches the radii in Graph.jsx / HistoryTab.jsx.
         r: e.type === "principle" ? 28 : e.type === "theory" ? 22 : 18,
-        x: prev?.x ?? dims.w / 2 + (Math.random() - 0.5) * 200,
-        y: prev?.y ?? dims.h / 2 + (Math.random() - 0.5) * 200,
+        x: prev?.x ?? halfWidth + (Math.random() - 0.5) * halfWidth/10,
+        y: prev?.y ?? halfHeight + (Math.random() - 0.5) * halfHeight/10,
         vx: 0,
         vy: 0,
       };
@@ -100,14 +103,14 @@ export function useStablePositions(state, dims) {
           .strength(0.4),
       )
       .force("charge", d3.forceManyBody().strength(-320))
-      .force("center", d3.forceCenter(dims.w / 2, dims.h / 2))
+      .force("center", d3.forceCenter(halfWidth, halfHeight))
       .force(
         "collision",
         d3.forceCollide().radius((d) => d.r + 12),
       )
       // Weak restoring forces keep isolated nodes from drifting off-screen.
-      .force("x", d3.forceX(dims.w / 2).strength(0.04))
-      .force("y", d3.forceY(dims.h / 2).strength(0.04))
+      .force("x", d3.forceX(halfWidth).strength(0.04))
+      .force("y", d3.forceY(halfHeight).strength(0.04))
       .alphaDecay(0.01);
 
     // On every tick, snapshot positions into both the ref (stable) and state (triggers re-render).
@@ -129,6 +132,7 @@ export function useStablePositions(state, dims) {
     simRef.current = sim;
     return () => sim.stop();
   }, [state.elements.length, state.relations.length, dims.w, dims.h]);
+
 
   return { positions, ready };
 }
