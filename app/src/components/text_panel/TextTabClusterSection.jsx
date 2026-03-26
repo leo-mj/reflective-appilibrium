@@ -16,9 +16,10 @@ import { sortElementIds } from "../../utils/stateUtils.js";
 import {
   CARD_STYLE,
   CONTENT_FONT_SIZE,
+  CLUSTER_CARD_STYLE,
 } from "../../constants/textTabStyles.js";
 import { Ctx } from "./TextTabContext.js";
-import { SectionHeader, Highlight } from "./TextTabCards.jsx";
+import { Badge, SectionHeader, Highlight } from "./TextTabCards.jsx";
 
 /**
  * @param {Object}   props
@@ -86,39 +87,25 @@ export function ClusterSection({
                   {cluster.size} members
                 </span>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 4,
+                }}
+              >
                 {members.map((id) => {
                   const el = state.elements.find((e) => e.id === id);
                   return (
-                    <span
+                    <div
                       key={id}
-                      style={{ display: "flex", alignItems: "center", gap: 4 }}
+                      style={{
+                        ...CLUSTER_CARD_STYLE,
+                      }}
                     >
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: "bold",
-                          padding: "1px 7px",
-                          borderRadius: 4,
-                          background: badgeColor(id) + "22",
-                          color: badgeColor(id),
-                          border: `1px solid ${badgeColor(id)}55`,
-                        }}
-                      >
-                        {id}
-                      </span>
-                      {el && (
-                        <span
-                          style={{
-                            fontSize: CONTENT_FONT_SIZE,
-                            color: C.dim,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          <Highlight text={el.text} query={search} />
-                        </span>
-                      )}
-                    </span>
+                      <Badge id={id} />
+                      <Highlight text={el.text} query={search} />
+                    </div>
                   );
                 })}
               </div>

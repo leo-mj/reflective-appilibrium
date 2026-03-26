@@ -117,6 +117,7 @@ export function Badge({ id }) {
         fontSize: 12,
         fontWeight: "bold",
         padding: "1px 7px",
+        marginRight: "5px",
         borderRadius: 4,
         background: isSelected ? color + "44" : color + "22",
         color,
@@ -124,6 +125,8 @@ export function Badge({ id }) {
         flexShrink: 0,
         lineHeight: 1.8,
         cursor: "pointer",
+        width: "3em",
+        textAlign: "center",
       }}
     >
       {id}
