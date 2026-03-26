@@ -90,7 +90,10 @@ export function usePan() {
       const midY = (p1.y + p2.y) / 2 - rect.top;
       const newZoom = Math.max(
         ZOOM_MIN,
-        Math.min(ZOOM_MAX, zoomRef.current * (dist / pinchRef.current.prevDist)),
+        Math.min(
+          ZOOM_MAX,
+          zoomRef.current * (dist / pinchRef.current.prevDist),
+        ),
       );
       _applyZoomAt(newZoom, midX, midY);
       pinchRef.current = { prevDist: dist, midX, midY };

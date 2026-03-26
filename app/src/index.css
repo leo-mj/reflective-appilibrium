@@ -38,7 +38,9 @@ body {
 
 /* Prevent iOS Safari auto-zoom on input focus (triggered when font-size < 16px) */
 @media (max-width: 768px) {
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     font-size: 16px !important;
   }
 }

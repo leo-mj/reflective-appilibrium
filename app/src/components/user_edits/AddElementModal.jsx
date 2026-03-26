@@ -94,12 +94,14 @@ export function AddElementModal({
   onSave,
   onCancel,
 }) {
-  const [form, setForm] = useState(/** @type {AddElementFormData} */ ({
-    type: initialType,
-    confidence: "moderate",
-    origin: "user",
-    text: "",
-  }));
+  const [form, setForm] = useState(
+    /** @type {AddElementFormData} */ ({
+      type: initialType,
+      confidence: "moderate",
+      origin: "user",
+      text: "",
+    }),
+  );
   return (
     <ModalShell
       title="Add element"

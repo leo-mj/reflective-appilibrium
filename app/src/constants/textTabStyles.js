@@ -46,4 +46,4 @@ export const CLUSTER_CARD_STYLE = {
   fontSize: 12,
   paddingBottom: 3,
   borderBottom: `1px solid ${C.border}66`,
-}
+};

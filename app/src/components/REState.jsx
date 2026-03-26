@@ -898,8 +898,26 @@ export default function REState({ initialState, onHome, onReady }) {
             onEditRelRequest={setEditingRel}
             onWithdrawRequest={handleWithdrawRequest}
             onWithdrawRelRequest={handleWithdrawRelRequest}
-            onAddElement={handleAddElement}
-            onAddRelation={handleAddRelation}
+            onAddElement={
+              isWide
+                ? handleAddElement
+                : /** @param {import('./user_edits/AddElementModal.jsx').AddElementFormData} d */ (
+                    d,
+                  ) => {
+                    handleAddElement(d);
+                    handleSelectNode(() => null);
+                  }
+            }
+            onAddRelation={
+              isWide
+                ? handleAddRelation
+                : /** @param {import('./user_edits/AddRelationModal.jsx').AddRelationFormData} d */ (
+                    d,
+                  ) => {
+                    handleAddRelation(d);
+                    handleSelectRel(() => null);
+                  }
+            }
           />
         )}
         {(isWide || tab !== "text") && (

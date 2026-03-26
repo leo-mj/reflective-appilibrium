@@ -109,12 +109,14 @@ export function AddRelationForm({ form, setForm, elements }) {
  */
 export function AddRelationModal({ elements, currentRound, onSave, onCancel }) {
   const ids = elements.map((e) => e.id);
-  const [form, setForm] = useState(/** @type {AddRelationFormData} */ ({
-    from: ids[0] ?? "",
-    to: ids[1] ?? "",
-    type: "supports",
-    explanation: "",
-  }));
+  const [form, setForm] = useState(
+    /** @type {AddRelationFormData} */ ({
+      from: ids[0] ?? "",
+      to: ids[1] ?? "",
+      type: "supports",
+      explanation: "",
+    }),
+  );
   const selfLoop = form.from === form.to;
   return (
     <ModalShell

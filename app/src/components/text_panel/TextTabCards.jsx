@@ -442,7 +442,10 @@ export function HighlightedSection({
                 Relations
               </div>
               {hlRels.map((r) => (
-                <RelationCard key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`} r={r} />
+                <RelationCard
+                  key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`}
+                  r={r}
+                />
               ))}
             </>
           )}
@@ -452,7 +455,11 @@ export function HighlightedSection({
       <SectionHeader title="All elements" />
       <ElementCards els={restEls} dim />
       {restRels.map((r) => (
-        <RelationCard key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`} r={r} dim />
+        <RelationCard
+          key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`}
+          r={r}
+          dim
+        />
       ))}
     </>
   );
@@ -507,7 +514,12 @@ export function SectionListing({
           onToggle={() => toggle("relations")}
         />
         {!isCollapsed("relations") &&
-          displayRels.map((r) => <RelationCard key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`} r={r} />)}
+          displayRels.map((r) => (
+            <RelationCard
+              key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`}
+              r={r}
+            />
+          ))}
       </div>
     </>
   );

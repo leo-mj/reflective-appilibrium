@@ -268,9 +268,9 @@ export function TextTab({
       value={{
         state,
         selected,
-        onSelect,
+        onSelect: isWide ? onSelect : () => {},
         selectedRel,
-        onSelectRel,
+        onSelectRel: isWide ? onSelectRel : () => {},
         onEditRequest,
         onEditRelRequest,
         onWithdrawRequest,
@@ -430,7 +430,9 @@ export function TextTab({
         </button>
 
         {!isWide && (
-          <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 99 }}>
+          <div
+            style={{ position: "absolute", bottom: 10, right: 10, zIndex: 99 }}
+          >
             {addMenu && (
               <div
                 style={{
@@ -445,14 +447,21 @@ export function TextTab({
                   overflow: "hidden",
                 }}
               >
-                {[["element", "Element"], ["relation", "Relation"]].map(([key, label]) => (
+                {[
+                  ["element", "Element"],
+                  ["relation", "Relation"],
+                ].map(([key, label]) => (
                   <button
                     key={key}
-                    onClick={() => { setAdding(key); setAddMenu(false); }}
+                    onClick={() => {
+                      setAdding(key);
+                      setAddMenu(false);
+                    }}
                     style={{
                       background: "transparent",
                       border: "none",
-                      borderBottom: key === "element" ? `1px solid ${C.border}` : "none",
+                      borderBottom:
+                        key === "element" ? `1px solid ${C.border}` : "none",
                       color: C.text,
                       cursor: "pointer",
                       fontSize: 13,
@@ -492,7 +501,10 @@ export function TextTab({
           <AddElementModal
             initialType="judgment"
             currentRound={state.round}
-            onSave={(formData) => { onAddElement(formData); setAdding(null); }}
+            onSave={(formData) => {
+              onAddElement(formData);
+              setAdding(null);
+            }}
             onCancel={() => setAdding(null)}
           />
         )}
@@ -501,7 +513,10 @@ export function TextTab({
           <AddRelationModal
             elements={state.elements.filter((e) => e.status !== "withdrawn")}
             currentRound={state.round}
-            onSave={(formData) => { onAddRelation(formData); setAdding(null); }}
+            onSave={(formData) => {
+              onAddRelation(formData);
+              setAdding(null);
+            }}
             onCancel={() => setAdding(null)}
           />
         )}

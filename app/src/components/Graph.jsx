@@ -150,7 +150,11 @@ function useGraphClick({
   /** @param {React.PointerEvent} e */
   const onPointerDown = (e) => {
     panDown(e);
-    clickOrigin.current = { x: e.clientX, y: e.clientY, pointerType: e.pointerType };
+    clickOrigin.current = {
+      x: e.clientX,
+      y: e.clientY,
+      pointerType: e.pointerType,
+    };
     // On touch, keep the existing tooltip visible until pointerUp resolves the tap.
     if (e.pointerType !== "touch") setTooltip(null);
   };
@@ -162,7 +166,11 @@ function useGraphClick({
     const { x: ox, y: oy, pointerType } = clickOrigin.current;
     clickOrigin.current = null;
     const threshold = pointerType === "touch" ? 10 : 4;
-    if (Math.abs(e.clientX - ox) > threshold || Math.abs(e.clientY - oy) > threshold) return; // drag
+    if (
+      Math.abs(e.clientX - ox) > threshold ||
+      Math.abs(e.clientY - oy) > threshold
+    )
+      return; // drag
 
     // Convert screen → simulation coordinates (accounting for pan and zoom).
     const rect = e.currentTarget.getBoundingClientRect();
