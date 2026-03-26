@@ -10,6 +10,7 @@ import { useState, useRef } from "react";
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
+import { useAutoFit } from "../hooks/useAutoFit.js";
 import {
   hitRadius,
   getNeighbours,
@@ -282,7 +283,11 @@ export function Graph({
     applyWheel,
     zoomIn,
     zoomOut,
+    resetView,
   } = usePan();
+
+  useAutoFit({ positions, dims, resetView });
+
   const { onPointerDown, onPointerUp } = useGraphClick({
     panDown,
     panUp,

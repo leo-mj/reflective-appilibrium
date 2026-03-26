@@ -6,7 +6,7 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo } from "react";
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
@@ -21,6 +21,7 @@ import {
   graphNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
 import { findCoherentClusters, clusterColor } from "../utils/clusterUtils.js";
+import { useAutoFit } from "../hooks/useAutoFit.js";
 
 // ─── ClusterGraph ─────────────────────────────────────────────────────────────
 
@@ -28,9 +29,6 @@ import { findCoherentClusters, clusterColor } from "../utils/clusterUtils.js";
  * Mini pannable graph showing only the elements of one cluster,
  * centred in whatever space the parent gives it.
  */
-// Padding around the bounding box (accounts for node radius + label).
-const FIT_PADDING = 120;
-
 function ClusterGraph({ cluster, color, state, positions }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
@@ -53,42 +51,21 @@ function ClusterGraph({ cluster, color, state, positions }) {
     () => state.elements.filter((e) => members.has(e.id)),
     [state.elements, members],
   );
-  const ids = visibleEls.map((e) => e.id);
+  const ids = useMemo(() => visibleEls.map((e) => e.id), [visibleEls]);
 
-  // Stable key for the cluster membership — triggers re-fit when members change.
   const memberKey = useMemo(
     () => [...cluster.members].sort().join(","),
     [cluster],
   );
 
-  // Auto-fit: compute zoom + pan so all nodes are visible, then snap the view.
-  useEffect(() => {
-    if (!dims.w) return;
-    const pts = ids.map((id) => positions[id]).filter(Boolean);
-    if (!pts.length) return;
-    const xs = pts.map((p) => p.x),
-      ys = pts.map((p) => p.y);
-    const x0 = Math.min(...xs),
-      x1 = Math.max(...xs);
-    const y0 = Math.min(...ys),
-      y1 = Math.max(...ys);
-    const bboxW = x1 - x0,
-      bboxH = y1 - y0;
-    const fitZoom =
-      bboxW < 10 && bboxH < 10
-        ? 1
-        : Math.min(
-            (dims.w - FIT_PADDING) / bboxW,
-            (dims.h - FIT_PADDING) / bboxH,
-            0.8,
-          );
-    const cx = (x0 + x1) / 2,
-      cy = (y0 + y1) / 2;
-    resetView(
-      { x: dims.w / 2 - cx * fitZoom, y: dims.h / 2 - cy * fitZoom },
-      fitZoom,
-    );
-  }, [dims.w, dims.h, memberKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useAutoFit({
+    positions,
+    ids,
+    dims,
+    resetView,
+    maxZoom: 0.8,
+    refitKey: memberKey,
+  });
 
   const visRels = state.relations.filter(
     (r) => members.has(r.from) && members.has(r.to),

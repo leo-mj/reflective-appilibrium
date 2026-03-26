@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from "react";
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
+import { useAutoFit } from "../hooks/useAutoFit.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
 import {
   GraphCanvas,
@@ -142,6 +143,7 @@ function PlaybackSlider({
         flex: 1,
         position: "relative",
         height: 20,
+        minWidth: 100,
         display: "flex",
         alignItems: "center",
       }}
@@ -234,99 +236,118 @@ function PlaybackControls({ playback, maxRound }) {
         alignItems: "center",
         gap: 12,
         padding: "8px 0",
+        flexWrap: "wrap",
       }}
     >
-      <button
-        onClick={resetPlayback}
-        style={{
-          background: "none",
-          border: `1px solid ${C.border}`,
-          color: C.dim,
-          borderRadius: 4,
-          padding: "2px 8px",
-          cursor: "pointer",
-          fontSize: 12,
-        }}
-      >
-        Reset
-      </button>
-
-      <button
-        onClick={togglePlay}
-        style={{
-          background: playing ? C.conflicts : C.supports,
-          border: "none",
-          color: "#fff",
-          borderRadius: 4,
-          padding: "4px 12px",
-          cursor: "pointer",
-          fontSize: 12,
-          fontWeight: "bold",
-        }}
-      >
-        {playing ? "Pause" : "Play"}
-      </button>
-
       <div style={{ display: "flex", gap: 2 }}>
-        {SPEEDS.map((s) => (
-          <button
-            key={s}
-            onClick={() => setSpeed(s)}
-            style={{
-              background: speed === s ? C.border : "transparent",
-              border: `1px solid ${speed === s ? C.dim : C.border}`,
-              color: speed === s ? C.text : C.dim,
-              borderRadius: 4,
-              padding: "2px 6px",
-              cursor: "pointer",
-              fontSize: 11,
-            }}
-          >
-            {s}×
-          </button>
-        ))}
-      </div>
+        <button
+          onClick={resetPlayback}
+          style={{
+            background: "none",
+            border: `1px solid ${C.border}`,
+            color: C.dim,
+            borderRadius: 4,
+            padding: "2px 8px",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+        >
+          Reset
+        </button>
 
-      <PlaybackSlider
-        maxRound={maxRound}
-        targetRound={targetRound}
-        displayRound={displayRound}
-        snappedRound={snappedRound}
-        setTargetRound={setTargetRound}
-        setPlaying={setPlaying}
-      />
+        <button
+          onClick={togglePlay}
+          style={{
+            background: playing ? C.conflicts : C.supports,
+            border: "none",
+            color: "#fff",
+            borderRadius: 4,
+            padding: "4px 12px",
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: "bold",
+          }}
+        >
+          {playing ? "Pause" : "Play"}
+        </button>
+        <div
+          style={{
+            display: "flex",
+            gap: 2,
+            alignItems: "center",
+            marginLeft: "1em",
+          }}
+        >
+          {SPEEDS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSpeed(s)}
+              style={{
+                background: speed === s ? C.border : "transparent",
+                border: `1px solid ${speed === s ? C.dim : C.border}`,
+                color: speed === s ? C.text : C.dim,
+                borderRadius: 4,
+                padding: "2px 6px",
+                cursor: "pointer",
+                fontSize: 11,
+                minWidth: "3em",
+              }}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div
         style={{
-          minWidth: 80,
-          textAlign: "center",
-          padding: "4px 10px",
-          background: C.panel,
-          border: `1px solid ${C.border}`,
-          borderRadius: 6,
+          display: "flex",
+          gap: 3,
+          alignItems: "center",
+          flex: "auto",
         }}
       >
+        <PlaybackSlider
+          maxRound={maxRound}
+          targetRound={targetRound}
+          displayRound={displayRound}
+          snappedRound={snappedRound}
+          setTargetRound={setTargetRound}
+          setPlaying={setPlaying}
+        />
+
         <div
           style={{
-            fontSize: 9,
-            color: C.dim,
-            textTransform: "uppercase",
-            letterSpacing: 1,
+            minWidth: 80,
+            textAlign: "center",
+            padding: "4px 10px",
+            background: C.panel,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
           }}
         >
-          Round
+          <div
+            style={{
+              fontSize: 9,
+              color: C.dim,
+              textTransform: "uppercase",
+              letterSpacing: 1,
+            }}
+          >
+            Round
+          </div>
+          <div
+            style={{
+              fontSize: 20,
+              fontWeight: "bold",
+              color: C.text,
+              lineHeight: 1.2,
+            }}
+          >
+            {snappedRound === 0 ? "—" : snappedRound}
+          </div>
+          <div style={{ fontSize: 9, color: C.dim }}>of {maxRound}</div>
         </div>
-        <div
-          style={{
-            fontSize: 20,
-            fontWeight: "bold",
-            color: C.text,
-            lineHeight: 1.2,
-          }}
-        >
-          {snappedRound === 0 ? "—" : snappedRound}
-        </div>
-        <div style={{ fontSize: 9, color: C.dim }}>of {maxRound}</div>
       </div>
     </div>
   );
@@ -419,7 +440,7 @@ function LogOverlay({ sortedLog, snappedRound, logRef, currentLogRef }) {
  * @param {function(number): void} props.onRoundChange - Notifies parent of the current round.
  * @returns {React.ReactElement}
  */
-export function HistoryTab({ state, positions, onRoundChange }) {
+export function HistoryTab({ state, positions, onRoundChange, isWide }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
@@ -436,7 +457,9 @@ export function HistoryTab({ state, positions, onRoundChange }) {
     applyWheel,
     zoomIn,
     zoomOut,
+    resetView,
   } = usePan();
+  useAutoFit({ positions, dims, resetView, refitKey: state.elements.length });
   const playback = usePlayback(state.round);
   const { snappedRound } = playback;
 
@@ -480,12 +503,14 @@ export function HistoryTab({ state, positions, onRoundChange }) {
         containerStyle={{ flex: 1, minHeight: 0 }}
         overlay={
           <>
-            <LogOverlay
-              sortedLog={sortedLog}
-              snappedRound={snappedRound}
-              logRef={logRef}
-              currentLogRef={currentLogRef}
-            />
+            {isWide && (
+              <LogOverlay
+                sortedLog={sortedLog}
+                snappedRound={snappedRound}
+                logRef={logRef}
+                currentLogRef={currentLogRef}
+              />
+            )}
             <OffscreenIndicators
               els={state.elements}
               positions={positions}

@@ -85,7 +85,7 @@ export function AddBar({ elements, onAddElement, onAddRelation }) {
   return (
     <div
       style={{
-        height: "20vh",
+        minHeight: "20vh",
         flexShrink: 0,
         borderTop: `1px solid ${C.border}`,
         background: C.panel,
@@ -96,118 +96,147 @@ export function AddBar({ elements, onAddElement, onAddRelation }) {
     >
       {/* ── Controls row ── */}
       <div
-        style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flexShrink: 0,
+          flexWrap: "wrap",
+        }}
       >
-        <button
-          style={tabBtn("element")}
-          onClick={() => setActiveTab("element")}
-        >
-          Element
-        </button>
-        <button
-          style={tabBtn("relation")}
-          onClick={() => setActiveTab("relation")}
-        >
-          Relation
-        </button>
         <div
-          style={{ width: 1, height: 16, background: C.border, flexShrink: 0 }}
-        />
-
-        {activeTab === "element" ? (
-          <>
-            <select
-              value={elementForm.type}
-              onChange={(e) => setEl("type", e.target.value)}
-              style={SELECT_STYLE}
-            >
-              <option value="judgment">Judgment</option>
-              <option value="principle">Principle</option>
-              <option value="theory">Theory</option>
-            </select>
-            <select
-              value={elementForm.confidence}
-              onChange={(e) => setEl("confidence", e.target.value)}
-              style={SELECT_STYLE}
-            >
-              <option value="high">High</option>
-              <option value="moderate">Moderate</option>
-              <option value="low">Low</option>
-            </select>
-            <input
-              value={elementForm.origin}
-              onChange={(e) => setEl("origin", e.target.value)}
-              placeholder="Origin"
-              style={{ ...SELECT_STYLE, width: 90 }}
-            />
-          </>
-        ) : (
-          <>
-            <select
-              value={relationForm.from}
-              onChange={(e) => setRel("from", e.target.value)}
-              style={SELECT_STYLE}
-            >
-              {ids.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
-            <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
-              →
-            </span>
-            <select
-              value={relationForm.type}
-              onChange={(e) => setRel("type", e.target.value)}
-              style={{ ...SELECT_STYLE, color: C[relationForm.type] }}
-            >
-              <option value="supports">supports</option>
-              <option value="conflicts">conflicts</option>
-              <option value="undermines">undermines</option>
-              <option value="depends">depends</option>
-            </select>
-            <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
-              →
-            </span>
-            <select
-              value={relationForm.to}
-              onChange={(e) => setRel("to", e.target.value)}
-              style={SELECT_STYLE}
-            >
-              {ids.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
-            {relationForm.from === relationForm.to && ids.length >= 2 && (
-              <span style={{ fontSize: 10, color: C.conflicts }}>
-                From ≠ To
-              </span>
-            )}
-          </>
-        )}
-
-        <button
-          disabled={!canSubmit}
-          onClick={handleSubmit}
           style={{
-            marginLeft: "auto",
-            padding: "3px 14px",
-            borderRadius: 4,
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: canSubmit ? "pointer" : "default",
-            border: "none",
-            background: C.supports,
-            color: "#fff",
-            opacity: canSubmit ? 1 : 0.4,
-            fontFamily: "inherit",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexShrink: 0,
+            flexWrap: "wrap",
           }}
         >
-          Add {activeTab}
-        </button>
+          <button
+            disabled={!canSubmit}
+            onClick={handleSubmit}
+            style={{
+              marginLeft: "auto",
+              padding: "3px 14px",
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: "bold",
+              cursor: canSubmit ? "pointer" : "default",
+              border: "none",
+              background: C.supports,
+              color: "#fff",
+              opacity: canSubmit ? 1 : 0.4,
+              fontFamily: "inherit",
+            }}
+          >
+            Add {activeTab}
+          </button>
+          <button
+            style={tabBtn("element")}
+            onClick={() => setActiveTab("element")}
+          >
+            Element
+          </button>
+          <button
+            style={tabBtn("relation")}
+            onClick={() => setActiveTab("relation")}
+          >
+            Relation
+          </button>
+          <div
+            style={{
+              width: 1,
+              height: 16,
+              background: C.border,
+              flexShrink: 0,
+            }}
+          />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexShrink: 0,
+            flexWrap: "wrap",
+          }}
+        >
+          {activeTab === "element" ? (
+            <>
+              <select
+                value={elementForm.type}
+                onChange={(e) => setEl("type", e.target.value)}
+                style={SELECT_STYLE}
+              >
+                <option value="judgment">Judgment</option>
+                <option value="principle">Principle</option>
+                <option value="theory">Theory</option>
+              </select>
+              <select
+                value={elementForm.confidence}
+                onChange={(e) => setEl("confidence", e.target.value)}
+                style={SELECT_STYLE}
+              >
+                <option value="high">High</option>
+                <option value="moderate">Moderate</option>
+                <option value="low">Low</option>
+              </select>
+              <input
+                value={elementForm.origin}
+                onChange={(e) => setEl("origin", e.target.value)}
+                placeholder="Origin"
+                style={{ ...SELECT_STYLE, width: 90 }}
+              />
+            </>
+          ) : (
+            <>
+              <select
+                value={relationForm.from}
+                onChange={(e) => setRel("from", e.target.value)}
+                style={SELECT_STYLE}
+              >
+                {ids.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+              <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
+                →
+              </span>
+              <select
+                value={relationForm.type}
+                onChange={(e) => setRel("type", e.target.value)}
+                style={{ ...SELECT_STYLE, color: C[relationForm.type] }}
+              >
+                <option value="supports">supports</option>
+                <option value="conflicts">conflicts</option>
+                <option value="undermines">undermines</option>
+                <option value="depends">depends</option>
+              </select>
+              <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
+                →
+              </span>
+              <select
+                value={relationForm.to}
+                onChange={(e) => setRel("to", e.target.value)}
+                style={SELECT_STYLE}
+              >
+                {ids.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+              {relationForm.from === relationForm.to && ids.length >= 2 && (
+                <span style={{ fontSize: 10, color: C.conflicts }}>
+                  From ≠ To
+                </span>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Text / explanation ── */}

@@ -73,7 +73,7 @@ function NewProcessCard({ onStart }) {
   };
 
   return (
-    <div style={CARD_STYLE}>
+    <div style={{ ...CARD_STYLE, minWidth: 300 }}>
       <div style={TITLE_STYLE}>Start your own RE process</div>
       <div style={DESC_STYLE}>
         Begin a new wide reflective equilibrium process from scratch. Enter a
@@ -112,7 +112,7 @@ function NewProcessCard({ onStart }) {
  */
 function SampleProcessCard({ onLoad }) {
   return (
-    <div style={CARD_STYLE}>
+    <div style={{ ...CARD_STYLE, minWidth: 300 }}>
       <div style={TITLE_STYLE}>Explore the sample RE process</div>
       <div style={DESC_STYLE}>
         Browse a pre-built reflective equilibrium process on obligations to
