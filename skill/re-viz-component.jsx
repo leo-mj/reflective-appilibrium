@@ -4,11 +4,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import * as d3 from "d3";
+import _dummyState from "./dummy-state.js";
 
 // ============================================================
 // REPLACE THIS OBJECT WITH CURRENT STATE DATA WHEN GENERATING
 // ============================================================
-const SAMPLE_STATE = {
+const _inlineState = {
   topic: "",
   phase: 0,
   round: 0,
@@ -33,6 +34,7 @@ const SAMPLE_STATE = {
   ]
 };
 // ============================================================
+const SAMPLE_STATE = import.meta.env.VITE_USE_DUMMY_STATE ? _dummyState : _inlineState;
 
 const C = {
   bg: "#0f172a",
@@ -53,9 +55,12 @@ const C = {
   withdrawnMark: "#f97316",
 };
 
+// Opacity by confidence level, used for node fills.
 const confOp = { high: 1, moderate: 0.75, low: 0.5 };
+// CSS transition string applied to nodes and edges for smooth show/hide animations.
 const TRANSITION = "opacity 1.2s ease-in-out";
 
+// Hook: tracks the pixel width and height of a DOM element, updating on resize.
 function useContainerDims(ref) {
   const [dims, setDims] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -74,6 +79,9 @@ function useContainerDims(ref) {
   return dims;
 }
 
+// Hook: runs a D3 force-directed simulation over all elements (including withdrawn)
+// and returns stable {x, y} positions keyed by element ID. Positions persist across
+// tab switches and the show-withdrawn toggle so nodes don't jump around.
 function useStablePositions(state, dims) {
   const posRef = useRef({});
   const simRef = useRef(null);
@@ -126,6 +134,8 @@ function useStablePositions(state, dims) {
   return { positions, ready };
 }
 
+// Renders the correct SVG shape for an element's type:
+//   judgment  → circle, principle → rounded rect, theory → diamond.
 function NodeShape({ e, r, fill, stroke, op }) {
   if (e.type === "principle") {
     const rw = r * 2.2, rh = r * 1.5;
@@ -137,6 +147,7 @@ function NodeShape({ e, r, fill, stroke, op }) {
   return <circle r={r} fill={fill} stroke={stroke} strokeWidth={2} opacity={op} />;
 }
 
+// Returns { fill, stroke } colors for a node based on type, confidence, and withdrawn status.
 function getColors(e) {
   const isW = e.status === "withdrawn";
   if (isW) return { fill: C.withdrawn, stroke: C.withdrawn };
@@ -145,6 +156,9 @@ function getColors(e) {
   return { fill: C.theory[e.confidence], stroke: C.theory.high };
 }
 
+// Defines SVG <marker> arrowheads for every relation type (supports/conflicts/undermines/depends)
+// in both normal and withdrawn variants. The prefix keeps IDs unique between the Graph and
+// History SVGs so they don't collide in the same document.
 function ArrowDefs({ prefix }) {
   return (
     <defs>
@@ -161,6 +175,9 @@ function ArrowDefs({ prefix }) {
   );
 }
 
+// Renders the main force-directed graph: directed edges with arrowheads, shaped nodes,
+// and a hover tooltip showing element detail. Withdrawn elements and edges are hidden
+// unless showWithdrawn is true, in which case they appear at reduced opacity.
 function Graph({ state, showWithdrawn, positions }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
@@ -248,6 +265,9 @@ function Graph({ state, showWithdrawn, positions }) {
   );
 }
 
+// Renders the History tab: a play/pause slider that animates the RE process round by round.
+// Elements and relations appear at the round they were added and disappear when withdrawn.
+// Newly added elements pulse briefly. A log entry summary is shown below the controls.
 function HistoryTab({ state, positions }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
@@ -457,7 +477,12 @@ function HistoryTab({ state, positions }) {
       </div>
     </div>
   );
-}({ state, showWithdrawn }) {
+}
+
+// Renders the Text tab: a plain-text structured dump of the full RE state — judgments,
+// principles, theories, relations, coherence summary, and round log. Useful for copying
+// or reading without the graph.
+function TextTab({ state, showWithdrawn }) {
   const visibleEls = showWithdrawn ? state.elements : state.elements.filter(e => e.status !== "withdrawn");
   const visIds = new Set(visibleEls.map(e => e.id));
   const renderEl = (e) => {
@@ -498,6 +523,7 @@ function HistoryTab({ state, positions }) {
   );
 }
 
+// Renders the color/shape legend bar shown above all tabs.
 function Legend() {
   const items = [
     { label: "Judgment (high)", shape: "circle", color: "#2563eb" },
@@ -532,6 +558,8 @@ function Legend() {
   );
 }
 
+// Root component. Manages tab state and the show-withdrawn toggle, runs the shared force
+// simulation, and renders the appropriate tab content (Graph / Text / History).
 export default function REState() {
   const [tab, setTab] = useState("graph");
   const [showWithdrawn, setShowWithdrawn] = useState(false);
