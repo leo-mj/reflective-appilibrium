@@ -1,41 +1,33 @@
 /**
- * @fileoverview OpenAI client configuration and low-level transport.
- * Swap this file out to point the app at a different LLM backend.
+ * @fileoverview Backend LLM client — routes all LLM calls through the FastAPI
+ * backend so API keys are never exposed in the browser.
  * @module utils/openaiClient
  */
 
-import OpenAI from "openai";
-
-// ─── Configuration ────────────────────────────────────────────────────────────
-
-/** Loaded from VITE_OPENAI_API_KEY in app/.env */
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-
-/** OpenAI model to use. Update here to switch models. */
-export const OPENAI_MODEL = "gpt-5.4-mini";
-
-/** OpenAI client instance. */
-const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true,
-});
-// DO NOT use this outside of local development, as it will expose your API key in the browser.
-
-// ─── Transport ────────────────────────────────────────────────────────────────
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 /**
- * Sends a prompt to the OpenAI Responses API and returns the raw output text.
+ * Sends a prompt to the backend LLM service and returns the raw text response
+ * along with the model name used.
  *
  * @param {string} prompt
  * @param {number} [temperature=0.3]
- * @returns {Promise<string>}
+ * @returns {Promise<{ text: string, model: string }>}
  */
-export async function callOpenAIAPI(prompt, temperature = 0.3) {
-  const response = await openai.responses.create({
-    model: OPENAI_MODEL,
-    input: prompt,
-    temperature,
-    text: { format: { type: "json_object" } },
+export async function callBackendLLM(prompt, temperature = 0.3) {
+  console.log(`Fetching response through ${BACKEND_URL}`)
+  const res = await fetch(`${BACKEND_URL}/api/llm/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: [{ role: "user", content: prompt }],
+      temperature,
+      json_mode: true,
+    }),
   });
-  return response.output_text;
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Backend error ${res.status}: ${body}`);
+  }
+  return res.json();
 }

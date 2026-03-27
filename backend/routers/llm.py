@@ -4,6 +4,7 @@ LLM router — /api/llm
 Exposes the LLM service over HTTP so the frontend never handles API keys.
 """
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -13,7 +14,7 @@ from ..dependencies import get_llm_service
 from ..services.llm import LLMService
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])
-
+logger = logging.getLogger(__name__)
 
 # ── Request / response models ──────────────────────────────────────────────────
 
@@ -41,9 +42,11 @@ async def complete(
     llm: Annotated[LLMService, Depends(get_llm_service)],
 ) -> CompletionResponse:
     """Send a prompt to the configured LLM and return the reply."""
+    logger.info("Requesting matrix from LLM.")
     text = await llm.complete(
         messages=[m.model_dump() for m in request.messages],
         temperature=request.temperature,
         json_mode=request.json_mode,
     )
+    logger.info(f"Received response: {text[:20]}")
     return CompletionResponse(text=text, model=llm.model)

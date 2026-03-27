@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { C } from "../constants/colors.js";
 import _dummyMatrix from "../dummy-matrix.js";
-import { callOpenAIAPI, OPENAI_MODEL } from "../utils/openaiClient.js";
+import { callBackendLLM } from "../utils/openaiClient.js";
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 
@@ -92,8 +92,8 @@ Respond with valid JSON only, in exactly this format:
  * @returns {Promise<{ overview: string, matrix: Object, pairDescriptions: Object }>}
  */
 async function callLLMAPI(prompt) {
-  const outputText = await callOpenAIAPI(prompt);
-  return JSON.parse(outputText);
+  const { text, model } = await callBackendLLM(prompt);
+  return { ...JSON.parse(text), _model: model };
 }
 
 /**
@@ -102,11 +102,12 @@ async function callLLMAPI(prompt) {
  *
  * @param {string}      topic
  * @param {REElement[]} elements
- * @returns {Promise<{ overview: string, matrix: Object, pairDescriptions: Object }>}
+ * @returns {Promise<{ overview: string, matrix: Object, pairDescriptions: Object, _model: string }>}
  */
 async function fetchRelatednessMatrix(topic, elements) {
-  if (import.meta.env.VITE_USE_DUMMY_MATRIX) {
-    return JSON.parse(_dummyMatrix);
+  if (import.meta.env.VITE_USE_DUMMY_MATRIX === false) {
+    console.log("Getting dummy matrix.");
+    return { ...JSON.parse(_dummyMatrix), _model: "dummy" };
   }
   return callLLMAPI(buildPrompt(topic, elements));
 }
@@ -133,12 +134,13 @@ function getPairDesc(pairDescriptions, idA, idB) {
  * Toolbar with element count summary and Analyze button.
  *
  * @param {Object}   props
- * @param {number}   props.elementCount
- * @param {boolean}  props.loading
- * @param {boolean}  props.hasResult
- * @param {Function} props.onAnalyze
+ * @param {number}          props.elementCount
+ * @param {boolean}         props.loading
+ * @param {boolean}         props.hasResult
+ * @param {Function}        props.onAnalyze
+ * @param {string|undefined} props.model
  */
-function Toolbar({ elementCount, loading, hasResult, onAnalyze }) {
+function Toolbar({ elementCount, loading, hasResult, onAnalyze, model }) {
   const disabled = loading || elementCount < 2;
   return (
     <div
@@ -155,7 +157,7 @@ function Toolbar({ elementCount, loading, hasResult, onAnalyze }) {
         <span style={{ color: C.text, fontWeight: "bold" }}>
           {elementCount}
         </span>{" "}
-        elements (judgments + principles), scored by {OPENAI_MODEL}.
+        elements (judgments + principles){model ? `, scored by ${model}` : ""}.
       </div>
       <button
         onClick={onAnalyze}
@@ -397,6 +399,7 @@ function PairDescription({ hovered }) {
  * @returns {React.ReactElement}
  */
 export function CoherenceMatrixTab({ state }) {
+  /** @type {[{overview: string, matrix: Object, pairDescriptions: Object, _model: string}|null, Function]} */
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -424,6 +427,7 @@ export function CoherenceMatrixTab({ state }) {
         loading={loading}
         hasResult={!!result}
         onAnalyze={analyze}
+        model={result?._model}
       />
 
       {error && <ErrorBanner message={error} />}
