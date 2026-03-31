@@ -28,6 +28,7 @@ import {
   MatrixIcon,
   ClusterIcon,
   SuggestIcon,
+  PrincipleIcon,
 } from "./Icons.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
@@ -47,6 +48,14 @@ const RelationSuggestTab = LLM_ENABLED
   ? lazy(() =>
       import("./RelationSuggestTab.jsx").then((m) => ({
         default: m.RelationSuggestTab,
+      })),
+    )
+  : null;
+
+const PrincipleSuggestTab = LLM_ENABLED
+  ? lazy(() =>
+      import("./PrincipleSuggestTab.jsx").then((m) => ({
+        default: m.PrincipleSuggestTab,
       })),
     )
   : null;
@@ -302,13 +311,15 @@ const TAB_ICONS = {
   matrix: <MatrixIcon />,
   clusters: <ClusterIcon />,
   suggest: <SuggestIcon />,
+  principles: <PrincipleIcon />,
 };
 const TAB_LABELS = {
   graph: "Graph",
   history: "History",
   matrix: "Matrix",
   clusters: "Clusters",
-  suggest: "Suggest",
+  suggest: "Suggest Relations",
+  principles: "Suggest Principles",
 };
 
 /**
@@ -422,7 +433,7 @@ function AppHeader({
     "graph",
     "history",
     "clusters",
-    ...(LLM_ENABLED ? ["matrix", "suggest"] : []),
+    ...(LLM_ENABLED ? ["matrix", "suggest", "principles"] : []),
   ];
 
   const hiddenInput = (
@@ -772,6 +783,14 @@ function GraphPanel({
               state={state}
               onAddRelation={onAddRelation}
               onScrollToRelations={onScrollToRelations}
+            />
+          </Suspense>
+        )}
+        {tab === "principles" && LLM_ENABLED && (
+          <Suspense fallback={null}>
+            <PrincipleSuggestTab
+              state={state}
+              onAddElement={onAddElement}
             />
           </Suspense>
         )}

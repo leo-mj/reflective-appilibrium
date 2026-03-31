@@ -59,13 +59,13 @@ const _inlineState = {
 /**
  * The active RE state used by all components.
  *
- * Source is chosen at build time via the `VITE_USE_DUMMY_STATE` env var:
+ * Source is chosen at build time via the `VITE_USE_DUMMY` env var:
  * - `"true"` → uses `dummy-state.js` (rich fixture, good for development)
  * - anything else → uses `_inlineState` (the skeleton defined above)
  *
  * @type {REState}
  */
-export const SAMPLE_STATE = import.meta.env.VITE_USE_DUMMY_STATE
+export const SAMPLE_STATE = import.meta.env.VITE_USE_DUMMY
   ? _dummyState
   : _inlineState;
 

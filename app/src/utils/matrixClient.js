@@ -17,7 +17,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @returns {Promise<{ overview: string, matrix: Object, pairDescriptions: Object, _model: string }>}
  */
 export async function fetchRelatednessMatrix(state) {
-  if (import.meta.env.VITE_USE_DUMMY_MATRIX === "true") {
+  if (import.meta.env.VITE_USE_DUMMY === "true") {
     return { ...JSON.parse(_dummyMatrix), _model: "dummy" };
   }
   const res = await fetch(`${BACKEND_URL}/api/matrix/analyze`, {

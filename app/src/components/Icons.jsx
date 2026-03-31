@@ -172,6 +172,33 @@ export function SuggestIcon({ size = "2em" }) {
   );
 }
 
+export function PrincipleIcon({ size = "2em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <rect
+        x="60"
+        y="160"
+        width="392"
+        height="192"
+        rx="48"
+        stroke="currentColor"
+        strokeWidth="24"
+        fill="none"
+      />
+      <g stroke="currentColor" strokeWidth="20" strokeLinecap="round">
+        <line x1="140" y1="220" x2="372" y2="220" />
+        <line x1="140" y1="256" x2="320" y2="256" />
+        <line x1="140" y1="292" x2="256" y2="292" />
+      </g>
+    </svg>
+  );
+}
+
 export function AddIcon({ size = "2em" }) {
   return (
     <svg
