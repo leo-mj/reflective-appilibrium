@@ -172,6 +172,34 @@ export function SuggestIcon({ size = "2em" }) {
   );
 }
 
+export function JudgmentIcon({ size = "2em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <circle
+        cx="256"
+        cy="220"
+        r="130"
+        stroke="currentColor"
+        strokeWidth="24"
+        fill="none"
+      />
+      <g stroke="currentColor" strokeWidth="20" strokeLinecap="round">
+        <line x1="256" y1="380" x2="256" y2="420" />
+        <line x1="210" y1="430" x2="302" y2="430" />
+      </g>
+      <g stroke="currentColor" strokeWidth="22" strokeLinecap="round" fill="none">
+        <path d="M220 200 Q256 160 292 200 Q310 220 256 250 Q256 270 256 285" />
+      </g>
+      <circle cx="256" cy="310" r="12" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function PrincipleIcon({ size = "2em" }) {
   return (
     <svg

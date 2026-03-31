@@ -29,6 +29,7 @@ import {
   ClusterIcon,
   SuggestIcon,
   PrincipleIcon,
+  JudgmentIcon,
 } from "./Icons.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
@@ -56,6 +57,14 @@ const PrincipleSuggestTab = LLM_ENABLED
   ? lazy(() =>
       import("./PrincipleSuggestTab.jsx").then((m) => ({
         default: m.PrincipleSuggestTab,
+      })),
+    )
+  : null;
+
+const JudgmentElicitTab = LLM_ENABLED
+  ? lazy(() =>
+      import("./JudgmentElicitTab.jsx").then((m) => ({
+        default: m.JudgmentElicitTab,
       })),
     )
   : null;
@@ -312,6 +321,7 @@ const TAB_ICONS = {
   clusters: <ClusterIcon />,
   suggest: <SuggestIcon />,
   principles: <PrincipleIcon />,
+  judgments: <JudgmentIcon />,
 };
 const TAB_LABELS = {
   graph: "Graph",
@@ -320,6 +330,7 @@ const TAB_LABELS = {
   clusters: "Clusters",
   suggest: "Suggest Relations",
   principles: "Suggest Principles",
+  judgments: "Elicit Judgments",
 };
 
 /**
@@ -433,7 +444,7 @@ function AppHeader({
     "graph",
     "history",
     "clusters",
-    ...(LLM_ENABLED ? ["matrix", "suggest", "principles"] : []),
+    ...(LLM_ENABLED ? ["matrix", "suggest", "principles", "judgments"] : []),
   ];
 
   const hiddenInput = (
@@ -789,6 +800,14 @@ function GraphPanel({
         {tab === "principles" && LLM_ENABLED && (
           <Suspense fallback={null}>
             <PrincipleSuggestTab
+              state={state}
+              onAddElement={onAddElement}
+            />
+          </Suspense>
+        )}
+        {tab === "judgments" && LLM_ENABLED && (
+          <Suspense fallback={null}>
+            <JudgmentElicitTab
               state={state}
               onAddElement={onAddElement}
             />
