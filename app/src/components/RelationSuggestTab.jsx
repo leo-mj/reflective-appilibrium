@@ -39,6 +39,7 @@ function Toolbar({
   suggestionCount,
   onSuggest,
   onSaveAll,
+  onRejectAll,
   model,
 }) {
   const suggestDisabled = loading || elementCount < 2;
@@ -61,21 +62,38 @@ function Toolbar({
       </div>
       <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
         {suggestionCount > 0 && (
-          <button
-            onClick={onSaveAll}
-            style={{
-              background: C.principle.high,
-              border: "none",
-              color: "#fff",
-              borderRadius: 6,
-              padding: "6px 14px",
-              fontSize: 12,
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            Save {suggestionCount}
-          </button>
+          <>
+            <button
+              onClick={onSaveAll}
+              style={{
+                background: C.principle.high,
+                border: "none",
+                color: "#fff",
+                borderRadius: 6,
+                padding: "6px 14px",
+                fontSize: 12,
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              Save all
+            </button>
+            <button
+              onClick={onRejectAll}
+              style={{
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                color: C.dim,
+                borderRadius: 6,
+                padding: "6px 14px",
+                fontSize: 12,
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              Reject all
+            </button>
+          </>
         )}
         <button
           onClick={onSuggest}
@@ -121,13 +139,14 @@ function ErrorBanner({ message }) {
 }
 
 /**
- * A single suggestion card with a Reject button.
+ * A single suggestion card with Accept and Reject buttons.
  *
  * @param {Object}   props
  * @param {{from: string, to: string, type: string, explanation: string}} props.suggestion
+ * @param {Function} props.onAccept
  * @param {Function} props.onReject
  */
-function SuggestionCard({ suggestion, onReject }) {
+function SuggestionCard({ suggestion, onAccept, onReject }) {
   const color = REL_COLOR[suggestion.type] ?? C.dim;
   return (
     <div
@@ -166,21 +185,36 @@ function SuggestionCard({ suggestion, onReject }) {
         >
           {suggestion.type}
         </span>
-        <button
-          onClick={onReject}
-          style={{
-            marginLeft: "auto",
-            background: "transparent",
-            border: `1px solid ${C.border}`,
-            color: C.dim,
-            borderRadius: 4,
-            padding: "2px 10px",
-            fontSize: 11,
-            cursor: "pointer",
-          }}
-        >
-          Reject
-        </button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+          <button
+            onClick={onAccept}
+            style={{
+              background: C.principle.high,
+              border: "none",
+              color: "#fff",
+              borderRadius: 4,
+              padding: "2px 10px",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            Accept
+          </button>
+          <button
+            onClick={onReject}
+            style={{
+              background: "transparent",
+              border: `1px solid ${C.border}`,
+              color: C.dim,
+              borderRadius: 4,
+              padding: "2px 10px",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            Reject
+          </button>
+        </div>
       </div>
       <div style={{ color: C.dim, lineHeight: 1.6 }}>
         {suggestion.explanation}
@@ -200,6 +234,7 @@ export function RelationSuggestTab({
   state,
   onAddRelation,
   onScrollToRelations,
+  onLogRejections,
 }) {
   /** @type {[Array<{from: string, to: string, type: string, explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -225,7 +260,21 @@ export function RelationSuggestTab({
     }
   };
 
+  const accept = (suggestion) => {
+    onAddRelation(
+      {
+        from: suggestion.from,
+        to: suggestion.to,
+        type: suggestion.type,
+        explanation: suggestion.explanation,
+      },
+      { select: false },
+    );
+    setSuggestions((prev) => prev.filter((s) => s !== suggestion));
+  };
+
   const reject = (suggestion) => {
+    onLogRejections([`${suggestion.from} → ${suggestion.to} (${suggestion.type})`]);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
@@ -239,6 +288,11 @@ export function RelationSuggestTab({
     setSuggestions([]);
   };
 
+  const rejectAll = () => {
+    onLogRejections(suggestions.map((s) => `${s.from} → ${s.to} (${s.type})`));
+    setSuggestions([]);
+  };
+
   return (
     <div style={{ overflowY: "auto", height: "100%", padding: "0 4px 24px" }}>
       <Toolbar
@@ -248,6 +302,7 @@ export function RelationSuggestTab({
         suggestionCount={suggestions?.length ?? 0}
         onSuggest={suggest}
         onSaveAll={saveAll}
+        onRejectAll={rejectAll}
         model={model}
       />
 
@@ -266,7 +321,12 @@ export function RelationSuggestTab({
       )}
 
       {suggestions?.map((s, i) => (
-        <SuggestionCard key={i} suggestion={s} onReject={() => reject(s)} />
+        <SuggestionCard
+          key={i}
+          suggestion={s}
+          onAccept={() => accept(s)}
+          onReject={() => reject(s)}
+        />
       ))}
     </div>
   );

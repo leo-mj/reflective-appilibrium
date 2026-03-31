@@ -280,6 +280,21 @@ function useREActions(initialState) {
     if (select) handleSelectRel(() => newRel);
   };
 
+  const handleLogRejections = (items) => {
+    setState((prev) => ({
+      ...prev,
+      log: [
+        ...prev.log,
+        makeLogEntry(
+          prev.round,
+          `${items.length} suggestion${items.length !== 1 ? "s" : ""} rejected.`,
+          "Rejected",
+          items.join("; "),
+        ),
+      ],
+    }));
+  };
+
   const handleImportFile = async (file) => {
     try {
       const newState = await importStateFromFile(file);
@@ -308,6 +323,7 @@ function useREActions(initialState) {
     handleWithdrawRelRequest,
     handleAddElement,
     handleAddRelation,
+    handleLogRejections,
     handleImportFile,
   };
 }
@@ -703,6 +719,7 @@ function GraphPanel({
   onAddElement,
   onAddRelation,
   onScrollToRelations,
+  onLogRejections,
   onRoundChange,
   isWide,
 }) {
@@ -794,6 +811,7 @@ function GraphPanel({
               state={state}
               onAddRelation={onAddRelation}
               onScrollToRelations={onScrollToRelations}
+              onLogRejections={onLogRejections}
             />
           </Suspense>
         )}
@@ -802,6 +820,7 @@ function GraphPanel({
             <PrincipleSuggestTab
               state={state}
               onAddElement={onAddElement}
+              onLogRejections={onLogRejections}
             />
           </Suspense>
         )}
@@ -810,6 +829,7 @@ function GraphPanel({
             <JudgmentElicitTab
               state={state}
               onAddElement={onAddElement}
+              onLogRejections={onLogRejections}
             />
           </Suspense>
         )}
@@ -886,6 +906,7 @@ export default function REState({ initialState, onHome, onReady }) {
     handleWithdrawRelRequest,
     handleAddElement,
     handleAddRelation,
+    handleLogRejections,
     handleImportFile,
   } = actions;
 
@@ -1012,6 +1033,7 @@ export default function REState({ initialState, onHome, onReady }) {
             onAddElement={handleAddElement}
             onAddRelation={handleAddRelation}
             onScrollToRelations={scrollToRelations}
+            onLogRejections={handleLogRejections}
             onRoundChange={setHistoryRound}
             isWide={isWide}
           />

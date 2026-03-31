@@ -21,6 +21,7 @@ import { fetchPrincipleSuggestions } from "../utils/principlesClient.js";
  * @param {number}           props.suggestionCount
  * @param {Function}         props.onSuggest
  * @param {Function}         props.onSaveAll
+ * @param {Function}         props.onRejectAll
  * @param {string|undefined} props.model
  */
 function Toolbar({
@@ -30,6 +31,7 @@ function Toolbar({
   suggestionCount,
   onSuggest,
   onSaveAll,
+  onRejectAll,
   model,
 }) {
   const suggestDisabled = loading || jAndPCount < 1;
@@ -50,21 +52,38 @@ function Toolbar({
       </div>
       <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
         {suggestionCount > 0 && (
-          <button
-            onClick={onSaveAll}
-            style={{
-              background: C.principle.high,
-              border: "none",
-              color: "#fff",
-              borderRadius: 6,
-              padding: "6px 14px",
-              fontSize: 12,
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            Save {suggestionCount}
-          </button>
+          <>
+            <button
+              onClick={onSaveAll}
+              style={{
+                background: C.principle.high,
+                border: "none",
+                color: "#fff",
+                borderRadius: 6,
+                padding: "6px 14px",
+                fontSize: 12,
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              Save all
+            </button>
+            <button
+              onClick={onRejectAll}
+              style={{
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                color: C.dim,
+                borderRadius: 6,
+                padding: "6px 14px",
+                fontSize: 12,
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              Reject all
+            </button>
+          </>
         )}
         <button
           onClick={onSuggest}
@@ -110,13 +129,14 @@ function ErrorBanner({ message }) {
 }
 
 /**
- * A single suggestion card with a Reject button.
+ * A single suggestion card with Accept and Reject buttons.
  *
  * @param {Object}   props
  * @param {{text: string, confidence: string, covers: string[], explanation: string}} props.suggestion
+ * @param {Function} props.onAccept
  * @param {Function} props.onReject
  */
-function SuggestionCard({ suggestion, onReject }) {
+function SuggestionCard({ suggestion, onAccept, onReject }) {
   return (
     <div
       style={{
@@ -146,21 +166,36 @@ function SuggestionCard({ suggestion, onReject }) {
         >
           {suggestion.text}
         </div>
-        <button
-          onClick={onReject}
-          style={{
-            flexShrink: 0,
-            background: "transparent",
-            border: `1px solid ${C.border}`,
-            color: C.dim,
-            borderRadius: 4,
-            padding: "2px 10px",
-            fontSize: 11,
-            cursor: "pointer",
-          }}
-        >
-          Reject
-        </button>
+        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          <button
+            onClick={onAccept}
+            style={{
+              background: C.principle.high,
+              border: "none",
+              color: "#fff",
+              borderRadius: 4,
+              padding: "2px 10px",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            Accept
+          </button>
+          <button
+            onClick={onReject}
+            style={{
+              background: "transparent",
+              border: `1px solid ${C.border}`,
+              color: C.dim,
+              borderRadius: 4,
+              padding: "2px 10px",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            Reject
+          </button>
+        </div>
       </div>
       <div
         style={{
@@ -201,7 +236,7 @@ function SuggestionCard({ suggestion, onReject }) {
  * @param {REState}  props.state
  * @param {Function} props.onAddElement
  */
-export function PrincipleSuggestTab({ state, onAddElement }) {
+export function PrincipleSuggestTab({ state, onAddElement, onLogRejections }) {
   /** @type {[Array<{text: string, confidence: string, covers: string[], explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -230,7 +265,18 @@ export function PrincipleSuggestTab({ state, onAddElement }) {
     }
   };
 
+  const accept = (suggestion) => {
+    onAddElement({
+      type: "principle",
+      text: suggestion.text,
+      confidence: suggestion.confidence,
+      origin: "llm",
+    });
+    setSuggestions((prev) => prev.filter((s) => s !== suggestion));
+  };
+
   const reject = (suggestion) => {
+    onLogRejections([suggestion.text]);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
@@ -246,6 +292,11 @@ export function PrincipleSuggestTab({ state, onAddElement }) {
     setSuggestions([]);
   };
 
+  const rejectAll = () => {
+    onLogRejections(suggestions.map((s) => s.text));
+    setSuggestions([]);
+  };
+
   return (
     <div style={{ overflowY: "auto", height: "100%", padding: "0 4px 24px" }}>
       <Toolbar
@@ -255,6 +306,7 @@ export function PrincipleSuggestTab({ state, onAddElement }) {
         suggestionCount={suggestions?.length ?? 0}
         onSuggest={suggest}
         onSaveAll={saveAll}
+        onRejectAll={rejectAll}
         model={model}
       />
 
@@ -274,7 +326,12 @@ export function PrincipleSuggestTab({ state, onAddElement }) {
       )}
 
       {suggestions?.map((s, i) => (
-        <SuggestionCard key={i} suggestion={s} onReject={() => reject(s)} />
+        <SuggestionCard
+          key={i}
+          suggestion={s}
+          onAccept={() => accept(s)}
+          onReject={() => reject(s)}
+        />
       ))}
     </div>
   );
