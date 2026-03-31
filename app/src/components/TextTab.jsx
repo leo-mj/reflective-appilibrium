@@ -87,6 +87,7 @@ export function TextTab({
   onAddRelation,
   isWide,
   clusterSectionRef,
+  scrollToRelationsKey,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   const scrollRef = useRef(null);
@@ -197,6 +198,11 @@ export function TextTab({
       }),
     );
   };
+
+  useEffect(() => {
+    if (scrollToRelationsKey > 0)
+      requestAnimationFrame(() => navigateTo("relations"));
+  }, [scrollToRelationsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const container = scrollRef.current;

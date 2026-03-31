@@ -15,7 +15,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @returns {Promise<{ text: string, model: string }>}
  */
 export async function callBackendLLM(prompt, temperature = 0.3) {
-  console.log(`Fetching response through ${BACKEND_URL}`)
+  console.log(`Fetching response through ${BACKEND_URL}`);
   const res = await fetch(`${BACKEND_URL}/api/llm/complete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

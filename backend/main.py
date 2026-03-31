@@ -7,11 +7,20 @@ Start with:
 Interactive docs at http://localhost:8000/docs
 """
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import llm
+from .routers import llm, matrix, relations
+
+# ── Logging ────────────────────────────────────────────────────────────────────
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter("%(levelname)-8s %(name)s: %(message)s"))
+logging.getLogger("backend").addHandler(_handler)
+logging.getLogger("backend").setLevel(logging.INFO)
 
 # ── App ────────────────────────────────────────────────────────────────────────
 
@@ -34,6 +43,8 @@ app.add_middleware(
 # ── Routers ────────────────────────────────────────────────────────────────────
 
 app.include_router(llm.router)
+app.include_router(matrix.router)
+app.include_router(relations.router)
 # Future: app.include_router(coherence.router)
 # Future: app.include_router(sessions.router)
 

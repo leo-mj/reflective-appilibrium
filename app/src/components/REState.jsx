@@ -22,17 +22,31 @@ import { HistoryTab } from "./HistoryTab.jsx";
 import { Legend } from "./graphs_shared/Legend.jsx";
 import { EditModal } from "./user_edits/EditModal.jsx";
 import { EditRelationModal } from "./user_edits/EditRelationModal.jsx";
-import { NetworkIcon, HistoryIcon, MatrixIcon, ClusterIcon } from "./Icons.jsx";
+import {
+  NetworkIcon,
+  HistoryIcon,
+  MatrixIcon,
+  ClusterIcon,
+  SuggestIcon,
+} from "./Icons.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
 import { importStateFromFile } from "../utils/importMarkdown.js";
 
-// Loaded only in LLM-enabled builds; tree-shaken (with the openai SDK) in public builds.
+// Loaded only in LLM-enabled builds; tree-shaken in public builds.
 const CoherenceMatrixTab = LLM_ENABLED
   ? lazy(() =>
       import("./CoherenceMatrixTab.jsx").then((m) => ({
         default: m.CoherenceMatrixTab,
+      })),
+    )
+  : null;
+
+const RelationSuggestTab = LLM_ENABLED
+  ? lazy(() =>
+      import("./RelationSuggestTab.jsx").then((m) => ({
+        default: m.RelationSuggestTab,
       })),
     )
   : null;
@@ -228,7 +242,7 @@ function useREActions(initialState) {
     handleSelectNode(() => newId);
   };
 
-  const handleAddRelation = (formData) => {
+  const handleAddRelation = (formData, { select = true } = {}) => {
     const newRound = state.round + 1;
     const newRel = { ...formData, addedRound: newRound };
     setState((prev) => ({
@@ -245,7 +259,7 @@ function useREActions(initialState) {
         ),
       ],
     }));
-    handleSelectRel(() => newRel);
+    if (select) handleSelectRel(() => newRel);
   };
 
   const handleImportFile = async (file) => {
@@ -287,12 +301,14 @@ const TAB_ICONS = {
   history: <HistoryIcon />,
   matrix: <MatrixIcon />,
   clusters: <ClusterIcon />,
+  suggest: <SuggestIcon />,
 };
 const TAB_LABELS = {
   graph: "Graph",
   history: "History",
   matrix: "Matrix",
   clusters: "Clusters",
+  suggest: "Suggest",
 };
 
 /**
@@ -406,7 +422,7 @@ function AppHeader({
     "graph",
     "history",
     "clusters",
-    ...(LLM_ENABLED ? ["matrix"] : []),
+    ...(LLM_ENABLED ? ["matrix", "suggest"] : []),
   ];
 
   const hiddenInput = (
@@ -621,7 +637,12 @@ function AppHeader({
   );
 }
 
-function TextPanel({ isWide, clusterSectionRef, ...textTabProps }) {
+function TextPanel({
+  isWide,
+  clusterSectionRef,
+  scrollToRelationsKey,
+  ...textTabProps
+}) {
   return (
     <div
       style={{
@@ -640,6 +661,7 @@ function TextPanel({ isWide, clusterSectionRef, ...textTabProps }) {
       <TextTab
         {...textTabProps}
         clusterSectionRef={clusterSectionRef}
+        scrollToRelationsKey={scrollToRelationsKey}
         isWide={isWide}
       />
     </div>
@@ -658,6 +680,7 @@ function GraphPanel({
   onSelectRel,
   onAddElement,
   onAddRelation,
+  onScrollToRelations,
   onRoundChange,
   isWide,
 }) {
@@ -743,6 +766,15 @@ function GraphPanel({
             <CoherenceMatrixTab state={state} />
           </Suspense>
         )}
+        {tab === "suggest" && LLM_ENABLED && (
+          <Suspense fallback={null}>
+            <RelationSuggestTab
+              state={state}
+              onAddRelation={onAddRelation}
+              onScrollToRelations={onScrollToRelations}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );
@@ -820,6 +852,13 @@ export default function REState({ initialState, onHome, onReady }) {
   } = actions;
 
   const clusterSectionRef = useRef(null);
+  const [scrollToRelationsKey, setScrollToRelationsKey] = useState(0);
+  const scrollToRelations = () => {
+    if (isWide) setShowText(true);
+    else setTab("text");
+    setScrollToRelationsKey((k) => k + 1);
+  };
+
   const handleSetTab = (t) => {
     setTab(t);
     if (t === "clusters" && isWide) {
@@ -888,6 +927,7 @@ export default function REState({ initialState, onHome, onReady }) {
           <TextPanel
             isWide={isWide}
             clusterSectionRef={clusterSectionRef}
+            scrollToRelationsKey={scrollToRelationsKey}
             state={textState}
             showWithdrawn={showWithdrawn}
             selected={selected}
@@ -933,6 +973,7 @@ export default function REState({ initialState, onHome, onReady }) {
             onSelectRel={handleSelectRel}
             onAddElement={handleAddElement}
             onAddRelation={handleAddRelation}
+            onScrollToRelations={scrollToRelations}
             onRoundChange={setHistoryRound}
             isWide={isWide}
           />

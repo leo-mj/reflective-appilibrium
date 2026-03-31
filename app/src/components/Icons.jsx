@@ -141,6 +141,37 @@ export function ClusterIcon({ size = "2em" }) {
   );
 }
 
+export function SuggestIcon({ size = "2em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <g fill="currentColor">
+        <circle cx="100" cy="256" r="52" />
+        <circle cx="412" cy="256" r="52" />
+      </g>
+      <g
+        stroke="currentColor"
+        strokeWidth="24"
+        strokeLinecap="round"
+        fill="none"
+      >
+        <line x1="160" y1="256" x2="320" y2="256" />
+        <polyline points="300,220 340,256 300,292" />
+      </g>
+      <g stroke="currentColor" strokeWidth="16" strokeLinecap="round">
+        <line x1="256" y1="80" x2="256" y2="110" />
+        <line x1="256" y1="402" x2="256" y2="432" />
+        <line x1="196" y1="100" x2="211" y2="127" />
+        <line x1="316" y1="385" x2="301" y2="412" />
+      </g>
+    </svg>
+  );
+}
+
 export function AddIcon({ size = "2em" }) {
   return (
     <svg

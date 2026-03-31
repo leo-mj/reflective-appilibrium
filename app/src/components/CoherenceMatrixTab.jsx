@@ -9,8 +9,7 @@
 
 import { useState } from "react";
 import { C } from "../constants/colors.js";
-import _dummyMatrix from "../dummy-matrix.js";
-import { callBackendLLM } from "../utils/openaiClient.js";
+import { fetchRelatednessMatrix } from "../utils/matrixClient.js";
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 
@@ -45,71 +44,6 @@ function getAnalysisElements(state) {
       e.status !== "withdrawn" &&
       (e.type === "judgment" || e.type === "principle"),
   );
-}
-
-// ─── Prompt building ──────────────────────────────────────────────────────────
-
-/**
- * Builds the prompt string for the relatedness matrix request.
- *
- * @param {string}      topic
- * @param {REElement[]} elements
- * @returns {string}
- */
-function buildPrompt(topic, elements) {
-  const elementList = elements
-    .map((e) => `${e.id} [${e.type}]: ${e.text}`)
-    .join("\n");
-
-  return `\
-You are assisting a reflective equilibrium (RE) analysis in ethics.
-Topic: "${topic}"
-
-Elements (judgments and principles):
-${elementList}
-
-Task: compute a symmetric relatedness matrix.
-- Score each ordered pair (including diagonal) from 0.0 (completely unrelated) to 1.0 (identical or directly equivalent).
-- Diagonal entries must be 1.0.
-- For each off-diagonal unordered pair, provide a one-sentence description. Use the key "A→B" where A and B are sorted according to JavaScript string array sorting (.sort()), \
-so that ["J12", "J10", "J1", "J3"].sort() results in [ 'J1', 'J10', 'J12', 'J3' ].
-- Write a 2–3 sentence overview of the overall element landscape.
-
-Respond with valid JSON only, in exactly this format:
-{
-  "overview": "...",
-  "matrix": { "J1": { "J1": 1.0, "J2": 0.6, "P1": 0.4 }, "J2": { "J1": 0.6, "J2": 1.0, "P1": 0.9 }, "P1": { "J1": 0.4, "J2": 0.9, "P1": 1.0 } },
-  "pairDescriptions": { "J1→J2": "Brief description of how J1 and J2 relate." }
-}`;
-}
-
-// ─── LLM API call ──────────────────────────────────────────────────────────
-
-/**
- * Calls an LLM API and returns the parsed JSON result.
- *
- * @param {string} prompt
- * @returns {Promise<{ overview: string, matrix: Object, pairDescriptions: Object }>}
- */
-async function callLLMAPI(prompt) {
-  const { text, model } = await callBackendLLM(prompt);
-  return { ...JSON.parse(text), _model: model };
-}
-
-/**
- * Builds the prompt, calls an LLM API (or returns the dummy fixture), and
- * returns the parsed relatedness matrix result.
- *
- * @param {string}      topic
- * @param {REElement[]} elements
- * @returns {Promise<{ overview: string, matrix: Object, pairDescriptions: Object, _model: string }>}
- */
-async function fetchRelatednessMatrix(topic, elements) {
-  if (import.meta.env.VITE_USE_DUMMY_MATRIX === false) {
-    console.log("Getting dummy matrix.");
-    return { ...JSON.parse(_dummyMatrix), _model: "dummy" };
-  }
-  return callLLMAPI(buildPrompt(topic, elements));
 }
 
 // ─── Pair description lookup ──────────────────────────────────────────────────
@@ -412,7 +346,7 @@ export function CoherenceMatrixTab({ state }) {
     setLoading(true);
     setError(null);
     try {
-      setResult(await fetchRelatednessMatrix(state.topic, elements));
+      setResult(await fetchRelatednessMatrix(state));
     } catch (e) {
       setError(e.message);
     } finally {

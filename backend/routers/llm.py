@@ -42,11 +42,11 @@ async def complete(
     llm: Annotated[LLMService, Depends(get_llm_service)],
 ) -> CompletionResponse:
     """Send a prompt to the configured LLM and return the reply."""
-    logger.info("Requesting matrix from LLM.")
+    logger.info("Sending request to LLM.")
     text = await llm.complete(
         messages=[m.model_dump() for m in request.messages],
         temperature=request.temperature,
         json_mode=request.json_mode,
     )
-    logger.info(f"Received response: {text[:20]}")
+    logger.info(f"Received response beginning with: {text[:20]}")
     return CompletionResponse(text=text, model=llm.model)
