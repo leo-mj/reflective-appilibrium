@@ -1,7 +1,7 @@
 /**
  * @fileoverview Principle suggestion tab — asks the backend LLM to suggest new
  * principles that would systematise existing judgments, then lets the user
- * reject individual suggestions and save the rest in one go.
+ * accept, reject, or modify individual suggestions before saving.
  * @module components/PrincipleSuggestTab
  */
 
@@ -10,6 +10,14 @@
 import { useState } from "react";
 import { C } from "../constants/colors.js";
 import { fetchPrincipleSuggestions } from "../utils/principlesClient.js";
+import {
+  AcceptButton,
+  RejectButton,
+  ModifyButton,
+  CancelButton,
+  ModifyTextarea,
+  ErrorBanner,
+} from "./SuggestionActions.jsx";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -46,9 +54,9 @@ function Toolbar({
       }}
     >
       <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
-        Principle suggestions for{" "}
+        Principle suggestions based on{" "}
         <span style={{ color: C.text, fontWeight: "bold" }}>{jAndPCount}</span>{" "}
-        judgments{model ? `, via ${model}` : ""}.
+        judgments and principles{model ? `, via ${model}` : ""}.
       </div>
       <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
         {suggestionCount > 0 && (
@@ -71,9 +79,9 @@ function Toolbar({
             <button
               onClick={onRejectAll}
               style={{
-                background: "transparent",
-                border: `1px solid ${C.border}`,
-                color: C.dim,
+                background: "#dc2626",
+                border: "none",
+                color: "#fff",
                 borderRadius: 6,
                 padding: "6px 14px",
                 fontSize: 12,
@@ -107,36 +115,28 @@ function Toolbar({
 }
 
 /**
- * @param {Object} props
- * @param {string} props.message
- */
-function ErrorBanner({ message }) {
-  return (
-    <div
-      style={{
-        background: "#7c1d1d44",
-        border: "1px solid #dc2626",
-        borderRadius: 6,
-        padding: "10px 14px",
-        fontSize: 12,
-        color: "#fca5a5",
-        marginBottom: 14,
-      }}
-    >
-      {message}
-    </div>
-  );
-}
-
-/**
- * A single suggestion card with Accept and Reject buttons.
+ * A single principle suggestion card. The principle text can be modified inline
+ * before accepting.
  *
  * @param {Object}   props
  * @param {{text: string, confidence: string, covers: string[], explanation: string}} props.suggestion
+ * @param {string|null} props.draft  Current draft text when editing, null otherwise.
  * @param {Function} props.onAccept
  * @param {Function} props.onReject
+ * @param {Function} props.onModify
+ * @param {Function} props.onModifyChange  Called with the new draft string.
+ * @param {Function} props.onModifyCancel
  */
-function SuggestionCard({ suggestion, onAccept, onReject }) {
+function SuggestionCard({
+  suggestion,
+  draft,
+  onAccept,
+  onReject,
+  onModify,
+  onModifyChange,
+  onModifyCancel,
+}) {
+  const isEditing = draft !== null;
   return (
     <div
       style={{
@@ -151,60 +151,29 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
       <div
         style={{
           display: "flex",
-          alignItems: "flex-start",
+          alignItems: isEditing ? "flex-start" : "flex-start",
           gap: 8,
           marginBottom: 6,
         }}
       >
-        <div
-          style={{
-            flex: 1,
-            fontWeight: "bold",
-            color: C.text,
-            lineHeight: 1.5,
-          }}
-        >
-          {suggestion.text}
-        </div>
+        {isEditing ? (
+          <ModifyTextarea value={draft} onChange={onModifyChange} accentColor={C.principle.high} />
+        ) : (
+          <div style={{ flex: 1, fontWeight: "bold", color: C.text, lineHeight: 1.5 }}>
+            {suggestion.text}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-          <button
-            onClick={onAccept}
-            style={{
-              background: C.principle.high,
-              border: "none",
-              color: "#fff",
-              borderRadius: 4,
-              padding: "2px 10px",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            Accept
-          </button>
-          <button
-            onClick={onReject}
-            style={{
-              background: "transparent",
-              border: `1px solid ${C.border}`,
-              color: C.dim,
-              borderRadius: 4,
-              padding: "2px 10px",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            Reject
-          </button>
+          <AcceptButton onClick={onAccept} accentColor={C.principle.high} />
+          <RejectButton onClick={onReject} />
+          {isEditing ? (
+            <CancelButton onClick={onModifyCancel} />
+          ) : (
+            <ModifyButton onClick={onModify} />
+          )}
         </div>
       </div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 6,
-        }}
-      >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <span
           style={{
             fontSize: 10,
@@ -222,9 +191,7 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
           </span>
         )}
       </div>
-      <div style={{ color: C.dim, lineHeight: 1.6 }}>
-        {suggestion.explanation}
-      </div>
+      <div style={{ color: C.dim, lineHeight: 1.6 }}>{suggestion.explanation}</div>
     </div>
   );
 }
@@ -235,6 +202,7 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
  * @param {Object}   props
  * @param {REState}  props.state
  * @param {Function} props.onAddElement
+ * @param {Function} props.onRejectElements
  */
 export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
   /** @type {[Array<{text: string, confidence: string, covers: string[], explanation: string}>|null, Function]} */
@@ -242,6 +210,8 @@ export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [model, setModel] = useState(null);
+  /** @type {[{suggestion: Object, draft: string}|null, Function]} */
+  const [editing, setEditing] = useState(null);
 
   const judgments = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.type === "judgment",
@@ -254,8 +224,7 @@ export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
     setLoading(true);
     setError(null);
     try {
-      const { suggestions: s, model: m } =
-        await fetchPrincipleSuggestions(state);
+      const { suggestions: s, model: m } = await fetchPrincipleSuggestions(state);
       setSuggestions(s);
       setModel(m);
     } catch (e) {
@@ -265,35 +234,34 @@ export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
     }
   };
 
+  const resolvedText = (suggestion) =>
+    editing?.suggestion === suggestion ? editing.draft : suggestion.text;
+
   const accept = (suggestion) => {
-    onAddElement({
-      type: "principle",
-      text: suggestion.text,
-      confidence: suggestion.confidence,
-      origin: "llm",
-    });
+    onAddElement({ type: "principle", text: resolvedText(suggestion), confidence: suggestion.confidence, origin: "llm" });
+    setEditing(null);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
   const reject = (suggestion) => {
-    onRejectElements([{ type: "principle", text: suggestion.text, confidence: suggestion.confidence, origin: "llm" }]);
+    onRejectElements([{ type: "principle", text: resolvedText(suggestion), confidence: suggestion.confidence, origin: "llm" }]);
+    setEditing(null);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
   const saveAll = () => {
-    suggestions.forEach((s) => {
-      onAddElement({
-        type: "principle",
-        text: s.text,
-        confidence: s.confidence,
-        origin: "llm",
-      });
-    });
+    suggestions.forEach((s) =>
+      onAddElement({ type: "principle", text: resolvedText(s), confidence: s.confidence, origin: "llm" })
+    );
+    setEditing(null);
     setSuggestions([]);
   };
 
   const rejectAll = () => {
-    onRejectElements(suggestions.map((s) => ({ type: "principle", text: s.text, confidence: s.confidence, origin: "llm" })));
+    onRejectElements(
+      suggestions.map((s) => ({ type: "principle", text: resolvedText(s), confidence: s.confidence, origin: "llm" }))
+    );
+    setEditing(null);
     setSuggestions([]);
   };
 
@@ -314,23 +282,24 @@ export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
 
       {judgments.length + principles.length <= 1 && (
         <div style={{ fontSize: 12, color: C.dim }}>
-          Add at least one non-withdrawn judgment or principle to suggest
-          principles.
+          Add at least one non-withdrawn judgment or principle to suggest principles.
         </div>
       )}
 
       {suggestions !== null && suggestions.length === 0 && (
-        <div style={{ fontSize: 12, color: C.dim }}>
-          No suggestions remaining.
-        </div>
+        <div style={{ fontSize: 12, color: C.dim }}>No suggestions remaining.</div>
       )}
 
       {suggestions?.map((s, i) => (
         <SuggestionCard
           key={i}
           suggestion={s}
+          draft={editing?.suggestion === s ? editing.draft : null}
           onAccept={() => accept(s)}
           onReject={() => reject(s)}
+          onModify={() => setEditing({ suggestion: s, draft: s.text })}
+          onModifyChange={(text) => setEditing((prev) => ({ ...prev, draft: text }))}
+          onModifyCancel={() => setEditing(null)}
         />
       ))}
     </div>

@@ -1,8 +1,8 @@
 /**
  * @fileoverview Judgment elicitation tab — asks the backend LLM to present
  * questions and thought experiments that may prompt the user to articulate
- * new moral judgments. The user can reject individual suggestions and save
- * the tentative judgments for the ones they find compelling.
+ * new moral judgments. Each question comes with multiple jointly exhaustive
+ * positions; the user accepts the ones they agree with and rejects the rest.
  * @module components/JudgmentElicitTab
  */
 
@@ -11,6 +11,14 @@
 import { useState } from "react";
 import { C } from "../constants/colors.js";
 import { fetchJudgmentElicitations } from "../utils/judgmentsClient.js";
+import {
+  AcceptButton,
+  RejectButton,
+  ModifyButton,
+  CancelButton,
+  ModifyTextarea,
+  ErrorBanner,
+} from "./SuggestionActions.jsx";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -47,9 +55,7 @@ function Toolbar({
     >
       <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
         Judgment elicitation for{" "}
-        <span style={{ color: C.text, fontWeight: "bold" }}>
-          {elementCount}
-        </span>{" "}
+        <span style={{ color: C.text, fontWeight: "bold" }}>{elementCount}</span>{" "}
         elements{model ? `, via ${model}` : ""}.
       </div>
       <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -73,9 +79,9 @@ function Toolbar({
             <button
               onClick={onRejectAll}
               style={{
-                background: "transparent",
-                border: `1px solid ${C.border}`,
-                color: C.dim,
+                background: "#dc2626",
+                border: "none",
+                color: "#fff",
                 borderRadius: 6,
                 padding: "6px 14px",
                 fontSize: 12,
@@ -109,36 +115,29 @@ function Toolbar({
 }
 
 /**
- * @param {Object} props
- * @param {string} props.message
- */
-function ErrorBanner({ message }) {
-  return (
-    <div
-      style={{
-        background: "#7c1d1d44",
-        border: "1px solid #dc2626",
-        borderRadius: 6,
-        padding: "10px 14px",
-        fontSize: 12,
-        color: "#fca5a5",
-        marginBottom: 14,
-      }}
-    >
-      {message}
-    </div>
-  );
-}
-
-/**
- * A single suggestion card showing the thought experiment and tentative judgment.
+ * A single suggestion card showing a thought experiment and its multiple
+ * possible positions. Each position can be accepted, rejected, or modified
+ * inline before a decision is made.
  *
  * @param {Object}   props
- * @param {{question: string, text: string, confidence: string}} props.suggestion
- * @param {Function} props.onAccept
- * @param {Function} props.onReject
+ * @param {{question: string, judgments: Array<{text: string, confidence: string}>}} props.suggestion
+ * @param {{judgment: Object, draft: string}|null} props.editing
+ *   The judgment currently being edited and its draft text, or null.
+ * @param {Function} props.onAcceptJudgment   Called with the judgment object.
+ * @param {Function} props.onRejectJudgment   Called with the judgment object.
+ * @param {Function} props.onModify           Called with the judgment object to start editing.
+ * @param {Function} props.onModifyChange     Called with the new draft string.
+ * @param {Function} props.onModifyCancel     Called when the user cancels editing.
  */
-function SuggestionCard({ suggestion, onAccept, onReject }) {
+function SuggestionCard({
+  suggestion,
+  editing,
+  onAcceptJudgment,
+  onRejectJudgment,
+  onModify,
+  onModifyChange,
+  onModifyCancel,
+}) {
   return (
     <div
       style={{
@@ -150,74 +149,72 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
         fontSize: 12,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 8,
-          marginBottom: 8,
-        }}
-      >
-        <div style={{ color: C.text, lineHeight: 1.6, fontStyle: "italic" }}>
-          {suggestion.question}
-        </div>
-        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-          <button
-            onClick={onAccept}
+      <div style={{ color: C.text, lineHeight: 1.6, fontStyle: "italic", marginBottom: 8 }}>
+        {suggestion.question}
+      </div>
+      {suggestion.judgments.map((j, i) => {
+        const isEditing = editing?.judgment === j;
+        return (
+          <div
+            key={i}
             style={{
-              background: C.judgment.high,
-              border: "none",
-              color: "#fff",
-              borderRadius: 4,
-              padding: "2px 10px",
-              fontSize: 11,
-              cursor: "pointer",
+              borderTop: `1px solid ${C.border}`,
+              paddingTop: 7,
+              paddingBottom: 7,
+              display: "flex",
+              alignItems: isEditing ? "flex-start" : "baseline",
+              gap: 8,
             }}
           >
-            Accept
-          </button>
-          <button
-            onClick={onReject}
-            style={{
-              background: "transparent",
-              border: `1px solid ${C.border}`,
-              color: C.dim,
-              borderRadius: 4,
-              padding: "2px 10px",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            Reject
-          </button>
-        </div>
-      </div>
-      <div
-        style={{
-          borderTop: `1px solid ${C.border}`,
-          paddingTop: 8,
-          display: "flex",
-          alignItems: "baseline",
-          gap: 8,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 10,
-            color: C.judgment.high,
-            border: `1px solid ${C.judgment.high}`,
-            borderRadius: 4,
-            padding: "1px 6px",
-            flexShrink: 0,
-          }}
-        >
-          {suggestion.confidence}
-        </span>
-        <div style={{ color: C.dim, lineHeight: 1.6 }}>{suggestion.text}</div>
-      </div>
+            <span
+              style={{
+                fontSize: 10,
+                color: C.judgment.high,
+                border: `1px solid ${C.judgment.high}`,
+                borderRadius: 4,
+                padding: "1px 6px",
+                flexShrink: 0,
+                marginTop: isEditing ? 4 : 0,
+              }}
+            >
+              {j.confidence}
+            </span>
+            {isEditing ? (
+              <ModifyTextarea
+                value={editing.draft}
+                onChange={onModifyChange}
+                accentColor={C.judgment.high}
+              />
+            ) : (
+              <div style={{ color: C.dim, lineHeight: 1.6, flex: 1 }}>{j.text}</div>
+            )}
+            <div style={{ display: "flex", gap: 4, flexShrink: 0, marginTop: isEditing ? 2 : 0 }}>
+              <AcceptButton onClick={() => onAcceptJudgment(j)} accentColor={C.judgment.high} />
+              <RejectButton onClick={() => onRejectJudgment(j)} />
+              {isEditing ? (
+                <CancelButton onClick={onModifyCancel} />
+              ) : (
+                <ModifyButton onClick={() => onModify(j)} />
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Removes one judgment option from its parent suggestion, dropping the suggestion if empty. */
+function removeJudgment(suggestions, suggestion, judgment) {
+  return suggestions
+    .map((s) =>
+      s === suggestion
+        ? { ...s, judgments: s.judgments.filter((j) => j !== judgment) }
+        : s
+    )
+    .filter((s) => s.judgments.length > 0);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -226,13 +223,16 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
  * @param {Object}   props
  * @param {REState}  props.state
  * @param {Function} props.onAddElement
+ * @param {Function} props.onRejectElements
  */
 export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
-  /** @type {[Array<{question: string, text: string, confidence: string}>|null, Function]} */
+  /** @type {[Array<{question: string, judgments: Array<{text: string, confidence: string}>}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [model, setModel] = useState(null);
+  /** @type {[{suggestion: Object, judgment: Object, draft: string}|null, Function]} */
+  const [editing, setEditing] = useState(null);
 
   const activeElements = state.elements.filter((e) => e.status !== "withdrawn");
 
@@ -240,8 +240,7 @@ export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
     setLoading(true);
     setError(null);
     try {
-      const { suggestions: s, model: m } =
-        await fetchJudgmentElicitations(state);
+      const { suggestions: s, model: m } = await fetchJudgmentElicitations(state);
       setSuggestions(s);
       setModel(m);
     } catch (e) {
@@ -251,37 +250,41 @@ export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
     }
   };
 
-  const accept = (suggestion) => {
-    onAddElement({
-      type: "judgment",
-      text: suggestion.text,
-      confidence: suggestion.confidence,
-      origin: "llm",
-    });
-    setSuggestions((prev) => prev.filter((s) => s !== suggestion));
+  const resolvedText = (judgment) =>
+    editing?.judgment === judgment ? editing.draft : judgment.text;
+
+  const accept = (suggestion, judgment) => {
+    onAddElement({ type: "judgment", text: resolvedText(judgment), confidence: judgment.confidence, origin: "llm" });
+    setEditing(null);
+    setSuggestions((prev) => removeJudgment(prev, suggestion, judgment));
   };
 
-  const reject = (suggestion) => {
-    onRejectElements([{ type: "judgment", text: suggestion.text, confidence: suggestion.confidence, origin: "llm" }]);
-    setSuggestions((prev) => prev.filter((s) => s !== suggestion));
+  const reject = (suggestion, judgment) => {
+    onRejectElements([{ type: "judgment", text: resolvedText(judgment), confidence: judgment.confidence, origin: "llm" }]);
+    setEditing(null);
+    setSuggestions((prev) => removeJudgment(prev, suggestion, judgment));
   };
 
   const saveAll = () => {
-    suggestions.forEach((s) => {
-      onAddElement({
-        type: "judgment",
-        text: s.text,
-        confidence: s.confidence,
-        origin: "llm",
-      });
-    });
+    suggestions.forEach((s) =>
+      s.judgments.forEach((j) =>
+        onAddElement({ type: "judgment", text: resolvedText(j), confidence: j.confidence, origin: "llm" })
+      )
+    );
+    setEditing(null);
     setSuggestions([]);
   };
 
   const rejectAll = () => {
-    onRejectElements(suggestions.map((s) => ({ type: "judgment", text: s.text, confidence: s.confidence, origin: "llm" })));
+    const all = suggestions.flatMap((s) =>
+      s.judgments.map((j) => ({ type: "judgment", text: resolvedText(j), confidence: j.confidence, origin: "llm" }))
+    );
+    onRejectElements(all);
+    setEditing(null);
     setSuggestions([]);
   };
+
+  const remainingJudgments = suggestions?.reduce((n, s) => n + s.judgments.length, 0) ?? 0;
 
   return (
     <div style={{ overflowY: "auto", height: "100%", padding: "0 4px 24px" }}>
@@ -289,7 +292,7 @@ export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
         elementCount={activeElements.length}
         loading={loading}
         hasResult={suggestions !== null}
-        suggestionCount={suggestions?.length ?? 0}
+        suggestionCount={remainingJudgments}
         onElicit={elicit}
         onSaveAll={saveAll}
         onRejectAll={rejectAll}
@@ -299,17 +302,19 @@ export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
       {error && <ErrorBanner message={error} />}
 
       {suggestions !== null && suggestions.length === 0 && (
-        <div style={{ fontSize: 12, color: C.dim }}>
-          No suggestions remaining.
-        </div>
+        <div style={{ fontSize: 12, color: C.dim }}>No suggestions remaining.</div>
       )}
 
       {suggestions?.map((s, i) => (
         <SuggestionCard
           key={i}
           suggestion={s}
-          onAccept={() => accept(s)}
-          onReject={() => reject(s)}
+          editing={editing?.suggestion === s ? editing : null}
+          onAcceptJudgment={(j) => accept(s, j)}
+          onRejectJudgment={(j) => reject(s, j)}
+          onModify={(j) => setEditing({ suggestion: s, judgment: j, draft: j.text })}
+          onModifyChange={(text) => setEditing((prev) => ({ ...prev, draft: text }))}
+          onModifyCancel={() => setEditing(null)}
         />
       ))}
     </div>

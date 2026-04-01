@@ -109,7 +109,7 @@ async def suggest_principles(
     request: SuggestPrinciplesRequest,
     llm: Annotated[LLMService, Depends(get_llm_service)],
 ) -> SuggestPrinciplesResponse:
-    """Ask the LLM to suggest new principles that systematise existing judgments."""
+    """Ask the LLM to suggest new principles that systematise existing judgments and principles."""
     active = [e for e in request.elements if e.status not in {"withdrawn", "rejected"}]
     judgments = [e for e in active if e.type == "judgment"]
     existing_principles = [e for e in active if e.type == "principle"]

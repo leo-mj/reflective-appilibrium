@@ -38,12 +38,23 @@ class ElicitJudgmentsRequest(BaseModel):
 Confidence = Literal["high", "moderate", "low"]
 
 
-class JudgmentSuggestion(BaseModel):
-    """A single LLM-generated thought experiment and the judgment it may elicit."""
+class JudgmentOption(BaseModel):
+    """One of several jointly exhaustive positions a user might hold in response to a question."""
 
-    question: str = Field(max_length=2_000)
     text: str = Field(max_length=2_000)
     confidence: Confidence
+
+
+class JudgmentSuggestion(BaseModel):
+    """A thought experiment paired with multiple possible positions.
+
+    ``judgments`` contains 2–4 options that collectively cover the main stances
+    a user might take in response to ``question``.  The user accepts the ones
+    they agree with and rejects the rest.
+    """
+
+    question: str = Field(max_length=2_000)
+    judgments: list[JudgmentOption] = Field(min_length=1, max_length=6)
 
 
 class ElicitJudgmentsResponse(BaseModel):
@@ -100,8 +111,11 @@ Recent round notes:
 
 Task: identify 3–5 moral questions or thought experiments that are relevant \
 to the topic and may prompt the user to articulate judgments they have not yet \
-recorded. For each, also propose a tentative judgment the question is likely \
-to elicit.
+recorded.
+
+For each question, provide 2–4 possible positions that together cover the main \
+stances a person might hold in response to that question (jointly exhaustive \
+alternatives). The user will accept the positions they agree with and reject the rest.
 
 Guidelines:
 - Target gaps: aspects of the topic the existing judgments do not yet address.
@@ -109,14 +123,20 @@ Guidelines:
 near-miss scenarios, or analogies from other domains.
 - Do not re-elicit judgments already present or withdrawn.
 - Keep questions concise (1–2 sentences) and concrete.
+- Each position should be a stand-alone moral verdict (not a rephrasing of the question).
+- Positions within one question should be mutually exclusive — a user should be \
+able to hold at most one without contradiction.
 
 Respond with valid JSON only, in exactly this format:
 {{
   "suggestions": [
     {{
       "question": "A brief thought experiment or question.",
-      "text": "Tentative judgment the question is likely to elicit.",
-      "confidence": "high" | "moderate" | "low"
+      "judgments": [
+        {{"text": "One plausible position in response to the question.", "confidence": "high"}},
+        {{"text": "Another plausible position.", "confidence": "moderate"}},
+        {{"text": "A more cautious or defeasible position.", "confidence": "low"}}
+      ]
     }}
   ]
 }}"""
@@ -142,6 +162,10 @@ async def elicit_judgments(
     )
     data = json.loads(raw)
     suggestions = [JudgmentSuggestion(**s) for s in data.get("suggestions", [])]
-    logger.info(f"Received {len(suggestions)} judgment elicitation suggestions from LLM.")
+    total_judgments = sum(len(s.judgments) for s in suggestions)
+    logger.info(
+        f"Received {len(suggestions)} judgment elicitation suggestions "
+        f"({total_judgments} judgment options) from LLM."
+    )
 
     return ElicitJudgmentsResponse(suggestions=suggestions, model=llm.model)

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Relation suggestion tab — asks the backend LLM to identify
- * relations between existing elements, then lets the user reject individual
- * suggestions and save the rest in one go.
+ * relations between existing elements, then lets the user accept, reject, or
+ * modify the explanation of individual suggestions before saving.
  * @module components/RelationSuggestTab
  */
 
@@ -10,6 +10,14 @@
 import { useState } from "react";
 import { C } from "../constants/colors.js";
 import { fetchRelationSuggestions } from "../utils/relationsClient.js";
+import {
+  AcceptButton,
+  RejectButton,
+  ModifyButton,
+  CancelButton,
+  ModifyTextarea,
+  ErrorBanner,
+} from "./SuggestionActions.jsx";
 
 // ─── Colour helper ────────────────────────────────────────────────────────────
 
@@ -30,6 +38,7 @@ const REL_COLOR = {
  * @param {number}           props.suggestionCount
  * @param {Function}         props.onSuggest
  * @param {Function}         props.onSaveAll
+ * @param {Function}         props.onRejectAll
  * @param {string|undefined} props.model
  */
 function Toolbar({
@@ -55,9 +64,7 @@ function Toolbar({
     >
       <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
         Relation suggestions for{" "}
-        <span style={{ color: C.text, fontWeight: "bold" }}>
-          {elementCount}
-        </span>{" "}
+        <span style={{ color: C.text, fontWeight: "bold" }}>{elementCount}</span>{" "}
         elements{model ? `, via ${model}` : ""}.
       </div>
       <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -81,9 +88,9 @@ function Toolbar({
             <button
               onClick={onRejectAll}
               style={{
-                background: "transparent",
-                border: `1px solid ${C.border}`,
-                color: C.dim,
+                background: "#dc2626",
+                border: "none",
+                color: "#fff",
                 borderRadius: 6,
                 padding: "6px 14px",
                 fontSize: 12,
@@ -117,37 +124,29 @@ function Toolbar({
 }
 
 /**
- * @param {Object} props
- * @param {string} props.message
- */
-function ErrorBanner({ message }) {
-  return (
-    <div
-      style={{
-        background: "#7c1d1d44",
-        border: "1px solid #dc2626",
-        borderRadius: 6,
-        padding: "10px 14px",
-        fontSize: 12,
-        color: "#fca5a5",
-        marginBottom: 14,
-      }}
-    >
-      {message}
-    </div>
-  );
-}
-
-/**
- * A single suggestion card with Accept and Reject buttons.
+ * A single relation suggestion card. The explanation can be modified inline
+ * before accepting.
  *
  * @param {Object}   props
  * @param {{from: string, to: string, type: string, explanation: string}} props.suggestion
+ * @param {string|null} props.draft  Current draft explanation when editing, null otherwise.
  * @param {Function} props.onAccept
  * @param {Function} props.onReject
+ * @param {Function} props.onModify
+ * @param {Function} props.onModifyChange  Called with the new draft string.
+ * @param {Function} props.onModifyCancel
  */
-function SuggestionCard({ suggestion, onAccept, onReject }) {
+function SuggestionCard({
+  suggestion,
+  draft,
+  onAccept,
+  onReject,
+  onModify,
+  onModifyChange,
+  onModifyCancel,
+}) {
   const color = REL_COLOR[suggestion.type] ?? C.dim;
+  const isEditing = draft !== null;
   return (
     <div
       style={{
@@ -167,13 +166,9 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
           marginBottom: 6,
         }}
       >
-        <span style={{ fontWeight: "bold", color: C.text }}>
-          {suggestion.from}
-        </span>
+        <span style={{ fontWeight: "bold", color: C.text }}>{suggestion.from}</span>
         <span style={{ color: C.dim }}>→</span>
-        <span style={{ fontWeight: "bold", color: C.text }}>
-          {suggestion.to}
-        </span>
+        <span style={{ fontWeight: "bold", color: C.text }}>{suggestion.to}</span>
         <span
           style={{
             color,
@@ -186,39 +181,20 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
           {suggestion.type}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-          <button
-            onClick={onAccept}
-            style={{
-              background: C.principle.high,
-              border: "none",
-              color: "#fff",
-              borderRadius: 4,
-              padding: "2px 10px",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            Accept
-          </button>
-          <button
-            onClick={onReject}
-            style={{
-              background: "transparent",
-              border: `1px solid ${C.border}`,
-              color: C.dim,
-              borderRadius: 4,
-              padding: "2px 10px",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            Reject
-          </button>
+          <AcceptButton onClick={onAccept} accentColor={C.principle.high} />
+          <RejectButton onClick={onReject} />
+          {isEditing ? (
+            <CancelButton onClick={onModifyCancel} />
+          ) : (
+            <ModifyButton onClick={onModify} />
+          )}
         </div>
       </div>
-      <div style={{ color: C.dim, lineHeight: 1.6 }}>
-        {suggestion.explanation}
-      </div>
+      {isEditing ? (
+        <ModifyTextarea value={draft} onChange={onModifyChange} accentColor={color} />
+      ) : (
+        <div style={{ color: C.dim, lineHeight: 1.6 }}>{suggestion.explanation}</div>
+      )}
     </div>
   );
 }
@@ -229,6 +205,8 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
  * @param {Object}   props
  * @param {REState}  props.state
  * @param {Function} props.onAddRelation
+ * @param {Function} props.onScrollToRelations
+ * @param {Function} props.onRejectRelations
  */
 export function RelationSuggestTab({
   state,
@@ -241,6 +219,8 @@ export function RelationSuggestTab({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [model, setModel] = useState(null);
+  /** @type {[{suggestion: Object, draft: string}|null, Function]} */
+  const [editing, setEditing] = useState(null);
 
   const activeElements = state.elements.filter((e) => e.status !== "withdrawn");
 
@@ -249,8 +229,7 @@ export function RelationSuggestTab({
     setLoading(true);
     setError(null);
     try {
-      const { suggestions: s, model: m } =
-        await fetchRelationSuggestions(state);
+      const { suggestions: s, model: m } = await fetchRelationSuggestions(state);
       setSuggestions(s);
       setModel(m);
     } catch (e) {
@@ -260,36 +239,40 @@ export function RelationSuggestTab({
     }
   };
 
+  const resolvedExplanation = (suggestion) =>
+    editing?.suggestion === suggestion ? editing.draft : suggestion.explanation;
+
   const accept = (suggestion) => {
     onAddRelation(
-      {
-        from: suggestion.from,
-        to: suggestion.to,
-        type: suggestion.type,
-        explanation: suggestion.explanation,
-      },
+      { from: suggestion.from, to: suggestion.to, type: suggestion.type, explanation: resolvedExplanation(suggestion) },
       { select: false },
     );
+    setEditing(null);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
   const reject = (suggestion) => {
-    onRejectRelations([{ from: suggestion.from, to: suggestion.to, type: suggestion.type, explanation: suggestion.explanation }]);
+    onRejectRelations([{ from: suggestion.from, to: suggestion.to, type: suggestion.type, explanation: resolvedExplanation(suggestion) }]);
+    setEditing(null);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
   const saveAll = () => {
-    suggestions.forEach((s) => {
+    suggestions.forEach((s) =>
       onAddRelation(
-        { from: s.from, to: s.to, type: s.type, explanation: s.explanation },
+        { from: s.from, to: s.to, type: s.type, explanation: resolvedExplanation(s) },
         { select: false },
-      );
-    });
+      )
+    );
+    setEditing(null);
     setSuggestions([]);
   };
 
   const rejectAll = () => {
-    onRejectRelations(suggestions.map((s) => ({ from: s.from, to: s.to, type: s.type, explanation: s.explanation })));
+    onRejectRelations(
+      suggestions.map((s) => ({ from: s.from, to: s.to, type: s.type, explanation: resolvedExplanation(s) }))
+    );
+    setEditing(null);
     setSuggestions([]);
   };
 
@@ -315,17 +298,19 @@ export function RelationSuggestTab({
       )}
 
       {suggestions !== null && suggestions.length === 0 && (
-        <div style={{ fontSize: 12, color: C.dim }}>
-          No suggestions remaining.
-        </div>
+        <div style={{ fontSize: 12, color: C.dim }}>No suggestions remaining.</div>
       )}
 
       {suggestions?.map((s, i) => (
         <SuggestionCard
           key={i}
           suggestion={s}
+          draft={editing?.suggestion === s ? editing.draft : null}
           onAccept={() => accept(s)}
           onReject={() => reject(s)}
+          onModify={() => setEditing({ suggestion: s, draft: s.explanation })}
+          onModifyChange={(text) => setEditing((prev) => ({ ...prev, draft: text }))}
+          onModifyCancel={() => setEditing(null)}
         />
       ))}
     </div>
