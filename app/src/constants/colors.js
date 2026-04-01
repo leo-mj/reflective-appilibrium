@@ -35,13 +35,15 @@
  *   principle: {high: string, moderate: string, low: string},
  *   theory: {high: string, moderate: string, low: string},
  *   withdrawn: string,
+ *   rejected: string,
  *   supports: string,
  *   conflicts: string,
  *   undermines: string,
  *   depends: string,
  *   added: string,
  *   revised: string,
- *   withdrawnMark: string
+ *   withdrawnMark: string,
+ *   rejectedMark: string
  * }}
  */
 export const C = {
@@ -54,6 +56,7 @@ export const C = {
   principle: { high: "#7c3aed", moderate: "#a78bfa", low: "#c4b5fd" },
   theory: { high: "#d97706", moderate: "#fbbf24", low: "#fcd34d" },
   withdrawn: "#64748b",
+  rejected: "#fb7185",
   supports: "#06b6d4",
   conflicts: "#f97316",
   undermines: "#eab308",
@@ -61,6 +64,7 @@ export const C = {
   added: "#06b6d4", // pulse ring colour for newly-added nodes in the History tab
   revised: "#eab308", // label colour for "revised" annotations
   withdrawnMark: "#f97316", // label colour for "withdrawn" annotations
+  rejectedMark: "#fb7185", // label colour for "rejected" annotations
 };
 
 /**
@@ -100,6 +104,8 @@ export const TRANSITION = "opacity 1.2s ease-in-out";
 export function getColors(e) {
   const isW = e.status === "withdrawn";
   if (isW) return { fill: C.withdrawn, stroke: C.withdrawn };
+  const isR = e.status === "rejected";
+  if (isR) return { fill: C.rejected, stroke: C.rejected };
   if (e.type === "judgment")
     return { fill: C.judgment[e.confidence], stroke: C.judgment.high };
   if (e.type === "principle")

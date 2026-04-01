@@ -227,7 +227,7 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
  * @param {REState}  props.state
  * @param {Function} props.onAddElement
  */
-export function JudgmentElicitTab({ state, onAddElement, onLogRejections }) {
+export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
   /** @type {[Array<{question: string, text: string, confidence: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -262,7 +262,7 @@ export function JudgmentElicitTab({ state, onAddElement, onLogRejections }) {
   };
 
   const reject = (suggestion) => {
-    onLogRejections([suggestion.text]);
+    onRejectElements([{ type: "judgment", text: suggestion.text, confidence: suggestion.confidence, origin: "llm" }]);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
@@ -279,7 +279,7 @@ export function JudgmentElicitTab({ state, onAddElement, onLogRejections }) {
   };
 
   const rejectAll = () => {
-    onLogRejections(suggestions.map((s) => s.text));
+    onRejectElements(suggestions.map((s) => ({ type: "judgment", text: s.text, confidence: s.confidence, origin: "llm" })));
     setSuggestions([]);
   };
 

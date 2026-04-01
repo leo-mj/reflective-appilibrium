@@ -24,6 +24,7 @@ export function Legend() {
     { label: "Principle", shape: "roundrect", color: "#7c3aed" },
     { label: "Theory", shape: "diamond", color: "#d97706" },
     { label: "Withdrawn", shape: "circle", color: "#64748b", faded: true },
+    { label: "Rejected", shape: "circle", color: "#fb7185", faded: true },
   ];
   const lines = [
     { label: "Supports", color: C.supports, dash: "" },

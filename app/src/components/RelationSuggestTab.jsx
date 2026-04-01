@@ -234,7 +234,7 @@ export function RelationSuggestTab({
   state,
   onAddRelation,
   onScrollToRelations,
-  onLogRejections,
+  onRejectRelations,
 }) {
   /** @type {[Array<{from: string, to: string, type: string, explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -274,7 +274,7 @@ export function RelationSuggestTab({
   };
 
   const reject = (suggestion) => {
-    onLogRejections([`${suggestion.from} → ${suggestion.to} (${suggestion.type})`]);
+    onRejectRelations([{ from: suggestion.from, to: suggestion.to, type: suggestion.type, explanation: suggestion.explanation }]);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
@@ -289,7 +289,7 @@ export function RelationSuggestTab({
   };
 
   const rejectAll = () => {
-    onLogRejections(suggestions.map((s) => `${s.from} → ${s.to} (${s.type})`));
+    onRejectRelations(suggestions.map((s) => ({ from: s.from, to: s.to, type: s.type, explanation: s.explanation })));
     setSuggestions([]);
   };
 

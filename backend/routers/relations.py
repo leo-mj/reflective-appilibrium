@@ -104,7 +104,7 @@ async def suggest_relations(
     llm: Annotated[LLMService, Depends(get_llm_service)],
 ) -> SuggestResponse:
     """Ask the LLM to identify relations between the provided RE elements."""
-    active = [e for e in request.elements if e.status != "withdrawn"]
+    active = [e for e in request.elements if e.status not in {"withdrawn", "rejected"}]
     prompt = _build_prompt(request.topic, active, request.existing_relations)
     logger.info(f"Requesting relation suggestions from LLM between {len(active)} active elements.")
     raw = await llm.complete(

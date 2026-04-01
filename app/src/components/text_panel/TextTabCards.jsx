@@ -146,6 +146,14 @@ export function StatusLabel({ status }) {
         withdrawn
       </span>
     );
+  if (status === "rejected")
+    return (
+      <span
+        style={{ ...META_LABEL_STYLE, fontSize: 10, color: C.rejectedMark }}
+      >
+        rejected
+      </span>
+    );
   if (status === "revised")
     return (
       <span style={{ ...META_LABEL_STYLE, fontSize: 10, color: C.revised }}>
@@ -178,12 +186,13 @@ export function ElementCard({ e, dim }) {
   const { pCovers, onEditRequest, onWithdrawRequest, badgeColor, search } =
     useContext(Ctx);
   const isW = e.status === "withdrawn";
+  const isR = e.status === "rejected";
   const color = badgeColor(e.id);
   return (
     <div
       style={{
         ...CARD_STYLE,
-        opacity: dim ? 0.4 : isW ? 0.55 : 1,
+        opacity: dim ? 0.4 : isW || isR ? 0.55 : 1,
         borderLeft: `3px solid ${color}`,
         paddingLeft: 10,
       }}
@@ -216,15 +225,15 @@ export function ElementCard({ e, dim }) {
         </div>
         <ActionButtons
           onRevise={() => onEditRequest(e.id)}
-          onWithdraw={!isW ? () => onWithdrawRequest(e.id) : null}
+          onWithdraw={!isW && !isR ? () => onWithdrawRequest(e.id) : null}
         />
       </div>
       <div
         style={{
           fontSize: CONTENT_FONT_SIZE,
-          color: isW ? C.dim : C.text,
+          color: isW || isR ? C.dim : C.text,
           lineHeight: 1.65,
-          textDecoration: isW ? "line-through" : "none",
+          textDecoration: isW || isR ? "line-through" : "none",
         }}
       >
         <Highlight text={e.text} query={search} />

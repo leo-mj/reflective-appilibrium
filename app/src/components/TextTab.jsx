@@ -59,6 +59,7 @@ const NAV_SECTIONS = [
  * @param {Object}          props
  * @param {REState}         props.state
  * @param {boolean}         props.showWithdrawn
+ * @param {boolean}         props.showRejected
  * @param {string|null}     props.selected
  * @param {function}        props.onSelect
  * @param {RERelation|null} props.selectedRel
@@ -75,6 +76,7 @@ const NAV_SECTIONS = [
 export function TextTab({
   state,
   showWithdrawn,
+  showRejected,
   selected,
   onSelect,
   selectedRel,
@@ -112,12 +114,18 @@ export function TextTab({
   const isCollapsed = (key) => (search ? false : !!collapsed[key]);
 
   // ── Derived data ─────────────────────────────────────────────────────────
-  const visibleEls = showWithdrawn
-    ? state.elements
-    : state.elements.filter((e) => e.status !== "withdrawn");
+  const visibleEls = state.elements.filter(
+    (e) =>
+      (showWithdrawn || e.status !== "withdrawn") &&
+      (showRejected || e.status !== "rejected"),
+  );
   const visIds = new Set(visibleEls.map((e) => e.id));
   const visRels = state.relations.filter(
-    (r) => visIds.has(r.from) && visIds.has(r.to),
+    (r) =>
+      visIds.has(r.from) &&
+      visIds.has(r.to) &&
+      (showRejected || r.status !== "rejected") &&
+      (showWithdrawn || r.status !== "withdrawn"),
   );
   const pCovers = buildPrincipleCovers(
     visibleEls.filter((e) => e.type === "principle"),
@@ -517,7 +525,9 @@ export function TextTab({
 
         {adding === "relation" && (
           <AddRelationModal
-            elements={state.elements.filter((e) => e.status !== "withdrawn")}
+            elements={state.elements.filter(
+            (e) => e.status !== "withdrawn" && e.status !== "rejected",
+          )}
             currentRound={state.round}
             onSave={(formData) => {
               onAddRelation(formData);

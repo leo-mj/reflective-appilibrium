@@ -236,7 +236,7 @@ function SuggestionCard({ suggestion, onAccept, onReject }) {
  * @param {REState}  props.state
  * @param {Function} props.onAddElement
  */
-export function PrincipleSuggestTab({ state, onAddElement, onLogRejections }) {
+export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
   /** @type {[Array<{text: string, confidence: string, covers: string[], explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -276,7 +276,7 @@ export function PrincipleSuggestTab({ state, onAddElement, onLogRejections }) {
   };
 
   const reject = (suggestion) => {
-    onLogRejections([suggestion.text]);
+    onRejectElements([{ type: "principle", text: suggestion.text, confidence: suggestion.confidence, origin: "llm" }]);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
@@ -293,7 +293,7 @@ export function PrincipleSuggestTab({ state, onAddElement, onLogRejections }) {
   };
 
   const rejectAll = () => {
-    onLogRejections(suggestions.map((s) => s.text));
+    onRejectElements(suggestions.map((s) => ({ type: "principle", text: s.text, confidence: s.confidence, origin: "llm" })));
     setSuggestions([]);
   };
 

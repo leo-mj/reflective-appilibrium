@@ -280,16 +280,51 @@ function useREActions(initialState) {
     if (select) handleSelectRel(() => newRel);
   };
 
-  const handleLogRejections = (items) => {
+  const handleRejectElements = (formDatas) => {
+    setState((prev) => {
+      // Assign IDs sequentially, feeding each new element into the next ID lookup.
+      let running = prev.elements;
+      const newEls = formDatas.map((fd) => {
+        const id = nextElementId(running, fd.type);
+        const el = { id, status: "rejected", addedRound: prev.round, rejectedRound: prev.round, ...fd };
+        running = [...running, el];
+        return el;
+      });
+      return {
+        ...prev,
+        elements: [...prev.elements, ...newEls],
+        log: [
+          ...prev.log,
+          makeLogEntry(
+            prev.round,
+            `${formDatas.length} suggestion${formDatas.length !== 1 ? "s" : ""} rejected.`,
+            "Rejected",
+            formDatas.map((fd) => fd.text).join("; "),
+          ),
+        ],
+      };
+    });
+  };
+
+  const handleRejectRelations = (formDatas) => {
     setState((prev) => ({
       ...prev,
+      relations: [
+        ...prev.relations,
+        ...formDatas.map((fd) => ({
+          ...fd,
+          status: "rejected",
+          addedRound: prev.round,
+          rejectedRound: prev.round,
+        })),
+      ],
       log: [
         ...prev.log,
         makeLogEntry(
           prev.round,
-          `${items.length} suggestion${items.length !== 1 ? "s" : ""} rejected.`,
+          `${formDatas.length} relation suggestion${formDatas.length !== 1 ? "s" : ""} rejected.`,
           "Rejected",
-          items.join("; "),
+          formDatas.map((fd) => `${fd.from} → ${fd.to} (${fd.type})`).join("; "),
         ),
       ],
     }));
@@ -323,7 +358,8 @@ function useREActions(initialState) {
     handleWithdrawRelRequest,
     handleAddElement,
     handleAddRelation,
-    handleLogRejections,
+    handleRejectElements,
+    handleRejectRelations,
     handleImportFile,
   };
 }
@@ -712,6 +748,8 @@ function GraphPanel({
   positions,
   showWithdrawn,
   setShowWithdrawn,
+  showRejected,
+  setShowRejected,
   selected,
   onSelect,
   selectedRel,
@@ -719,7 +757,8 @@ function GraphPanel({
   onAddElement,
   onAddRelation,
   onScrollToRelations,
-  onLogRejections,
+  onRejectElements,
+  onRejectRelations,
   onRoundChange,
   isWide,
 }) {
@@ -734,48 +773,31 @@ function GraphPanel({
       }}
     >
       <Legend />
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          fontSize: 11,
-          color: C.dim,
-          cursor: "pointer",
-        }}
-      >
-        <div
-          onClick={() => setShowWithdrawn((s) => !s)}
-          style={{
-            width: 32,
-            height: 18,
-            borderRadius: 9,
-            position: "relative",
-            background: showWithdrawn ? "#7c3aed" : C.border,
-            transition: "background 0.3s",
-            cursor: "pointer",
-          }}
-        >
-          <div
-            style={{
-              width: 14,
-              height: 14,
-              borderRadius: 7,
-              background: C.text,
-              position: "absolute",
-              top: 2,
-              left: showWithdrawn ? 16 : 2,
-              transition: "left 0.3s ease",
-            }}
-          />
-        </div>
-        Show withdrawn
-      </label>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {[
+          { label: "Show withdrawn", value: showWithdrawn, set: setShowWithdrawn, color: "#7c3aed" },
+          { label: "Show rejected",  value: showRejected,  set: setShowRejected,  color: "#fb7185" },
+        ].map(({ label, value, set, color }) => (
+          <label
+            key={label}
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.dim, cursor: "pointer" }}
+          >
+            <div
+              onClick={() => set((s) => !s)}
+              style={{ width: 32, height: 18, borderRadius: 9, position: "relative", background: value ? color : C.border, transition: "background 0.3s", cursor: "pointer" }}
+            >
+              <div style={{ width: 14, height: 14, borderRadius: 7, background: C.text, position: "absolute", top: 2, left: value ? 16 : 2, transition: "left 0.3s ease" }} />
+            </div>
+            {label}
+          </label>
+        ))}
+      </div>
       <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
         {tab === "graph" && (
           <Graph
             state={state}
             showWithdrawn={showWithdrawn}
+            showRejected={showRejected}
             positions={positions}
             selected={selected}
             onSelect={onSelect}
@@ -811,7 +833,7 @@ function GraphPanel({
               state={state}
               onAddRelation={onAddRelation}
               onScrollToRelations={onScrollToRelations}
-              onLogRejections={onLogRejections}
+              onRejectRelations={onRejectRelations}
             />
           </Suspense>
         )}
@@ -820,7 +842,7 @@ function GraphPanel({
             <PrincipleSuggestTab
               state={state}
               onAddElement={onAddElement}
-              onLogRejections={onLogRejections}
+              onRejectElements={onRejectElements}
             />
           </Suspense>
         )}
@@ -829,7 +851,7 @@ function GraphPanel({
             <JudgmentElicitTab
               state={state}
               onAddElement={onAddElement}
-              onLogRejections={onLogRejections}
+              onRejectElements={onRejectElements}
             />
           </Suspense>
         )}
@@ -885,6 +907,7 @@ function EditModals({
 export default function REState({ initialState, onHome, onReady }) {
   const [tab, setTab] = useState("graph");
   const [showWithdrawn, setShowWithdrawn] = useState(false);
+  const [showRejected, setShowRejected] = useState(false);
   const [showText, setShowText] = useState(true);
   const [historyRound, setHistoryRound] = useState(0);
 
@@ -906,7 +929,8 @@ export default function REState({ initialState, onHome, onReady }) {
     handleWithdrawRelRequest,
     handleAddElement,
     handleAddRelation,
-    handleLogRejections,
+    handleRejectElements,
+    handleRejectRelations,
     handleImportFile,
   } = actions;
 
@@ -989,6 +1013,7 @@ export default function REState({ initialState, onHome, onReady }) {
             scrollToRelationsKey={scrollToRelationsKey}
             state={textState}
             showWithdrawn={showWithdrawn}
+            showRejected={showRejected}
             selected={selected}
             onSelect={handleSelectNode}
             selectedRel={selectedRel}
@@ -1026,6 +1051,8 @@ export default function REState({ initialState, onHome, onReady }) {
             positions={positions}
             showWithdrawn={showWithdrawn}
             setShowWithdrawn={setShowWithdrawn}
+            showRejected={showRejected}
+            setShowRejected={setShowRejected}
             selected={selected}
             onSelect={handleSelectNode}
             selectedRel={selectedRel}
@@ -1033,7 +1060,8 @@ export default function REState({ initialState, onHome, onReady }) {
             onAddElement={handleAddElement}
             onAddRelation={handleAddRelation}
             onScrollToRelations={scrollToRelations}
-            onLogRejections={handleLogRejections}
+            onRejectElements={handleRejectElements}
+            onRejectRelations={handleRejectRelations}
             onRoundChange={setHistoryRound}
             isWide={isWide}
           />
@@ -1042,7 +1070,7 @@ export default function REState({ initialState, onHome, onReady }) {
 
       {isWide && (
         <AddBar
-          elements={state.elements.filter((e) => e.status !== "withdrawn")}
+          elements={state.elements.filter((e) => e.status !== "withdrawn" && e.status !== "rejected")}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
         />

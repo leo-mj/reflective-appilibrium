@@ -251,6 +251,7 @@ function useGraphClick({
  * @param {Object}      props
  * @param {REState}     props.state
  * @param {boolean}     props.showWithdrawn
+ * @param {boolean}     props.showRejected
  * @param {PositionMap} props.positions
  * @param {string|null} props.selected
  * @param {function(function): void} props.onSelect
@@ -263,6 +264,7 @@ function useGraphClick({
 export function Graph({
   state,
   showWithdrawn,
+  showRejected,
   positions,
   selected,
   onSelect,
@@ -281,10 +283,19 @@ export function Graph({
 
   const { active, withdrawn } = elementsAtRound(state.elements, state.round);
   const wIds = new Set(withdrawn.map((e) => e.id));
-  const visibleEls = showWithdrawn ? [...active, ...withdrawn] : active;
+  const rejectedEls = state.elements.filter((e) => e.status === "rejected");
+  const visibleEls = [
+    ...active,
+    ...(showWithdrawn ? withdrawn : []),
+    ...(showRejected ? rejectedEls : []),
+  ];
   const visIds = new Set(visibleEls.map((e) => e.id));
   const visRels = state.relations.filter(
-    (r) => visIds.has(r.from) && visIds.has(r.to),
+    (r) =>
+      visIds.has(r.from) &&
+      visIds.has(r.to) &&
+      (showRejected || r.status !== "rejected") &&
+      (showWithdrawn || r.status !== "withdrawn"),
   );
 
   const highlightedIds = selected
@@ -333,7 +344,9 @@ export function Graph({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const activeEls = state.elements.filter((e) => e.status !== "withdrawn");
+  const activeEls = state.elements.filter(
+    (e) => e.status !== "withdrawn" && e.status !== "rejected",
+  );
 
   return (
     <>

@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 # ── Element ────────────────────────────────────────────────────────────────────
 
 ElementType = Literal["judgment", "principle", "theory"]
-Status = Literal["active", "revised", "withdrawn"]
+Status = Literal["active", "revised", "withdrawn", "rejected"]
 Confidence = Literal["high", "moderate", "low"]
 
 
@@ -36,6 +36,9 @@ class REElement(BaseModel):
     reason: Optional[str] = Field(None, max_length=2_000)
     withdrawn_round: Optional[int] = Field(None, alias="withdrawnRound", ge=1)
 
+    # Rejected fields
+    rejected_round: Optional[int] = Field(None, alias="rejectedRound", ge=1)
+
     model_config = {"populate_by_name": True}
 
 
@@ -54,6 +57,7 @@ class RERelation(BaseModel):
     status: Optional[Status] = None
     revised_round: Optional[int] = Field(None, alias="revisedRound", ge=1)
     withdrawn_round: Optional[int] = Field(None, alias="withdrawnRound", ge=1)
+    rejected_round: Optional[int] = Field(None, alias="rejectedRound", ge=1)
 
     model_config = {"populate_by_name": True}
 

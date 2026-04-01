@@ -49,7 +49,7 @@ def _build_prompt(
     elements: list[REElement],
     log: list[RELogEntry],
 ) -> str:
-    active = [e for e in elements if e.status != "withdrawn"]
+    active = [e for e in elements if e.status not in {"withdrawn", "rejected"}]
     withdrawn = [e for e in elements if e.status == "withdrawn"]
 
     active_lines = (
