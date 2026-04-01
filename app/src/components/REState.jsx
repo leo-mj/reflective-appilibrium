@@ -286,7 +286,13 @@ function useREActions(initialState) {
       let running = prev.elements;
       const newEls = formDatas.map((fd) => {
         const id = nextElementId(running, fd.type);
-        const el = { id, status: "rejected", addedRound: prev.round, rejectedRound: prev.round, ...fd };
+        const el = {
+          id,
+          status: "rejected",
+          addedRound: prev.round,
+          rejectedRound: prev.round,
+          ...fd,
+        };
         running = [...running, el];
         return el;
       });
@@ -324,7 +330,9 @@ function useREActions(initialState) {
           prev.round,
           `${formDatas.length} relation suggestion${formDatas.length !== 1 ? "s" : ""} rejected.`,
           "Rejected",
-          formDatas.map((fd) => `${fd.from} → ${fd.to} (${fd.type})`).join("; "),
+          formDatas
+            .map((fd) => `${fd.from} → ${fd.to} (${fd.type})`)
+            .join("; "),
         ),
       ],
     }));
@@ -492,12 +500,38 @@ function AppHeader({
     color: active ? C.text : C.dim,
     fontFamily: "inherit",
   });
-  const tabs = [
+  // Classic connected-tab style for the Analyze / Assist meta-tab buttons.
+  // The active tab's bottom border matches the page background, making it
+  // appear to open into the content below the tab bar border.
+  const metaTabBtn = (active) => ({
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 30,
+    padding: "0 14px",
+    boxSizing: "border-box",
+    borderRadius: "4px 4px 0 0",
+    border: `1px solid ${C.border}`,
+    borderBottom: `1px solid ${active ? C.bg : C.border}`,
+    marginBottom: active ? -1 : 0,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: active ? "600" : "normal",
+    background: active ? C.border : "transparent",
+    color: active ? C.text : C.dim,
+    fontFamily: "inherit",
+    position: "relative",
+    zIndex: active ? 1 : 0,
+  });
+  const ANALYZE_TABS = [
     "graph",
     "history",
     "clusters",
-    ...(LLM_ENABLED ? ["matrix", "suggest", "principles", "judgments"] : []),
+    ...(LLM_ENABLED ? ["matrix"] : []),
   ];
+  const ASSIST_TABS = LLM_ENABLED ? ["suggest", "principles", "judgments"] : [];
+  const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
+  const visibleSubTabs = metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS;
 
   const hiddenInput = (
     <input
@@ -585,7 +619,18 @@ function AppHeader({
               ← Home
             </button>
             {divider}
-            {tabs.map((t) => (
+            <div
+              style={{
+                fontSize: 10,
+                color: C.dim,
+                fontWeight: "bold",
+                padding: "4px 4px 2px",
+                letterSpacing: "0.05em",
+              }}
+            >
+              Analyze
+            </div>
+            {ANALYZE_TABS.map((t) => (
               <button
                 key={t}
                 onClick={close(() => setTab(t))}
@@ -595,6 +640,31 @@ function AppHeader({
                 {TAB_LABELS[t]}
               </button>
             ))}
+            {LLM_ENABLED && (
+              <>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: C.dim,
+                    fontWeight: "bold",
+                    padding: "4px 4px 2px",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Assist
+                </div>
+                {ASSIST_TABS.map((t) => (
+                  <button
+                    key={t}
+                    onClick={close(() => setTab(t))}
+                    style={menuBtn(tab === t)}
+                  >
+                    {TAB_ICONS[t]}
+                    {TAB_LABELS[t]}
+                  </button>
+                ))}
+              </>
+            )}
             <button
               onClick={close(() => setTab("text"))}
               style={menuBtn(tab === "text")}
@@ -628,35 +698,30 @@ function AppHeader({
     );
   }
 
-  // ── Wide (desktop): existing layout ───────────────────────────────────────
-  return (
+  // ── Wide (desktop): two-row layout ───────────────────────────────────────
+  const divider = (
     <div
       style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 6,
+        width: 1,
+        height: 20,
+        background: C.border,
+        alignSelf: "center",
+        margin: "0 4px",
       }}
-    >
-      <div style={{ display: "flex", flex: "1 1 0", minWidth: 0 }}>
-        {hiddenInput}
-        <button
-          onClick={handleImportClick}
-          style={{ marginRight: 6, flexShrink: 0, ...btn(false) }}
-        >
-          ↑ Import
-        </button>
-        <button
-          onClick={onDownload}
-          style={{
-            marginRight: "2em",
-            flexShrink: 0,
-            ...btn(true),
-            background: C.theory.high,
-          }}
-        >
-          ↓ Export
-        </button>
+    />
+  );
+  return (
+    <div>
+      {hiddenInput}
+      {/* Row 1: utility — import/export, title, show-text, home */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 6,
+        }}
+      >
         <div style={{ minWidth: 0 }}>
           <div
             style={{
@@ -674,38 +739,97 @@ function AppHeader({
             style={{ fontSize: 14, color: C.dim, marginTop: 2 }}
           />
         </div>
+        <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+          <button
+            onClick={() => setShowText((s) => !s)}
+            style={{ ...btn(false), position: "relative" }}
+          >
+            <span style={{ visibility: "hidden" }}>
+              {showText ? "Hide text" : "Show text"}
+            </span>
+            <span
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {showText ? "Hide text" : "Show text"}
+            </span>
+          </button>
+          {divider}
+          <div style={{ display: "flex", flex: "1 1 0", minWidth: 0 }}>
+            <button
+              onClick={handleImportClick}
+              style={{ marginRight: 2, flexShrink: 0, ...btn(false) }}
+            >
+              ↑ Import
+            </button>
+            <button
+              onClick={onDownload}
+              style={{
+                flexShrink: 0,
+                ...btn(true),
+                background: C.theory.high,
+              }}
+            >
+              ↓ Export
+            </button>
+            {divider}
+            <button onClick={onHome} style={{ ...btn(false) }}>
+              ← Home
+            </button>
+          </div>
+        </div>
       </div>
+      {/* Row 2: tab bar — meta-tabs connect to the border below */}
       <div
-        style={{ display: "flex", gap: 2, alignItems: "center", flexShrink: 0 }}
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 2,
+          borderBottom: `1px solid ${C.border}`,
+          marginBottom: 6,
+          paddingBottom: 2,
+        }}
       >
-        {tabs.map((t) => (
+        {LLM_ENABLED && (
+          <>
+            <button
+              style={metaTabBtn(metaTab === "analyze")}
+              onClick={() => {
+                if (metaTab !== "analyze") setTab("graph");
+              }}
+            >
+              Analyze
+            </button>
+            <button
+              style={metaTabBtn(metaTab === "assist")}
+              onClick={() => {
+                if (metaTab !== "assist") setTab("suggest");
+              }}
+            >
+              Assist
+            </button>
+            <div
+              style={{
+                width: 1,
+                height: 20,
+                background: C.border,
+                alignSelf: "center",
+                margin: "0 4px",
+              }}
+            />
+          </>
+        )}
+        {visibleSubTabs.map((t) => (
           <button key={t} onClick={() => setTab(t)} style={btn(tab === t)}>
             {TAB_ICONS[t]}
             {TAB_LABELS[t]}
           </button>
         ))}
-        <button
-          onClick={() => setShowText((s) => !s)}
-          style={{ ...btn(false), position: "relative" }}
-        >
-          <span style={{ visibility: "hidden" }}>
-            {showText ? "Hide text" : "Show text"}
-          </span>
-          <span
-            style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {showText ? "Hide text" : "Show text"}
-          </span>
-        </button>
-        <button onClick={onHome} style={{ ...btn(false), marginLeft: 50 }}>
-          ← Home
-        </button>
       </div>
     </div>
   );
@@ -775,18 +899,54 @@ function GraphPanel({
       <Legend />
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         {[
-          { label: "Show withdrawn", value: showWithdrawn, set: setShowWithdrawn, color: "#7c3aed" },
-          { label: "Show rejected",  value: showRejected,  set: setShowRejected,  color: "#fb7185" },
+          {
+            label: "Show withdrawn",
+            value: showWithdrawn,
+            set: setShowWithdrawn,
+            color: "#7c3aed",
+          },
+          {
+            label: "Show rejected",
+            value: showRejected,
+            set: setShowRejected,
+            color: "#fb7185",
+          },
         ].map(({ label, value, set, color }) => (
           <label
             key={label}
-            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.dim, cursor: "pointer" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11,
+              color: C.dim,
+              cursor: "pointer",
+            }}
           >
             <div
               onClick={() => set((s) => !s)}
-              style={{ width: 32, height: 18, borderRadius: 9, position: "relative", background: value ? color : C.border, transition: "background 0.3s", cursor: "pointer" }}
+              style={{
+                width: 32,
+                height: 18,
+                borderRadius: 9,
+                position: "relative",
+                background: value ? color : C.border,
+                transition: "background 0.3s",
+                cursor: "pointer",
+              }}
             >
-              <div style={{ width: 14, height: 14, borderRadius: 7, background: C.text, position: "absolute", top: 2, left: value ? 16 : 2, transition: "left 0.3s ease" }} />
+              <div
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 7,
+                  background: C.text,
+                  position: "absolute",
+                  top: 2,
+                  left: value ? 16 : 2,
+                  transition: "left 0.3s ease",
+                }}
+              />
             </div>
             {label}
           </label>
@@ -1070,7 +1230,9 @@ export default function REState({ initialState, onHome, onReady }) {
 
       {isWide && (
         <AddBar
-          elements={state.elements.filter((e) => e.status !== "withdrawn" && e.status !== "rejected")}
+          elements={state.elements.filter(
+            (e) => e.status !== "withdrawn" && e.status !== "rejected",
+          )}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
         />
