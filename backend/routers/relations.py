@@ -23,12 +23,20 @@ logger = logging.getLogger(__name__)
 # ── Request / response models ──────────────────────────────────────────────────
 
 class SuggestRequest(BaseModel):
+    """Payload for ``POST /api/relations/suggest``.
+
+    ``existing_relations`` are passed so the LLM can skip already-recorded
+    directed pairs and only return genuinely new suggestions.
+    """
+
     topic: str = Field(max_length=500)
     elements: list[REElement] = Field(min_length=2, max_length=200)
     existing_relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
 
 
 class RelationSuggestion(BaseModel):
+    """A single LLM-proposed directed relation between two RE elements."""
+
     from_id: str = Field(alias="from")
     to_id: str = Field(alias="to")
     type: RelationType
@@ -38,6 +46,8 @@ class RelationSuggestion(BaseModel):
 
 
 class SuggestResponse(BaseModel):
+    """Response from ``POST /api/relations/suggest``."""
+
     suggestions: list[RelationSuggestion]
     model: str
 
@@ -60,6 +70,13 @@ def _build_prompt(
     elements: list[REElement],
     existing_relations: list[RERelation],
 ) -> str:
+    """Build the LLM prompt for relation suggestion.
+
+    Already-recorded directed pairs are extracted from ``existing_relations``
+    and injected into the prompt as a skip list.  The model is instructed to
+    check both directions for every element pair and to err on the side of
+    inclusion — the user can reject spurious suggestions in the UI.
+    """
     element_lines = "\n".join(
         f"{e.id} [{e.type}]: {e.text}" for e in elements
     )

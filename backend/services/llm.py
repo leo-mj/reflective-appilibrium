@@ -12,7 +12,15 @@ from ..config import Settings
 
 
 class LLMService:
+    """Thin async wrapper around the OpenAI chat-completions API.
+
+    Initialised once per request via ``get_llm_service`` and injected by
+    FastAPI's dependency system.  Swap ``Settings.openai_base_url`` to point
+    at Ollama, vLLM, or any other compatible server without touching this class.
+    """
+
     def __init__(self, settings: Settings) -> None:
+        """Initialise the underlying ``AsyncOpenAI`` client from *settings*."""
         self._client = AsyncOpenAI(
             api_key=settings.openai_api_key,
             base_url=settings.openai_base_url,

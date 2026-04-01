@@ -19,17 +19,23 @@ logger = logging.getLogger(__name__)
 # ── Request / response models ──────────────────────────────────────────────────
 
 class Message(BaseModel):
+    """A single chat message with a role and text content."""
+
     role: str = Field(pattern=r"^(system|user|assistant)$")
     content: str = Field(max_length=100_000)
 
 
 class CompletionRequest(BaseModel):
+    """Payload for ``POST /api/llm/complete``."""
+
     messages: list[Message] = Field(min_length=1, max_length=100)
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
     json_mode: bool = False
 
 
 class CompletionResponse(BaseModel):
+    """Response from ``POST /api/llm/complete``."""
+
     text: str
     model: str
 

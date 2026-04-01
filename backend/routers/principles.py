@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 # ── Request / response models ──────────────────────────────────────────────────
 
 class SuggestPrinciplesRequest(BaseModel):
+    """Payload for ``POST /api/principles/suggest``."""
+
     topic: str = Field(max_length=500)
     elements: list[REElement] = Field(min_length=1, max_length=200)
 
@@ -31,6 +33,12 @@ Confidence = Literal["high", "moderate", "low"]
 
 
 class PrincipleSuggestion(BaseModel):
+    """A single LLM-proposed principle.
+
+    ``covers`` lists the IDs of the judgments (and/or existing principles)
+    that this principle would systematise.
+    """
+
     text: str = Field(max_length=2_000)
     confidence: Confidence
     covers: list[str] = Field(default_factory=list)
@@ -38,6 +46,8 @@ class PrincipleSuggestion(BaseModel):
 
 
 class SuggestPrinciplesResponse(BaseModel):
+    """Response from ``POST /api/principles/suggest``."""
+
     suggestions: list[PrincipleSuggestion]
     model: str
 
@@ -49,6 +59,12 @@ def _build_prompt(
     judgments: list[REElement],
     existing_principles: list[REElement],
 ) -> str:
+    """Build the LLM prompt for principle suggestion.
+
+    Both active judgments and existing principles are included so the model
+    can avoid redundant proposals and estimate how many new principles are
+    warranted (target: roughly one per three elements).
+    """
     judgment_lines = "\n".join(f"  {e.id}: {e.text}" for e in judgments)
     principle_lines = (
         "\n".join(f"  {e.id}: {e.text}" for e in existing_principles)

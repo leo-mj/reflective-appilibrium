@@ -23,11 +23,21 @@ logger = logging.getLogger(__name__)
 # ── Request / response models ──────────────────────────────────────────────────
 
 class MatrixRequest(BaseModel):
+    """Payload for ``POST /api/matrix/analyze``."""
+
     topic: str = Field(max_length=500)
     elements: list[REElement] = Field(min_length=2, max_length=200)
 
 
 class MatrixResponse(BaseModel):
+    """Response from ``POST /api/matrix/analyze``.
+
+    ``matrix`` is a square dict-of-dicts keyed by element ID with float
+    relatedness scores in [0, 1]; diagonal entries are always 1.0.
+    ``pair_descriptions`` maps ``"A→B"`` (IDs in JS sort order) to a
+    one-sentence description of the relationship.
+    """
+
     overview: str
     matrix: dict[str, dict[str, float]]
     pair_descriptions: dict[str, str] = Field(alias="pairDescriptions")
@@ -39,6 +49,12 @@ class MatrixResponse(BaseModel):
 # ── Prompt ────────────────────────────────────────────────────────────────────
 
 def _build_prompt(topic: str, elements: list[REElement]) -> str:
+    """Build the LLM prompt for relatedness matrix computation.
+
+    The prompt instructs the model to produce a symmetric matrix with
+    diagonal 1.0 entries and a ``pairDescriptions`` dict keyed by
+    ``"A→B"`` in JavaScript sort order (to match the frontend).
+    """
     element_list = "\n".join(f"{e.id} [{e.type}]: {e.text}" for e in elements)
     ids = [e.id for e in elements]
     example_ids = ids[:3] if len(ids) >= 3 else ids

@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 # ── Request / response models ──────────────────────────────────────────────────
 
 class ElicitJudgmentsRequest(BaseModel):
+    """Payload for ``POST /api/judgments/elicit``.
+
+    ``elements`` is the full element list so the LLM can avoid re-eliciting
+    judgments that are already recorded or withdrawn.  ``log`` provides recent
+    round notes for additional context.
+    """
+
     topic: str = Field(max_length=500)
     elements: list[REElement] = Field(default_factory=list, max_length=200)
     log: list[RELogEntry] = Field(default_factory=list, max_length=1_000)
@@ -32,12 +39,16 @@ Confidence = Literal["high", "moderate", "low"]
 
 
 class JudgmentSuggestion(BaseModel):
+    """A single LLM-generated thought experiment and the judgment it may elicit."""
+
     question: str = Field(max_length=2_000)
     text: str = Field(max_length=2_000)
     confidence: Confidence
 
 
 class ElicitJudgmentsResponse(BaseModel):
+    """Response from ``POST /api/judgments/elicit``."""
+
     suggestions: list[JudgmentSuggestion]
     model: str
 
@@ -49,6 +60,12 @@ def _build_prompt(
     elements: list[REElement],
     log: list[RELogEntry],
 ) -> str:
+    """Build the LLM prompt for judgment elicitation.
+
+    Active and withdrawn elements are listed separately so the model can
+    target genuine gaps rather than re-eliciting already-recorded positions.
+    Only the five most recent log entries are included to stay within token limits.
+    """
     active = [e for e in elements if e.status not in {"withdrawn", "rejected"}]
     withdrawn = [e for e in elements if e.status == "withdrawn"]
 
