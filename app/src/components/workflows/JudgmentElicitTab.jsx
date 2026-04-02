@@ -20,6 +20,7 @@ import {
   ErrorBanner,
 } from "../SuggestionActions.jsx";
 import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
+import { ConversationPanel } from "./ConversationPanel.jsx";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -143,6 +144,7 @@ function Toolbar({
 function SuggestionCard({
   suggestion,
   editing,
+  state,
   onAcceptJudgment,
   onRejectJudgment,
   onModify,
@@ -230,6 +232,7 @@ function SuggestionCard({
           </div>
         );
       })}
+      <ConversationPanel state={state} suggestion={suggestion} />
     </div>
   );
 }
@@ -380,6 +383,7 @@ export function JudgmentElicitTab({
           key={i}
           suggestion={s}
           editing={editing?.suggestion === s ? editing : null}
+          state={state}
           onAcceptJudgment={(j) => accept(s, j)}
           onRejectJudgment={(j) => reject(s, j)}
           onModify={(j) =>

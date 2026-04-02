@@ -23,6 +23,7 @@ import {
   WORKFLOW_NEXT_PHASE,
 } from "../../utils/workflowUtils.js";
 import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
+import { ConversationPanel } from "./ConversationPanel.jsx";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -143,6 +144,7 @@ function Toolbar({
 function SuggestionCard({
   suggestion,
   draft,
+  state,
   onAccept,
   onReject,
   onModify,
@@ -225,6 +227,7 @@ function SuggestionCard({
       <div style={{ color: C.dim, lineHeight: 1.6 }}>
         {suggestion.explanation}
       </div>
+      <ConversationPanel state={state} suggestion={suggestion} />
     </div>
   );
 }
@@ -371,6 +374,7 @@ export function PrincipleSuggestTab({
           key={i}
           suggestion={s}
           draft={editing?.suggestion === s ? editing.draft : null}
+          state={state}
           onAccept={() => accept(s)}
           onReject={() => reject(s)}
           onModify={() => setEditing({ suggestion: s, draft: s.text })}
