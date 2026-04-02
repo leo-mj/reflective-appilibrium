@@ -8,16 +8,26 @@ backend/server.log
 
 # Dummy/sample data
 app/src/dummy-*.js
-skill/dummy-state.js
 
-# Large Phase 1 skill files (read directly when needed)
-skill/re-viz-component.jsx
-skill/re-skill-prompt.md
-skill/re-relations-reference.md
-skill/cluster-algorithm.md
+# Phase 1 skill files (read directly when needed)
+skill/
 
 # Lock files
 app/package-lock.json
+
+# IDE and CI config
+.vscode/
+.github/
+
+# Static assets
+app/src/assets/
+
+# Env files
+.env
+app/.env
+app/.env.production
+backend/.env
+backend/.env.example
 
 # Docs
 README.md

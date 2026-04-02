@@ -8,7 +8,7 @@
 
 /** @import { REState } from '../../types.js' */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
 import {
