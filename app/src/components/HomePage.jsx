@@ -69,7 +69,7 @@ function NewProcessCard({ onStart }) {
   const trimmed = topic.trim();
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && trimmed) onStart(trimmed);
+    if (e.key === "Enter" && e.ctrlKey && trimmed) onStart(trimmed);
   };
 
   return (

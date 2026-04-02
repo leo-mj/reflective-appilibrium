@@ -257,6 +257,12 @@ export function AddBar({ elements, onAddElement, onAddRelation }) {
             ? setEl("text", e.target.value)
             : setRel("explanation", e.target.value)
         }
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && e.ctrlKey && canSubmit) {
+            e.preventDefault();
+            handleSubmit();
+          }
+        }}
         placeholder={
           activeTab === "element"
             ? "Enter statement…"
@@ -360,6 +366,12 @@ export function AddElementPanel({ elementType, onAddElement }) {
       <textarea
         value={form.text}
         onChange={(e) => set("text", e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && e.ctrlKey && canSubmit) {
+            e.preventDefault();
+            handleSubmit();
+          }
+        }}
         placeholder="Enter statement…"
         style={{
           flex: 1,
@@ -467,6 +479,12 @@ export function AddRelationPanel({ elements, onAddRelation }) {
       <textarea
         value={form.explanation}
         onChange={(e) => set("explanation", e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && e.ctrlKey && canSubmit) {
+            e.preventDefault();
+            handleSubmit();
+          }
+        }}
         placeholder="Explanation (optional)…"
         style={{
           flex: 1,

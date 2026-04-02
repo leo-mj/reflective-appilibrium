@@ -91,7 +91,7 @@ export function ConversationPanel({ state, suggestion }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && e.ctrlKey) {
               e.preventDefault();
               send();
             }
