@@ -35,6 +35,11 @@ import { ClusterTab } from "./ClusterTab.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
 import { importStateFromFile } from "../utils/importMarkdown.js";
+import {
+  WORKFLOW_PHASE_LABELS,
+  WORKFLOW_NEXT_PHASE,
+  nextPhaseEnabled,
+} from "../utils/workflowUtils.js";
 
 // Loaded only in LLM-enabled builds; tree-shaken in public builds.
 const CoherenceMatrixTab =
@@ -49,7 +54,7 @@ const CoherenceMatrixTab =
 const RelationSuggestTab =
   LLM_ENABLED | VITE_USE_DUMMY
     ? lazy(() =>
-        import("./RelationSuggestTab.jsx").then((m) => ({
+        import("./workflows/RelationSuggestTab.jsx").then((m) => ({
           default: m.RelationSuggestTab,
         })),
       )
@@ -58,7 +63,7 @@ const RelationSuggestTab =
 const PrincipleSuggestTab =
   LLM_ENABLED | VITE_USE_DUMMY
     ? lazy(() =>
-        import("./PrincipleSuggestTab.jsx").then((m) => ({
+        import("./workflows/PrincipleSuggestTab.jsx").then((m) => ({
           default: m.PrincipleSuggestTab,
         })),
       )
@@ -67,7 +72,7 @@ const PrincipleSuggestTab =
 const JudgmentElicitTab =
   LLM_ENABLED | VITE_USE_DUMMY
     ? lazy(() =>
-        import("./JudgmentElicitTab.jsx").then((m) => ({
+        import("./workflows/JudgmentElicitTab.jsx").then((m) => ({
           default: m.JudgmentElicitTab,
         })),
       )
@@ -383,18 +388,18 @@ const TAB_ICONS = {
   history: <HistoryIcon />,
   matrix: <MatrixIcon />,
   clusters: <ClusterIcon />,
-  suggest: <SuggestIcon />,
-  principles: <PrincipleIcon />,
-  judgments: <JudgmentIcon />,
+  suggestRelations: <SuggestIcon />,
+  suggestPrinciples: <PrincipleIcon />,
+  elicitJudgments: <JudgmentIcon />,
 };
 const TAB_LABELS = {
   graph: "Graph",
   history: "History",
   matrix: "Matrix",
   clusters: "Clusters",
-  suggest: "Suggest Relations",
-  principles: "Suggest Principles",
-  judgments: "Elicit Judgments",
+  elicitJudgments: "Elicit Judgments",
+  suggestPrinciples: "Suggest Principles",
+  suggestRelations: "Suggest Relations",
 };
 
 /**
@@ -477,6 +482,9 @@ function AppHeader({
   hasExistingState,
   onHome,
   isWide,
+  workflowPhase,
+  onStartWorkflow,
+  onStopWorkflow,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -534,7 +542,9 @@ function AppHeader({
     ...(LLM_ENABLED | VITE_USE_DUMMY ? ["matrix"] : []),
   ];
   const ASSIST_TABS =
-    LLM_ENABLED | VITE_USE_DUMMY ? ["suggest", "principles", "judgments"] : [];
+    LLM_ENABLED | VITE_USE_DUMMY
+      ? ["elicitJudgments", "suggestPrinciples", "suggestRelations"]
+      : [];
   const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
   const visibleSubTabs = metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS;
 
@@ -667,6 +677,32 @@ function AppHeader({
                     {TAB_LABELS[t]}
                   </button>
                 ))}
+                {workflowPhase ? (
+                  <>
+                    <button
+                      onClick={close(onStopWorkflow)}
+                      style={{
+                        ...menuBtn(),
+                        color: C.conflicts,
+                        borderColor: C.conflicts,
+                      }}
+                    >
+                      ✕ Stop Workflow
+                      <span
+                        style={{ marginLeft: 6, fontSize: 10, color: C.dim }}
+                      >
+                        ({WORKFLOW_PHASE_LABELS[workflowPhase]})
+                      </span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={close(onStartWorkflow)}
+                    style={{ ...menuBtn(), color: C.supports }}
+                  >
+                    ▶ Start Workflow
+                  </button>
+                )}
               </>
             )}
             <button
@@ -812,7 +848,7 @@ function AppHeader({
             <button
               style={metaTabBtn(metaTab === "assist")}
               onClick={() => {
-                if (metaTab !== "assist") setTab("suggest");
+                if (metaTab !== "assist") setTab("elicitJudgments");
               }}
             >
               Assist
@@ -834,6 +870,43 @@ function AppHeader({
             {TAB_LABELS[t]}
           </button>
         ))}
+        {metaTab === "assist" && (
+          <div
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {workflowPhase && (
+              <span style={{ fontSize: 11, color: C.dim }}>
+                {WORKFLOW_PHASE_LABELS[workflowPhase]}
+              </span>
+            )}
+            {workflowPhase ? (
+              <>
+                <button
+                  onClick={onStopWorkflow}
+                  style={{
+                    ...btn(false),
+                    color: C.conflicts,
+                    borderColor: C.conflicts,
+                  }}
+                >
+                  ✕ Stop Workflow
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={onStartWorkflow}
+                style={{ ...btn(false), color: C.supports }}
+              >
+                ▶ Start Workflow
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -889,7 +962,11 @@ function GraphPanel({
   onRejectRelations,
   onRoundChange,
   isWide,
+  workflowPhase,
+  onAdvanceWorkflow,
+  nextPhaseIsEnabled,
 }) {
+  const autoFetch = !!workflowPhase;
   return (
     <div
       style={{
@@ -991,31 +1068,43 @@ function GraphPanel({
             <CoherenceMatrixTab state={state} />
           </Suspense>
         )}
-        {tab === "suggest" && LLM_ENABLED | VITE_USE_DUMMY && (
+        {tab === "suggestRelations" && LLM_ENABLED | VITE_USE_DUMMY && (
           <Suspense fallback={null}>
             <RelationSuggestTab
               state={state}
               onAddRelation={onAddRelation}
               onScrollToRelations={onScrollToRelations}
               onRejectRelations={onRejectRelations}
+              autoFetch={autoFetch}
+              workflowPhase={workflowPhase}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
             />
           </Suspense>
         )}
-        {tab === "principles" && LLM_ENABLED | VITE_USE_DUMMY && (
+        {tab === "suggestPrinciples" && LLM_ENABLED | VITE_USE_DUMMY && (
           <Suspense fallback={null}>
             <PrincipleSuggestTab
               state={state}
               onAddElement={onAddElement}
               onRejectElements={onRejectElements}
+              autoFetch={autoFetch}
+              workflowPhase={workflowPhase}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
             />
           </Suspense>
         )}
-        {tab === "judgments" && LLM_ENABLED | VITE_USE_DUMMY && (
+        {tab === "elicitJudgments" && LLM_ENABLED | VITE_USE_DUMMY && (
           <Suspense fallback={null}>
             <JudgmentElicitTab
               state={state}
               onAddElement={onAddElement}
               onRejectElements={onRejectElements}
+              autoFetch={autoFetch}
+              workflowPhase={workflowPhase}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
             />
           </Suspense>
         )}
@@ -1074,6 +1163,7 @@ export default function REState({ initialState, onHome, onReady }) {
   const [showRejected, setShowRejected] = useState(false);
   const [showText, setShowText] = useState(true);
   const [historyRound, setHistoryRound] = useState(0);
+  const [workflowPhase, setWorkflowPhase] = useState(null);
 
   const actions = useREActions(initialState);
   const {
@@ -1097,6 +1187,18 @@ export default function REState({ initialState, onHome, onReady }) {
     handleRejectRelations,
     handleImportFile,
   } = actions;
+
+  const startWorkflow = () => {
+    setWorkflowPhase("elicitJudgments");
+    setTab("elicitJudgments");
+  };
+  const stopWorkflow = () => setWorkflowPhase(null);
+  const advanceWorkflow = () => {
+    const next = WORKFLOW_NEXT_PHASE[workflowPhase];
+    setWorkflowPhase(next);
+    setTab(next);
+  };
+  const workflowNextPhaseEnabled = nextPhaseEnabled(workflowPhase, state);
 
   const clusterSectionRef = useRef(null);
   const [scrollToRelationsKey, setScrollToRelationsKey] = useState(0);
@@ -1175,6 +1277,9 @@ export default function REState({ initialState, onHome, onReady }) {
         hasExistingState={state.elements.length > 0}
         onHome={onHome}
         isWide={isWide}
+        workflowPhase={workflowPhase}
+        onStartWorkflow={startWorkflow}
+        onStopWorkflow={stopWorkflow}
       />
 
       <div
@@ -1244,6 +1349,9 @@ export default function REState({ initialState, onHome, onReady }) {
             onRejectRelations={handleRejectRelations}
             onRoundChange={setHistoryRound}
             isWide={isWide}
+            workflowPhase={workflowPhase}
+            onAdvanceWorkflow={advanceWorkflow}
+            nextPhaseIsEnabled={workflowNextPhaseEnabled}
           />
         )}
       </div>

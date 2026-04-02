@@ -5,11 +5,11 @@
  * @module components/RelationSuggestTab
  */
 
-/** @import { REState } from '../types.js' */
+/** @import { REState } from '../../types.js' */
 
-import { useState } from "react";
-import { C } from "../constants/colors.js";
-import { fetchRelationSuggestions } from "../utils/relationsClient.js";
+import { useState, useEffect, useRef } from "react";
+import { C } from "../../constants/colors.js";
+import { fetchRelationSuggestions } from "../../utils/relationsClient.js";
 import {
   AcceptButton,
   RejectButton,
@@ -17,7 +17,12 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
-} from "./SuggestionActions.jsx";
+} from "../SuggestionActions.jsx";
+import {
+  nextPhaseEnabled,
+  WORKFLOW_NEXT_PHASE,
+} from "../../utils/workflowUtils.js";
+import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 
 // ─── Colour helper ────────────────────────────────────────────────────────────
 
@@ -50,6 +55,9 @@ function Toolbar({
   onSaveAll,
   onRejectAll,
   model,
+  workflowPhase,
+  advanceWorkflow,
+  nextPhaseIsEnabled,
 }) {
   const suggestDisabled = loading || elementCount < 2;
   return (
@@ -64,10 +72,17 @@ function Toolbar({
     >
       <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
         Relation suggestions for{" "}
-        <span style={{ color: C.text, fontWeight: "bold" }}>{elementCount}</span>{" "}
+        <span style={{ color: C.text, fontWeight: "bold" }}>
+          {elementCount}
+        </span>{" "}
         elements{model ? `, via ${model}` : ""}.
       </div>
       <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+        <ProgressWorkflowBtn
+          nextPhaseIsEnabled={nextPhaseIsEnabled}
+          workflowPhase={workflowPhase}
+          advanceWorkflow={advanceWorkflow}
+        />
         {suggestionCount > 0 && (
           <>
             <button
@@ -166,9 +181,13 @@ function SuggestionCard({
           marginBottom: 6,
         }}
       >
-        <span style={{ fontWeight: "bold", color: C.text }}>{suggestion.from}</span>
+        <span style={{ fontWeight: "bold", color: C.text }}>
+          {suggestion.from}
+        </span>
         <span style={{ color: C.dim }}>→</span>
-        <span style={{ fontWeight: "bold", color: C.text }}>{suggestion.to}</span>
+        <span style={{ fontWeight: "bold", color: C.text }}>
+          {suggestion.to}
+        </span>
         <span
           style={{
             color,
@@ -191,9 +210,15 @@ function SuggestionCard({
         </div>
       </div>
       {isEditing ? (
-        <ModifyTextarea value={draft} onChange={onModifyChange} accentColor={color} />
+        <ModifyTextarea
+          value={draft}
+          onChange={onModifyChange}
+          accentColor={color}
+        />
       ) : (
-        <div style={{ color: C.dim, lineHeight: 1.6 }}>{suggestion.explanation}</div>
+        <div style={{ color: C.dim, lineHeight: 1.6 }}>
+          {suggestion.explanation}
+        </div>
       )}
     </div>
   );
@@ -213,6 +238,9 @@ export function RelationSuggestTab({
   onAddRelation,
   onScrollToRelations,
   onRejectRelations,
+  autoFetch,
+  workflowPhase,
+  onAdvanceWorkflow,
 }) {
   /** @type {[Array<{from: string, to: string, type: string, explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -229,7 +257,8 @@ export function RelationSuggestTab({
     setLoading(true);
     setError(null);
     try {
-      const { suggestions: s, model: m } = await fetchRelationSuggestions(state);
+      const { suggestions: s, model: m } =
+        await fetchRelationSuggestions(state);
       setSuggestions(s);
       setModel(m);
     } catch (e) {
@@ -239,12 +268,22 @@ export function RelationSuggestTab({
     }
   };
 
+  const autoFetchRef = useRef(autoFetch);
+  useEffect(() => {
+    if (autoFetchRef.current) suggest();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const resolvedExplanation = (suggestion) =>
     editing?.suggestion === suggestion ? editing.draft : suggestion.explanation;
 
   const accept = (suggestion) => {
     onAddRelation(
-      { from: suggestion.from, to: suggestion.to, type: suggestion.type, explanation: resolvedExplanation(suggestion) },
+      {
+        from: suggestion.from,
+        to: suggestion.to,
+        type: suggestion.type,
+        explanation: resolvedExplanation(suggestion),
+      },
       { select: false },
     );
     setEditing(null);
@@ -252,7 +291,14 @@ export function RelationSuggestTab({
   };
 
   const reject = (suggestion) => {
-    onRejectRelations([{ from: suggestion.from, to: suggestion.to, type: suggestion.type, explanation: resolvedExplanation(suggestion) }]);
+    onRejectRelations([
+      {
+        from: suggestion.from,
+        to: suggestion.to,
+        type: suggestion.type,
+        explanation: resolvedExplanation(suggestion),
+      },
+    ]);
     setEditing(null);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
@@ -260,21 +306,34 @@ export function RelationSuggestTab({
   const saveAll = () => {
     suggestions.forEach((s) =>
       onAddRelation(
-        { from: s.from, to: s.to, type: s.type, explanation: resolvedExplanation(s) },
+        {
+          from: s.from,
+          to: s.to,
+          type: s.type,
+          explanation: resolvedExplanation(s),
+        },
         { select: false },
-      )
+      ),
     );
     setEditing(null);
     setSuggestions([]);
   };
 
   const rejectAll = () => {
+    if (!suggestions?.length) return;
     onRejectRelations(
-      suggestions.map((s) => ({ from: s.from, to: s.to, type: s.type, explanation: resolvedExplanation(s) }))
+      suggestions.map((s) => ({
+        from: s.from,
+        to: s.to,
+        type: s.type,
+        explanation: resolvedExplanation(s),
+      })),
     );
     setEditing(null);
     setSuggestions([]);
   };
+
+  const nextPhaseIsEnabled = nextPhaseEnabled(workflowPhase, state);
 
   return (
     <div style={{ overflowY: "auto", height: "100%", padding: "0 4px 24px" }}>
@@ -287,6 +346,9 @@ export function RelationSuggestTab({
         onSaveAll={saveAll}
         onRejectAll={rejectAll}
         model={model}
+        workflowPhase={workflowPhase}
+        advanceWorkflow={onAdvanceWorkflow}
+        nextPhaseIsEnabled={nextPhaseIsEnabled}
       />
 
       {error && <ErrorBanner message={error} />}
@@ -298,7 +360,9 @@ export function RelationSuggestTab({
       )}
 
       {suggestions !== null && suggestions.length === 0 && (
-        <div style={{ fontSize: 12, color: C.dim }}>No suggestions remaining.</div>
+        <div style={{ fontSize: 12, color: C.dim }}>
+          No suggestions remaining.
+        </div>
       )}
 
       {suggestions?.map((s, i) => (
@@ -309,7 +373,9 @@ export function RelationSuggestTab({
           onAccept={() => accept(s)}
           onReject={() => reject(s)}
           onModify={() => setEditing({ suggestion: s, draft: s.explanation })}
-          onModifyChange={(text) => setEditing((prev) => ({ ...prev, draft: text }))}
+          onModifyChange={(text) =>
+            setEditing((prev) => ({ ...prev, draft: text }))
+          }
           onModifyCancel={() => setEditing(null)}
         />
       ))}

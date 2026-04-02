@@ -1,0 +1,24 @@
+# Dependencies and build artifacts
+node_modules/
+app/dist/
+backend/.venv/
+
+# Logs
+backend/server.log
+
+# Dummy/sample data
+app/src/dummy-*.js
+skill/dummy-state.js
+
+# Large Phase 1 skill files (read directly when needed)
+skill/re-viz-component.jsx
+skill/re-skill-prompt.md
+skill/re-relations-reference.md
+skill/cluster-algorithm.md
+
+# Lock files
+app/package-lock.json
+
+# Docs
+README.md
+app/README.md

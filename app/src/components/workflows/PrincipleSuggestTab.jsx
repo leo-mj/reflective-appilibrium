@@ -5,11 +5,11 @@
  * @module components/PrincipleSuggestTab
  */
 
-/** @import { REState } from '../types.js' */
+/** @import { REState } from '../../types.js' */
 
-import { useState } from "react";
-import { C } from "../constants/colors.js";
-import { fetchPrincipleSuggestions } from "../utils/principlesClient.js";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { C } from "../../constants/colors.js";
+import { fetchPrincipleSuggestions } from "../../utils/principlesClient.js";
 import {
   AcceptButton,
   RejectButton,
@@ -17,7 +17,12 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
-} from "./SuggestionActions.jsx";
+} from "../SuggestionActions.jsx";
+import {
+  nextPhaseEnabled,
+  WORKFLOW_NEXT_PHASE,
+} from "../../utils/workflowUtils.js";
+import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -41,6 +46,9 @@ function Toolbar({
   onSaveAll,
   onRejectAll,
   model,
+  workflowPhase,
+  advanceWorkflow,
+  nextPhaseIsEnabled,
 }) {
   const suggestDisabled = loading || jAndPCount < 1;
   return (
@@ -59,6 +67,11 @@ function Toolbar({
         judgments and principles{model ? `, via ${model}` : ""}.
       </div>
       <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+        <ProgressWorkflowBtn
+          nextPhaseIsEnabled={nextPhaseIsEnabled}
+          workflowPhase={workflowPhase}
+          advanceWorkflow={advanceWorkflow}
+        />
         {suggestionCount > 0 && (
           <>
             <button
@@ -157,9 +170,20 @@ function SuggestionCard({
         }}
       >
         {isEditing ? (
-          <ModifyTextarea value={draft} onChange={onModifyChange} accentColor={C.principle.high} />
+          <ModifyTextarea
+            value={draft}
+            onChange={onModifyChange}
+            accentColor={C.principle.high}
+          />
         ) : (
-          <div style={{ flex: 1, fontWeight: "bold", color: C.text, lineHeight: 1.5 }}>
+          <div
+            style={{
+              flex: 1,
+              fontWeight: "bold",
+              color: C.text,
+              lineHeight: 1.5,
+            }}
+          >
             {suggestion.text}
           </div>
         )}
@@ -173,7 +197,14 @@ function SuggestionCard({
           )}
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 6,
+        }}
+      >
         <span
           style={{
             fontSize: 10,
@@ -191,7 +222,9 @@ function SuggestionCard({
           </span>
         )}
       </div>
-      <div style={{ color: C.dim, lineHeight: 1.6 }}>{suggestion.explanation}</div>
+      <div style={{ color: C.dim, lineHeight: 1.6 }}>
+        {suggestion.explanation}
+      </div>
     </div>
   );
 }
@@ -204,7 +237,14 @@ function SuggestionCard({
  * @param {Function} props.onAddElement
  * @param {Function} props.onRejectElements
  */
-export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
+export function PrincipleSuggestTab({
+  state,
+  onAddElement,
+  onRejectElements,
+  autoFetch,
+  workflowPhase,
+  onAdvanceWorkflow,
+}) {
   /** @type {[Array<{text: string, confidence: string, covers: string[], explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -224,7 +264,8 @@ export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
     setLoading(true);
     setError(null);
     try {
-      const { suggestions: s, model: m } = await fetchPrincipleSuggestions(state);
+      const { suggestions: s, model: m } =
+        await fetchPrincipleSuggestions(state);
       setSuggestions(s);
       setModel(m);
     } catch (e) {
@@ -234,36 +275,66 @@ export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
     }
   };
 
+  const autoFetchRef = useRef(autoFetch);
+  useEffect(() => {
+    if (autoFetchRef.current) suggest();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const resolvedText = (suggestion) =>
     editing?.suggestion === suggestion ? editing.draft : suggestion.text;
 
   const accept = (suggestion) => {
-    onAddElement({ type: "principle", text: resolvedText(suggestion), confidence: suggestion.confidence, origin: "llm" });
+    onAddElement({
+      type: "principle",
+      text: resolvedText(suggestion),
+      confidence: suggestion.confidence,
+      origin: "llm",
+    });
     setEditing(null);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
   const reject = (suggestion) => {
-    onRejectElements([{ type: "principle", text: resolvedText(suggestion), confidence: suggestion.confidence, origin: "llm" }]);
+    onRejectElements([
+      {
+        type: "principle",
+        text: resolvedText(suggestion),
+        confidence: suggestion.confidence,
+        origin: "llm",
+      },
+    ]);
     setEditing(null);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
   const saveAll = () => {
     suggestions.forEach((s) =>
-      onAddElement({ type: "principle", text: resolvedText(s), confidence: s.confidence, origin: "llm" })
+      onAddElement({
+        type: "principle",
+        text: resolvedText(s),
+        confidence: s.confidence,
+        origin: "llm",
+      }),
     );
     setEditing(null);
     setSuggestions([]);
   };
 
-  const rejectAll = () => {
+  const rejectAll = useCallback(() => {
+    if (!suggestions?.length) return;
     onRejectElements(
-      suggestions.map((s) => ({ type: "principle", text: resolvedText(s), confidence: s.confidence, origin: "llm" }))
+      suggestions.map((s) => ({
+        type: "principle",
+        text: editing?.suggestion === s ? editing.draft : s.text,
+        confidence: s.confidence,
+        origin: "llm",
+      })),
     );
     setEditing(null);
     setSuggestions([]);
-  };
+  }, [suggestions, editing, onRejectElements]);
+
+  const nextPhaseIsEnabled = nextPhaseEnabled(workflowPhase, state);
 
   return (
     <div style={{ overflowY: "auto", height: "100%", padding: "0 4px 24px" }}>
@@ -276,18 +347,23 @@ export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
         onSaveAll={saveAll}
         onRejectAll={rejectAll}
         model={model}
+        workflowPhase={workflowPhase}
+        advanceWorkflow={onAdvanceWorkflow}
+        nextPhaseIsEnabled={nextPhaseIsEnabled}
       />
-
       {error && <ErrorBanner message={error} />}
 
       {judgments.length + principles.length <= 1 && (
         <div style={{ fontSize: 12, color: C.dim }}>
-          Add at least one non-withdrawn judgment or principle to suggest principles.
+          Add at least one non-withdrawn judgment or principle to suggest
+          principles.
         </div>
       )}
 
       {suggestions !== null && suggestions.length === 0 && (
-        <div style={{ fontSize: 12, color: C.dim }}>No suggestions remaining.</div>
+        <div style={{ fontSize: 12, color: C.dim }}>
+          No suggestions remaining.
+        </div>
       )}
 
       {suggestions?.map((s, i) => (
@@ -298,7 +374,9 @@ export function PrincipleSuggestTab({ state, onAddElement, onRejectElements }) {
           onAccept={() => accept(s)}
           onReject={() => reject(s)}
           onModify={() => setEditing({ suggestion: s, draft: s.text })}
-          onModifyChange={(text) => setEditing((prev) => ({ ...prev, draft: text }))}
+          onModifyChange={(text) =>
+            setEditing((prev) => ({ ...prev, draft: text }))
+          }
           onModifyCancel={() => setEditing(null)}
         />
       ))}

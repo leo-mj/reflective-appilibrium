@@ -6,11 +6,11 @@
  * @module components/JudgmentElicitTab
  */
 
-/** @import { REState } from '../types.js' */
+/** @import { REState } from '../../types.js' */
 
-import { useState } from "react";
-import { C } from "../constants/colors.js";
-import { fetchJudgmentElicitations } from "../utils/judgmentsClient.js";
+import { useState, useEffect, useRef } from "react";
+import { C } from "../../constants/colors.js";
+import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
 import {
   AcceptButton,
   RejectButton,
@@ -18,7 +18,8 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
-} from "./SuggestionActions.jsx";
+} from "../SuggestionActions.jsx";
+import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -42,6 +43,9 @@ function Toolbar({
   onSaveAll,
   onRejectAll,
   model,
+  workflowPhase,
+  advanceWorkflow,
+  nextPhaseIsEnabled,
 }) {
   return (
     <div
@@ -55,10 +59,17 @@ function Toolbar({
     >
       <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
         Judgment elicitation for{" "}
-        <span style={{ color: C.text, fontWeight: "bold" }}>{elementCount}</span>{" "}
+        <span style={{ color: C.text, fontWeight: "bold" }}>
+          {elementCount}
+        </span>{" "}
         elements{model ? `, via ${model}` : ""}.
       </div>
       <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+        <ProgressWorkflowBtn
+          nextPhaseIsEnabled={nextPhaseIsEnabled}
+          workflowPhase={workflowPhase}
+          advanceWorkflow={advanceWorkflow}
+        />
         {suggestionCount > 0 && (
           <>
             <button
@@ -149,7 +160,14 @@ function SuggestionCard({
         fontSize: 12,
       }}
     >
-      <div style={{ color: C.text, lineHeight: 1.6, fontStyle: "italic", marginBottom: 8 }}>
+      <div
+        style={{
+          color: C.text,
+          lineHeight: 1.6,
+          fontStyle: "italic",
+          marginBottom: 8,
+        }}
+      >
         {suggestion.question}
       </div>
       {suggestion.judgments.map((j, i) => {
@@ -186,10 +204,22 @@ function SuggestionCard({
                 accentColor={C.judgment.high}
               />
             ) : (
-              <div style={{ color: C.dim, lineHeight: 1.6, flex: 1 }}>{j.text}</div>
+              <div style={{ color: C.dim, lineHeight: 1.6, flex: 1 }}>
+                {j.text}
+              </div>
             )}
-            <div style={{ display: "flex", gap: 4, flexShrink: 0, marginTop: isEditing ? 2 : 0 }}>
-              <AcceptButton onClick={() => onAcceptJudgment(j)} accentColor={C.judgment.high} />
+            <div
+              style={{
+                display: "flex",
+                gap: 4,
+                flexShrink: 0,
+                marginTop: isEditing ? 2 : 0,
+              }}
+            >
+              <AcceptButton
+                onClick={() => onAcceptJudgment(j)}
+                accentColor={C.judgment.high}
+              />
               <RejectButton onClick={() => onRejectJudgment(j)} />
               {isEditing ? (
                 <CancelButton onClick={onModifyCancel} />
@@ -212,7 +242,7 @@ function removeJudgment(suggestions, suggestion, judgment) {
     .map((s) =>
       s === suggestion
         ? { ...s, judgments: s.judgments.filter((j) => j !== judgment) }
-        : s
+        : s,
     )
     .filter((s) => s.judgments.length > 0);
 }
@@ -225,7 +255,15 @@ function removeJudgment(suggestions, suggestion, judgment) {
  * @param {Function} props.onAddElement
  * @param {Function} props.onRejectElements
  */
-export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
+export function JudgmentElicitTab({
+  state,
+  onAddElement,
+  onRejectElements,
+  autoFetch,
+  workflowPhase,
+  onAdvanceWorkflow,
+  nextPhaseIsEnabled,
+}) {
   /** @type {[Array<{question: string, judgments: Array<{text: string, confidence: string}>}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -240,7 +278,8 @@ export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
     setLoading(true);
     setError(null);
     try {
-      const { suggestions: s, model: m } = await fetchJudgmentElicitations(state);
+      const { suggestions: s, model: m } =
+        await fetchJudgmentElicitations(state);
       setSuggestions(s);
       setModel(m);
     } catch (e) {
@@ -250,17 +289,33 @@ export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
     }
   };
 
+  useEffect(() => {
+    if (autoFetch) elicit();
+  }, [autoFetch]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const resolvedText = (judgment) =>
     editing?.judgment === judgment ? editing.draft : judgment.text;
 
   const accept = (suggestion, judgment) => {
-    onAddElement({ type: "judgment", text: resolvedText(judgment), confidence: judgment.confidence, origin: "llm" });
+    onAddElement({
+      type: "judgment",
+      text: resolvedText(judgment),
+      confidence: judgment.confidence,
+      origin: "llm",
+    });
     setEditing(null);
     setSuggestions((prev) => removeJudgment(prev, suggestion, judgment));
   };
 
   const reject = (suggestion, judgment) => {
-    onRejectElements([{ type: "judgment", text: resolvedText(judgment), confidence: judgment.confidence, origin: "llm" }]);
+    onRejectElements([
+      {
+        type: "judgment",
+        text: resolvedText(judgment),
+        confidence: judgment.confidence,
+        origin: "llm",
+      },
+    ]);
     setEditing(null);
     setSuggestions((prev) => removeJudgment(prev, suggestion, judgment));
   };
@@ -268,23 +323,34 @@ export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
   const saveAll = () => {
     suggestions.forEach((s) =>
       s.judgments.forEach((j) =>
-        onAddElement({ type: "judgment", text: resolvedText(j), confidence: j.confidence, origin: "llm" })
-      )
+        onAddElement({
+          type: "judgment",
+          text: resolvedText(j),
+          confidence: j.confidence,
+          origin: "llm",
+        }),
+      ),
     );
     setEditing(null);
     setSuggestions([]);
   };
 
   const rejectAll = () => {
+    if (!suggestions?.length) return;
     const all = suggestions.flatMap((s) =>
-      s.judgments.map((j) => ({ type: "judgment", text: resolvedText(j), confidence: j.confidence, origin: "llm" }))
+      s.judgments.map((j) => ({
+        type: "judgment",
+        text: resolvedText(j),
+        confidence: j.confidence,
+        origin: "llm",
+      })),
     );
     onRejectElements(all);
     setEditing(null);
     setSuggestions([]);
   };
-
-  const remainingJudgments = suggestions?.reduce((n, s) => n + s.judgments.length, 0) ?? 0;
+  const remainingJudgments =
+    suggestions?.reduce((n, s) => n + s.judgments.length, 0) ?? 0;
 
   return (
     <div style={{ overflowY: "auto", height: "100%", padding: "0 4px 24px" }}>
@@ -297,12 +363,16 @@ export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
         onSaveAll={saveAll}
         onRejectAll={rejectAll}
         model={model}
+        workflowPhase={workflowPhase}
+        advanceWorkflow={onAdvanceWorkflow}
+        nextPhaseIsEnabled={nextPhaseIsEnabled}
       />
-
       {error && <ErrorBanner message={error} />}
 
       {suggestions !== null && suggestions.length === 0 && (
-        <div style={{ fontSize: 12, color: C.dim }}>No suggestions remaining.</div>
+        <div style={{ fontSize: 12, color: C.dim }}>
+          No suggestions remaining.
+        </div>
       )}
 
       {suggestions?.map((s, i) => (
@@ -312,8 +382,12 @@ export function JudgmentElicitTab({ state, onAddElement, onRejectElements }) {
           editing={editing?.suggestion === s ? editing : null}
           onAcceptJudgment={(j) => accept(s, j)}
           onRejectJudgment={(j) => reject(s, j)}
-          onModify={(j) => setEditing({ suggestion: s, judgment: j, draft: j.text })}
-          onModifyChange={(text) => setEditing((prev) => ({ ...prev, draft: text }))}
+          onModify={(j) =>
+            setEditing({ suggestion: s, judgment: j, draft: j.text })
+          }
+          onModifyChange={(text) =>
+            setEditing((prev) => ({ ...prev, draft: text }))
+          }
           onModifyCancel={() => setEditing(null)}
         />
       ))}
