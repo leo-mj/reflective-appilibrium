@@ -7,7 +7,7 @@
 
 import { useState, useRef, lazy, Suspense, useEffect } from "react";
 import { C } from "../constants/colors.js";
-import { LLM_ENABLED } from "../config.js";
+import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
 import {
@@ -37,37 +37,41 @@ import { downloadMarkdown } from "../utils/exportMarkdown.js";
 import { importStateFromFile } from "../utils/importMarkdown.js";
 
 // Loaded only in LLM-enabled builds; tree-shaken in public builds.
-const CoherenceMatrixTab = LLM_ENABLED
-  ? lazy(() =>
-      import("./CoherenceMatrixTab.jsx").then((m) => ({
-        default: m.CoherenceMatrixTab,
-      })),
-    )
-  : null;
+const CoherenceMatrixTab =
+  LLM_ENABLED | VITE_USE_DUMMY
+    ? lazy(() =>
+        import("./CoherenceMatrixTab.jsx").then((m) => ({
+          default: m.CoherenceMatrixTab,
+        })),
+      )
+    : null;
 
-const RelationSuggestTab = LLM_ENABLED
-  ? lazy(() =>
-      import("./RelationSuggestTab.jsx").then((m) => ({
-        default: m.RelationSuggestTab,
-      })),
-    )
-  : null;
+const RelationSuggestTab =
+  LLM_ENABLED | VITE_USE_DUMMY
+    ? lazy(() =>
+        import("./RelationSuggestTab.jsx").then((m) => ({
+          default: m.RelationSuggestTab,
+        })),
+      )
+    : null;
 
-const PrincipleSuggestTab = LLM_ENABLED
-  ? lazy(() =>
-      import("./PrincipleSuggestTab.jsx").then((m) => ({
-        default: m.PrincipleSuggestTab,
-      })),
-    )
-  : null;
+const PrincipleSuggestTab =
+  LLM_ENABLED | VITE_USE_DUMMY
+    ? lazy(() =>
+        import("./PrincipleSuggestTab.jsx").then((m) => ({
+          default: m.PrincipleSuggestTab,
+        })),
+      )
+    : null;
 
-const JudgmentElicitTab = LLM_ENABLED
-  ? lazy(() =>
-      import("./JudgmentElicitTab.jsx").then((m) => ({
-        default: m.JudgmentElicitTab,
-      })),
-    )
-  : null;
+const JudgmentElicitTab =
+  LLM_ENABLED | VITE_USE_DUMMY
+    ? lazy(() =>
+        import("./JudgmentElicitTab.jsx").then((m) => ({
+          default: m.JudgmentElicitTab,
+        })),
+      )
+    : null;
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
@@ -527,9 +531,10 @@ function AppHeader({
     "graph",
     "history",
     "clusters",
-    ...(LLM_ENABLED ? ["matrix"] : []),
+    ...(LLM_ENABLED | VITE_USE_DUMMY ? ["matrix"] : []),
   ];
-  const ASSIST_TABS = LLM_ENABLED ? ["suggest", "principles", "judgments"] : [];
+  const ASSIST_TABS =
+    LLM_ENABLED | VITE_USE_DUMMY ? ["suggest", "principles", "judgments"] : [];
   const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
   const visibleSubTabs = metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS;
 
@@ -546,7 +551,6 @@ function AppHeader({
       }}
     />
   );
-
   // ── Narrow (phone): title + hamburger menu ─────────────────────────────────
   if (!isWide) {
     const menuBtn = (active = false) => ({
@@ -640,7 +644,7 @@ function AppHeader({
                 {TAB_LABELS[t]}
               </button>
             ))}
-            {LLM_ENABLED && (
+            {LLM_ENABLED | VITE_USE_DUMMY && (
               <>
                 <div
                   style={{
@@ -795,7 +799,7 @@ function AppHeader({
           paddingBottom: 2,
         }}
       >
-        {LLM_ENABLED && (
+        {LLM_ENABLED | VITE_USE_DUMMY && (
           <>
             <button
               style={metaTabBtn(metaTab === "analyze")}
@@ -982,12 +986,12 @@ function GraphPanel({
             showWithdrawn={showWithdrawn}
           />
         )}
-        {tab === "matrix" && LLM_ENABLED && (
+        {tab === "matrix" && LLM_ENABLED | VITE_USE_DUMMY && (
           <Suspense fallback={null}>
             <CoherenceMatrixTab state={state} />
           </Suspense>
         )}
-        {tab === "suggest" && LLM_ENABLED && (
+        {tab === "suggest" && LLM_ENABLED | VITE_USE_DUMMY && (
           <Suspense fallback={null}>
             <RelationSuggestTab
               state={state}
@@ -997,7 +1001,7 @@ function GraphPanel({
             />
           </Suspense>
         )}
-        {tab === "principles" && LLM_ENABLED && (
+        {tab === "principles" && LLM_ENABLED | VITE_USE_DUMMY && (
           <Suspense fallback={null}>
             <PrincipleSuggestTab
               state={state}
@@ -1006,7 +1010,7 @@ function GraphPanel({
             />
           </Suspense>
         )}
-        {tab === "judgments" && LLM_ENABLED && (
+        {tab === "judgments" && LLM_ENABLED | VITE_USE_DUMMY && (
           <Suspense fallback={null}>
             <JudgmentElicitTab
               state={state}
@@ -1143,6 +1147,22 @@ export default function REState({ initialState, onHome, onReady }) {
         transition: "opacity 0.6s ease",
       }}
     >
+      {VITE_USE_DUMMY && (
+        <div
+          style={{
+            background: C.panel,
+            borderBottom: `1px solid ${C.border}`,
+            color: C.dim,
+            fontSize: 11,
+            textAlign: "center",
+            padding: "6px 16px",
+            margin: "-16px -16px 12px -16px",
+          }}
+        >
+          INFO: No LLM API connection — pre-set examples shown in the Analyze
+          Tabs and the Matrix Tab
+        </div>
+      )}
       <AppHeader
         round={state.round}
         topic={state.topic}
