@@ -10,6 +10,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchPrincipleSuggestions } from "../../utils/principlesClient.js";
+import { AddElementPanel } from "../user_edits/TextTabAddPanel.jsx";
 import {
   AcceptButton,
   RejectButton,
@@ -340,50 +341,53 @@ export function PrincipleSuggestTab({
   const nextPhaseIsEnabled = nextPhaseEnabled(workflowPhase, state);
 
   return (
-    <div style={{ overflowY: "auto", height: "100%", padding: "0 4px 24px" }}>
-      <Toolbar
-        jAndPCount={judgments.length + principles.length}
-        loading={loading}
-        hasResult={suggestions !== null}
-        suggestionCount={suggestions?.length ?? 0}
-        onSuggest={suggest}
-        onSaveAll={saveAll}
-        onRejectAll={rejectAll}
-        model={model}
-        workflowPhase={workflowPhase}
-        advanceWorkflow={onAdvanceWorkflow}
-        nextPhaseIsEnabled={nextPhaseIsEnabled}
-      />
-      {error && <ErrorBanner message={error} />}
-
-      {judgments.length + principles.length <= 1 && (
-        <div style={{ fontSize: 12, color: C.dim }}>
-          Add at least one non-withdrawn judgment or principle to suggest
-          principles.
-        </div>
-      )}
-
-      {suggestions !== null && suggestions.length === 0 && (
-        <div style={{ fontSize: 12, color: C.dim }}>
-          No suggestions remaining.
-        </div>
-      )}
-
-      {suggestions?.map((s, i) => (
-        <SuggestionCard
-          key={i}
-          suggestion={s}
-          draft={editing?.suggestion === s ? editing.draft : null}
-          state={state}
-          onAccept={() => accept(s)}
-          onReject={() => reject(s)}
-          onModify={() => setEditing({ suggestion: s, draft: s.text })}
-          onModifyChange={(text) =>
-            setEditing((prev) => ({ ...prev, draft: text }))
-          }
-          onModifyCancel={() => setEditing(null)}
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
+        <Toolbar
+          jAndPCount={judgments.length + principles.length}
+          loading={loading}
+          hasResult={suggestions !== null}
+          suggestionCount={suggestions?.length ?? 0}
+          onSuggest={suggest}
+          onSaveAll={saveAll}
+          onRejectAll={rejectAll}
+          model={model}
+          workflowPhase={workflowPhase}
+          advanceWorkflow={onAdvanceWorkflow}
+          nextPhaseIsEnabled={nextPhaseIsEnabled}
         />
-      ))}
+        {error && <ErrorBanner message={error} />}
+
+        {judgments.length + principles.length <= 1 && (
+          <div style={{ fontSize: 12, color: C.dim }}>
+            Add at least one non-withdrawn judgment or principle to suggest
+            principles.
+          </div>
+        )}
+
+        {suggestions !== null && suggestions.length === 0 && (
+          <div style={{ fontSize: 12, color: C.dim }}>
+            No suggestions remaining.
+          </div>
+        )}
+
+        {suggestions?.map((s, i) => (
+          <SuggestionCard
+            key={i}
+            suggestion={s}
+            draft={editing?.suggestion === s ? editing.draft : null}
+            state={state}
+            onAccept={() => accept(s)}
+            onReject={() => reject(s)}
+            onModify={() => setEditing({ suggestion: s, draft: s.text })}
+            onModifyChange={(text) =>
+              setEditing((prev) => ({ ...prev, draft: text }))
+            }
+            onModifyCancel={() => setEditing(null)}
+          />
+        ))}
+      </div>
+      <AddElementPanel elementType="principle" onAddElement={onAddElement} />
     </div>
   );
 }

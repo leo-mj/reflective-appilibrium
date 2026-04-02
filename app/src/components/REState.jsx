@@ -1356,15 +1356,18 @@ export default function REState({ initialState, onHome, onReady }) {
         )}
       </div>
 
-      {isWide && (
-        <AddBar
-          elements={state.elements.filter(
-            (e) => e.status !== "withdrawn" && e.status !== "rejected",
-          )}
-          onAddElement={handleAddElement}
-          onAddRelation={handleAddRelation}
-        />
-      )}
+      {isWide &&
+        !["elicitJudgments", "suggestPrinciples", "suggestRelations"].includes(
+          tab,
+        ) && (
+          <AddBar
+            elements={state.elements.filter(
+              (e) => e.status !== "withdrawn" && e.status !== "rejected",
+            )}
+            onAddElement={handleAddElement}
+            onAddRelation={handleAddRelation}
+          />
+        )}
 
       <EditModals
         editingEl={editingEl}

@@ -11,6 +11,7 @@
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
+import { AddElementPanel } from "../user_edits/TextTabAddPanel.jsx";
 import {
   AcceptButton,
   RejectButton,
@@ -356,45 +357,48 @@ export function JudgmentElicitTab({
     suggestions?.reduce((n, s) => n + s.judgments.length, 0) ?? 0;
 
   return (
-    <div style={{ overflowY: "auto", height: "100%", padding: "0 4px 24px" }}>
-      <Toolbar
-        elementCount={activeElements.length}
-        loading={loading}
-        hasResult={suggestions !== null}
-        suggestionCount={remainingJudgments}
-        onElicit={elicit}
-        onSaveAll={saveAll}
-        onRejectAll={rejectAll}
-        model={model}
-        workflowPhase={workflowPhase}
-        advanceWorkflow={onAdvanceWorkflow}
-        nextPhaseIsEnabled={nextPhaseIsEnabled}
-      />
-      {error && <ErrorBanner message={error} />}
-
-      {suggestions !== null && suggestions.length === 0 && (
-        <div style={{ fontSize: 12, color: C.dim }}>
-          No suggestions remaining.
-        </div>
-      )}
-
-      {suggestions?.map((s, i) => (
-        <SuggestionCard
-          key={i}
-          suggestion={s}
-          editing={editing?.suggestion === s ? editing : null}
-          state={state}
-          onAcceptJudgment={(j) => accept(s, j)}
-          onRejectJudgment={(j) => reject(s, j)}
-          onModify={(j) =>
-            setEditing({ suggestion: s, judgment: j, draft: j.text })
-          }
-          onModifyChange={(text) =>
-            setEditing((prev) => ({ ...prev, draft: text }))
-          }
-          onModifyCancel={() => setEditing(null)}
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
+        <Toolbar
+          elementCount={activeElements.length}
+          loading={loading}
+          hasResult={suggestions !== null}
+          suggestionCount={remainingJudgments}
+          onElicit={elicit}
+          onSaveAll={saveAll}
+          onRejectAll={rejectAll}
+          model={model}
+          workflowPhase={workflowPhase}
+          advanceWorkflow={onAdvanceWorkflow}
+          nextPhaseIsEnabled={nextPhaseIsEnabled}
         />
-      ))}
+        {error && <ErrorBanner message={error} />}
+
+        {suggestions !== null && suggestions.length === 0 && (
+          <div style={{ fontSize: 12, color: C.dim }}>
+            No suggestions remaining.
+          </div>
+        )}
+
+        {suggestions?.map((s, i) => (
+          <SuggestionCard
+            key={i}
+            suggestion={s}
+            editing={editing?.suggestion === s ? editing : null}
+            state={state}
+            onAcceptJudgment={(j) => accept(s, j)}
+            onRejectJudgment={(j) => reject(s, j)}
+            onModify={(j) =>
+              setEditing({ suggestion: s, judgment: j, draft: j.text })
+            }
+            onModifyChange={(text) =>
+              setEditing((prev) => ({ ...prev, draft: text }))
+            }
+            onModifyCancel={() => setEditing(null)}
+          />
+        ))}
+      </div>
+      <AddElementPanel elementType="judgment" onAddElement={onAddElement} />
     </div>
   );
 }
