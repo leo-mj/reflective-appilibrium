@@ -469,6 +469,10 @@ function TopicLabel({ topic, style }) {
  * @param {function(string): void} props.setTab
  * @param {boolean}  props.showText
  * @param {import('react').Dispatch<import('react').SetStateAction<boolean>>} props.setShowText
+ * @param {boolean}  props.showWithdrawn
+ * @param {import('react').Dispatch<import('react').SetStateAction<boolean>>} props.setShowWithdrawn
+ * @param {boolean}  props.showRejected
+ * @param {import('react').Dispatch<import('react').SetStateAction<boolean>>} props.setShowRejected
  * @param {function(): void} props.onDownload
  * @param {function(File): void} props.onImportFile
  * @param {boolean}  props.hasExistingState
@@ -482,6 +486,10 @@ function AppHeader({
   setTab,
   showText,
   setShowText,
+  showWithdrawn,
+  setShowWithdrawn,
+  showRejected,
+  setShowRejected,
   assistSidePanel,
   setAssistSidePanel,
   onDownload,
@@ -827,6 +835,23 @@ function AppHeader({
               </span>
             </button>
           )}
+          {[
+            { label: "Withdrawn", value: showWithdrawn, set: setShowWithdrawn, color: "#7c3aed" },
+            { label: "Rejected", value: showRejected, set: setShowRejected, color: "#fb7185" },
+          ].map(({ label, value, set, color }) => (
+            <label
+              key={label}
+              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.dim, cursor: "pointer", marginLeft: 6 }}
+            >
+              <div
+                onClick={() => set((s) => !s)}
+                style={{ width: 28, height: 16, borderRadius: 8, position: "relative", background: value ? color : C.border, transition: "background 0.3s", cursor: "pointer", flexShrink: 0 }}
+              >
+                <div style={{ width: 12, height: 12, borderRadius: 6, background: C.text, position: "absolute", top: 2, left: value ? 14 : 2, transition: "left 0.3s ease" }} />
+              </div>
+              {label}
+            </label>
+          ))}
           {divider}
           <div style={{ display: "flex", flex: "1 1 0", minWidth: 0 }}>
             <button
@@ -976,9 +1001,7 @@ function GraphPanel({
   state,
   positions,
   showWithdrawn,
-  setShowWithdrawn,
   showRejected,
-  setShowRejected,
   selected,
   onSelect,
   selectedRel,
@@ -995,6 +1018,7 @@ function GraphPanel({
   nextPhaseIsEnabled,
 }) {
   const autoFetch = !!workflowPhase;
+  const isAssistPanel = ASSIST_TABS.includes(tab);
   return (
     <div
       style={{
@@ -1005,62 +1029,7 @@ function GraphPanel({
         flexDirection: "column",
       }}
     >
-      <Legend />
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        {[
-          {
-            label: "Show withdrawn",
-            value: showWithdrawn,
-            set: setShowWithdrawn,
-            color: "#7c3aed",
-          },
-          {
-            label: "Show rejected",
-            value: showRejected,
-            set: setShowRejected,
-            color: "#fb7185",
-          },
-        ].map(({ label, value, set, color }) => (
-          <label
-            key={label}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 11,
-              color: C.dim,
-              cursor: "pointer",
-            }}
-          >
-            <div
-              onClick={() => set((s) => !s)}
-              style={{
-                width: 32,
-                height: 18,
-                borderRadius: 9,
-                position: "relative",
-                background: value ? color : C.border,
-                transition: "background 0.3s",
-                cursor: "pointer",
-              }}
-            >
-              <div
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: 7,
-                  background: C.text,
-                  position: "absolute",
-                  top: 2,
-                  left: value ? 16 : 2,
-                  transition: "left 0.3s ease",
-                }}
-              />
-            </div>
-            {label}
-          </label>
-        ))}
-      </div>
+      {!isAssistPanel && <Legend />}
       <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
         {tab === "graph" && (
           <Graph
@@ -1316,6 +1285,10 @@ export default function REState({ initialState, onHome, onReady }) {
         setTab={handleSetTab}
         showText={showText}
         setShowText={setShowText}
+        showWithdrawn={showWithdrawn}
+        setShowWithdrawn={setShowWithdrawn}
+        showRejected={showRejected}
+        setShowRejected={setShowRejected}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         onDownload={() => downloadMarkdown(state, positions)}
@@ -1364,9 +1337,7 @@ export default function REState({ initialState, onHome, onReady }) {
             state={state}
             positions={positions}
             showWithdrawn={showWithdrawn}
-            setShowWithdrawn={setShowWithdrawn}
             showRejected={showRejected}
-            setShowRejected={setShowRejected}
             selected={selected}
             onSelect={handleSelectNode}
             selectedRel={selectedRel}
@@ -1427,9 +1398,7 @@ export default function REState({ initialState, onHome, onReady }) {
             state={state}
             positions={positions}
             showWithdrawn={showWithdrawn}
-            setShowWithdrawn={setShowWithdrawn}
             showRejected={showRejected}
-            setShowRejected={setShowRejected}
             selected={selected}
             onSelect={handleSelectNode}
             selectedRel={selectedRel}
