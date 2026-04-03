@@ -23,6 +23,7 @@ import { Legend } from "./graphs_shared/Legend.jsx";
 import { EditModal } from "./user_edits/EditModal.jsx";
 import { EditRelationModal } from "./user_edits/EditRelationModal.jsx";
 import { WithdrawReasonModal } from "./user_edits/WithdrawReasonModal.jsx";
+import { ModalShell } from "./user_edits/ModalShell.jsx";
 import {
   NetworkIcon,
   HistoryIcon,
@@ -355,14 +356,10 @@ function useREActions(initialState) {
   };
 
   const handleImportFile = async (file) => {
-    try {
-      const newState = await importStateFromFile(file);
-      setState(newState);
-      setSelected(null);
-      setSelectedRel(null);
-    } catch (e) {
-      window.alert(`Import failed: ${e.message}`);
-    }
+    const newState = await importStateFromFile(file);
+    setState(newState);
+    setSelected(null);
+    setSelectedRel(null);
   };
 
   return {
@@ -513,12 +510,18 @@ function AppHeader({
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [importConfirmPending, setImportConfirmPending] = useState(null);
+  const [importError, setImportError] = useState(null);
+
+  const doImport = async (file) => {
+    try {
+      await onImportFile(file);
+    } catch (e) {
+      setImportError(e.message);
+    }
+  };
+
   const handleImportClick = () => {
-    if (
-      hasExistingState &&
-      !window.confirm("Importing will replace your current session. Continue?")
-    )
-      return;
     fileInputRef.current.click();
   };
   const btn = (active) => ({
@@ -569,6 +572,34 @@ function AppHeader({
   const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
   const visibleSubTabs = metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS;
 
+  const importModals = (
+    <>
+      {importConfirmPending && (
+        <ModalShell
+          title="Replace session?"
+          subtitle="Importing will replace your current session."
+          onCancel={() => setImportConfirmPending(null)}
+          onSave={() => {
+            const file = importConfirmPending;
+            setImportConfirmPending(null);
+            doImport(file);
+          }}
+          saveLabel="Replace"
+          saveDisabled={false}
+        />
+      )}
+      {importError && (
+        <ModalShell
+          title="Import failed"
+          subtitle={importError}
+          onCancel={() => setImportError(null)}
+          onSave={() => setImportError(null)}
+          saveLabel="OK"
+        />
+      )}
+    </>
+  );
+
   const hiddenInput = (
     <input
       ref={fileInputRef}
@@ -577,8 +608,13 @@ function AppHeader({
       style={{ display: "none" }}
       onChange={(e) => {
         const file = e.target.files?.[0];
-        if (file) onImportFile(file);
         e.target.value = "";
+        if (!file) return;
+        if (hasExistingState) {
+          setImportConfirmPending(file);
+        } else {
+          doImport(file);
+        }
       }}
     />
   );
@@ -601,6 +637,7 @@ function AppHeader({
     return (
       <div style={{ position: "relative", marginBottom: 6 }}>
         {hiddenInput}
+        {importModals}
         <div
           style={{
             display: "flex",
@@ -774,6 +811,7 @@ function AppHeader({
   return (
     <div>
       {hiddenInput}
+      {importModals}
       {/* Row 1: utility — import/export, title, show-text, home */}
       <div
         style={{
