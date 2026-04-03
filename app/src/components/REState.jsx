@@ -383,6 +383,11 @@ function useREActions(initialState) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+const ASSIST_TABS =
+  LLM_ENABLED | VITE_USE_DUMMY
+    ? ["elicitJudgments", "suggestPrinciples", "suggestRelations"]
+    : [];
+
 const TAB_ICONS = {
   graph: <NetworkIcon />,
   history: <HistoryIcon />,
@@ -477,6 +482,8 @@ function AppHeader({
   setTab,
   showText,
   setShowText,
+  assistSidePanel,
+  setAssistSidePanel,
   onDownload,
   onImportFile,
   hasExistingState,
@@ -541,10 +548,6 @@ function AppHeader({
     "clusters",
     ...(LLM_ENABLED | VITE_USE_DUMMY ? ["matrix"] : []),
   ];
-  const ASSIST_TABS =
-    LLM_ENABLED | VITE_USE_DUMMY
-      ? ["elicitJudgments", "suggestPrinciples", "suggestRelations"]
-      : [];
   const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
   const visibleSubTabs = metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS;
 
@@ -780,25 +783,50 @@ function AppHeader({
           />
         </div>
         <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-          <button
-            onClick={() => setShowText((s) => !s)}
-            style={{ ...btn(false), position: "relative" }}
-          >
-            <span style={{ visibility: "hidden" }}>
-              {showText ? "Hide text" : "Show text"}
-            </span>
-            <span
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+          {metaTab === "assist" ? (
+            <div style={{ display: "flex", gap: 0, flexShrink: 0 }}>
+              {[
+                { value: "text", label: "Text" },
+                { value: "graph", label: "Graph" },
+                { value: "none", label: "None" },
+              ].map(({ value, label }, i) => (
+                <button
+                  key={value}
+                  onClick={() => setAssistSidePanel(value)}
+                  style={{
+                    ...btn(assistSidePanel === value),
+                    borderRadius:
+                      i === 0 ? "4px 0 0 4px" : i === 2 ? "0 4px 4px 0" : 0,
+                    borderRight: i < 2 ? "none" : undefined,
+                    fontSize: 11,
+                    padding: "0 10px",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowText((s) => !s)}
+              style={{ ...btn(false), position: "relative" }}
             >
-              {showText ? "Hide text" : "Show text"}
-            </span>
-          </button>
+              <span style={{ visibility: "hidden" }}>
+                {showText ? "Hide text" : "Show text"}
+              </span>
+              <span
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {showText ? "Hide text" : "Show text"}
+              </span>
+            </button>
+          )}
           {divider}
           <div style={{ display: "flex", flex: "1 1 0", minWidth: 0 }}>
             <button
@@ -1162,6 +1190,7 @@ export default function REState({ initialState, onHome, onReady }) {
   const [showWithdrawn, setShowWithdrawn] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
   const [showText, setShowText] = useState(true);
+  const [assistSidePanel, setAssistSidePanel] = useState("text");
   const [historyRound, setHistoryRound] = useState(0);
   const [workflowPhase, setWorkflowPhase] = useState(null);
 
@@ -1203,8 +1232,10 @@ export default function REState({ initialState, onHome, onReady }) {
   const clusterSectionRef = useRef(null);
   const [scrollToRelationsKey, setScrollToRelationsKey] = useState(0);
   const scrollToRelations = () => {
-    if (isWide) setShowText(true);
-    else setTab("text");
+    if (isWide) {
+      if (ASSIST_TABS.includes(tab)) setAssistSidePanel("text");
+      else setShowText(true);
+    } else setTab("text");
     setScrollToRelationsKey((k) => k + 1);
   };
 
@@ -1223,7 +1254,9 @@ export default function REState({ initialState, onHome, onReady }) {
 
   const dims = useWindowSize();
   const isWide = dims.w > 768 && dims.h > 500;
-  const graphW = isWide && showText ? (dims.w - 32) / 2 - 12 : dims.w - 32;
+  const isAssistTab = ASSIST_TABS.includes(tab);
+  const hasSidePanel = isWide && (isAssistTab ? assistSidePanel !== "none" : showText);
+  const graphW = hasSidePanel ? (dims.w - 32) / 2 - 12 : dims.w - 32;
   const { positions, ready } = useStablePositions(state, {
     w: graphW,
     h: dims.h * 0.8, // subtract the 20vh AddBar at the bottom
@@ -1272,6 +1305,8 @@ export default function REState({ initialState, onHome, onReady }) {
         setTab={handleSetTab}
         showText={showText}
         setShowText={setShowText}
+        assistSidePanel={assistSidePanel}
+        setAssistSidePanel={setAssistSidePanel}
         onDownload={() => downloadMarkdown(state, positions)}
         onImportFile={handleImportFile}
         hasExistingState={state.elements.length > 0}
@@ -1291,7 +1326,53 @@ export default function REState({ initialState, onHome, onReady }) {
           gap: 12,
         }}
       >
-        {(isWide ? showText : tab === "text") && (
+        {/* Left side panel */}
+        {isWide && isAssistTab && assistSidePanel === "text" && (
+          <TextPanel
+            isWide={isWide}
+            clusterSectionRef={clusterSectionRef}
+            scrollToRelationsKey={scrollToRelationsKey}
+            state={textState}
+            showWithdrawn={showWithdrawn}
+            showRejected={showRejected}
+            selected={selected}
+            onSelect={handleSelectNode}
+            selectedRel={selectedRel}
+            onSelectRel={handleSelectRel}
+            onEditRequest={handleEditRequest}
+            onEditRelRequest={setEditingRel}
+            onWithdrawRequest={handleWithdrawRequest}
+            onWithdrawRelRequest={handleWithdrawRelRequest}
+            onAddElement={handleAddElement}
+            onAddRelation={handleAddRelation}
+          />
+        )}
+        {isWide && isAssistTab && assistSidePanel === "graph" && (
+          <GraphPanel
+            tab="graph"
+            state={state}
+            positions={positions}
+            showWithdrawn={showWithdrawn}
+            setShowWithdrawn={setShowWithdrawn}
+            showRejected={showRejected}
+            setShowRejected={setShowRejected}
+            selected={selected}
+            onSelect={handleSelectNode}
+            selectedRel={selectedRel}
+            onSelectRel={handleSelectRel}
+            onAddElement={handleAddElement}
+            onAddRelation={handleAddRelation}
+            onScrollToRelations={scrollToRelations}
+            onRejectElements={handleRejectElements}
+            onRejectRelations={handleRejectRelations}
+            onRoundChange={setHistoryRound}
+            isWide={isWide}
+            workflowPhase={null}
+            onAdvanceWorkflow={null}
+            nextPhaseIsEnabled={false}
+          />
+        )}
+        {(!isWide ? tab === "text" : !isAssistTab && showText) && (
           <TextPanel
             isWide={isWide}
             clusterSectionRef={clusterSectionRef}
@@ -1356,10 +1437,7 @@ export default function REState({ initialState, onHome, onReady }) {
         )}
       </div>
 
-      {isWide &&
-        !["elicitJudgments", "suggestPrinciples", "suggestRelations"].includes(
-          tab,
-        ) && (
+      {isWide && !isAssistTab && (
           <AddBar
             elements={state.elements.filter(
               (e) => e.status !== "withdrawn" && e.status !== "rejected",
