@@ -22,6 +22,7 @@ import { HistoryTab } from "./HistoryTab.jsx";
 import { Legend } from "./graphs_shared/Legend.jsx";
 import { EditModal } from "./user_edits/EditModal.jsx";
 import { EditRelationModal } from "./user_edits/EditRelationModal.jsx";
+import { WithdrawReasonModal } from "./user_edits/WithdrawReasonModal.jsx";
 import {
   NetworkIcon,
   HistoryIcon,
@@ -118,6 +119,7 @@ function useREActions(initialState) {
   const [editingRel, setEditingRel] = useState(null);
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
+  const [withdrawingId, setWithdrawingId] = useState(null);
 
   const handleSelectNode = (updater) => {
     setSelectedRel(null);
@@ -198,6 +200,10 @@ function useREActions(initialState) {
   };
 
   const handleWithdrawRequest = (elementId) => {
+    setWithdrawingId(elementId);
+  };
+
+  const handleWithdrawConfirm = (elementId, reason) => {
     const newRound = state.round + 1;
     setState((prev) => ({
       ...prev,
@@ -208,7 +214,7 @@ function useREActions(initialState) {
               ...e,
               status: "withdrawn",
               withdrawnRound: newRound,
-              reason: "",
+              reason: reason ?? "",
               previousText: undefined,
               revisedRound: undefined,
             }
@@ -224,6 +230,7 @@ function useREActions(initialState) {
         ),
       ],
     }));
+    setWithdrawingId(null);
   };
 
   const handleWithdrawRelRequest = (rel) => {
@@ -372,6 +379,9 @@ function useREActions(initialState) {
     setEditingRel,
     handleRelEditSave,
     handleWithdrawRequest,
+    handleWithdrawConfirm,
+    withdrawingId,
+    setWithdrawingId,
     handleWithdrawRelRequest,
     handleAddElement,
     handleAddRelation,
@@ -1118,6 +1128,9 @@ function EditModals({
   setEditingRel,
   onRelEditSave,
   round,
+  withdrawingId,
+  onWithdrawConfirm,
+  onWithdrawCancel,
 }) {
   return (
     <>
@@ -1135,6 +1148,13 @@ function EditModals({
           currentRound={round}
           onSave={onRelEditSave}
           onCancel={() => setEditingRel(null)}
+        />
+      )}
+      {withdrawingId && (
+        <WithdrawReasonModal
+          elementId={withdrawingId}
+          onConfirm={(reason) => onWithdrawConfirm(withdrawingId, reason)}
+          onCancel={onWithdrawCancel}
         />
       )}
     </>
@@ -1178,6 +1198,9 @@ export default function REState({ initialState, onHome, onReady }) {
     handleRelEditSave,
     handleEditRequest,
     handleWithdrawRequest,
+    handleWithdrawConfirm,
+    withdrawingId,
+    setWithdrawingId,
     handleWithdrawRelRequest,
     handleAddElement,
     handleAddRelation,
@@ -1435,6 +1458,9 @@ export default function REState({ initialState, onHome, onReady }) {
         setEditingRel={setEditingRel}
         onRelEditSave={handleRelEditSave}
         round={state.round}
+        withdrawingId={withdrawingId}
+        onWithdrawConfirm={handleWithdrawConfirm}
+        onWithdrawCancel={() => setWithdrawingId(null)}
       />
     </div>
   );
