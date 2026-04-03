@@ -797,7 +797,7 @@ function AppHeader({
                     ...btn(assistSidePanel === value),
                     borderRadius:
                       i === 0 ? "4px 0 0 4px" : i === 2 ? "0 4px 4px 0" : 0,
-                    borderRight: i < 2 ? "none" : undefined,
+                    // borderRight: i < 2 ? "none" : undefined,
                     fontSize: 11,
                     padding: "0 10px",
                   }}
@@ -1255,8 +1255,19 @@ export default function REState({ initialState, onHome, onReady }) {
   const dims = useWindowSize();
   const isWide = dims.w > 768 && dims.h > 500;
   const isAssistTab = ASSIST_TABS.includes(tab);
-  const hasSidePanel = isWide && (isAssistTab ? assistSidePanel !== "none" : showText);
-  const graphW = hasSidePanel ? (dims.w - 32) / 2 - 12 : dims.w - 32;
+  const hasSidePanel =
+    isWide && (isAssistTab ? assistSidePanel !== "none" : showText);
+  // graphW must match the actual rendered width of the graph SVG panel so the
+  // force simulation centres nodes in the visible area.
+  // - Assist+graph: two flex:1 panels sharing (content - gap) → (W-32-12)/2
+  // - Text+graph (analyze or assist+text): TextPanel=50%, GraphPanel=flex:1 → (W-32)/2-12
+  // - Full width (no side panel): W-32
+  const graphW =
+    isAssistTab && assistSidePanel === "graph"
+      ? (dims.w - 44) / 2
+      : hasSidePanel
+        ? (dims.w - 32) / 2 - 12
+        : dims.w - 32;
   const { positions, ready } = useStablePositions(state, {
     w: graphW,
     h: dims.h * 0.8, // subtract the 20vh AddBar at the bottom
@@ -1438,14 +1449,14 @@ export default function REState({ initialState, onHome, onReady }) {
       </div>
 
       {isWide && !isAssistTab && (
-          <AddBar
-            elements={state.elements.filter(
-              (e) => e.status !== "withdrawn" && e.status !== "rejected",
-            )}
-            onAddElement={handleAddElement}
-            onAddRelation={handleAddRelation}
-          />
-        )}
+        <AddBar
+          elements={state.elements.filter(
+            (e) => e.status !== "withdrawn" && e.status !== "rejected",
+          )}
+          onAddElement={handleAddElement}
+          onAddRelation={handleAddRelation}
+        />
+      )}
 
       <EditModals
         editingEl={editingEl}
