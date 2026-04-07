@@ -5,7 +5,7 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
@@ -144,6 +144,7 @@ function useGraphClick({
   onSelect,
   onSelectRel,
   setTooltip,
+  onCtrlNodeClick,
 }) {
   const clickOrigin = useRef(null);
 
@@ -201,8 +202,12 @@ function useGraphClick({
       const pos = positions[el.id];
       if (!pos) continue;
       if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitRadius(el.type) ** 2) {
-        onSelectRel(() => null);
-        onSelect((prev) => (prev === el.id ? null : el.id));
+        if (e.ctrlKey || e.metaKey) {
+          onCtrlNodeClick(el.id);
+        } else {
+          onSelectRel(() => null);
+          onSelect((prev) => (prev === el.id ? null : el.id));
+        }
         return;
       }
     }
@@ -259,6 +264,10 @@ function useGraphClick({
  * @param {function(function): void} props.onSelectRel
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
+ * @param {function}    [props.onCtrlSecondSelect] - Called with a node id when ctrl+click
+ *   happens while another node is already selected. Used to fill the AddBar "to" field.
+ * @param {boolean}     [props.ready] - When false, suppresses auto-fit until the force
+ *   simulation has settled. Prevents fitting against initial clustered positions.
  * @returns {React.ReactElement}
  */
 export function Graph({
@@ -272,12 +281,18 @@ export function Graph({
   onSelectRel,
   onAddElement,
   onAddRelation,
+  onCtrlSecondSelect,
+  ready,
 }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
   const [addingElType, setAddingElType] = useState(null);
   const [addingRel, setAddingRel] = useState(false);
+  const [ctrlSelected, setCtrlSelected] = useState(null);
+
+  // Clear ctrl-selection whenever the primary selection changes.
+  useEffect(() => { setCtrlSelected(null); }, [selected]);
 
   // ── Derived visibility and highlight sets ─────────────────────────────────
 
@@ -298,11 +313,13 @@ export function Graph({
       (showWithdrawn || r.status !== "withdrawn"),
   );
 
-  const highlightedIds = selected
-    ? getNeighbours(selected, visRels)
-    : selectedRel
-      ? new Set([selectedRel.from, selectedRel.to])
-      : null;
+  const highlightedIds = ctrlSelected && selected
+    ? new Set([selected, ctrlSelected])
+    : selected
+      ? getNeighbours(selected, visRels)
+      : selectedRel
+        ? new Set([selectedRel.from, selectedRel.to])
+        : null;
 
   const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
   const dimEdge = (r) => {
@@ -327,7 +344,7 @@ export function Graph({
     resetView,
   } = usePan();
 
-  useAutoFit({ positions, dims, resetView });
+  useAutoFit({ positions, dims, resetView, enabled: ready });
 
   const { onPointerDown, onPointerUp } = useGraphClick({
     panDown,
@@ -340,6 +357,15 @@ export function Graph({
     onSelect,
     onSelectRel,
     setTooltip,
+    onCtrlNodeClick: (id) => {
+      if (selected) {
+        setCtrlSelected(id);
+        onCtrlSecondSelect?.(id);
+      } else {
+        onSelectRel(() => null);
+        onSelect((prev) => (prev === id ? null : id));
+      }
+    },
   });
 
   // ── Render ────────────────────────────────────────────────────────────────

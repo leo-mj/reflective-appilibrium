@@ -751,7 +751,10 @@ function AppHeader({
                         style={{ marginLeft: 6, fontSize: 10, color: C.dim }}
                       >
                         ({WORKFLOW_PHASE_LABELS[workflowPhase]}
-                        {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""})
+                        {workflowLoops > 0
+                          ? ` · Loop ${workflowLoops + 1}`
+                          : ""}
+                        )
                       </span>
                     </button>
                   </>
@@ -846,7 +849,6 @@ function AppHeader({
               {[
                 { value: "text", label: "Text" },
                 { value: "graph", label: "Graph" },
-                { value: "none", label: "None" },
               ].map(({ value, label }, i) => (
                 <button
                   key={value}
@@ -854,7 +856,7 @@ function AppHeader({
                   style={{
                     ...btn(assistSidePanel === value),
                     borderRadius:
-                      i === 0 ? "4px 0 0 4px" : i === 2 ? "0 4px 4px 0" : 0,
+                      i === 0 ? "4px 0 0 4px" : i === 1 ? "0 4px 4px 0" : 0,
                     // borderRight: i < 2 ? "none" : undefined,
                     fontSize: 11,
                     padding: "0 10px",
@@ -886,18 +888,56 @@ function AppHeader({
             </button>
           )}
           {[
-            { label: "Withdrawn", value: showWithdrawn, set: setShowWithdrawn, color: "#7c3aed" },
-            { label: "Rejected", value: showRejected, set: setShowRejected, color: "#fb7185" },
+            {
+              label: "Withdrawn",
+              value: showWithdrawn,
+              set: setShowWithdrawn,
+              color: "#7c3aed",
+            },
+            {
+              label: "Rejected",
+              value: showRejected,
+              set: setShowRejected,
+              color: "#fb7185",
+            },
           ].map(({ label, value, set, color }) => (
             <label
               key={label}
-              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.dim, cursor: "pointer", marginLeft: 6 }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                fontSize: 11,
+                color: C.dim,
+                cursor: "pointer",
+                marginLeft: 6,
+              }}
             >
               <div
                 onClick={() => set((s) => !s)}
-                style={{ width: 28, height: 16, borderRadius: 8, position: "relative", background: value ? color : C.border, transition: "background 0.3s", cursor: "pointer", flexShrink: 0 }}
+                style={{
+                  width: 28,
+                  height: 16,
+                  borderRadius: 8,
+                  position: "relative",
+                  background: value ? color : C.border,
+                  transition: "background 0.3s",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
               >
-                <div style={{ width: 12, height: 12, borderRadius: 6, background: C.text, position: "absolute", top: 2, left: value ? 14 : 2, transition: "left 0.3s ease" }} />
+                <div
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 6,
+                    background: C.text,
+                    position: "absolute",
+                    top: 2,
+                    left: value ? 14 : 2,
+                    transition: "left 0.3s ease",
+                  }}
+                />
               </div>
               {label}
             </label>
@@ -1067,6 +1107,8 @@ function GraphPanel({
   workflowPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
+  onCtrlSecondSelect,
+  ready,
 }) {
   const autoFetch = !!workflowPhase;
   const isAssistPanel = ASSIST_TABS.includes(tab);
@@ -1094,6 +1136,8 @@ function GraphPanel({
             onSelectRel={onSelectRel}
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
+            onCtrlSecondSelect={onCtrlSecondSelect}
+            ready={ready}
           />
         )}
         {tab === "history" && (
@@ -1250,6 +1294,7 @@ export default function REState({ initialState, onHome, onReady }) {
     handleImportFile,
   } = actions;
 
+  const [addBarCtrlTo, setAddBarCtrlTo] = useState(null);
   const [workflowLoops, setWorkflowLoops] = useState(0);
   const startWorkflow = () => {
     setWorkflowPhase("elicitJudgments");
@@ -1423,6 +1468,8 @@ export default function REState({ initialState, onHome, onReady }) {
             workflowPhase={null}
             onAdvanceWorkflow={null}
             nextPhaseIsEnabled={false}
+            onCtrlSecondSelect={setAddBarCtrlTo}
+            ready={ready}
           />
         )}
         {(!isWide ? tab === "text" : !isAssistTab && showText) && (
@@ -1484,6 +1531,8 @@ export default function REState({ initialState, onHome, onReady }) {
             workflowPhase={workflowPhase}
             onAdvanceWorkflow={advanceWorkflow}
             nextPhaseIsEnabled={workflowNextPhaseEnabled}
+            onCtrlSecondSelect={setAddBarCtrlTo}
+            ready={ready}
           />
         )}
       </div>
@@ -1495,6 +1544,8 @@ export default function REState({ initialState, onHome, onReady }) {
           )}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
+          selected={selected}
+          ctrlTo={addBarCtrlTo}
         />
       )}
 

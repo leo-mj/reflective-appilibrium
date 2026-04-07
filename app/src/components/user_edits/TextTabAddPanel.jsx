@@ -7,7 +7,7 @@
 
 /** @import { REElement } from '../../types.js' */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { C } from "../../constants/colors.js";
 import { sortElementIds } from "../../utils/stateUtils.js";
@@ -49,12 +49,24 @@ const SELECT_STYLE = {
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
  */
-export function AddBar({ elements, onAddElement, onAddRelation }) {
+export function AddBar({ elements, onAddElement, onAddRelation, selected, ctrlTo }) {
   const [activeTab, setActiveTab] = useState("element");
   const [elementForm, setElementForm] = useState(ELEMENT_DEFAULTS);
   const [relationForm, setRelationForm] = useState(() =>
     makeRelationDefaults(elements),
   );
+
+  useEffect(() => {
+    if (!selected) return;
+    setActiveTab("relation");
+    setRelationForm((prev) => ({ ...prev, from: selected }));
+  }, [selected]);
+
+  useEffect(() => {
+    if (!ctrlTo) return;
+    setActiveTab("relation");
+    setRelationForm((prev) => ({ ...prev, to: ctrlTo }));
+  }, [ctrlTo]);
 
   const setEl = (field, value) =>
     setElementForm((prev) => ({ ...prev, [field]: value }));
