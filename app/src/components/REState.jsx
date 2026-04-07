@@ -505,6 +505,7 @@ function AppHeader({
   onHome,
   isWide,
   workflowPhase,
+  workflowLoops,
   onStartWorkflow,
   onStopWorkflow,
 }) {
@@ -749,7 +750,8 @@ function AppHeader({
                       <span
                         style={{ marginLeft: 6, fontSize: 10, color: C.dim }}
                       >
-                        ({WORKFLOW_PHASE_LABELS[workflowPhase]})
+                        ({WORKFLOW_PHASE_LABELS[workflowPhase]}
+                        {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""})
                       </span>
                     </button>
                   </>
@@ -983,6 +985,7 @@ function AppHeader({
             {workflowPhase && (
               <span style={{ fontSize: 11, color: C.dim }}>
                 {WORKFLOW_PHASE_LABELS[workflowPhase]}
+                {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""}
               </span>
             )}
             {workflowPhase ? (
@@ -1247,13 +1250,19 @@ export default function REState({ initialState, onHome, onReady }) {
     handleImportFile,
   } = actions;
 
+  const [workflowLoops, setWorkflowLoops] = useState(0);
   const startWorkflow = () => {
     setWorkflowPhase("elicitJudgments");
+    setWorkflowLoops(0);
     setTab("elicitJudgments");
   };
-  const stopWorkflow = () => setWorkflowPhase(null);
+  const stopWorkflow = () => {
+    setWorkflowPhase(null);
+    setWorkflowLoops(0);
+  };
   const advanceWorkflow = () => {
     const next = WORKFLOW_NEXT_PHASE[workflowPhase];
+    if (next === "elicitJudgments") setWorkflowLoops((n) => n + 1);
     setWorkflowPhase(next);
     setTab(next);
   };
@@ -1358,6 +1367,7 @@ export default function REState({ initialState, onHome, onReady }) {
         onHome={onHome}
         isWide={isWide}
         workflowPhase={workflowPhase}
+        workflowLoops={workflowLoops}
         onStartWorkflow={startWorkflow}
         onStopWorkflow={stopWorkflow}
       />
