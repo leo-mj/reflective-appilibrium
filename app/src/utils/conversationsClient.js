@@ -30,7 +30,11 @@ async function post(url, body) {
  * @returns {Promise<{ session_id: string, reply: string, model: string }>}
  */
 export async function startConversation(state, suggestion, message) {
-  return post(`${BACKEND_URL}/api/conversations`, { state, suggestion, message });
+  return post(`${BACKEND_URL}/api/conversations`, {
+    state,
+    suggestion,
+    message,
+  });
 }
 
 /**
@@ -41,8 +45,7 @@ export async function startConversation(state, suggestion, message) {
  * @returns {Promise<{ session_id: string, reply: string, model: string }>}
  */
 export async function sendConversationMessage(sessionId, message) {
-  return post(
-    `${BACKEND_URL}/api/conversations/${sessionId}/messages`,
-    { message },
-  );
+  return post(`${BACKEND_URL}/api/conversations/${sessionId}/messages`, {
+    message,
+  });
 }

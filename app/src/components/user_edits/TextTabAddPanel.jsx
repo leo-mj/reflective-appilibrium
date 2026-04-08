@@ -49,7 +49,13 @@ const SELECT_STYLE = {
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
  */
-export function AddBar({ elements, onAddElement, onAddRelation, selected, ctrlTo }) {
+export function AddBar({
+  elements,
+  onAddElement,
+  onAddRelation,
+  selected,
+  ctrlTo,
+}) {
   const [activeTab, setActiveTab] = useState("element");
   const [elementForm, setElementForm] = useState(ELEMENT_DEFAULTS);
   const [relationForm, setRelationForm] = useState(() =>
@@ -324,7 +330,8 @@ export function AddElementPanel({ elementType, onAddElement }) {
     origin: "user",
     text: "",
   });
-  const set = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+  const set = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
   const canSubmit = form.text.trim().length > 0;
   const handleSubmit = () => {
     onAddElement({ type: elementType, ...form });
@@ -414,7 +421,8 @@ export function AddElementPanel({ elementType, onAddElement }) {
  */
 export function AddRelationPanel({ elements, onAddRelation }) {
   const [form, setForm] = useState(() => makeRelationDefaults(elements));
-  const set = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+  const set = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
   const ids = elements.map((e) => e.id).sort(sortElementIds);
   const canSubmit = form.from && form.to && form.from !== form.to;
   const handleSubmit = () => {
@@ -461,7 +469,9 @@ export function AddRelationPanel({ elements, onAddRelation }) {
             </option>
           ))}
         </select>
-        <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>→</span>
+        <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
+          →
+        </span>
         <select
           value={form.type}
           onChange={(e) => set("type", e.target.value)}
@@ -472,7 +482,9 @@ export function AddRelationPanel({ elements, onAddRelation }) {
           <option value="undermines">undermines</option>
           <option value="depends">depends</option>
         </select>
-        <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>→</span>
+        <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
+          →
+        </span>
         <select
           value={form.to}
           onChange={(e) => set("to", e.target.value)}

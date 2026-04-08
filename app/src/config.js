@@ -28,4 +28,3 @@ export const LLM_ENABLED = import.meta.env.VITE_ENABLE_LLM === "true";
  * so visitors see pre-set examples and the info banner.
  */
 export const VITE_USE_DUMMY = import.meta.env.VITE_USE_DUMMY === "true";
-

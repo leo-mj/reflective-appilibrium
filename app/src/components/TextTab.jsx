@@ -526,8 +526,8 @@ export function TextTab({
         {adding === "relation" && (
           <AddRelationModal
             elements={state.elements.filter(
-            (e) => e.status !== "withdrawn" && e.status !== "rejected",
-          )}
+              (e) => e.status !== "withdrawn" && e.status !== "rejected",
+            )}
             currentRound={state.round}
             onSave={(formData) => {
               onAddRelation(formData);

@@ -109,7 +109,14 @@ export function AddRelationForm({ form, setForm, elements }) {
  * @param {string}      [props.initialTo]   - Pre-fill the To field.
  * @returns {React.ReactElement}
  */
-export function AddRelationModal({ elements, currentRound, onSave, onCancel, initialFrom, initialTo }) {
+export function AddRelationModal({
+  elements,
+  currentRound,
+  onSave,
+  onCancel,
+  initialFrom,
+  initialTo,
+}) {
   const ids = elements.map((e) => e.id);
   const [form, setForm] = useState(
     /** @type {AddRelationFormData} */ ({

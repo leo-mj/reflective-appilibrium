@@ -144,7 +144,11 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst) {
   const isRejected = element.status === "rejected";
   const isSelected = element.id === selected;
   const isCtrlFirst = element.id === ctrlFirst;
-  const baseOpacity = isWithdrawn ? 0.25 : isRejected ? 0.35 : confOp[element.confidence];
+  const baseOpacity = isWithdrawn
+    ? 0.25
+    : isRejected
+      ? 0.35
+      : confOp[element.confidence];
   return {
     isWithdrawn,
     isRejected,

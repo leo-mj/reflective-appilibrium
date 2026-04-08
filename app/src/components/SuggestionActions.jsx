@@ -8,8 +8,21 @@
 import { C } from "../constants/colors.js";
 
 // Button base styles (card-level, smaller than toolbar buttons)
-const SOLID = { borderRadius: 4, padding: "2px 10px", fontSize: 11, cursor: "pointer", border: "none" };
-const OUTLINE = { borderRadius: 4, padding: "2px 10px", fontSize: 11, cursor: "pointer", background: "transparent", border: `1px solid ${C.border}` };
+const SOLID = {
+  borderRadius: 4,
+  padding: "2px 10px",
+  fontSize: 11,
+  cursor: "pointer",
+  border: "none",
+};
+const OUTLINE = {
+  borderRadius: 4,
+  padding: "2px 10px",
+  fontSize: 11,
+  cursor: "pointer",
+  background: "transparent",
+  border: `1px solid ${C.border}`,
+};
 
 /**
  * @param {Object}   props
@@ -18,7 +31,10 @@ const OUTLINE = { borderRadius: 4, padding: "2px 10px", fontSize: 11, cursor: "p
  */
 export function AcceptButton({ onClick, accentColor }) {
   return (
-    <button onClick={onClick} style={{ ...SOLID, background: accentColor, color: "#fff" }}>
+    <button
+      onClick={onClick}
+      style={{ ...SOLID, background: accentColor, color: "#fff" }}
+    >
       Accept
     </button>
   );
@@ -30,7 +46,10 @@ export function AcceptButton({ onClick, accentColor }) {
  */
 export function RejectButton({ onClick }) {
   return (
-    <button onClick={onClick} style={{ ...SOLID, background: "#dc2626", color: "#fff" }}>
+    <button
+      onClick={onClick}
+      style={{ ...SOLID, background: "#dc2626", color: "#fff" }}
+    >
       Reject
     </button>
   );

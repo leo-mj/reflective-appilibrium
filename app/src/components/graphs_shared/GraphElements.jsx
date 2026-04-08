@@ -51,7 +51,11 @@ export function GraphEdge({
   transition,
   hitArea = false,
 }) {
-  const color = isRejected ? C.rejected : isWithdrawn ? C.withdrawn : C[relation.type];
+  const color = isRejected
+    ? C.rejected
+    : isWithdrawn
+      ? C.withdrawn
+      : C[relation.type];
   const { x1, y1, x2, y2, tipX, tipY, perpX, perpY } = arrowGeometry(
     sourcePos,
     targetPos,

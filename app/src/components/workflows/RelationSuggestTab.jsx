@@ -386,7 +386,10 @@ export function RelationSuggestTab({
           />
         ))}
       </div>
-      <AddRelationPanel elements={activeElements} onAddRelation={onAddRelation} />
+      <AddRelationPanel
+        elements={activeElements}
+        onAddRelation={onAddRelation}
+      />
     </div>
   );
 }

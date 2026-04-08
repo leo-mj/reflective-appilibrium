@@ -116,6 +116,18 @@ function stateAtRound(state, round) {
  */
 function useREActions(initialState) {
   const [state, setState] = useState(initialState);
+  const undoStack = useRef([]);
+  const MAX_UNDO = 20;
+  const [undoCount, setUndoCount] = useState(0);
+
+  const mutate = (updater) => {
+    setState((prev) => {
+      undoStack.current = [prev, ...undoStack.current].slice(0, MAX_UNDO);
+      return updater(prev);
+    });
+    setUndoCount((n) => n + 1);
+  };
+
   const [editingEl, setEditingEl] = useState(null);
   const [editingRel, setEditingRel] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -154,7 +166,7 @@ function useREActions(initialState) {
       oldEl,
       formData,
     );
-    setState((prev) => ({
+    mutate((prev) => ({
       ...prev,
       round: newRound,
       elements: prev.elements.map((e) => (e.id === oldEl.id ? newEl : e)),
@@ -174,7 +186,7 @@ function useREActions(initialState) {
   const handleRelEditSave = (formData) => {
     const newRound = state.round + 1;
     const diffs = makeDiff(["type", "explanation"], editingRel, formData);
-    setState((prev) => ({
+    mutate((prev) => ({
       ...prev,
       round: newRound,
       relations: prev.relations.map((r) =>
@@ -206,7 +218,7 @@ function useREActions(initialState) {
 
   const handleWithdrawConfirm = (elementId, reason) => {
     const newRound = state.round + 1;
-    setState((prev) => ({
+    mutate((prev) => ({
       ...prev,
       round: newRound,
       elements: prev.elements.map((e) =>
@@ -232,11 +244,12 @@ function useREActions(initialState) {
       ],
     }));
     setWithdrawingId(null);
+    if (selected === elementId) setSelected(null);
   };
 
   const handleWithdrawRelRequest = (rel) => {
     const newRound = state.round + 1;
-    setState((prev) => ({
+    mutate((prev) => ({
       ...prev,
       round: newRound,
       relations: prev.relations.map((r) =>
@@ -252,12 +265,13 @@ function useREActions(initialState) {
         ),
       ],
     }));
+    if (selectedRel === rel) setSelectedRel(null);
   };
 
   const handleAddElement = (formData) => {
     const newRound = state.round + 1;
     const newId = nextElementId(state.elements, formData.type);
-    setState((prev) => ({
+    mutate((prev) => ({
       ...prev,
       round: newRound,
       elements: [
@@ -280,7 +294,7 @@ function useREActions(initialState) {
   const handleAddRelation = (formData, { select = true } = {}) => {
     const newRound = state.round + 1;
     const newRel = { ...formData, addedRound: newRound };
-    setState((prev) => ({
+    mutate((prev) => ({
       ...prev,
       round: newRound,
       relations: [...prev.relations, newRel],
@@ -298,7 +312,7 @@ function useREActions(initialState) {
   };
 
   const handleRejectElements = (formDatas) => {
-    setState((prev) => {
+    mutate((prev) => {
       // Assign IDs sequentially, feeding each new element into the next ID lookup.
       let running = prev.elements;
       const newEls = formDatas.map((fd) => {
@@ -330,7 +344,7 @@ function useREActions(initialState) {
   };
 
   const handleRejectRelations = (formDatas) => {
-    setState((prev) => ({
+    mutate((prev) => ({
       ...prev,
       relations: [
         ...prev.relations,
@@ -355,8 +369,25 @@ function useREActions(initialState) {
     }));
   };
 
+  const handleUndo = () => {
+    const prev = undoStack.current[0];
+    if (!prev) return;
+    undoStack.current = undoStack.current.slice(1);
+    setUndoCount((n) => n - 1);
+    setState(prev);
+    if (selected && !prev.elements.some((e) => e.id === selected)) {
+      setSelected(null);
+    }
+    if (selectedRel && !prev.relations.some((r) => r === selectedRel)) {
+      setSelectedRel(null);
+    }
+  };
+  const canUndo = undoCount > 0;
+
   const handleImportFile = async (file) => {
     const newState = await importStateFromFile(file);
+    undoStack.current = [];
+    setUndoCount(0);
     setState(newState);
     setSelected(null);
     setSelectedRel(null);
@@ -385,6 +416,8 @@ function useREActions(initialState) {
     handleRejectElements,
     handleRejectRelations,
     handleImportFile,
+    handleUndo,
+    canUndo,
   };
 }
 
@@ -508,6 +541,8 @@ function AppHeader({
   workflowLoops,
   onStartWorkflow,
   onStopWorkflow,
+  onUndo,
+  canUndo,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -776,6 +811,13 @@ function AppHeader({
             </button>
             {divider}
             <button
+              onClick={close(onUndo)}
+              disabled={!canUndo}
+              style={{ ...menuBtn(), opacity: canUndo ? 1 : 0.4 }}
+            >
+              ↩ Undo
+            </button>
+            <button
               onClick={() => {
                 handleImportClick();
                 setMenuOpen(false);
@@ -944,6 +986,13 @@ function AppHeader({
           ))}
           {divider}
           <div style={{ display: "flex", flex: "1 1 0", minWidth: 0 }}>
+            <button
+              onClick={onUndo}
+              disabled={!canUndo}
+              style={{ marginRight: 2, flexShrink: 0, ...btn(false), opacity: canUndo ? 1 : 0.4 }}
+            >
+              ↩ Undo
+            </button>
             <button
               onClick={handleImportClick}
               style={{ marginRight: 2, flexShrink: 0, ...btn(false) }}
@@ -1292,10 +1341,29 @@ export default function REState({ initialState, onHome, onReady }) {
     handleRejectElements,
     handleRejectRelations,
     handleImportFile,
+    handleUndo,
+    canUndo,
   } = actions;
 
   const [addBarCtrlTo, setAddBarCtrlTo] = useState(null);
   const [workflowLoops, setWorkflowLoops] = useState(0);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (
+        e.key === "z" &&
+        (e.ctrlKey || e.metaKey) &&
+        !e.shiftKey &&
+        e.target.tagName !== "TEXTAREA" &&
+        e.target.tagName !== "INPUT"
+      ) {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [handleUndo]);
   const startWorkflow = () => {
     setWorkflowPhase("elicitJudgments");
     setWorkflowLoops(0);
@@ -1415,6 +1483,8 @@ export default function REState({ initialState, onHome, onReady }) {
         workflowLoops={workflowLoops}
         onStartWorkflow={startWorkflow}
         onStopWorkflow={stopWorkflow}
+        onUndo={handleUndo}
+        canUndo={canUndo}
       />
 
       <div

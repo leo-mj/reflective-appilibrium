@@ -292,7 +292,9 @@ export function Graph({
   const [ctrlSelected, setCtrlSelected] = useState(null);
 
   // Clear ctrl-selection whenever the primary selection changes.
-  useEffect(() => { setCtrlSelected(null); }, [selected]);
+  useEffect(() => {
+    setCtrlSelected(null);
+  }, [selected]);
 
   // ── Derived visibility and highlight sets ─────────────────────────────────
 
@@ -313,13 +315,14 @@ export function Graph({
       (showWithdrawn || r.status !== "withdrawn"),
   );
 
-  const highlightedIds = ctrlSelected && selected
-    ? new Set([selected, ctrlSelected])
-    : selected
-      ? getNeighbours(selected, visRels)
-      : selectedRel
-        ? new Set([selectedRel.from, selectedRel.to])
-        : null;
+  const highlightedIds =
+    ctrlSelected && selected
+      ? new Set([selected, ctrlSelected])
+      : selected
+        ? getNeighbours(selected, visRels)
+        : selectedRel
+          ? new Set([selectedRel.from, selectedRel.to])
+          : null;
 
   const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
   const dimEdge = (r) => {
