@@ -4,9 +4,13 @@
  */
 
 import { C } from "../../constants/colors.js";
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../../config.js";
+import { LLM_ENABLED, VITE_USE_DUMMY, BACKEND_ENABLED } from "../../config.js";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
-import { ASSIST_TABS, TAB_ICONS, TAB_LABELS } from "../../constants/tabConstants.jsx";
+import {
+  ASSIST_TABS,
+  TAB_ICONS,
+  TAB_LABELS,
+} from "../../constants/tabConstants.jsx";
 import { btn } from "./appHeaderStyles.js";
 import { TopicLabel } from "./TopicLabel.jsx";
 
@@ -19,7 +23,6 @@ import { TopicLabel } from "./TopicLabel.jsx";
  * @param {boolean}  props.menuOpen
  * @param {function} props.setMenuOpen
  * @param {string[]} props.ANALYZE_TABS
- * @param {string}   props.metaTab
  * @param {function} props.handleImportClick
  * @param {function} props.onDownload
  * @param {function} props.onHome
@@ -38,7 +41,6 @@ export function AppHeaderNarrow({
   menuOpen,
   setMenuOpen,
   ANALYZE_TABS,
-  metaTab,
   handleImportClick,
   onDownload,
   onSave,
@@ -205,16 +207,21 @@ export function AppHeaderNarrow({
           >
             ↩ Undo
           </button>
-          <button
-            onClick={close(onSave)}
-            disabled={saveBusy}
-            style={{
-              ...menuBtn(),
-              ...(saveColor ? { color: saveColor, borderColor: saveColor } : {}),
-            }}
-          >
-            {saveLabel}
-          </button>
+          {BACKEND_ENABLED && (
+            <button
+              onClick={close(onSave)}
+              disabled={saveBusy}
+              title="Save session"
+              style={{
+                ...menuBtn(),
+                ...(saveColor
+                  ? { color: saveColor, borderColor: saveColor }
+                  : {}),
+              }}
+            >
+              {saveLabel}Save
+            </button>
+          )}
           <button
             onClick={() => {
               handleImportClick();

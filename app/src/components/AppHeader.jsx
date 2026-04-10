@@ -5,6 +5,27 @@
 
 import { useState, useRef } from "react";
 import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
+
+const SaveIcon = () => (
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 12 12"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: "block" }}
+  >
+    {/* Body with notched top-right corner */}
+    <path d="M1.5 1h7l2 2v8a.5.5 0 01-.5.5h-8a.5.5 0 01-.5-.5V1.5A.5.5 0 011.5 1z" />
+    {/* Shutter slot */}
+    <rect x="3" y="1" width="3.5" height="3" rx="0.3" />
+    {/* Label area */}
+    <rect x="2.5" y="6" width="7" height="3.5" rx="0.3" />
+  </svg>
+);
 import { ModalShell } from "./user_edits/ModalShell.jsx";
 import { ASSIST_TABS } from "../constants/tabConstants.jsx";
 import { AppHeaderNarrow } from "./app_header/AppHeaderNarrow.jsx";
@@ -83,7 +104,7 @@ export function AppHeader({
   };
 
   const SAVE_LABEL = {
-    idle: "↑ Save",
+    idle: <SaveIcon />,
     saving: "…",
     saved: "✓ Saved",
     error: "! Failed",

@@ -3,8 +3,9 @@
  * @module components/app_header/AppHeaderWide
  */
 
+import { useState } from "react";
 import { C } from "../../constants/colors.js";
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../../config.js";
+import { LLM_ENABLED, VITE_USE_DUMMY, BACKEND_ENABLED } from "../../config.js";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import { TAB_ICONS, TAB_LABELS } from "../../constants/tabConstants.jsx";
 import { btn, metaTabBtn } from "./appHeaderStyles.js";
@@ -20,6 +21,23 @@ const divider = (
       margin: "0 4px",
     }}
   />
+);
+
+const FileIcon = () => (
+  <svg
+    width="11"
+    height="13"
+    viewBox="0 0 11 13"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: "block" }}
+  >
+    <path d="M1.5 1.5h5l3 3v7.5a.5.5 0 01-.5.5h-7.5a.5.5 0 01-.5-.5v-10a.5.5 0 01.5-.5z" />
+    <path d="M6.5 1.5v3h3" />
+  </svg>
 );
 
 /** Two-row desktop header: title row + tab bar. Props mirror AppHeader. */
@@ -53,6 +71,18 @@ export function AppHeaderWide({
   onStartWorkflow,
   onStopWorkflow,
 }) {
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
+
+  const fileDropdownItem = {
+    ...btn(false),
+    width: "100%",
+    justifyContent: "flex-start",
+    height: 32,
+    padding: "0 10px",
+    borderRadius: 4,
+    border: "none",
+  };
+
   return (
     <div>
       {/* Row 1: utility — import/export, title, show-text, home */}
@@ -184,34 +214,88 @@ export function AppHeaderWide({
             <button
               onClick={onUndo}
               disabled={!canUndo}
-              style={{ marginRight: 2, flexShrink: 0, ...btn(false), opacity: canUndo ? 1 : 0.4 }}
-            >
-              ↩ Undo
-            </button>
-            <button
-              onClick={onSave}
-              disabled={saveBusy}
               style={{
                 marginRight: 2,
                 flexShrink: 0,
                 ...btn(false),
-                ...(saveColor ? { color: saveColor, borderColor: saveColor } : {}),
+                opacity: canUndo ? 1 : 0.4,
               }}
             >
-              {saveLabel}
+              ↩ Undo
             </button>
-            <button
-              onClick={handleImportClick}
-              style={{ marginRight: 2, flexShrink: 0, ...btn(false) }}
+            {BACKEND_ENABLED && (
+              <button
+                onClick={onSave}
+                disabled={saveBusy}
+                title="Save session"
+                style={{
+                  marginRight: 2,
+                  flexShrink: 0,
+                  ...btn(false),
+                  ...(saveColor
+                    ? { color: saveColor, borderColor: saveColor }
+                    : {}),
+                }}
+              >
+                {saveLabel}Save
+              </button>
+            )}
+            {/* File menu: Import + Export in a dropdown */}
+            <div
+              style={{ position: "relative", marginRight: 2, flexShrink: 0 }}
             >
-              ↑ Import
-            </button>
-            <button
-              onClick={onDownload}
-              style={{ flexShrink: 0, ...btn(true), background: C.theory.high }}
-            >
-              ↓ Export
-            </button>
+              <button
+                onClick={() => setFileMenuOpen((o) => !o)}
+                style={{ ...btn(fileMenuOpen) }}
+                title="Import / Export"
+              >
+                <FileIcon />
+              </button>
+              {fileMenuOpen && (
+                <>
+                  <div
+                    style={{ position: "fixed", inset: 0, zIndex: 99 }}
+                    onClick={() => setFileMenuOpen(false)}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      right: 0,
+                      zIndex: 100,
+                      background: C.panel,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 6,
+                      padding: 4,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 2,
+                      minWidth: 120,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+                    }}
+                  >
+                    <button
+                      style={fileDropdownItem}
+                      onClick={() => {
+                        handleImportClick();
+                        setFileMenuOpen(false);
+                      }}
+                    >
+                      ↑ Import
+                    </button>
+                    <button
+                      style={{ ...fileDropdownItem, color: C.theory.high }}
+                      onClick={() => {
+                        onDownload();
+                        setFileMenuOpen(false);
+                      }}
+                    >
+                      ↓ Export
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             {divider}
             <button onClick={onHome} style={{ ...btn(false) }}>
               ← Home

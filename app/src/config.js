@@ -28,3 +28,10 @@ export const LLM_ENABLED = import.meta.env.VITE_ENABLE_LLM === "true";
  * so visitors see pre-set examples and the info banner.
  */
 export const VITE_USE_DUMMY = import.meta.env.VITE_USE_DUMMY === "true";
+
+/**
+ * Whether the FastAPI backend is available.  Set to "true" in local dev;
+ * leave unset (or "false") for the public SPA-only build.  Gates session
+ * save/load and any other backend-only features independently of LLM access.
+ */
+export const BACKEND_ENABLED = import.meta.env.VITE_BACKEND_ENABLED === "true";
