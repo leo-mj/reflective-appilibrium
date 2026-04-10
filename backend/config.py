@@ -7,7 +7,7 @@ OpenAI-compatible endpoint without code changes.
 """
 
 from functools import lru_cache
-from pathlib import Path
+from pathlib import Path  # used in default value for sessions_dir
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).parent / ".env"
@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
     cors_origins: str = "http://localhost:5173"
+    sessions_dir: str = str(Path(__file__).parent.parent / "sessions")
 
     @property
     def cors_origins_list(self) -> list[str]:

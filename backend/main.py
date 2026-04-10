@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import conversations, judgments, llm, matrix, principles, relations
+from .routers import conversations, judgments, llm, matrix, principles, relations, sessions
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +48,7 @@ app.include_router(llm.router)
 app.include_router(matrix.router)
 app.include_router(principles.router)
 app.include_router(relations.router)
+app.include_router(sessions.router)
 # Future: app.include_router(coherence.router)
 
 

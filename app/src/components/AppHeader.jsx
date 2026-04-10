@@ -9,6 +9,7 @@ import { ModalShell } from "./user_edits/ModalShell.jsx";
 import { ASSIST_TABS } from "../constants/tabConstants.jsx";
 import { AppHeaderNarrow } from "./app_header/AppHeaderNarrow.jsx";
 import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
+import { C } from "../constants/colors.js";
 
 /**
  * @param {Object}   props
@@ -33,6 +34,7 @@ import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
  * @param {number}   props.workflowLoops
  * @param {function} props.onStartWorkflow
  * @param {function} props.onStopWorkflow
+ * @param {function} props.onSave
  * @param {function} props.onUndo
  * @param {boolean}  props.canUndo
  */
@@ -50,6 +52,7 @@ export function AppHeader({
   assistSidePanel,
   setAssistSidePanel,
   onDownload,
+  onSave,
   onImportFile,
   hasExistingState,
   onHome,
@@ -65,6 +68,32 @@ export function AppHeader({
   const [menuOpen, setMenuOpen] = useState(false);
   const [importConfirmPending, setImportConfirmPending] = useState(null);
   const [importError, setImportError] = useState(null);
+  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "error"
+
+  const handleSave = async () => {
+    setSaveStatus("saving");
+    try {
+      await onSave();
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    }
+  };
+
+  const SAVE_LABEL = {
+    idle: "↑ Save",
+    saving: "…",
+    saved: "✓ Saved",
+    error: "! Failed",
+  };
+  const SAVE_COLOR = {
+    idle: null,
+    saving: null,
+    saved: C.supports,
+    error: C.conflicts,
+  };
 
   const doImport = async (file) => {
     try {
@@ -138,6 +167,10 @@ export function AppHeader({
     setTab,
     handleImportClick,
     onDownload,
+    onSave: handleSave,
+    saveLabel: SAVE_LABEL[saveStatus],
+    saveColor: SAVE_COLOR[saveStatus],
+    saveBusy: saveStatus === "saving",
     onHome,
     onUndo,
     canUndo,

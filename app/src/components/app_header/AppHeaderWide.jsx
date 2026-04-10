@@ -38,6 +38,10 @@ export function AppHeaderWide({
   setAssistSidePanel,
   handleImportClick,
   onDownload,
+  onSave,
+  saveLabel,
+  saveColor,
+  saveBusy,
   onHome,
   onUndo,
   canUndo,
@@ -183,6 +187,18 @@ export function AppHeaderWide({
               style={{ marginRight: 2, flexShrink: 0, ...btn(false), opacity: canUndo ? 1 : 0.4 }}
             >
               ↩ Undo
+            </button>
+            <button
+              onClick={onSave}
+              disabled={saveBusy}
+              style={{
+                marginRight: 2,
+                flexShrink: 0,
+                ...btn(false),
+                ...(saveColor ? { color: saveColor, borderColor: saveColor } : {}),
+              }}
+            >
+              {saveLabel}
             </button>
             <button
               onClick={handleImportClick}

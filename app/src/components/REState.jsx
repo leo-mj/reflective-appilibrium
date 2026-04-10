@@ -7,6 +7,7 @@ import { stateAtRound } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { ASSIST_TABS } from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
+import { saveSession } from "../utils/sessionsClient.js";
 import { WORKFLOW_NEXT_PHASE, nextPhaseEnabled } from "../utils/workflowUtils.js";
 import { AppHeader } from "./AppHeader.jsx";
 import { TextPanel } from "./TextPanel.jsx";
@@ -218,6 +219,7 @@ export default function REState({ initialState, onHome, onReady }) {
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         onDownload={() => downloadMarkdown(state, positions)}
+        onSave={() => saveSession(state)}
         onImportFile={handleImportFile}
         hasExistingState={state.elements.length > 0}
         onHome={onHome}

@@ -44,6 +44,7 @@ export default function App() {
       <HomePage
         onStartFresh={(topic) => navigate(makeEmptyState(topic))}
         onLoadSample={() => navigate(SAMPLE_STATE)}
+        onLoadSession={(state) => navigate(state)}
       />
     );
   }

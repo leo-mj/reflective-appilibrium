@@ -41,6 +41,10 @@ export function AppHeaderNarrow({
   metaTab,
   handleImportClick,
   onDownload,
+  onSave,
+  saveLabel,
+  saveColor,
+  saveBusy,
   onHome,
   onUndo,
   canUndo,
@@ -200,6 +204,16 @@ export function AppHeaderNarrow({
             style={{ ...menuBtn(), opacity: canUndo ? 1 : 0.4 }}
           >
             ↩ Undo
+          </button>
+          <button
+            onClick={close(onSave)}
+            disabled={saveBusy}
+            style={{
+              ...menuBtn(),
+              ...(saveColor ? { color: saveColor, borderColor: saveColor } : {}),
+            }}
+          >
+            {saveLabel}
           </button>
           <button
             onClick={() => {
