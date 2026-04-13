@@ -17,7 +17,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @returns {Promise<{ suggestions: Array<{from: string, to: string, type: string, explanation: string}>, model: string }>}
  */
 export async function fetchRelationSuggestions(state) {
-  if (import.meta.env.VITE_USE_DUMMY === "true") {
+  if (!import.meta.env.VITE_ENABLE_LLM && import.meta.env.VITE_USE_DUMMY === "true") {
     return dummyRelations;
   }
   const res = await fetch(`${BACKEND_URL}/api/relations/suggest`, {

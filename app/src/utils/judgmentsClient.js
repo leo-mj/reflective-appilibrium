@@ -17,7 +17,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @returns {Promise<{ suggestions: Array<{question: string, judgments: Array<{text: string, confidence: string}>}>, model: string }>}
  */
 export async function fetchJudgmentElicitations(state) {
-  if (import.meta.env.VITE_USE_DUMMY === "true") {
+  if (!import.meta.env.VITE_ENABLE_LLM && import.meta.env.VITE_USE_DUMMY === "true") {
     return dummyJudgments;
   }
   const res = await fetch(`${BACKEND_URL}/api/judgments/elicit`, {
