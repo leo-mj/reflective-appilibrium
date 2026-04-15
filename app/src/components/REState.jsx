@@ -248,6 +248,7 @@ export default function REState({ initialState, onHome, onReady }) {
             workflowPhase={null}
             onAdvanceWorkflow={null}
             nextPhaseIsEnabled={false}
+            onCtrlSecondSelect={setAddBarCtrlTo}
           />
         )}
         {showingTextPanel && <TextPanel {...textPanelProps} />}
@@ -262,7 +263,7 @@ export default function REState({ initialState, onHome, onReady }) {
         )}
       </div>
 
-      {isWide && !isAssistTab && (
+      {isWide && (!isAssistTab || assistSidePanel === "graph") && (
         <AddBar
           elements={state.elements.filter(
             (e) => e.status !== "withdrawn" && e.status !== "rejected",

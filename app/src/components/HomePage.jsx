@@ -6,7 +6,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { C } from "../constants/colors.js";
-import { fetchSessions, loadSession, deleteSession } from "../utils/sessionsClient.js";
+import {
+  fetchSessions,
+  loadSession,
+  deleteSession,
+} from "../utils/sessionsClient.js";
+import { BACKEND_ENABLED } from "../config.js";
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -151,7 +156,9 @@ function SessionsCard({ onLoad }) {
       .catch((e) => setError(e.message));
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const handleLoad = async (id) => {
     setLoadingId(id);
@@ -349,7 +356,7 @@ export function HomePage({ onStartFresh, onLoadSample, onLoadSession }) {
       >
         <NewProcessCard onStart={onStartFresh} />
         <SampleProcessCard onLoad={onLoadSample} />
-        <SessionsCard onLoad={onLoadSession} />
+        {BACKEND_ENABLED && <SessionsCard onLoad={onLoadSession} />}
       </div>
     </div>
   );
