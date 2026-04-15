@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
-    openai_api_key: str
+    openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
     cors_origins: str = "http://localhost:5173"

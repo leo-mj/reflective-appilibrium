@@ -7,6 +7,23 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 /**
+ * Returns BYOK request headers from sessionStorage, or an empty object if
+ * no LLM settings have been saved.
+ *
+ * @returns {Record<string, string>}
+ */
+export function getLLMHeaders() {
+  const raw = sessionStorage.getItem("llmSettings");
+  if (!raw) return {};
+  const { apiKey, baseUrl, model } = JSON.parse(raw);
+  const headers = {};
+  if (apiKey) headers["x-api-key"] = apiKey;
+  if (baseUrl) headers["x-base-url"] = baseUrl;
+  if (model) headers["x-model"] = model;
+  return headers;
+}
+
+/**
  * Sends a prompt to the backend LLM service and returns the raw text response
  * along with the model name used.
  *
@@ -18,7 +35,7 @@ export async function callBackendLLM(prompt, temperature = 0.3) {
   console.log(`Fetching response from LLM`);
   const res = await fetch(`${BACKEND_URL}/api/llm/complete`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       messages: [{ role: "user", content: prompt }],
       temperature,

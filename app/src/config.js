@@ -35,3 +35,7 @@ export const VITE_USE_DUMMY = import.meta.env.VITE_USE_DUMMY === "true";
  * save/load and any other backend-only features independently of LLM access.
  */
 export const BACKEND_ENABLED = import.meta.env.VITE_BACKEND_ENABLED === "true";
+
+export const BYOK_ENABLED = import.meta.env.VITE_BYOK_ENABLED === "true";
+export const DEFAULT_PROVIDER = import.meta.env.VITE_DEFAULT_PROVIDER ?? "";
+export const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL ?? "";

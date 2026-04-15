@@ -42,6 +42,19 @@ class CompletionResponse(BaseModel):
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
+@router.post("/test")
+async def test_connection(
+    llm: Annotated[LLMService, Depends(get_llm_service)],
+) -> dict:
+    """Verify that the supplied API key and model are reachable."""
+    await llm.complete(
+        messages=[{"role": "user", "content": "Reply with the single word OK."}],
+        temperature=0.0,
+        json_mode=False,
+    )
+    return {"status": "ok", "model": llm.model}
+
+
 @router.post("/complete", response_model=CompletionResponse)
 async def complete(
     request: CompletionRequest,

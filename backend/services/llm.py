@@ -6,9 +6,16 @@ and most other local inference servers. Swap `base_url` in .env to point at
 any compatible endpoint without changing this file.
 """
 
+from dataclasses import dataclass
+
 from openai import AsyncOpenAI
 
-from ..config import Settings
+
+@dataclass
+class LLMConfig:
+    api_key: str
+    base_url: str
+    model: str
 
 
 class LLMService:
@@ -19,13 +26,13 @@ class LLMService:
     at Ollama, vLLM, or any other compatible server without touching this class.
     """
 
-    def __init__(self, settings: Settings) -> None:
-        """Initialise the underlying ``AsyncOpenAI`` client from *settings*."""
+    def __init__(self, config: LLMConfig) -> None:
+        """Initialise the underlying ``AsyncOpenAI`` client from *config*."""
         self._client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
+            api_key=config.api_key,
+            base_url=config.base_url,
         )
-        self.model = settings.openai_model
+        self.model = config.model
 
     async def complete(
         self,

@@ -3,8 +3,10 @@
  * @module components/app_header/AppHeaderNarrow
  */
 
+import { useState } from "react";
 import { C } from "../../constants/colors.js";
-import { LLM_ENABLED, VITE_USE_DUMMY, BACKEND_ENABLED } from "../../config.js";
+import { LLM_ENABLED, VITE_USE_DUMMY, BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
+import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import {
   ASSIST_TABS,
@@ -55,6 +57,18 @@ export function AppHeaderNarrow({
   onStartWorkflow,
   onStopWorkflow,
 }) {
+  const [llmOpen, setLlmOpen] = useState(false);
+
+  const llmSaved = (() => {
+    if (!BYOK_ENABLED) return null;
+    try {
+      const s = JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}");
+      return s?.apiKey ? s : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const menuBtn = (active = false) => ({
     ...btn(active),
     width: "100%",
@@ -92,18 +106,40 @@ export function AppHeaderNarrow({
           </div>
           <TopicLabel topic={topic} style={{ fontSize: 12, color: C.dim }} />
         </div>
-        <button
-          onClick={() => setMenuOpen((m) => !m)}
-          style={{
-            ...btn(menuOpen),
-            flexShrink: 0,
-            marginLeft: 8,
-            border: `1px solid ${C.text}`,
-          }}
-        >
-          ☰
-        </button>
+        <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }}>
+          {BYOK_ENABLED && (
+            <button
+              onClick={() => setLlmOpen((o) => !o)}
+              title="LLM settings"
+              style={{
+                ...btn(llmOpen),
+                color: llmSaved ? C.supports : C.dim,
+                borderColor: llmSaved ? C.supports : undefined,
+                fontSize: 10,
+                gap: 4,
+              }}
+            >
+              {llmSaved ? llmSaved.model : "LLM"}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={() => setMenuOpen((m) => !m)}
+            style={{
+              ...btn(menuOpen),
+              border: `1px solid ${C.text}`,
+            }}
+          >
+            ☰
+          </button>
+        </div>
       </div>
+      {BYOK_ENABLED && (
+        <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
+      )}
       {menuOpen && (
         <div
           style={{

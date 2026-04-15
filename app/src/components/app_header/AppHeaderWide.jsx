@@ -5,11 +5,17 @@
 
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
-import { LLM_ENABLED, VITE_USE_DUMMY, BACKEND_ENABLED } from "../../config.js";
+import {
+  LLM_ENABLED,
+  VITE_USE_DUMMY,
+  BACKEND_ENABLED,
+  BYOK_ENABLED,
+} from "../../config.js";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import { TAB_ICONS, TAB_LABELS } from "../../constants/tabConstants.jsx";
 import { btn, metaTabBtn } from "./appHeaderStyles.js";
 import { TopicLabel } from "./TopicLabel.jsx";
+import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 
 const divider = (
   <div
@@ -40,6 +46,23 @@ const FileIcon = () => (
   </svg>
 );
 
+const GearIcon = () => (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: "block" }}
+  >
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+  </svg>
+);
+
 /** Two-row desktop header: title row + tab bar. Props mirror AppHeader. */
 export function AppHeaderWide({
   round,
@@ -64,7 +87,6 @@ export function AppHeaderWide({
   onUndo,
   canUndo,
   metaTab,
-  ANALYZE_TABS,
   visibleSubTabs,
   workflowPhase,
   workflowLoops,
@@ -72,6 +94,17 @@ export function AppHeaderWide({
   onStopWorkflow,
 }) {
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [llmOpen, setLlmOpen] = useState(false);
+
+  const llmSaved = (() => {
+    if (!BYOK_ENABLED) return null;
+    try {
+      const s = JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}");
+      return s?.apiKey ? s : null;
+    } catch {
+      return null;
+    }
+  })();
 
   const fileDropdownItem = {
     ...btn(false),
@@ -297,12 +330,36 @@ export function AppHeaderWide({
               )}
             </div>
             {divider}
+            {BYOK_ENABLED && (
+              <>
+                <button
+                  onClick={() => setLlmOpen((o) => !o)}
+                  title="LLM settings"
+                  style={{
+                    ...btn(llmOpen),
+                    marginRight: 2,
+                    color: llmSaved ? C.supports : C.dim,
+                    borderColor: llmSaved ? C.supports : undefined,
+                  }}
+                >
+                  <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>
+                    {llmSaved ? llmSaved.model : "LLM"}
+                  </span>
+                  <GearIcon />
+                </button>
+
+                {divider}
+              </>
+            )}
             <button onClick={onHome} style={{ ...btn(false) }}>
               ← Home
             </button>
           </div>
         </div>
       </div>
+      {BYOK_ENABLED && (
+        <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
+      )}
       {/* Row 2: tab bar — meta-tabs connect to the border below */}
       <div
         style={{
