@@ -26,10 +26,10 @@ function getInitialModel(provider) {
   const raw = sessionStorage.getItem("llmSettings");
   if (raw) {
     const { model } = JSON.parse(raw);
-    if (provider.models.includes(model)) return model;
+    if (model) return model;
   }
   const defaultModel = import.meta.env.VITE_DEFAULT_MODEL;
-  if (defaultModel && provider.models.includes(defaultModel)) return defaultModel;
+  if (defaultModel) return defaultModel;
   return provider.models[0];
 }
 
@@ -186,13 +186,21 @@ export function LLMSettingsModal({ open, onClose }) {
         {/* Model */}
         <div style={fieldStyle}>
           <label style={labelStyle}>Model</label>
-          <select value={model} onChange={handleModelChange} style={inputStyle}>
+          <input
+            type="text"
+            list="llm-model-suggestions"
+            value={model}
+            onChange={handleModelChange}
+            placeholder={provider.models[0]}
+            style={inputStyle}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <datalist id="llm-model-suggestions">
             {provider.models.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
+              <option key={m} value={m} />
             ))}
-          </select>
+          </datalist>
         </div>
 
         {/* API key */}

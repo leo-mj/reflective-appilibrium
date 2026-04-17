@@ -25,10 +25,9 @@ export class LLMProvider {
 
 export const LLM_PROVIDERS = [
   new LLMProvider("openai", "OpenAI", "https://api.openai.com/v1", [
-    "gpt-4o",
-    "gpt-4o-mini",
-    "gpt-4.1",
-    "gpt-4.1-mini",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
   ]),
   new LLMProvider("mistral", "Mistral", "https://api.mistral.ai/v1", [
     "mistral-small-latest",
@@ -37,7 +36,7 @@ export const LLM_PROVIDERS = [
   ]),
   new LLMProvider("anthropic", "Anthropic", "https://api.anthropic.com/v1", [
     "claude-haiku-4-5",
-    "claude-sonnet-4-5",
-    "claude-opus-4-5",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7",
   ]),
 ];
