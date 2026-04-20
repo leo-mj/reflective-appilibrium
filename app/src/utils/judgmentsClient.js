@@ -6,7 +6,7 @@
 /** @import { REState } from '../types.js' */
 
 import dummyJudgments from "../dummy-judgments.js";
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
+import { LLM_ENABLED } from "../config.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -15,10 +15,11 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * that may elicit new judgments from the user.
  *
  * @param {REState} state
+ * @param {boolean} [useDummy=false]
  * @returns {Promise<{ suggestions: Array<{question: string, judgments: Array<{text: string, confidence: string}>}>, model: string }>}
  */
-export async function fetchJudgmentElicitations(state) {
-  if (!LLM_ENABLED && VITE_USE_DUMMY) {
+export async function fetchJudgmentElicitations(state, useDummy = false) {
+  if (!LLM_ENABLED || useDummy) {
     return dummyJudgments;
   }
   const res = await fetch(`${BACKEND_URL}/api/judgments/elicit`, {

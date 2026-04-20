@@ -3,50 +3,38 @@
  * @module components/GraphPanel
  */
 
-import { lazy, Suspense } from "react";
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
+import { lazy, Suspense, useState } from "react";
+import { IS_DEV } from "../config.js";
+import { C } from "../constants/colors.js";
 import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { Legend } from "./graphs_shared/Legend.jsx";
 import { ASSIST_TABS } from "../constants/tabConstants.jsx";
 
-// Loaded only in LLM-enabled builds; tree-shaken in public builds.
-const CoherenceMatrixTab =
-  LLM_ENABLED | VITE_USE_DUMMY
-    ? lazy(() =>
-        import("./CoherenceMatrixTab.jsx").then((m) => ({
-          default: m.CoherenceMatrixTab,
-        })),
-      )
-    : null;
+const CoherenceMatrixTab = lazy(() =>
+  import("./CoherenceMatrixTab.jsx").then((m) => ({
+    default: m.CoherenceMatrixTab,
+  })),
+);
 
-const RelationSuggestTab =
-  LLM_ENABLED | VITE_USE_DUMMY
-    ? lazy(() =>
-        import("./workflows/RelationSuggestTab.jsx").then((m) => ({
-          default: m.RelationSuggestTab,
-        })),
-      )
-    : null;
+const RelationSuggestTab = lazy(() =>
+  import("./workflows/RelationSuggestTab.jsx").then((m) => ({
+    default: m.RelationSuggestTab,
+  })),
+);
 
-const PrincipleSuggestTab =
-  LLM_ENABLED | VITE_USE_DUMMY
-    ? lazy(() =>
-        import("./workflows/PrincipleSuggestTab.jsx").then((m) => ({
-          default: m.PrincipleSuggestTab,
-        })),
-      )
-    : null;
+const PrincipleSuggestTab = lazy(() =>
+  import("./workflows/PrincipleSuggestTab.jsx").then((m) => ({
+    default: m.PrincipleSuggestTab,
+  })),
+);
 
-const JudgmentElicitTab =
-  LLM_ENABLED | VITE_USE_DUMMY
-    ? lazy(() =>
-        import("./workflows/JudgmentElicitTab.jsx").then((m) => ({
-          default: m.JudgmentElicitTab,
-        })),
-      )
-    : null;
+const JudgmentElicitTab = lazy(() =>
+  import("./workflows/JudgmentElicitTab.jsx").then((m) => ({
+    default: m.JudgmentElicitTab,
+  })),
+);
 
 export function GraphPanel({
   tab,
@@ -71,6 +59,8 @@ export function GraphPanel({
   onCtrlSecondSelect,
   ready,
 }) {
+  const [useDummyAssist, setUseDummyAssist] = useState(false);
+
   const autoFetch = !!workflowPhase;
   const isAssistPanel = ASSIST_TABS.includes(tab);
   return (
@@ -84,6 +74,28 @@ export function GraphPanel({
       }}
     >
       {!isAssistPanel && <Legend />}
+      {IS_DEV && isAssistPanel && (
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 11,
+            color: C.dim,
+            padding: "4px 0 2px",
+            userSelect: "none",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={useDummyAssist}
+            onChange={(e) => setUseDummyAssist(e.target.checked)}
+            style={{ accentColor: C.supports, cursor: "pointer" }}
+          />
+          Use dummy suggestions
+        </label>
+      )}
       <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
         {tab === "graph" && (
           <Graph
@@ -116,12 +128,12 @@ export function GraphPanel({
             showWithdrawn={showWithdrawn}
           />
         )}
-        {tab === "matrix" && LLM_ENABLED | VITE_USE_DUMMY && (
+        {tab === "matrix" && (
           <Suspense fallback={null}>
             <CoherenceMatrixTab state={state} />
           </Suspense>
         )}
-        {tab === "suggestRelations" && LLM_ENABLED | VITE_USE_DUMMY && (
+        {tab === "suggestRelations" && (
           <Suspense fallback={null}>
             <RelationSuggestTab
               state={state}
@@ -132,10 +144,11 @@ export function GraphPanel({
               workflowPhase={workflowPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
+              useDummy={useDummyAssist}
             />
           </Suspense>
         )}
-        {tab === "suggestPrinciples" && LLM_ENABLED | VITE_USE_DUMMY && (
+        {tab === "suggestPrinciples" && (
           <Suspense fallback={null}>
             <PrincipleSuggestTab
               state={state}
@@ -145,10 +158,11 @@ export function GraphPanel({
               workflowPhase={workflowPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
+              useDummy={useDummyAssist}
             />
           </Suspense>
         )}
-        {tab === "elicitJudgments" && LLM_ENABLED | VITE_USE_DUMMY && (
+        {tab === "elicitJudgments" && (
           <Suspense fallback={null}>
             <JudgmentElicitTab
               state={state}
@@ -158,6 +172,7 @@ export function GraphPanel({
               workflowPhase={workflowPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
+              useDummy={useDummyAssist}
             />
           </Suspense>
         )}

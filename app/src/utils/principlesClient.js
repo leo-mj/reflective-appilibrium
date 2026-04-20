@@ -6,7 +6,7 @@
 /** @import { REState } from '../types.js' */
 
 import dummyPrinciples from "../dummy-principles.js";
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
+import { LLM_ENABLED } from "../config.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -15,10 +15,11 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * the judgments in the given RE state.
  *
  * @param {REState} state
+ * @param {boolean} [useDummy=false]
  * @returns {Promise<{ suggestions: Array<{text: string, confidence: string, covers: string[], explanation: string}>, model: string }>}
  */
-export async function fetchPrincipleSuggestions(state) {
-  if (!LLM_ENABLED && VITE_USE_DUMMY) {
+export async function fetchPrincipleSuggestions(state, useDummy = false) {
+  if (!LLM_ENABLED || useDummy) {
     return dummyPrinciples;
   }
   const res = await fetch(`${BACKEND_URL}/api/principles/suggest`, {

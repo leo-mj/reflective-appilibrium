@@ -6,7 +6,7 @@
 /** @import { REState } from '../types.js' */
 
 import dummyRelations from "../dummy-relations.js";
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
+import { LLM_ENABLED } from "../config.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -15,10 +15,11 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * the given RE state, excluding relations that already exist.
  *
  * @param {REState} state
+ * @param {boolean} [useDummy=false]
  * @returns {Promise<{ suggestions: Array<{from: string, to: string, type: string, explanation: string}>, model: string }>}
  */
-export async function fetchRelationSuggestions(state) {
-  if (!LLM_ENABLED && VITE_USE_DUMMY) {
+export async function fetchRelationSuggestions(state, useDummy = false) {
+  if (!LLM_ENABLED || useDummy) {
     return dummyRelations;
   }
   const res = await fetch(`${BACKEND_URL}/api/relations/suggest`, {

@@ -245,6 +245,7 @@ export function RelationSuggestTab({
   autoFetch,
   workflowPhase,
   onAdvanceWorkflow,
+  useDummy = false,
 }) {
   /** @type {[Array<{from: string, to: string, type: string, explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -262,7 +263,7 @@ export function RelationSuggestTab({
     setError(null);
     try {
       const { suggestions: s, model: m } =
-        await fetchRelationSuggestions(state);
+        await fetchRelationSuggestions(state, useDummy);
       setSuggestions(s);
       setModel(m);
     } catch (e) {

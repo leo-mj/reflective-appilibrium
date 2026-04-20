@@ -5,7 +5,6 @@
 
 import { useState, useRef } from "react";
 import { TutorialOverlay } from "./TutorialOverlay.jsx";
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
 
 const SaveIcon = () => (
   <svg
@@ -131,7 +130,7 @@ export function AppHeader({
     "graph",
     "history",
     "clusters",
-    ...(LLM_ENABLED | VITE_USE_DUMMY ? ["matrix"] : []),
+    "matrix",
   ];
   const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
   const visibleSubTabs = metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS;

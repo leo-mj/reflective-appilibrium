@@ -267,6 +267,7 @@ export function JudgmentElicitTab({
   workflowPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
+  useDummy = false,
 }) {
   /** @type {[Array<{question: string, judgments: Array<{text: string, confidence: string}>}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -283,7 +284,7 @@ export function JudgmentElicitTab({
     setError(null);
     try {
       const { suggestions: s, model: m } =
-        await fetchJudgmentElicitations(state);
+        await fetchJudgmentElicitations(state, useDummy);
       setSuggestions(s);
       setModel(m);
     } catch (e) {

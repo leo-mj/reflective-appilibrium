@@ -1,6 +1,6 @@
 // Dummy relation suggestions for the RelationSuggestTab.
 // Topic: obligations to future generations (matches dummy-state.js).
-// Set VITE_USE_DUMMY=true in .env to use this instead of calling the backend.
+// Used automatically in PROD, or in DEV when the "Use dummy suggestions" toggle is on.
 
 const dummyRelations = {
   model: "dummy",

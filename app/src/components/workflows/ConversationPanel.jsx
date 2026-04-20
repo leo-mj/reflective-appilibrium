@@ -5,7 +5,7 @@
  */
 
 /** @import { REState } from '../../types.js' */
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../../config.js";
+import { LLM_ENABLED } from "../../config.js";
 
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
@@ -28,7 +28,7 @@ export function ConversationPanel({ state, suggestion }) {
   const [error, setError] = useState(null);
 
   const send = async () => {
-    if (!LLM_ENABLED && VITE_USE_DUMMY) {
+    if (!LLM_ENABLED) {
       setError("No LLM API connection");
       return;
     }

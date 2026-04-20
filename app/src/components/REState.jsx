@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { C } from "../constants/colors.js";
-import { VITE_USE_DUMMY } from "../config.js";
+import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
 import { stateAtRound } from "../utils/stateUtils.js";
@@ -189,7 +189,7 @@ export default function REState({ initialState, onHome, onReady }) {
         transition: "opacity 0.6s ease",
       }}
     >
-      {VITE_USE_DUMMY && (
+      {!LLM_ENABLED && (
         <div
           style={{
             background: C.panel,

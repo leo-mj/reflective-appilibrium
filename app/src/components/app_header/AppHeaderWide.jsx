@@ -7,7 +7,6 @@ import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import {
   LLM_ENABLED,
-  VITE_USE_DUMMY,
   BACKEND_ENABLED,
   BYOK_ENABLED,
 } from "../../config.js";
@@ -392,8 +391,7 @@ export function AppHeaderWide({
           paddingBottom: 2,
         }}
       >
-        {LLM_ENABLED | VITE_USE_DUMMY ? (
-          <>
+        <>
             <button
               data-tutorial="meta-analyze"
               style={metaTabBtn(metaTab === "analyze")}
@@ -421,8 +419,7 @@ export function AppHeaderWide({
                 margin: "0 4px",
               }}
             />
-          </>
-        ) : null}
+        </>
         {visibleSubTabs.map((t) => (
           <button
             key={t}

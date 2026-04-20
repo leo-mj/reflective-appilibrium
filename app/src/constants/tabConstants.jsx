@@ -3,7 +3,6 @@
  * @module constants/tabConstants
  */
 
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
 import {
   NetworkIcon,
   HistoryIcon,
@@ -14,10 +13,7 @@ import {
   JudgmentIcon,
 } from "../components/Icons.jsx";
 
-export const ASSIST_TABS =
-  LLM_ENABLED | VITE_USE_DUMMY
-    ? ["elicitJudgments", "suggestPrinciples", "suggestRelations"]
-    : [];
+export const ASSIST_TABS = ["elicitJudgments", "suggestPrinciples", "suggestRelations"];
 
 export const TAB_ICONS = {
   graph: <NetworkIcon />,

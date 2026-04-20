@@ -6,7 +6,7 @@
 /** @import { REState } from '../types.js' */
 
 import _dummyMatrix from "../dummy-matrix.js";
-import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
+import { LLM_ENABLED } from "../config.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -18,7 +18,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @returns {Promise<{ overview: string, matrix: Object, pairDescriptions: Object, _model: string }>}
  */
 export async function fetchRelatednessMatrix(state) {
-  if (!LLM_ENABLED && VITE_USE_DUMMY) {
+  if (!LLM_ENABLED) {
     return { ...JSON.parse(_dummyMatrix), _model: "dummy" };
   }
   const res = await fetch(`${BACKEND_URL}/api/matrix/analyze`, {

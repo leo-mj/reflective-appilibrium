@@ -248,6 +248,7 @@ export function PrincipleSuggestTab({
   autoFetch,
   workflowPhase,
   onAdvanceWorkflow,
+  useDummy = false,
 }) {
   /** @type {[Array<{text: string, confidence: string, covers: string[], explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -269,7 +270,7 @@ export function PrincipleSuggestTab({
     setError(null);
     try {
       const { suggestions: s, model: m } =
-        await fetchPrincipleSuggestions(state);
+        await fetchPrincipleSuggestions(state, useDummy);
       setSuggestions(s);
       setModel(m);
     } catch (e) {

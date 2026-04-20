@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
-import { LLM_ENABLED, VITE_USE_DUMMY, BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
+import { LLM_ENABLED, BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import {
@@ -181,8 +181,7 @@ export function AppHeaderNarrow({
               {TAB_LABELS[t]}
             </button>
           ))}
-          {LLM_ENABLED | VITE_USE_DUMMY ? (
-            <>
+          <>
               <div
                 style={{
                   fontSize: 10,
@@ -227,8 +226,7 @@ export function AppHeaderNarrow({
                   ▶ Start Workflow
                 </button>
               )}
-            </>
-          ) : null}
+          </>
           <button
             onClick={close(() => setTab("text"))}
             style={menuBtn(tab === "text")}
