@@ -92,6 +92,8 @@ export function AppHeaderWide({
   workflowLoops,
   onStartWorkflow,
   onStopWorkflow,
+  tutorialMode,
+  onToggleTutorial,
 }) {
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
@@ -193,6 +195,7 @@ export function AppHeaderWide({
               value: showWithdrawn,
               set: setShowWithdrawn,
               color: "#7c3aed",
+              tutorial: "toggle-withdrawn",
             },
             {
               label: "Rejected",
@@ -200,9 +203,10 @@ export function AppHeaderWide({
               set: setShowRejected,
               color: "#fb7185",
             },
-          ].map(({ label, value, set, color }) => (
+          ].map(({ label, value, set, color, tutorial }) => (
             <label
               key={label}
+              data-tutorial={tutorial}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -245,6 +249,7 @@ export function AppHeaderWide({
           {divider}
           <div style={{ display: "flex", flex: "1 1 0", minWidth: 0 }}>
             <button
+              data-tutorial="btn-undo"
               onClick={onUndo}
               disabled={!canUndo}
               style={{
@@ -278,6 +283,7 @@ export function AppHeaderWide({
               style={{ position: "relative", marginRight: 2, flexShrink: 0 }}
             >
               <button
+                data-tutorial="btn-file"
                 onClick={() => setFileMenuOpen((o) => !o)}
                 style={{ ...btn(fileMenuOpen) }}
                 title="Import / Export"
@@ -333,6 +339,7 @@ export function AppHeaderWide({
             {BYOK_ENABLED && (
               <>
                 <button
+                  data-tutorial="btn-llm"
                   onClick={() => setLlmOpen((o) => !o)}
                   title="LLM settings"
                   style={{
@@ -351,8 +358,22 @@ export function AppHeaderWide({
                 {divider}
               </>
             )}
-            <button onClick={onHome} style={{ ...btn(false) }}>
+            <button data-tutorial="btn-home" onClick={onHome} style={{ ...btn(false) }}>
               ← Home
+            </button>
+            {divider}
+            <button
+              onClick={onToggleTutorial}
+              title="Toggle tutorial"
+              style={{
+                ...btn(tutorialMode),
+                color: tutorialMode ? C.supports : C.dim,
+                borderColor: tutorialMode ? C.supports : undefined,
+                fontWeight: "bold",
+                fontSize: 13,
+              }}
+            >
+              ?
             </button>
           </div>
         </div>
@@ -374,6 +395,7 @@ export function AppHeaderWide({
         {LLM_ENABLED | VITE_USE_DUMMY ? (
           <>
             <button
+              data-tutorial="meta-analyze"
               style={metaTabBtn(metaTab === "analyze")}
               onClick={() => {
                 if (metaTab !== "analyze") setTab("graph");
@@ -382,6 +404,7 @@ export function AppHeaderWide({
               Analyze
             </button>
             <button
+              data-tutorial="meta-assist"
               style={metaTabBtn(metaTab === "assist")}
               onClick={() => {
                 if (metaTab !== "assist") setTab("elicitJudgments");
@@ -401,7 +424,12 @@ export function AppHeaderWide({
           </>
         ) : null}
         {visibleSubTabs.map((t) => (
-          <button key={t} onClick={() => setTab(t)} style={btn(tab === t)}>
+          <button
+            key={t}
+            data-tutorial={`tab-${t}`}
+            onClick={() => setTab(t)}
+            style={btn(tab === t)}
+          >
             {TAB_ICONS[t]}
             {TAB_LABELS[t]}
           </button>

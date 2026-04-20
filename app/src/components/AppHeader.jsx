@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef } from "react";
+import { TutorialOverlay } from "./TutorialOverlay.jsx";
 import { LLM_ENABLED, VITE_USE_DUMMY } from "../config.js";
 
 const SaveIcon = () => (
@@ -87,6 +88,7 @@ export function AppHeader({
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [tutorialMode, setTutorialMode] = useState(false);
   const [importConfirmPending, setImportConfirmPending] = useState(null);
   const [importError, setImportError] = useState(null);
   const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "error"
@@ -222,6 +224,7 @@ export function AppHeader({
     <>
       {hiddenInput}
       {importModals}
+      <TutorialOverlay active={tutorialMode} />
       <AppHeaderWide
         {...shared}
         showText={showText}
@@ -233,6 +236,8 @@ export function AppHeader({
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         visibleSubTabs={visibleSubTabs}
+        tutorialMode={tutorialMode}
+        onToggleTutorial={() => setTutorialMode((v) => !v)}
       />
     </>
   );
