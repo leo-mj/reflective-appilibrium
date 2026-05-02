@@ -104,7 +104,6 @@ export function ModifyTextarea({ value, onChange, accentColor }) {
         padding: "4px 6px",
         resize: "vertical",
         minHeight: 60,
-        fontFamily: "inherit",
       }}
     />
   );

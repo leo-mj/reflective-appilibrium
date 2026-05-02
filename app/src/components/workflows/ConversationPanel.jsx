@@ -106,7 +106,6 @@ export function ConversationPanel({ state, suggestion }) {
             padding: "4px 8px",
             fontSize: 11,
             color: C.text,
-            fontFamily: "inherit",
             outline: "none",
           }}
         />
@@ -121,7 +120,6 @@ export function ConversationPanel({ state, suggestion }) {
             fontSize: 11,
             color: "#fff",
             cursor: loading || !input.trim() ? "not-allowed" : "pointer",
-            fontFamily: "inherit",
             flexShrink: 0,
           }}
         >

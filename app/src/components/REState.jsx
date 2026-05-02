@@ -180,7 +180,6 @@ export default function REState({ initialState, onHome, onReady }) {
       style={{
         background: C.bg,
         color: C.text,
-        fontFamily: "inherit",
         height: "100vh",
         display: "flex",
         flexDirection: "column",

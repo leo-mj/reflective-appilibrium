@@ -37,7 +37,6 @@ export function WithdrawReasonModal({ elementId, onConfirm, onCancel }) {
           fontSize: 12,
           padding: "8px 10px",
           resize: "vertical",
-          fontFamily: "inherit",
         }}
       />
     </ModalShell>

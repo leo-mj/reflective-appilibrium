@@ -18,7 +18,6 @@ const workflowBtnStyle = {
   fontSize: 12,
   background: "transparent",
   color: C.dim,
-  fontFamily: "inherit",
 };
 
 export function ProgressWorkflowBtn({

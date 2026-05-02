@@ -204,7 +204,6 @@ export function TextTab({
             padding: "0 4px 24px",
             background: C.bg,
             color: C.text,
-            fontFamily: "inherit",
           }}
         >
           {highlightedIds && (
@@ -275,7 +274,6 @@ export function TextTab({
             color: C.dim,
             cursor: "pointer",
             fontSize: 16,
-            fontFamily: "inherit",
             padding: "3px 8px",
           }}
         >

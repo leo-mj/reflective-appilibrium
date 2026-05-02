@@ -40,7 +40,6 @@ const SELECT_STYLE = {
   color: C.text,
   padding: "3px 6px",
   fontSize: 14,
-  fontFamily: "inherit",
 };
 
 /**
@@ -105,7 +104,6 @@ export function AddBar({
     border: `1px solid ${C.border}`,
     background: activeTab === t ? C.border : "transparent",
     color: activeTab === t ? C.text : C.dim,
-    fontFamily: "inherit",
   });
 
   return (
@@ -153,7 +151,6 @@ export function AddBar({
               background: C.supports,
               color: "#fff",
               opacity: canSubmit ? 1 : 0.4,
-              fontFamily: "inherit",
             }}
           >
             Add {activeTab}
@@ -298,7 +295,6 @@ export function AddBar({
           color: C.text,
           padding: "6px 10px",
           fontSize: 14,
-          fontFamily: "inherit",
           outline: "none",
         }}
       />
@@ -361,7 +357,6 @@ export function AddElementPanel({ elementType, onAddElement }) {
             background: C.supports,
             color: "#fff",
             opacity: canSubmit ? 1 : 0.4,
-            fontFamily: "inherit",
           }}
         >
           Add {elementType}
@@ -404,7 +399,6 @@ export function AddElementPanel({ elementType, onAddElement }) {
           color: C.text,
           padding: "6px 10px",
           fontSize: 14,
-          fontFamily: "inherit",
           outline: "none",
         }}
       />
@@ -453,7 +447,6 @@ export function AddRelationPanel({ elements, onAddRelation }) {
             background: C.supports,
             color: "#fff",
             opacity: canSubmit ? 1 : 0.4,
-            fontFamily: "inherit",
           }}
         >
           Add relation
@@ -522,7 +515,6 @@ export function AddRelationPanel({ elements, onAddRelation }) {
           color: C.text,
           padding: "6px 10px",
           fontSize: 14,
-          fontFamily: "inherit",
           outline: "none",
         }}
       />

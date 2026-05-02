@@ -118,7 +118,6 @@ function Toolbar({
             borderRadius: 6,
             padding: "6px 14px",
             fontSize: 12,
-            fontFamily: "inherit",
             fontWeight: "bold",
             cursor: suggestDisabled ? "not-allowed" : "pointer",
           }}

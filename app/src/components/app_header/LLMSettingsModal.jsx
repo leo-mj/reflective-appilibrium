@@ -120,7 +120,6 @@ export function LLMSettingsModal({ open, onClose }) {
     height: 32,
     width: "100%",
     boxSizing: "border-box",
-    fontFamily: "inherit",
   };
 
   const labelStyle = {

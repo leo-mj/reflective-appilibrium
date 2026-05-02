@@ -48,7 +48,6 @@ export function NodeTooltip({ tooltip }) {
         maxWidth: 300,
         pointerEvents: "none",
         zIndex: 10,
-        fontFamily: "inherit",
       }}
     >
       <div

@@ -20,7 +20,6 @@ export const btn = (active) => ({
   fontSize: 12,
   background: active ? C.border : "transparent",
   color: active ? C.text : C.dim,
-  fontFamily: "inherit",
 });
 
 /** Connected-tab style for Analyze / Assist meta-tab buttons (wide layout). */
@@ -40,7 +39,6 @@ export const metaTabBtn = (active) => ({
   fontWeight: active ? "600" : "normal",
   background: active ? C.border : "transparent",
   color: active ? C.text : C.dim,
-  fontFamily: "inherit",
   position: "relative",
   zIndex: active ? 1 : 0,
 });
