@@ -118,6 +118,7 @@ function Toolbar({
             borderRadius: 6,
             padding: "6px 14px",
             fontSize: 12,
+            fontFamily: "inherit",
             fontWeight: "bold",
             cursor: suggestDisabled ? "not-allowed" : "pointer",
           }}
@@ -269,8 +270,10 @@ export function PrincipleSuggestTab({
     setLoading(true);
     setError(null);
     try {
-      const { suggestions: s, model: m } =
-        await fetchPrincipleSuggestions(state, useDummy);
+      const { suggestions: s, model: m } = await fetchPrincipleSuggestions(
+        state,
+        useDummy,
+      );
       setSuggestions(s);
       setModel(m);
     } catch (e) {

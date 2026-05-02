@@ -50,6 +50,7 @@ export function NavBar({
               padding: "4px 8px",
               borderRadius: 10,
               fontSize: 11,
+              fontFamily: "inherit",
               cursor: "pointer",
               border: `1px solid ${isActive ? C.text : C.border}`,
               background: isActive ? C.border : "transparent",

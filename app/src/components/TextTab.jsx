@@ -94,7 +94,14 @@ export function TextTab({
     hasCoherence,
     clusters,
     clusterCount,
-  } = useTextTabData({ state, showWithdrawn, showRejected, selected, selectedRel, search });
+  } = useTextTabData({
+    state,
+    showWithdrawn,
+    showRejected,
+    selected,
+    selectedRel,
+    search,
+  });
 
   // ── Navigation ───────────────────────────────────────────────────────────
   const sectionRefs = {
@@ -268,6 +275,7 @@ export function TextTab({
             color: C.dim,
             cursor: "pointer",
             fontSize: 16,
+            fontFamily: "inherit",
             padding: "3px 8px",
           }}
         >

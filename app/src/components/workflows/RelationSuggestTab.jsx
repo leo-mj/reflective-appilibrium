@@ -129,6 +129,7 @@ function Toolbar({
             borderRadius: 6,
             padding: "6px 14px",
             fontSize: 12,
+            fontFamily: "inherit",
             fontWeight: "bold",
             cursor: suggestDisabled ? "not-allowed" : "pointer",
           }}
@@ -262,8 +263,10 @@ export function RelationSuggestTab({
     setLoading(true);
     setError(null);
     try {
-      const { suggestions: s, model: m } =
-        await fetchRelationSuggestions(state, useDummy);
+      const { suggestions: s, model: m } = await fetchRelationSuggestions(
+        state,
+        useDummy,
+      );
       setSuggestions(s);
       setModel(m);
     } catch (e) {

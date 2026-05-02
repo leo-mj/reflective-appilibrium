@@ -116,6 +116,7 @@ function Toolbar({
             borderRadius: 6,
             padding: "6px 14px",
             fontSize: 12,
+            fontFamily: "inherit",
             fontWeight: "bold",
             cursor: loading ? "not-allowed" : "pointer",
           }}
@@ -283,8 +284,10 @@ export function JudgmentElicitTab({
     setLoading(true);
     setError(null);
     try {
-      const { suggestions: s, model: m } =
-        await fetchJudgmentElicitations(state, useDummy);
+      const { suggestions: s, model: m } = await fetchJudgmentElicitations(
+        state,
+        useDummy,
+      );
       setSuggestions(s);
       setModel(m);
     } catch (e) {

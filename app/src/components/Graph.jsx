@@ -65,6 +65,7 @@ function AddButtonsOverlay({ onAddEl, onAddRel }) {
             borderRadius: 6,
             padding: "8px 12px",
             fontSize: 13,
+            fontFamily: "inherit",
             cursor: "pointer",
           }}
         >
@@ -80,6 +81,7 @@ function AddButtonsOverlay({ onAddEl, onAddRel }) {
           borderRadius: 6,
           padding: "8px 12px",
           fontSize: 13,
+          fontFamily: "inherit",
           cursor: "pointer",
         }}
       >
