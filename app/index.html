@@ -14,6 +14,8 @@
         var id = localStorage.getItem("fontId");
         if (id && map[id])
           document.documentElement.style.setProperty("--font-family", map[id]);
+        if (localStorage.getItem("theme") === "light")
+          document.documentElement.setAttribute("data-theme", "light");
       })();
     </script>
   </head>

@@ -47,11 +47,11 @@
  * }}
  */
 export const C = {
-  bg: "#0f172a",
-  panel: "#1e293b",
-  border: "#334155",
-  text: "#e2e8f0",
-  dim: "#94a3b8",
+  bg: "var(--c-bg)",
+  panel: "var(--c-panel)",
+  border: "var(--c-border)",
+  text: "var(--c-text)",
+  dim: "var(--c-dim)",
   judgment: { high: "#2563eb", moderate: "#60a5fa", low: "#93c5fd" },
   principle: { high: "#7c3aed", moderate: "#a78bfa", low: "#c4b5fd" },
   theory: { high: "#d97706", moderate: "#fbbf24", low: "#fcd34d" },

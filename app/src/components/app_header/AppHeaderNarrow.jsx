@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
+import { useTheme } from "../../hooks/useTheme.js";
 import { LLM_ENABLED, BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
@@ -60,6 +61,7 @@ export function AppHeaderNarrow({
 }) {
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
+  const { isDark, toggle: toggleTheme } = useTheme();
 
   const llmSaved = (() => {
     if (!BYOK_ENABLED) return null;
@@ -288,6 +290,12 @@ export function AppHeaderNarrow({
             style={menuBtn()}
           >
             Aa Font
+          </button>
+          <button
+            onClick={() => { toggleTheme(); setMenuOpen(false); }}
+            style={menuBtn()}
+          >
+            {isDark ? "Light mode" : "Dark mode"}
           </button>
         </div>
       )}
