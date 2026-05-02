@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Reflective APPilibrium</title>
+    <script>
+      (function () {
+        var map = {
+          serif: "Georgia,'Times New Roman',serif",
+          mono: "ui-monospace,Menlo,Consolas,monospace",
+        };
+        var id = localStorage.getItem("fontId");
+        if (id && map[id])
+          document.documentElement.style.setProperty("--font-family", map[id]);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

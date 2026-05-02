@@ -197,7 +197,7 @@ export function TextTab({
             padding: "0 4px 24px",
             background: C.bg,
             color: C.text,
-            fontFamily: "system-ui, sans-serif",
+            fontFamily: "inherit",
           }}
         >
           {highlightedIds && (

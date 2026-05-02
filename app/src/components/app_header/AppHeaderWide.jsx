@@ -15,6 +15,7 @@ import { TAB_ICONS, TAB_LABELS } from "../../constants/tabConstants.jsx";
 import { btn, metaTabBtn } from "./appHeaderStyles.js";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
+import { FontSettingsModal } from "./FontSettingsModal.jsx";
 
 const divider = (
   <div
@@ -96,6 +97,7 @@ export function AppHeaderWide({
 }) {
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
+  const [fontOpen, setFontOpen] = useState(false);
 
   const llmSaved = (() => {
     if (!BYOK_ENABLED) return null;
@@ -362,6 +364,14 @@ export function AppHeaderWide({
             </button>
             {divider}
             <button
+              onClick={() => setFontOpen((o) => !o)}
+              title="Font"
+              style={{ ...btn(fontOpen), fontSize: 13, fontWeight: "bold" }}
+            >
+              Aa
+            </button>
+            {divider}
+            <button
               onClick={onToggleTutorial}
               title="Toggle tutorial"
               style={{
@@ -380,6 +390,7 @@ export function AppHeaderWide({
       {BYOK_ENABLED && (
         <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       )}
+      <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
       {/* Row 2: tab bar — meta-tabs connect to the border below */}
       <div
         style={{

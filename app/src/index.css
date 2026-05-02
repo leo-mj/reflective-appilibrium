@@ -29,6 +29,7 @@
 body {
   margin: 0;
   background: #0f172a; /* C.bg — prevents white flash during React hydration */
+  font-family: var(--font-family, system-ui, -apple-system, BlinkMacSystemFont, sans-serif);
 }
 
 #root {

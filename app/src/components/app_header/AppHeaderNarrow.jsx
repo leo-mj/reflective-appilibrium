@@ -7,6 +7,7 @@ import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import { LLM_ENABLED, BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
+import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import {
   ASSIST_TABS,
@@ -58,6 +59,7 @@ export function AppHeaderNarrow({
   onStopWorkflow,
 }) {
   const [llmOpen, setLlmOpen] = useState(false);
+  const [fontOpen, setFontOpen] = useState(false);
 
   const llmSaved = (() => {
     if (!BYOK_ENABLED) return null;
@@ -140,6 +142,7 @@ export function AppHeaderNarrow({
       {BYOK_ENABLED && (
         <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       )}
+      <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
       {menuOpen && (
         <div
           style={{
@@ -275,6 +278,16 @@ export function AppHeaderNarrow({
             }}
           >
             ↓ Export
+          </button>
+          {divider}
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              setFontOpen(true);
+            }}
+            style={menuBtn()}
+          >
+            Aa Font
           </button>
         </div>
       )}
