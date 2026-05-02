@@ -239,24 +239,6 @@ export function AppHeaderWide({
             </button>
           </Tooltip>
 
-          {BACKEND_ENABLED && (
-            <Tooltip text="Save session to the backend server (localhost:8000). Reload it from the home screen.">
-              <button
-                onClick={onSave}
-                disabled={saveBusy}
-                style={{
-                  marginLeft: 2,
-                  ...btn(false),
-                  ...(saveColor
-                    ? { color: saveColor, borderColor: saveColor }
-                    : {}),
-                }}
-              >
-                {saveLabel}Save
-              </button>
-            </Tooltip>
-          )}
-
           {inlineDivider}
 
           <Tooltip text="Toggle tutorial mode — shows explanations for each button.">
@@ -431,6 +413,22 @@ export function AppHeaderWide({
                       <span style={icon}>↓</span>Export
                     </button>
                   </Tooltip>
+                  {BACKEND_ENABLED && (
+                    <Tooltip text="Save session to the backend server (localhost:8000). Reload it from the home screen.">
+                      <button
+                        onClick={close(onSave)}
+                        disabled={saveBusy}
+                        style={{
+                          ...menuItem,
+                          ...(saveColor
+                            ? { color: saveColor, borderColor: saveColor }
+                            : {}),
+                        }}
+                      >
+                        <span style={icon}>{saveLabel}</span>Save
+                      </button>
+                    </Tooltip>
+                  )}
                   {menuDivider}
 
                   {BYOK_ENABLED && (
