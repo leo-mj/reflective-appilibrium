@@ -15,7 +15,7 @@ import { GraphPanel } from "./GraphPanel.jsx";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
-  const [tab, setTab] = useState("graph");
+  const [tab, setTab] = useState("elicitJudgments");
   const [hiddenLegendKeys, setHiddenLegendKeys] = useState(new Set(["withdrawn", "rejected"]));
   const [showText, setShowText] = useState(true);
   const [showTabNav, setShowTabNav] = useState(true);

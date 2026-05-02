@@ -401,17 +401,6 @@ export function AppHeaderWide({
           paddingBottom: 2,
         }}
       >
-        <Tooltip text="View your RE state — switch between graph, text, coherence and history.">
-          <button
-            data-tutorial="meta-analyze"
-            style={metaTabBtn(metaTab === "analyze")}
-            onClick={() => {
-              if (metaTab !== "analyze") setTab("graph");
-            }}
-          >
-            Analyze
-          </button>
-        </Tooltip>
         <Tooltip text="AI-guided mode — elicit judgments, suggest principles and relations.">
           <button
             data-tutorial="meta-assist"
@@ -421,6 +410,17 @@ export function AppHeaderWide({
             }}
           >
             Assist
+          </button>
+        </Tooltip>
+        <Tooltip text="View your RE state — switch between graph, text, coherence and history.">
+          <button
+            data-tutorial="meta-analyze"
+            style={metaTabBtn(metaTab === "analyze")}
+            onClick={() => {
+              if (metaTab !== "analyze") setTab("graph");
+            }}
+          >
+            Analyze
           </button>
         </Tooltip>
         <div

@@ -224,9 +224,9 @@ export function AppHeaderNarrow({
                   letterSpacing: "0.05em",
                 }}
               >
-                Analyze
+                Assist
               </div>
-              {ANALYZE_TABS.map((t) => (
+              {ASSIST_TABS.map((t) => (
                 <button key={t} onClick={close(() => setTab(t))} style={menuBtn(tab === t)}>
                   {TAB_ICONS[t]}
                   {TAB_LABELS[t]}
@@ -242,9 +242,9 @@ export function AppHeaderNarrow({
                   letterSpacing: "0.05em",
                 }}
               >
-                Assist
+                Analyze
               </div>
-              {ASSIST_TABS.map((t) => (
+              {ANALYZE_TABS.map((t) => (
                 <button key={t} onClick={close(() => setTab(t))} style={menuBtn(tab === t)}>
                   {TAB_ICONS[t]}
                   {TAB_LABELS[t]}
