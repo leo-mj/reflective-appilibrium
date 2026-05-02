@@ -14,7 +14,7 @@ import { TextPanel } from "./TextPanel.jsx";
 import { GraphPanel } from "./GraphPanel.jsx";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
-export default function REState({ initialState, onHome, onReady }) {
+export default function REState({ initialState, isSample, onHome, onReady }) {
   const [tab, setTab] = useState("graph");
   const [showWithdrawn, setShowWithdrawn] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
@@ -175,6 +175,7 @@ export default function REState({ initialState, onHome, onReady }) {
     isWide,
     onCtrlSecondSelect: setAddBarCtrlTo,
     ready,
+    isSample,
   };
 
   return (

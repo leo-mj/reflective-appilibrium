@@ -58,6 +58,7 @@ export function GraphPanel({
   nextPhaseIsEnabled,
   onCtrlSecondSelect,
   ready,
+  isSample,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
 
@@ -74,7 +75,7 @@ export function GraphPanel({
       }}
     >
       {!isAssistPanel && <Legend />}
-      {APP_ENV === "dev" && isAssistPanel && (
+      {APP_ENV === "dev" && isAssistPanel && isSample && (
         <label
           style={{
             display: "flex",

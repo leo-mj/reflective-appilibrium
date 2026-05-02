@@ -33,9 +33,11 @@ function Spinner() {
 export default function App() {
   const [initialState, setInitialState] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isSample, setIsSample] = useState(false);
 
-  const navigate = (state) => {
+  const navigate = (state, sample = false) => {
     setLoading(true);
+    setIsSample(sample);
     setInitialState(state);
   };
 
@@ -43,7 +45,7 @@ export default function App() {
     return (
       <HomePage
         onStartFresh={(topic) => navigate(makeEmptyState(topic))}
-        onLoadSample={() => navigate(SAMPLE_STATE)}
+        onLoadSample={() => navigate(SAMPLE_STATE, true)}
         onLoadSession={(state) => navigate(state)}
       />
     );
@@ -54,6 +56,7 @@ export default function App() {
       {loading && <Spinner />}
       <REState
         initialState={initialState}
+        isSample={isSample}
         onHome={() => setInitialState(null)}
         onReady={() => setLoading(false)}
       />
