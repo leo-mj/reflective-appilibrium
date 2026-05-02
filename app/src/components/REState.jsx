@@ -161,7 +161,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     state,
     positions,
     showWithdrawn,
+    setShowWithdrawn,
     showRejected,
+    setShowRejected,
     selected,
     onSelect: handleSelectNode,
     selectedRel,
@@ -214,10 +216,6 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         setTab={handleSetTab}
         showText={showText}
         setShowText={setShowText}
-        showWithdrawn={showWithdrawn}
-        setShowWithdrawn={setShowWithdrawn}
-        showRejected={showRejected}
-        setShowRejected={setShowRejected}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         onDownload={() => downloadMarkdown(state, positions)}

@@ -39,10 +39,6 @@ export function AppHeaderWide({
   setTab,
   showText,
   setShowText,
-  showWithdrawn,
-  setShowWithdrawn,
-  showRejected,
-  setShowRejected,
   assistSidePanel,
   setAssistSidePanel,
   handleImportClick,
@@ -163,70 +159,6 @@ export function AppHeaderWide({
               ))}
             </div>
           )}
-
-          {/* Withdrawn / Rejected toggles */}
-          {[
-            {
-              label: "Withdrawn",
-              value: showWithdrawn,
-              set: setShowWithdrawn,
-              color: "#7c3aed",
-              tutorial: "toggle-withdrawn",
-              tooltip:
-                "Show or hide withdrawn elements in the graph and text panel.",
-            },
-            {
-              label: "Rejected",
-              value: showRejected,
-              set: setShowRejected,
-              color: "#fb7185",
-            },
-          ].map(({ label, value, set, color, tutorial, tooltip }) => (
-            <Tooltip key={label} text={tooltip}>
-              <label
-                data-tutorial={tutorial}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  fontSize: 11,
-                  color: C.dim,
-                  cursor: "pointer",
-                  marginLeft: 6,
-                }}
-              >
-                <div
-                  onClick={() => set((s) => !s)}
-                  style={{
-                    width: 28,
-                    height: 16,
-                    borderRadius: 8,
-                    position: "relative",
-                    background: value ? color : C.border,
-                    transition: "background 0.3s",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 6,
-                      background: C.text,
-                      position: "absolute",
-                      top: 2,
-                      left: value ? 14 : 2,
-                      transition: "left 0.3s ease",
-                    }}
-                  />
-                </div>
-                {label}
-              </label>
-            </Tooltip>
-          ))}
-
-          {inlineDivider}
 
           <Tooltip text="Undo the last change. Keyboard shortcut: Ctrl+Z.">
             <button

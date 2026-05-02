@@ -66,10 +66,6 @@ export function AppHeader({
   setTab,
   showText,
   setShowText,
-  showWithdrawn,
-  setShowWithdrawn,
-  showRejected,
-  setShowRejected,
   assistSidePanel,
   setAssistSidePanel,
   onDownload,
@@ -234,10 +230,6 @@ export function AppHeader({
         {...shared}
         showText={showText}
         setShowText={setShowText}
-        showWithdrawn={showWithdrawn}
-        setShowWithdrawn={setShowWithdrawn}
-        showRejected={showRejected}
-        setShowRejected={setShowRejected}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         visibleSubTabs={visibleSubTabs}

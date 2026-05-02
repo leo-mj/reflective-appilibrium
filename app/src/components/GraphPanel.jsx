@@ -41,7 +41,9 @@ export function GraphPanel({
   state,
   positions,
   showWithdrawn,
+  setShowWithdrawn,
   showRejected,
+  setShowRejected,
   selected,
   onSelect,
   selectedRel,
@@ -74,7 +76,7 @@ export function GraphPanel({
         flexDirection: "column",
       }}
     >
-      {!isAssistPanel && <Legend />}
+      {!isAssistPanel && <Legend showWithdrawn={showWithdrawn} setShowWithdrawn={setShowWithdrawn} showRejected={showRejected} setShowRejected={setShowRejected} />}
       {APP_ENV === "dev" && isAssistPanel && isSample && (
         <label
           style={{
