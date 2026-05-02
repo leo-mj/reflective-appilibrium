@@ -242,14 +242,26 @@ export default function REState({ initialState, onHome, onReady }) {
         }}
       >
         {isWide && isAssistTab && assistSidePanel === "graph" && (
-          <GraphPanel
-            {...graphPanelCommonProps}
-            tab="graph"
-            workflowPhase={null}
-            onAdvanceWorkflow={null}
-            nextPhaseIsEnabled={false}
-            onCtrlSecondSelect={setAddBarCtrlTo}
-          />
+          <div
+            style={{
+              width: "50%",
+              flexShrink: 0,
+              borderRight: `1px solid ${C.border}`,
+              paddingRight: 12,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <GraphPanel
+              {...graphPanelCommonProps}
+              tab="graph"
+              workflowPhase={null}
+              onAdvanceWorkflow={null}
+              nextPhaseIsEnabled={false}
+              onCtrlSecondSelect={setAddBarCtrlTo}
+            />
+          </div>
         )}
         {showingTextPanel && <TextPanel {...textPanelProps} />}
         {(isWide || tab !== "text") && (
@@ -263,7 +275,7 @@ export default function REState({ initialState, onHome, onReady }) {
         )}
       </div>
 
-      {isWide && (!isAssistTab || assistSidePanel === "graph") && (
+      {isWide && !isAssistTab && (
         <AddBar
           elements={state.elements.filter(
             (e) => e.status !== "withdrawn" && e.status !== "rejected",
