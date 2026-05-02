@@ -11,16 +11,16 @@
  * @module config
  */
 
-export const IS_DEV = import.meta.env.DEV;
-export const IS_PROD = import.meta.env.PROD;
+/** @type {"dev" | "prod"} */
+export const APP_ENV = import.meta.env.VITE_APP_ENV;
 
 export const BYOK_ENABLED = import.meta.env.VITE_BYOK_ENABLED === "true";
 
 /** LLM features available in dev or when the user brings their own key. */
-export const LLM_ENABLED = IS_DEV || BYOK_ENABLED;
+export const LLM_ENABLED = APP_ENV === "dev" || BYOK_ENABLED;
 
 /** FastAPI backend available under the same conditions as LLM. */
-export const BACKEND_ENABLED = IS_DEV || BYOK_ENABLED;
+export const BACKEND_ENABLED = APP_ENV === "dev" || BYOK_ENABLED;
 
 export const DEFAULT_PROVIDER = import.meta.env.VITE_DEFAULT_PROVIDER ?? "";
 export const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL ?? "";

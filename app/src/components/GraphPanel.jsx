@@ -4,7 +4,7 @@
  */
 
 import { lazy, Suspense, useState } from "react";
-import { IS_DEV } from "../config.js";
+import { APP_ENV } from "../config.js";
 import { C } from "../constants/colors.js";
 import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
@@ -74,7 +74,7 @@ export function GraphPanel({
       }}
     >
       {!isAssistPanel && <Legend />}
-      {IS_DEV && isAssistPanel && (
+      {APP_ENV === "dev" && isAssistPanel && (
         <label
           style={{
             display: "flex",
