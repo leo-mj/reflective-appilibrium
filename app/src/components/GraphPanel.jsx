@@ -40,10 +40,8 @@ export function GraphPanel({
   tab,
   state,
   positions,
-  showWithdrawn,
-  setShowWithdrawn,
-  showRejected,
-  setShowRejected,
+  hiddenLegendKeys,
+  setHiddenLegendKeys,
   selected,
   onSelect,
   selectedRel,
@@ -76,7 +74,7 @@ export function GraphPanel({
         flexDirection: "column",
       }}
     >
-      {!isAssistPanel && <Legend showWithdrawn={showWithdrawn} setShowWithdrawn={setShowWithdrawn} showRejected={showRejected} setShowRejected={setShowRejected} />}
+      {!isAssistPanel && <Legend hiddenLegendKeys={hiddenLegendKeys} setHiddenLegendKeys={setHiddenLegendKeys} />}
       {APP_ENV === "dev" && isAssistPanel && isSample && (
         <label
           style={{
@@ -103,8 +101,7 @@ export function GraphPanel({
         {tab === "graph" && (
           <Graph
             state={state}
-            showWithdrawn={showWithdrawn}
-            showRejected={showRejected}
+            hiddenLegendKeys={hiddenLegendKeys}
             positions={positions}
             selected={selected}
             onSelect={onSelect}
@@ -128,7 +125,6 @@ export function GraphPanel({
           <ClusterTab
             state={state}
             positions={positions}
-            showWithdrawn={showWithdrawn}
           />
         )}
         {tab === "matrix" && (

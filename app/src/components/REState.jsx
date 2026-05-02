@@ -16,8 +16,7 @@ import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
   const [tab, setTab] = useState("graph");
-  const [showWithdrawn, setShowWithdrawn] = useState(false);
-  const [showRejected, setShowRejected] = useState(false);
+  const [hiddenLegendKeys, setHiddenLegendKeys] = useState(new Set(["withdrawn", "rejected"]));
   const [showText, setShowText] = useState(true);
   const [showTabNav, setShowTabNav] = useState(true);
   const [assistSidePanel, setAssistSidePanel] = useState("text");
@@ -138,8 +137,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     clusterSectionRef,
     scrollToRelationsKey,
     state: textState,
-    showWithdrawn,
-    showRejected,
+    hiddenLegendKeys,
     selected,
     onSelect: handleSelectNode,
     selectedRel,
@@ -160,10 +158,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const graphPanelCommonProps = {
     state,
     positions,
-    showWithdrawn,
-    setShowWithdrawn,
-    showRejected,
-    setShowRejected,
+    hiddenLegendKeys,
+    setHiddenLegendKeys,
     selected,
     onSelect: handleSelectNode,
     selectedRel,

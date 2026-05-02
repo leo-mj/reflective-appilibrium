@@ -46,8 +46,7 @@ const NAV_SECTIONS = [
 /** Scrollable text panel rendering the full RE state as structured prose. */
 export function TextTab({
   state,
-  showWithdrawn,
-  showRejected,
+  hiddenLegendKeys,
   selected,
   onSelect,
   selectedRel,
@@ -97,8 +96,7 @@ export function TextTab({
     clusterCount,
   } = useTextTabData({
     state,
-    showWithdrawn,
-    showRejected,
+    hiddenLegendKeys,
     selected,
     selectedRel,
     search,

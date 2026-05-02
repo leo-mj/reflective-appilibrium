@@ -20,32 +20,35 @@ import {
  *
  * @param {Object}          opts
  * @param {REState}         opts.state
- * @param {boolean}         opts.showWithdrawn
- * @param {boolean}         opts.showRejected
+ * @param {Set<string>}     opts.hiddenLegendKeys
  * @param {string|null}     opts.selected
  * @param {RERelation|null} opts.selectedRel
  * @param {string}          opts.search
  */
 export function useTextTabData({
   state,
-  showWithdrawn,
-  showRejected,
+  hiddenLegendKeys,
   selected,
   selectedRel,
   search,
 }) {
-  const visibleEls = state.elements.filter(
-    (e) =>
-      (showWithdrawn || e.status !== "withdrawn") &&
-      (showRejected || e.status !== "rejected"),
-  );
+  const isElVisible = (el) => {
+    if (el.status === "withdrawn") return !hiddenLegendKeys?.has("withdrawn");
+    if (el.status === "rejected") return !hiddenLegendKeys?.has("rejected");
+    if (el.type === "judgment") return !hiddenLegendKeys?.has(`J-${el.confidence}`);
+    if (el.type === "principle") return !hiddenLegendKeys?.has("P");
+    if (el.type === "theory") return !hiddenLegendKeys?.has("T");
+    return true;
+  };
+  const visibleEls = state.elements.filter(isElVisible);
   const visIds = new Set(visibleEls.map((e) => e.id));
   const visRels = state.relations.filter(
     (r) =>
       visIds.has(r.from) &&
       visIds.has(r.to) &&
-      (showRejected || r.status !== "rejected") &&
-      (showWithdrawn || r.status !== "withdrawn"),
+      !hiddenLegendKeys?.has(r.type) &&
+      !(hiddenLegendKeys?.has("withdrawn") && r.status === "withdrawn") &&
+      !(hiddenLegendKeys?.has("rejected") && r.status === "rejected"),
   );
   const pCovers = buildPrincipleCovers(
     visibleEls.filter((e) => e.type === "principle"),

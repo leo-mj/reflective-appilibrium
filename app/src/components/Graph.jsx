@@ -255,8 +255,7 @@ function useGraphClick({
  *
  * @param {Object}      props
  * @param {REState}     props.state
- * @param {boolean}     props.showWithdrawn
- * @param {boolean}     props.showRejected
+ * @param {Set<string>} props.hiddenLegendKeys
  * @param {PositionMap} props.positions
  * @param {string|null} props.selected
  * @param {function(function): void} props.onSelect
@@ -272,8 +271,7 @@ function useGraphClick({
  */
 export function Graph({
   state,
-  showWithdrawn,
-  showRejected,
+  hiddenLegendKeys,
   positions,
   selected,
   onSelect,
@@ -301,18 +299,23 @@ export function Graph({
   const { active, withdrawn } = elementsAtRound(state.elements, state.round);
   const wIds = new Set(withdrawn.map((e) => e.id));
   const rejectedEls = state.elements.filter((e) => e.status === "rejected");
-  const visibleEls = [
-    ...active,
-    ...(showWithdrawn ? withdrawn : []),
-    ...(showRejected ? rejectedEls : []),
-  ];
+  const isElVisible = (el) => {
+    if (el.status === "withdrawn") return !hiddenLegendKeys?.has("withdrawn");
+    if (el.status === "rejected") return !hiddenLegendKeys?.has("rejected");
+    if (el.type === "judgment") return !hiddenLegendKeys?.has(`J-${el.confidence}`);
+    if (el.type === "principle") return !hiddenLegendKeys?.has("P");
+    if (el.type === "theory") return !hiddenLegendKeys?.has("T");
+    return true;
+  };
+  const visibleEls = [...active, ...withdrawn, ...rejectedEls].filter(isElVisible);
   const visIds = new Set(visibleEls.map((e) => e.id));
   const visRels = state.relations.filter(
     (r) =>
       visIds.has(r.from) &&
       visIds.has(r.to) &&
-      (showRejected || r.status !== "rejected") &&
-      (showWithdrawn || r.status !== "withdrawn"),
+      !hiddenLegendKeys?.has(r.type) &&
+      !(hiddenLegendKeys?.has("withdrawn") && r.status === "withdrawn") &&
+      !(hiddenLegendKeys?.has("rejected") && r.status === "rejected"),
   );
 
   const highlightedIds =
