@@ -61,6 +61,7 @@ export function TextTab({
   isWide,
   clusterSectionRef,
   scrollToRelationsKey,
+  showTabNav,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   const scrollRef = useRef(null);
@@ -187,14 +188,16 @@ export function TextTab({
           flexDirection: "column",
         }}
       >
-        <NavBar
-          navItems={navItems}
-          activeSection={activeSection}
-          isCollapsed={isCollapsed}
-          search={search}
-          onSearch={setSearch}
-          onNavigate={navigateTo}
-        />
+        {showTabNav && (
+          <NavBar
+            navItems={navItems}
+            activeSection={activeSection}
+            isCollapsed={isCollapsed}
+            search={search}
+            onSearch={setSearch}
+            onNavigate={navigateTo}
+          />
+        )}
 
         <div
           ref={scrollRef}

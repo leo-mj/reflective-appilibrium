@@ -19,6 +19,7 @@ export default function REState({ initialState, onHome, onReady }) {
   const [showWithdrawn, setShowWithdrawn] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
   const [showText, setShowText] = useState(true);
+  const [showTabNav, setShowTabNav] = useState(true);
   const [assistSidePanel, setAssistSidePanel] = useState("text");
   const [historyRound, setHistoryRound] = useState(0);
   const [workflowPhase, setWorkflowPhase] = useState(null);
@@ -153,6 +154,7 @@ export default function REState({ initialState, onHome, onReady }) {
     onAddRelation: isWide
       ? handleAddRelation
       : (d) => { handleAddRelation(d); handleSelectRel(() => null); },
+    showTabNav,
   };
 
   const graphPanelCommonProps = {
@@ -229,6 +231,8 @@ export default function REState({ initialState, onHome, onReady }) {
         onStopWorkflow={stopWorkflow}
         onUndo={handleUndo}
         canUndo={canUndo}
+        showTabNav={showTabNav}
+        setShowTabNav={setShowTabNav}
       />
 
       <div

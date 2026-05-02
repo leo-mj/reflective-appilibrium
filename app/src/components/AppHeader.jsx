@@ -84,6 +84,8 @@ export function AppHeader({
   onStopWorkflow,
   onUndo,
   canUndo,
+  showTabNav,
+  setShowTabNav,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -187,6 +189,10 @@ export function AppHeader({
     topic,
     tab,
     setTab,
+    showText,
+    setShowText,
+    showTabNav,
+    setShowTabNav,
     handleImportClick,
     onDownload,
     onSave: handleSave,

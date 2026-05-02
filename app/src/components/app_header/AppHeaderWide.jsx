@@ -6,11 +6,7 @@
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import { useTheme } from "../../hooks/useTheme.js";
-import {
-  LLM_ENABLED,
-  BACKEND_ENABLED,
-  BYOK_ENABLED,
-} from "../../config.js";
+import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import { TAB_ICONS, TAB_LABELS } from "../../constants/tabConstants.jsx";
 import { btn, metaTabBtn } from "./appHeaderStyles.js";
@@ -18,7 +14,7 @@ import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 
-const divider = (
+const inlineDivider = (
   <div
     style={{
       width: 1,
@@ -28,40 +24,6 @@ const divider = (
       margin: "0 4px",
     }}
   />
-);
-
-const FileIcon = () => (
-  <svg
-    width="11"
-    height="13"
-    viewBox="0 0 11 13"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    style={{ display: "block" }}
-  >
-    <path d="M1.5 1.5h5l3 3v7.5a.5.5 0 01-.5.5h-7.5a.5.5 0 01-.5-.5v-10a.5.5 0 01.5-.5z" />
-    <path d="M6.5 1.5v3h3" />
-  </svg>
-);
-
-const GearIcon = () => (
-  <svg
-    width="13"
-    height="13"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    style={{ display: "block" }}
-  >
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-  </svg>
 );
 
 /** Two-row desktop header: title row + tab bar. Props mirror AppHeader. */
@@ -95,8 +57,10 @@ export function AppHeaderWide({
   onStopWorkflow,
   tutorialMode,
   onToggleTutorial,
+  showTabNav,
+  setShowTabNav,
 }) {
-  const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
   const { isDark, toggle: toggleTheme } = useTheme();
@@ -111,7 +75,7 @@ export function AppHeaderWide({
     }
   })();
 
-  const fileDropdownItem = {
+  const menuItem = {
     ...btn(false),
     width: "100%",
     justifyContent: "flex-start",
@@ -120,10 +84,24 @@ export function AppHeaderWide({
     borderRadius: 4,
     border: "none",
   };
+  const icon = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 20,
+    flexShrink: 0,
+  };
+  const menuDivider = (
+    <div style={{ height: 1, background: C.border, margin: "2px 0" }} />
+  );
+  const close = (fn) => () => {
+    fn();
+    setMenuOpen(false);
+  };
 
   return (
     <div>
-      {/* Row 1: utility — import/export, title, show-text, home */}
+      {/* Row 1: title left, controls + burger right */}
       <div
         style={{
           display: "flex",
@@ -149,8 +127,17 @@ export function AppHeaderWide({
             style={{ fontSize: 14, color: C.dim, marginTop: 2 }}
           />
         </div>
-        <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-          {metaTab === "assist" ? (
+
+        <div
+          style={{
+            display: "flex",
+            gap: 2,
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          {/* Assist side-panel toggle (only in assist mode) */}
+          {metaTab === "assist" && (
             <div style={{ display: "flex", gap: 0, flexShrink: 0 }}>
               {[
                 { value: "text", label: "Text" },
@@ -161,8 +148,7 @@ export function AppHeaderWide({
                   onClick={() => setAssistSidePanel(value)}
                   style={{
                     ...btn(assistSidePanel === value),
-                    borderRadius:
-                      i === 0 ? "4px 0 0 4px" : i === 1 ? "0 4px 4px 0" : 0,
+                    borderRadius: i === 0 ? "4px 0 0 4px" : "0 4px 4px 0",
                     fontSize: 11,
                     padding: "0 10px",
                   }}
@@ -171,27 +157,9 @@ export function AppHeaderWide({
                 </button>
               ))}
             </div>
-          ) : (
-            <button
-              onClick={() => setShowText((s) => !s)}
-              style={{ ...btn(false), position: "relative" }}
-            >
-              <span style={{ visibility: "hidden" }}>
-                {showText ? "Hide text" : "Show text"}
-              </span>
-              <span
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {showText ? "Hide text" : "Show text"}
-              </span>
-            </button>
           )}
+
+          {/* Withdrawn / Rejected toggles */}
           {[
             {
               label: "Withdrawn",
@@ -249,262 +217,281 @@ export function AppHeaderWide({
               {label}
             </label>
           ))}
-          {divider}
-          <div style={{ display: "flex", flex: "1 1 0", minWidth: 0 }}>
+
+          {inlineDivider}
+
+          <button
+            data-tutorial="btn-undo"
+            onClick={onUndo}
+            disabled={!canUndo}
+            style={{ ...btn(false), opacity: canUndo ? 1 : 0.4 }}
+          >
+            ↩ Undo
+          </button>
+
+          {BACKEND_ENABLED && (
             <button
-              data-tutorial="btn-undo"
-              onClick={onUndo}
-              disabled={!canUndo}
+              onClick={onSave}
+              disabled={saveBusy}
+              title="Save session"
               style={{
-                marginRight: 2,
-                flexShrink: 0,
+                marginLeft: 2,
                 ...btn(false),
-                opacity: canUndo ? 1 : 0.4,
+                ...(saveColor
+                  ? { color: saveColor, borderColor: saveColor }
+                  : {}),
               }}
             >
-              ↩ Undo
+              {saveLabel}Save
             </button>
-            {BACKEND_ENABLED && (
-              <button
-                onClick={onSave}
-                disabled={saveBusy}
-                title="Save session"
-                style={{
-                  marginRight: 2,
-                  flexShrink: 0,
-                  ...btn(false),
-                  ...(saveColor
-                    ? { color: saveColor, borderColor: saveColor }
-                    : {}),
-                }}
-              >
-                {saveLabel}Save
-              </button>
-            )}
-            {/* File menu: Import + Export in a dropdown */}
-            <div
-              style={{ position: "relative", marginRight: 2, flexShrink: 0 }}
+          )}
+
+          {inlineDivider}
+
+          <button
+            onClick={onToggleTutorial}
+            title="Toggle tutorial"
+            style={{
+              ...btn(tutorialMode),
+              color: tutorialMode ? C.supports : C.dim,
+              borderColor: tutorialMode ? C.supports : undefined,
+              fontWeight: "bold",
+              fontSize: 13,
+            }}
+          >
+            ?
+          </button>
+
+          {inlineDivider}
+
+          {/* Burger menu */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              style={{ ...btn(menuOpen), border: `1px solid ${C.text}` }}
+              title="Settings"
             >
-              <button
-                data-tutorial="btn-file"
-                onClick={() => setFileMenuOpen((o) => !o)}
-                style={{ ...btn(fileMenuOpen) }}
-                title="Import / Export"
-              >
-                <FileIcon />
-              </button>
-              {fileMenuOpen && (
-                <>
-                  <div
-                    style={{ position: "fixed", inset: 0, zIndex: 99 }}
-                    onClick={() => setFileMenuOpen(false)}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "calc(100% + 4px)",
-                      right: 0,
-                      zIndex: 100,
-                      background: C.panel,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 6,
-                      padding: 4,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 2,
-                      minWidth: 120,
-                      boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
-                    }}
-                  >
-                    <button
-                      style={fileDropdownItem}
-                      onClick={() => {
-                        handleImportClick();
-                        setFileMenuOpen(false);
-                      }}
-                    >
-                      ↑ Import
-                    </button>
-                    <button
-                      style={{ ...fileDropdownItem, color: C.theory.high }}
-                      onClick={() => {
-                        onDownload();
-                        setFileMenuOpen(false);
-                      }}
-                    >
-                      ↓ Export
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-            {divider}
-            {BYOK_ENABLED && (
+              ☰
+            </button>
+
+            {menuOpen && (
               <>
-                <button
-                  data-tutorial="btn-llm"
-                  onClick={() => setLlmOpen((o) => !o)}
-                  title="LLM settings"
+                <div
+                  style={{ position: "fixed", inset: 0, zIndex: 99 }}
+                  onClick={() => setMenuOpen(false)}
+                />
+                <div
                   style={{
-                    ...btn(llmOpen),
-                    marginRight: 2,
-                    color: llmSaved ? C.supports : C.dim,
-                    borderColor: llmSaved ? C.supports : undefined,
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    right: 0,
+                    zIndex: 100,
+                    background: C.panel,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 6,
+                    padding: 6,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    minWidth: 180,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
                   }}
                 >
-                  <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>
-                    {llmSaved ? llmSaved.model : "LLM"}
-                  </span>
-                  <GearIcon />
-                </button>
+                  <button
+                    data-tutorial="btn-home"
+                    onClick={close(onHome)}
+                    style={menuItem}
+                  >
+                    <span style={icon}>←</span>Home
+                  </button>
 
-                {divider}
+                  {menuDivider}
+
+                  {metaTab !== "assist" && (
+                    <button
+                      onClick={close(() => setShowText((s) => !s))}
+                      style={menuItem}
+                    >
+                      <span style={icon}>≡</span>{showText ? "Hide text" : "Show text"}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={close(() => setShowTabNav((s) => !s))}
+                    style={menuItem}
+                  >
+                    <span style={icon}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                        <circle cx="11" cy="11" r="7"/>
+                        <line x1="16.5" y1="16.5" x2="22" y2="22"/>
+                      </svg>
+                    </span>{showTabNav ? "Hide nav bar" : "Show nav bar"}
+                  </button>
+
+                  {menuDivider}
+
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setFontOpen(true);
+                    }}
+                    style={menuItem}
+                  >
+                    <span style={icon}>Aa</span>Select Font
+                  </button>
+
+                  <button onClick={close(toggleTheme)} style={menuItem}>
+                    <span style={icon}>
+                      {isDark ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                          <circle cx="12" cy="12" r="5"/>
+                          <line x1="12" y1="1" x2="12" y2="3"/>
+                          <line x1="12" y1="21" x2="12" y2="23"/>
+                          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                          <line x1="1" y1="12" x2="3" y2="12"/>
+                          <line x1="21" y1="12" x2="23" y2="12"/>
+                          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                        </svg>
+                      ) : (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                      )}
+                    </span>
+                    {isDark ? "Light mode" : "Dark mode"}
+                  </button>
+
+                  {menuDivider}
+
+                  <button
+                    onClick={() => {
+                      handleImportClick();
+                      setMenuOpen(false);
+                    }}
+                    style={menuItem}
+                  >
+                    <span style={icon}>↑</span>Import
+                  </button>
+                  <button
+                    onClick={close(onDownload)}
+                    style={{ ...menuItem, color: C.theory.high }}
+                  >
+                    <span style={icon}>↓</span>Export
+                  </button>
+                  {menuDivider}
+
+                  {BYOK_ENABLED && (
+                    <button
+                      data-tutorial="btn-llm"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setLlmOpen(true);
+                      }}
+                      style={menuItem}
+                    >
+                      <span style={icon}>⚙</span>{llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
+                    </button>
+                  )}
+                </div>
               </>
             )}
-            <button data-tutorial="btn-home" onClick={onHome} style={{ ...btn(false) }}>
-              ← Home
-            </button>
-            {divider}
-            <button
-              onClick={() => setFontOpen((o) => !o)}
-              title="Font"
-              style={{ ...btn(fontOpen), fontSize: 13, fontWeight: "bold" }}
-            >
-              Aa
-            </button>
-            {divider}
-            <button
-              onClick={onToggleTutorial}
-              title="Toggle tutorial"
-              style={{
-                ...btn(tutorialMode),
-                color: tutorialMode ? C.supports : C.dim,
-                borderColor: tutorialMode ? C.supports : undefined,
-                fontWeight: "bold",
-                fontSize: 13,
-              }}
-            >
-              ?
-            </button>
-            {divider}
-            <button
-              onClick={toggleTheme}
-              title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-              style={{ ...btn(false), color: C.dim }}
-            >
-              {isDark ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
-                  <circle cx="12" cy="12" r="5"/>
-                  <line x1="12" y1="1" x2="12" y2="3"/>
-                  <line x1="12" y1="21" x2="12" y2="23"/>
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                  <line x1="1" y1="12" x2="3" y2="12"/>
-                  <line x1="21" y1="12" x2="23" y2="12"/>
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                </svg>
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                </svg>
-              )}
-            </button>
           </div>
         </div>
       </div>
+
       {BYOK_ENABLED && (
         <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       )}
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
-      {/* Row 2: tab bar — meta-tabs connect to the border below */}
+
+      {/* Row 2: tab bar */}
       <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: 2,
-          borderBottom: `1px solid ${C.border}`,
-          marginBottom: 6,
-          paddingBottom: 2,
-        }}
-      >
-        <>
-            <button
-              data-tutorial="meta-analyze"
-              style={metaTabBtn(metaTab === "analyze")}
-              onClick={() => {
-                if (metaTab !== "analyze") setTab("graph");
-              }}
-            >
-              Analyze
-            </button>
-            <button
-              data-tutorial="meta-assist"
-              style={metaTabBtn(metaTab === "assist")}
-              onClick={() => {
-                if (metaTab !== "assist") setTab("elicitJudgments");
-              }}
-            >
-              Assist
-            </button>
-            <div
-              style={{
-                width: 1,
-                height: 20,
-                background: C.border,
-                alignSelf: "center",
-                margin: "0 4px",
-              }}
-            />
-        </>
-        {visibleSubTabs.map((t) => (
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            gap: 2,
+            borderBottom: `1px solid ${C.border}`,
+            marginBottom: 6,
+            paddingBottom: 2,
+          }}
+        >
           <button
-            key={t}
-            data-tutorial={`tab-${t}`}
-            onClick={() => setTab(t)}
-            style={btn(tab === t)}
-          >
-            {TAB_ICONS[t]}
-            {TAB_LABELS[t]}
-          </button>
-        ))}
-        {metaTab === "assist" && (
-          <div
-            style={{
-              marginLeft: "auto",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
+            data-tutorial="meta-analyze"
+            style={metaTabBtn(metaTab === "analyze")}
+            onClick={() => {
+              if (metaTab !== "analyze") setTab("graph");
             }}
           >
-            {workflowPhase && (
-              <span style={{ fontSize: 11, color: C.dim }}>
-                {WORKFLOW_PHASE_LABELS[workflowPhase]}
-                {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""}
-              </span>
-            )}
-            {workflowPhase ? (
-              <button
-                onClick={onStopWorkflow}
-                style={{
-                  ...btn(false),
-                  color: C.conflicts,
-                  borderColor: C.conflicts,
-                }}
-              >
-                ✕ Stop Workflow
-              </button>
-            ) : (
-              <button
-                onClick={onStartWorkflow}
-                style={{ ...btn(false), color: C.supports }}
-              >
-                ▶ Start Workflow
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+            Analyze
+          </button>
+          <button
+            data-tutorial="meta-assist"
+            style={metaTabBtn(metaTab === "assist")}
+            onClick={() => {
+              if (metaTab !== "assist") setTab("elicitJudgments");
+            }}
+          >
+            Assist
+          </button>
+          <div
+            style={{
+              width: 1,
+              height: 20,
+              background: C.border,
+              alignSelf: "center",
+              margin: "0 4px",
+            }}
+          />
+          {visibleSubTabs.map((t) => (
+            <button
+              key={t}
+              data-tutorial={`tab-${t}`}
+              onClick={() => setTab(t)}
+              style={btn(tab === t)}
+            >
+              {TAB_ICONS[t]}
+              {TAB_LABELS[t]}
+            </button>
+          ))}
+          {metaTab === "assist" && (
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {workflowPhase && (
+                <span style={{ fontSize: 11, color: C.dim }}>
+                  {WORKFLOW_PHASE_LABELS[workflowPhase]}
+                  {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""}
+                </span>
+              )}
+              {workflowPhase ? (
+                <button
+                  onClick={onStopWorkflow}
+                  style={{
+                    ...btn(false),
+                    color: C.conflicts,
+                    borderColor: C.conflicts,
+                  }}
+                >
+                  ✕ Stop Workflow
+                </button>
+              ) : (
+                <button
+                  onClick={onStartWorkflow}
+                  style={{ ...btn(false), color: C.supports }}
+                >
+                  ▶ Start Workflow
+                </button>
+              )}
+            </div>
+          )}
+        </div>
     </div>
   );
 }
