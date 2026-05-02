@@ -40,23 +40,19 @@ const REL_COLOR = {
 
 /**
  * @param {Object}           props
- * @param {number}           props.elementCount
+ * @param {number}           props.elementCount   Used to disable the button; not shown in label.
+ * @param {number|null}      props.suggestionCount  Remaining suggestions, or null if not yet fetched.
  * @param {boolean}          props.loading
  * @param {boolean}          props.hasResult
- * @param {number}           props.suggestionCount
  * @param {Function}         props.onSuggest
- * @param {Function}         props.onSaveAll
- * @param {Function}         props.onRejectAll
  * @param {string|undefined} props.model
  */
 function Toolbar({
   elementCount,
+  suggestionCount,
   loading,
   hasResult,
-  suggestionCount,
   onSuggest,
-  onSaveAll,
-  onRejectAll,
   model,
   workflowPhase,
   advanceWorkflow,
@@ -73,69 +69,53 @@ function Toolbar({
         gap: 12,
       }}
     >
-      <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
-        Relation suggestions for{" "}
-        <span style={{ color: C.text, fontWeight: "bold" }}>
-          {elementCount}
-        </span>{" "}
-        elements{model ? `, via ${model}` : ""}.
-      </div>
-      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-        <ProgressWorkflowBtn
-          nextPhaseIsEnabled={nextPhaseIsEnabled}
-          workflowPhase={workflowPhase}
-          advanceWorkflow={advanceWorkflow}
-        />
-        {suggestionCount > 0 && (
-          <>
-            <button
-              onClick={onSaveAll}
-              style={{
-                background: C.principle.high,
-                border: "none",
-                color: "#fff",
-                borderRadius: 6,
-                padding: "6px 14px",
-                fontSize: 12,
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              Save all
-            </button>
-            <button
-              onClick={onRejectAll}
-              style={{
-                background: "#dc2626",
-                border: "none",
-                color: "#fff",
-                borderRadius: 6,
-                padding: "6px 14px",
-                fontSize: 12,
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              Reject all
-            </button>
-          </>
+      <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+        <span style={{ color: C.supports, fontWeight: "bold" }}>
+          Suggest Relations
+        </span>
+        {suggestionCount !== null && (
+          <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
         )}
+        {model && <span style={{ color: C.dim }}> · {model}</span>}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
         <button
           onClick={onSuggest}
           disabled={suggestDisabled}
           style={{
-            background: suggestDisabled ? C.border : C.supports,
-            border: "none",
-            color: "#fff",
+            background: "transparent",
+            border: `1px solid ${suggestDisabled ? C.border : C.supports}`,
+            color: suggestDisabled ? C.dim : C.supports,
             borderRadius: 6,
-            padding: "6px 14px",
+            padding: "5px 12px",
             fontSize: 12,
             fontWeight: "bold",
             cursor: suggestDisabled ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
           }}
         >
+          {!loading && <span>↺</span>}
           {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
         </button>
+        {workflowPhase && (
+          <>
+            <div
+              style={{
+                width: 1,
+                height: 18,
+                background: C.border,
+                margin: "0 8px",
+              }}
+            />
+            <ProgressWorkflowBtn
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
+              workflowPhase={workflowPhase}
+              advanceWorkflow={advanceWorkflow}
+            />
+          </>
+        )}
       </div>
     </div>
   );
@@ -205,7 +185,7 @@ function SuggestionCard({
           {suggestion.type}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-          <AcceptButton onClick={onAccept} accentColor={C.principle.high} />
+          <AcceptButton onClick={onAccept} accentColor={C.supports} />
           <RejectButton onClick={onReject} />
           {isEditing ? (
             <CancelButton onClick={onModifyCancel} />
@@ -317,36 +297,6 @@ export function RelationSuggestTab({
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
-  const saveAll = () => {
-    suggestions.forEach((s) =>
-      onAddRelation(
-        {
-          from: s.from,
-          to: s.to,
-          type: s.type,
-          explanation: resolvedExplanation(s),
-        },
-        { select: false },
-      ),
-    );
-    setEditing(null);
-    setSuggestions([]);
-  };
-
-  const rejectAll = () => {
-    if (!suggestions?.length) return;
-    onRejectRelations(
-      suggestions.map((s) => ({
-        from: s.from,
-        to: s.to,
-        type: s.type,
-        explanation: resolvedExplanation(s),
-      })),
-    );
-    setEditing(null);
-    setSuggestions([]);
-  };
-
   const nextPhaseIsEnabled = nextPhaseEnabled(workflowPhase, state);
 
   return (
@@ -354,12 +304,10 @@ export function RelationSuggestTab({
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         <Toolbar
           elementCount={activeElements.length}
+          suggestionCount={suggestions !== null ? suggestions.length : null}
           loading={loading}
           hasResult={suggestions !== null}
-          suggestionCount={suggestions?.length ?? 0}
           onSuggest={suggest}
-          onSaveAll={saveAll}
-          onRejectAll={rejectAll}
           model={model}
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}

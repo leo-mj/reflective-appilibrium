@@ -6,38 +6,39 @@
  */
 
 import { C } from "../constants/colors.js";
-import { ChatIcon } from "./Icons.jsx";
+import { CheckIcon, XIcon, EditIcon, ChatIcon } from "./Icons.jsx";
+import { Tooltip } from "./Tooltip.jsx";
 
-// Button base styles (card-level, smaller than toolbar buttons)
-const SOLID = {
-  borderRadius: 4,
-  padding: "2px 10px",
-  fontSize: 11,
+const CIRCLE_BTN = {
+  width: 26,
+  height: 26,
+  borderRadius: "50%",
   cursor: "pointer",
-  border: "none",
-};
-const OUTLINE = {
-  borderRadius: 4,
-  padding: "2px 10px",
-  fontSize: 11,
-  cursor: "pointer",
-  background: "transparent",
-  border: `1px solid ${C.border}`,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+  flexShrink: 0,
 };
 
 /**
  * @param {Object}   props
  * @param {Function} props.onClick
- * @param {string}   props.accentColor  Background colour — varies by element type.
+ * @param {string}   props.accentColor  Border/icon colour — varies by element type.
  */
 export function AcceptButton({ onClick, accentColor }) {
+  const color = accentColor ?? C.supports;
   return (
-    <button
-      onClick={onClick}
-      style={{ ...SOLID, background: accentColor, color: "#fff" }}
-    >
-      Accept
-    </button>
+    <Tooltip text="Accept">
+      <button onClick={onClick} style={{
+        ...CIRCLE_BTN,
+        background: color + "20",
+        border: `1.5px solid ${color}`,
+        color,
+      }}>
+        <CheckIcon size="11px" />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -47,12 +48,16 @@ export function AcceptButton({ onClick, accentColor }) {
  */
 export function RejectButton({ onClick }) {
   return (
-    <button
-      onClick={onClick}
-      style={{ ...SOLID, background: "#dc2626", color: "#fff" }}
-    >
-      Reject
-    </button>
+    <Tooltip text="Reject">
+      <button onClick={onClick} style={{
+        ...CIRCLE_BTN,
+        background: C.conflicts + "20",
+        border: `1.5px solid ${C.conflicts}`,
+        color: C.conflicts,
+      }}>
+        <XIcon size="11px" />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -62,9 +67,16 @@ export function RejectButton({ onClick }) {
  */
 export function ModifyButton({ onClick }) {
   return (
-    <button onClick={onClick} style={{ ...OUTLINE, color: C.dim }}>
-      Modify
-    </button>
+    <Tooltip text="Modify">
+      <button onClick={onClick} style={{
+        ...CIRCLE_BTN,
+        background: "transparent",
+        border: `1.5px solid ${C.border}`,
+        color: C.dim,
+      }}>
+        <EditIcon size="10px" />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -74,9 +86,16 @@ export function ModifyButton({ onClick }) {
  */
 export function CancelButton({ onClick }) {
   return (
-    <button onClick={onClick} style={{ ...OUTLINE, color: C.dim }}>
-      Cancel
-    </button>
+    <Tooltip text="Cancel">
+      <button onClick={onClick} style={{
+        ...CIRCLE_BTN,
+        background: "transparent",
+        border: `1.5px solid ${C.border}`,
+        color: C.dim,
+      }}>
+        <XIcon size="11px" />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -118,26 +137,27 @@ export function ModifyTextarea({ value, onChange, accentColor }) {
  */
 export function ChatButton({ isOpen, onClick, accentColor }) {
   return (
-    <button
-      onClick={onClick}
-      title="Discuss this suggestion"
-      style={{
-        width: 26,
-        height: 26,
-        borderRadius: "50%",
-        background: isOpen ? (accentColor ?? C.supports) + "20" : "transparent",
-        border: `1.5px solid ${isOpen ? (accentColor ?? C.supports) : C.border}`,
-        color: isOpen ? (accentColor ?? C.supports) : C.dim,
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 0,
-        flexShrink: 0,
-      }}
-    >
-      <ChatIcon size="11px" />
-    </button>
+    <Tooltip text="Discuss with AI">
+      <button
+        onClick={onClick}
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: "50%",
+          background: isOpen ? (accentColor ?? C.supports) + "20" : "transparent",
+          border: `1.5px solid ${isOpen ? (accentColor ?? C.supports) : C.border}`,
+          color: isOpen ? (accentColor ?? C.supports) : C.dim,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 0,
+          flexShrink: 0,
+        }}
+      >
+        <ChatIcon size="11px" />
+      </button>
+    </Tooltip>
   );
 }
 

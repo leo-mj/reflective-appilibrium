@@ -28,23 +28,17 @@ import { ConversationPanel } from "./ConversationPanel.jsx";
 
 /**
  * @param {Object}           props
- * @param {number}           props.elementCount
+ * @param {number|null}      props.suggestionCount  Remaining suggestions, or null if not yet fetched.
  * @param {boolean}          props.loading
  * @param {boolean}          props.hasResult
- * @param {number}           props.suggestionCount
  * @param {Function}         props.onElicit
- * @param {Function}         props.onSaveAll
- * @param {Function}         props.onRejectAll
  * @param {string|undefined} props.model
  */
 function Toolbar({
-  elementCount,
+  suggestionCount,
   loading,
   hasResult,
-  suggestionCount,
   onElicit,
-  onSaveAll,
-  onRejectAll,
   model,
   workflowPhase,
   advanceWorkflow,
@@ -60,69 +54,53 @@ function Toolbar({
         gap: 12,
       }}
     >
-      <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
-        Judgment elicitation for{" "}
-        <span style={{ color: C.text, fontWeight: "bold" }}>
-          {elementCount}
-        </span>{" "}
-        elements{model ? `, via ${model}` : ""}.
-      </div>
-      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-        <ProgressWorkflowBtn
-          nextPhaseIsEnabled={nextPhaseIsEnabled}
-          workflowPhase={workflowPhase}
-          advanceWorkflow={advanceWorkflow}
-        />
-        {suggestionCount > 0 && (
-          <>
-            <button
-              onClick={onSaveAll}
-              style={{
-                background: C.judgment.high,
-                border: "none",
-                color: "#fff",
-                borderRadius: 6,
-                padding: "6px 14px",
-                fontSize: 12,
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              Save all
-            </button>
-            <button
-              onClick={onRejectAll}
-              style={{
-                background: "#dc2626",
-                border: "none",
-                color: "#fff",
-                borderRadius: 6,
-                padding: "6px 14px",
-                fontSize: 12,
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              Reject all
-            </button>
-          </>
+      <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+        <span style={{ color: C.judgment.high, fontWeight: "bold" }}>
+          Elicit Judgments
+        </span>
+        {suggestionCount !== null && (
+          <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
         )}
+        {model && <span style={{ color: C.dim }}> · {model}</span>}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
         <button
           onClick={onElicit}
           disabled={loading}
           style={{
-            background: loading ? C.border : C.supports,
-            border: "none",
-            color: "#fff",
+            background: "transparent",
+            border: `1px solid ${loading ? C.border : C.judgment.high}`,
+            color: loading ? C.dim : C.judgment.high,
             borderRadius: 6,
-            padding: "6px 14px",
+            padding: "5px 12px",
             fontSize: 12,
             fontWeight: "bold",
             cursor: loading ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
           }}
         >
+          {!loading && <span>↺</span>}
           {loading ? "Thinking…" : hasResult ? "Re-elicit" : "Elicit"}
         </button>
+        {workflowPhase && (
+          <>
+            <div
+              style={{
+                width: 1,
+                height: 18,
+                background: C.border,
+                margin: "0 8px",
+              }}
+            />
+            <ProgressWorkflowBtn
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
+              workflowPhase={workflowPhase}
+              advanceWorkflow={advanceWorkflow}
+            />
+          </>
+        )}
       </div>
     </div>
   );
@@ -305,7 +283,6 @@ export function JudgmentElicitTab({
   /** @type {[{suggestion: Object, judgment: Object, draft: string}|null, Function]} */
   const [editing, setEditing] = useState(null);
 
-  const activeElements = state.elements.filter((e) => e.status !== "withdrawn");
 
   const elicit = async () => {
     setLoading(true);
@@ -355,49 +332,19 @@ export function JudgmentElicitTab({
     setSuggestions((prev) => removeJudgment(prev, suggestion, judgment));
   };
 
-  const saveAll = () => {
-    suggestions.forEach((s) =>
-      s.judgments.forEach((j) =>
-        onAddElement({
-          type: "judgment",
-          text: resolvedText(j),
-          confidence: j.confidence,
-          origin: "llm",
-        }),
-      ),
-    );
-    setEditing(null);
-    setSuggestions([]);
-  };
 
-  const rejectAll = () => {
-    if (!suggestions?.length) return;
-    const all = suggestions.flatMap((s) =>
-      s.judgments.map((j) => ({
-        type: "judgment",
-        text: resolvedText(j),
-        confidence: j.confidence,
-        origin: "llm",
-      })),
-    );
-    onRejectElements(all);
-    setEditing(null);
-    setSuggestions([]);
-  };
-  const remainingJudgments =
-    suggestions?.reduce((n, s) => n + s.judgments.length, 0) ?? 0;
+  const remainingJudgments = suggestions !== null
+    ? suggestions.reduce((n, s) => n + s.judgments.length, 0)
+    : null;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         <Toolbar
-          elementCount={activeElements.length}
+          suggestionCount={remainingJudgments}
           loading={loading}
           hasResult={suggestions !== null}
-          suggestionCount={remainingJudgments}
           onElicit={elicit}
-          onSaveAll={saveAll}
-          onRejectAll={rejectAll}
           model={model}
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}

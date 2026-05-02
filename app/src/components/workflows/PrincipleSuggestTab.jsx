@@ -7,7 +7,7 @@
 
 /** @import { REState } from '../../types.js' */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchPrincipleSuggestions } from "../../utils/principlesClient.js";
 import { AddElementPanel } from "../user_edits/TextTabAddPanel.jsx";
@@ -31,23 +31,19 @@ import { ConversationPanel } from "./ConversationPanel.jsx";
 
 /**
  * @param {Object}           props
- * @param {number}           props.jAndPCount
+ * @param {number}           props.jAndPCount   Used to disable the button; not shown in label.
+ * @param {number|null}      props.suggestionCount  Remaining suggestions, or null if not yet fetched.
  * @param {boolean}          props.loading
  * @param {boolean}          props.hasResult
- * @param {number}           props.suggestionCount
  * @param {Function}         props.onSuggest
- * @param {Function}         props.onSaveAll
- * @param {Function}         props.onRejectAll
  * @param {string|undefined} props.model
  */
 function Toolbar({
   jAndPCount,
+  suggestionCount,
   loading,
   hasResult,
-  suggestionCount,
   onSuggest,
-  onSaveAll,
-  onRejectAll,
   model,
   workflowPhase,
   advanceWorkflow,
@@ -64,67 +60,53 @@ function Toolbar({
         gap: 12,
       }}
     >
-      <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
-        Principle suggestions based on{" "}
-        <span style={{ color: C.text, fontWeight: "bold" }}>{jAndPCount}</span>{" "}
-        judgments and principles{model ? `, via ${model}` : ""}.
-      </div>
-      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-        <ProgressWorkflowBtn
-          nextPhaseIsEnabled={nextPhaseIsEnabled}
-          workflowPhase={workflowPhase}
-          advanceWorkflow={advanceWorkflow}
-        />
-        {suggestionCount > 0 && (
-          <>
-            <button
-              onClick={onSaveAll}
-              style={{
-                background: C.principle.high,
-                border: "none",
-                color: "#fff",
-                borderRadius: 6,
-                padding: "6px 14px",
-                fontSize: 12,
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              Save all
-            </button>
-            <button
-              onClick={onRejectAll}
-              style={{
-                background: "#dc2626",
-                border: "none",
-                color: "#fff",
-                borderRadius: 6,
-                padding: "6px 14px",
-                fontSize: 12,
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              Reject all
-            </button>
-          </>
+      <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+        <span style={{ color: C.principle.high, fontWeight: "bold" }}>
+          Suggest Principles
+        </span>
+        {suggestionCount !== null && (
+          <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
         )}
+        {model && <span style={{ color: C.dim }}> · {model}</span>}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
         <button
           onClick={onSuggest}
           disabled={suggestDisabled}
           style={{
-            background: suggestDisabled ? C.border : C.supports,
-            border: "none",
-            color: "#fff",
+            background: "transparent",
+            border: `1px solid ${suggestDisabled ? C.border : C.principle.high}`,
+            color: suggestDisabled ? C.dim : C.principle.high,
             borderRadius: 6,
-            padding: "6px 14px",
+            padding: "5px 12px",
             fontSize: 12,
             fontWeight: "bold",
             cursor: suggestDisabled ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
           }}
         >
+          {!loading && <span>↺</span>}
           {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
         </button>
+        {workflowPhase && (
+          <>
+            <div
+              style={{
+                width: 1,
+                height: 18,
+                background: C.border,
+                margin: "0 8px",
+              }}
+            />
+            <ProgressWorkflowBtn
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
+              workflowPhase={workflowPhase}
+              advanceWorkflow={advanceWorkflow}
+            />
+          </>
+        )}
       </div>
     </div>
   );
@@ -321,33 +303,6 @@ export function PrincipleSuggestTab({
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
   };
 
-  const saveAll = () => {
-    suggestions.forEach((s) =>
-      onAddElement({
-        type: "principle",
-        text: resolvedText(s),
-        confidence: s.confidence,
-        origin: "llm",
-      }),
-    );
-    setEditing(null);
-    setSuggestions([]);
-  };
-
-  const rejectAll = useCallback(() => {
-    if (!suggestions?.length) return;
-    onRejectElements(
-      suggestions.map((s) => ({
-        type: "principle",
-        text: editing?.suggestion === s ? editing.draft : s.text,
-        confidence: s.confidence,
-        origin: "llm",
-      })),
-    );
-    setEditing(null);
-    setSuggestions([]);
-  }, [suggestions, editing, onRejectElements]);
-
   const nextPhaseIsEnabled = nextPhaseEnabled(workflowPhase, state);
 
   return (
@@ -355,12 +310,10 @@ export function PrincipleSuggestTab({
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         <Toolbar
           jAndPCount={judgments.length + principles.length}
+          suggestionCount={suggestions !== null ? suggestions.length : null}
           loading={loading}
           hasResult={suggestions !== null}
-          suggestionCount={suggestions?.length ?? 0}
           onSuggest={suggest}
-          onSaveAll={saveAll}
-          onRejectAll={rejectAll}
           model={model}
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}
