@@ -245,7 +245,7 @@ export function TutorialOverlay({ active }) {
             top,
             left,
             width: BUBBLE_W,
-            background: "#0a1a30",
+            background: C.panel,
             border: `1px solid ${id === topId ? C.text : C.supports}`,
             borderRadius: 6,
             padding: "6px 10px",
@@ -254,8 +254,8 @@ export function TutorialOverlay({ active }) {
             lineHeight: 1.55,
             boxShadow:
               id === topId
-                ? "0 4px 20px rgba(0,0,0,0.9)"
-                : "0 2px 12px rgba(0,0,0,0.65)",
+                ? "0 4px 20px rgba(0,0,0,0.35)"
+                : "0 2px 12px rgba(0,0,0,0.2)",
             zIndex: id === topId ? 910 : 901,
             cursor: "pointer",
             userSelect: "none",
