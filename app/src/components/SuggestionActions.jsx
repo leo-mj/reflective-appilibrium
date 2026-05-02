@@ -6,6 +6,7 @@
  */
 
 import { C } from "../constants/colors.js";
+import { ChatIcon } from "./Icons.jsx";
 
 // Button base styles (card-level, smaller than toolbar buttons)
 const SOLID = {
@@ -106,6 +107,37 @@ export function ModifyTextarea({ value, onChange, accentColor }) {
         minHeight: 60,
       }}
     />
+  );
+}
+
+/**
+ * @param {Object}   props
+ * @param {boolean}  props.isOpen    Whether the conversation panel is open.
+ * @param {Function} props.onClick
+ * @param {string}   props.accentColor  Border/icon colour when open.
+ */
+export function ChatButton({ isOpen, onClick, accentColor }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Discuss this suggestion"
+      style={{
+        width: 26,
+        height: 26,
+        borderRadius: "50%",
+        background: isOpen ? (accentColor ?? C.supports) + "20" : "transparent",
+        border: `1.5px solid ${isOpen ? (accentColor ?? C.supports) : C.border}`,
+        color: isOpen ? (accentColor ?? C.supports) : C.dim,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0,
+        flexShrink: 0,
+      }}
+    >
+      <ChatIcon size="11px" />
+    </button>
   );
 }
 

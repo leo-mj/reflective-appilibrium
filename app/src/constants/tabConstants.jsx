@@ -30,9 +30,9 @@ export const TAB_LABELS = {
   history: "History",
   matrix: "Matrix",
   clusters: "Clusters",
-  elicitJudgments: "Elicit Judgments",
-  suggestPrinciples: "Suggest Principles",
-  suggestRelations: "Suggest Relations",
+  elicitJudgments: "Judgments",
+  suggestPrinciples: "Principles",
+  suggestRelations: "Relations",
 };
 
 export const TAB_TOOLTIPS = {

@@ -63,6 +63,7 @@ export function ConversationPanel({ state, suggestion }) {
     <div
       style={{
         marginTop: 10,
+        marginBottom: 10,
         borderTop: `1px solid ${C.border}`,
         paddingTop: 8,
       }}
@@ -104,6 +105,7 @@ export function ConversationPanel({ state, suggestion }) {
             border: `1px solid ${C.border}`,
             borderRadius: 4,
             padding: "4px 8px",
+            marginLeft: "8px",
             fontSize: 11,
             color: C.text,
             outline: "none",
@@ -117,6 +119,7 @@ export function ConversationPanel({ state, suggestion }) {
             border: "none",
             borderRadius: 4,
             padding: "4px 10px",
+            margin: "4px 8px 4px 0",
             fontSize: 11,
             color: "#fff",
             cursor: loading || !input.trim() ? "not-allowed" : "pointer",

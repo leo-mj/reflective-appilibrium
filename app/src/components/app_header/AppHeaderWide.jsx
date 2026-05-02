@@ -139,17 +139,30 @@ export function AppHeaderWide({
         >
           {/* Assist side-panel toggle (only in assist mode) */}
           {metaTab === "assist" && (
-            <div style={{ display: "flex", gap: 0, flexShrink: 0 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 0,
+                flexShrink: 0,
+              }}
+            >
               {[
                 { value: "text", label: "Text" },
                 { value: "graph", label: "Graph" },
-              ].map(({ value, label }, i) => (
+                { value: "focus", label: "Focus" },
+              ].map(({ value, label }, i, arr) => (
                 <button
                   key={value}
                   onClick={() => setAssistSidePanel(value)}
                   style={{
                     ...btn(assistSidePanel === value),
-                    borderRadius: i === 0 ? "4px 0 0 4px" : "0 4px 4px 0",
+                    borderRadius:
+                      i === 0
+                        ? "4px 0 0 4px"
+                        : i === arr.length - 1
+                          ? "0 4px 4px 0"
+                          : "0",
+                    ...(i > 0 && { borderLeft: "none" }),
                     fontSize: 11,
                     padding: "0 10px",
                   }}
@@ -157,6 +170,7 @@ export function AppHeaderWide({
                   {label}
                 </button>
               ))}
+              {inlineDivider}
             </div>
           )}
 

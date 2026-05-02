@@ -16,6 +16,7 @@ import {
   RejectButton,
   ModifyButton,
   CancelButton,
+  ChatButton,
   ModifyTextarea,
   ErrorBanner,
 } from "../SuggestionActions.jsx";
@@ -153,6 +154,7 @@ function SuggestionCard({
   onModifyCancel,
 }) {
   const isEditing = draft !== null;
+  const [convOpen, setConvOpen] = useState(false);
   return (
     <div
       style={{
@@ -167,7 +169,7 @@ function SuggestionCard({
       <div
         style={{
           display: "flex",
-          alignItems: isEditing ? "flex-start" : "flex-start",
+          alignItems: "flex-start",
           gap: 8,
           marginBottom: 6,
         }}
@@ -198,6 +200,11 @@ function SuggestionCard({
           ) : (
             <ModifyButton onClick={onModify} />
           )}
+          <ChatButton
+            isOpen={convOpen}
+            accentColor={C.principle.high}
+            onClick={() => setConvOpen((o) => !o)}
+          />
         </div>
       </div>
       <div
@@ -228,7 +235,7 @@ function SuggestionCard({
       <div style={{ color: C.dim, lineHeight: 1.6 }}>
         {suggestion.explanation}
       </div>
-      <ConversationPanel state={state} suggestion={suggestion} />
+      {convOpen && <ConversationPanel state={state} suggestion={suggestion} />}
     </div>
   );
 }

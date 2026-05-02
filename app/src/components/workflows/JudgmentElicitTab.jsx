@@ -17,6 +17,7 @@ import {
   RejectButton,
   ModifyButton,
   CancelButton,
+  ChatButton,
   ModifyTextarea,
   ErrorBanner,
 } from "../SuggestionActions.jsx";
@@ -152,88 +153,115 @@ function SuggestionCard({
   onModifyChange,
   onModifyCancel,
 }) {
+  const [hovered, setHovered] = useState(null);
+  const [convOpen, setConvOpen] = useState({});
+
   return (
     <div
       style={{
         borderLeft: `3px solid ${C.judgment.high}`,
         background: C.panel,
         borderRadius: "0 6px 6px 0",
-        padding: "10px 14px",
         marginBottom: 10,
         fontSize: 12,
+        overflow: "hidden",
       }}
     >
       <div
         style={{
-          color: C.text,
+          color: C.dim,
           lineHeight: 1.6,
           fontStyle: "italic",
-          marginBottom: 8,
+          padding: "8px 14px",
+          borderBottom: `1px solid ${C.border}`,
+          background: C.judgment.high + "10",
         }}
       >
         {suggestion.question}
       </div>
       {suggestion.judgments.map((j, i) => {
         const isEditing = editing?.judgment === j;
+        const isConvOpen = convOpen[i];
+        const isHovered = hovered === i;
         return (
-          <div
-            key={i}
-            style={{
-              borderTop: `1px solid ${C.border}`,
-              paddingTop: 7,
-              paddingBottom: 7,
-              display: "flex",
-              alignItems: isEditing ? "flex-start" : "baseline",
-              gap: 8,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10,
-                color: C.judgment.high,
-                border: `1px solid ${C.judgment.high}`,
-                borderRadius: 4,
-                padding: "1px 6px",
-                flexShrink: 0,
-                marginTop: isEditing ? 4 : 0,
-              }}
-            >
-              {j.confidence}
-            </span>
-            {isEditing ? (
-              <ModifyTextarea
-                value={editing.draft}
-                onChange={onModifyChange}
-                accentColor={C.judgment.high}
-              />
-            ) : (
-              <div style={{ color: C.dim, lineHeight: 1.6, flex: 1 }}>
-                {j.text}
-              </div>
-            )}
+          <div key={i}>
             <div
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
               style={{
+                borderTop: i === 0 ? "none" : `1px solid ${C.border}`,
+                padding: "8px 14px",
                 display: "flex",
-                gap: 4,
-                flexShrink: 0,
-                marginTop: isEditing ? 2 : 0,
+                alignItems: "flex-start",
+                gap: 8,
+                background: isHovered && !isEditing ? C.judgment.high + "08" : "transparent",
+                transition: "background 0.12s",
               }}
             >
-              <AcceptButton
-                onClick={() => onAcceptJudgment(j)}
-                accentColor={C.judgment.high}
-              />
-              <RejectButton onClick={() => onRejectJudgment(j)} />
+              <span
+                style={{
+                  fontSize: 10,
+                  color: C.judgment.high,
+                  border: `1px solid ${C.judgment.high}`,
+                  borderRadius: 4,
+                  padding: "1px 6px",
+                  flexShrink: 0,
+                  marginTop: 3,
+                  width: "5.5em",
+                  textAlign: "center",
+                  display: "inline-block",
+                }}
+              >
+                {j.confidence}
+              </span>
               {isEditing ? (
-                <CancelButton onClick={onModifyCancel} />
+                <ModifyTextarea
+                  value={editing.draft}
+                  onChange={onModifyChange}
+                  accentColor={C.judgment.high}
+                />
               ) : (
-                <ModifyButton onClick={() => onModify(j)} />
+                <div style={{ color: C.text, lineHeight: 1.6, flex: 1 }}>
+                  {j.text}
+                </div>
               )}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 4,
+                  flexShrink: 0,
+                  alignSelf: "flex-start",
+                  marginTop: 2,
+                  opacity: isHovered || isEditing || isConvOpen ? 1 : 0.2,
+                  transition: "opacity 0.12s",
+                }}
+              >
+                <AcceptButton
+                  onClick={() => onAcceptJudgment(j)}
+                  accentColor={C.judgment.high}
+                />
+                <RejectButton onClick={() => onRejectJudgment(j)} />
+                {isEditing ? (
+                  <CancelButton onClick={onModifyCancel} />
+                ) : (
+                  <ModifyButton onClick={() => onModify(j)} />
+                )}
+                <ChatButton
+                  isOpen={isConvOpen}
+                  accentColor={C.judgment.high}
+                  onClick={() => setConvOpen((o) => ({ ...o, [i]: !o[i] }))}
+                />
+              </div>
             </div>
+            {isConvOpen && (
+              <ConversationPanel
+                state={state}
+                suggestion={{ question: suggestion.question, ...j }}
+              />
+            )}
           </div>
         );
       })}
-      <ConversationPanel state={state} suggestion={suggestion} />
     </div>
   );
 }

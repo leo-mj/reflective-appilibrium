@@ -72,11 +72,13 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const dims = useWindowSize();
   const isWide = dims.w > 768 && dims.h > 500;
   const isAssistTab = ASSIST_TABS.includes(tab);
-  const hasSidePanel = isWide && (isAssistTab ? assistSidePanel !== "none" : showText);
+  const hasSidePanel = isWide && (isAssistTab ? (assistSidePanel !== "none" && assistSidePanel !== "focus") : showText);
   // graphW must match the actual rendered width of the graph SVG so the force
   // simulation centres nodes in the visible area.
+  // Focus mode keeps the same graphW as graph mode so switching between the two
+  // doesn't restart the simulation and scramble node positions.
   const graphW =
-    isAssistTab && assistSidePanel === "graph"
+    isAssistTab && (assistSidePanel === "graph" || assistSidePanel === "focus")
       ? (dims.w - 44) / 2
       : hasSidePanel
         ? (dims.w - 32) / 2 - 12
