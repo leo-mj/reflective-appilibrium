@@ -12,7 +12,7 @@ describe("LLM_PROVIDERS", () => {
     for (const p of LLM_PROVIDERS) {
       expect(p.id).toBeTruthy();
       expect(p.label).toBeTruthy();
-      expect(p.baseUrl).toMatch(/^https:\/\//);
+      expect(p.baseUrl).toMatch(/^https?:\/\//);
       expect(p.models.length).toBeGreaterThan(0);
     }
   });
@@ -22,9 +22,14 @@ describe("LLM_PROVIDERS", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("base URLs are HTTPS", () => {
+  it("remote providers use HTTPS; local providers may use HTTP", () => {
     for (const p of LLM_PROVIDERS) {
-      expect(p.baseUrl.startsWith("https://")).toBe(true);
+      const isLocal = p.baseUrl.includes("localhost") || p.baseUrl.includes("127.0.0.1");
+      if (isLocal) {
+        expect(p.baseUrl).toMatch(/^https?:\/\//);
+      } else {
+        expect(p.baseUrl.startsWith("https://")).toBe(true);
+      }
     }
   });
 
