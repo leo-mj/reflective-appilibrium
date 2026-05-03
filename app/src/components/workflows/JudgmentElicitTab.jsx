@@ -44,7 +44,9 @@ function Toolbar({
   workflowPhase,
   advanceWorkflow,
   nextPhaseIsEnabled,
+  suggestionsDisabled,
 }) {
+  const buttonDisabled = loading || suggestionsDisabled;
   return (
     <div
       style={{
@@ -67,16 +69,16 @@ function Toolbar({
       <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
         <button
           onClick={onElicit}
-          disabled={loading}
+          disabled={buttonDisabled}
           style={{
             background: "transparent",
-            border: `1px solid ${loading ? C.border : C.judgment.high}`,
-            color: loading ? C.dim : C.judgment.high,
+            border: `1px solid ${buttonDisabled ? C.border : C.judgment.high}`,
+            color: buttonDisabled ? C.dim : C.judgment.high,
             borderRadius: 6,
             padding: "5px 12px",
             fontSize: 12,
             fontWeight: "bold",
-            cursor: loading ? "not-allowed" : "pointer",
+            cursor: buttonDisabled ? "not-allowed" : "pointer",
             display: "flex",
             alignItems: "center",
             gap: 5,
@@ -173,7 +175,10 @@ function SuggestionCard({
                 display: "flex",
                 alignItems: "flex-start",
                 gap: 8,
-                background: isHovered && !isEditing ? C.judgment.high + "08" : "transparent",
+                background:
+                  isHovered && !isEditing
+                    ? C.judgment.high + "08"
+                    : "transparent",
                 transition: "background 0.12s",
               }}
             >
@@ -276,6 +281,7 @@ export function JudgmentElicitTab({
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
   useDummy = false,
+  suggestionsDisabled = false,
 }) {
   /** @type {[Array<{question: string, judgments: Array<{text: string, confidence: string}>}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -284,7 +290,6 @@ export function JudgmentElicitTab({
   const [model, setModel] = useState(null);
   /** @type {[{suggestion: Object, judgment: Object, draft: string}|null, Function]} */
   const [editing, setEditing] = useState(null);
-
 
   const elicit = async () => {
     setLoading(true);
@@ -304,7 +309,7 @@ export function JudgmentElicitTab({
   };
 
   useEffect(() => {
-    if (autoFetch) elicit();
+    if (autoFetch && !suggestionsDisabled) elicit();
   }, [autoFetch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resolvedText = (judgment) =>
@@ -334,10 +339,10 @@ export function JudgmentElicitTab({
     setSuggestions((prev) => removeJudgment(prev, suggestion, judgment));
   };
 
-
-  const remainingJudgments = suggestions !== null
-    ? suggestions.reduce((n, s) => n + s.judgments.length, 0)
-    : null;
+  const remainingJudgments =
+    suggestions !== null
+      ? suggestions.reduce((n, s) => n + s.judgments.length, 0)
+      : null;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -351,6 +356,7 @@ export function JudgmentElicitTab({
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
+          suggestionsDisabled={suggestionsDisabled}
         />
         {error && <ErrorBanner message={error} />}
 

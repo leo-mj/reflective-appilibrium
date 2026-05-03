@@ -49,8 +49,9 @@ function Toolbar({
   workflowPhase,
   advanceWorkflow,
   nextPhaseIsEnabled,
+  suggestionsDisabled,
 }) {
-  const suggestDisabled = loading || jAndPCount < 1;
+  const suggestDisabled = loading || jAndPCount < 1 || suggestionsDisabled;
   return (
     <div
       style={{
@@ -240,6 +241,7 @@ export function PrincipleSuggestTab({
   workflowPhase,
   onAdvanceWorkflow,
   useDummy = false,
+  suggestionsDisabled = false,
 }) {
   /** @type {[Array<{text: string, confidence: string, covers: string[], explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -275,7 +277,7 @@ export function PrincipleSuggestTab({
 
   const autoFetchRef = useRef(autoFetch);
   useEffect(() => {
-    if (autoFetchRef.current) suggest();
+    if (autoFetchRef.current && !suggestionsDisabled) suggest();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resolvedText = (suggestion) =>
@@ -320,6 +322,7 @@ export function PrincipleSuggestTab({
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
+          suggestionsDisabled={suggestionsDisabled}
         />
         {error && <ErrorBanner message={error} />}
 

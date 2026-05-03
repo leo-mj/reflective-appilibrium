@@ -58,8 +58,9 @@ function Toolbar({
   workflowPhase,
   advanceWorkflow,
   nextPhaseIsEnabled,
+  suggestionsDisabled,
 }) {
-  const suggestDisabled = loading || elementCount < 2;
+  const suggestDisabled = loading || elementCount < 2 || suggestionsDisabled;
   return (
     <div
       style={{
@@ -234,6 +235,7 @@ export function RelationSuggestTab({
   workflowPhase,
   onAdvanceWorkflow,
   useDummy = false,
+  suggestionsDisabled = false,
 }) {
   /** @type {[Array<{from: string, to: string, type: string, explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -265,7 +267,8 @@ export function RelationSuggestTab({
 
   const autoFetchRef = useRef(autoFetch);
   useEffect(() => {
-    if (autoFetchRef.current) suggest({ scroll: false });
+    if (autoFetchRef.current && !suggestionsDisabled)
+      suggest({ scroll: false });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resolvedExplanation = (suggestion) =>
@@ -313,6 +316,7 @@ export function RelationSuggestTab({
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
+          suggestionsDisabled={suggestionsDisabled}
         />
 
         {error && <ErrorBanner message={error} />}

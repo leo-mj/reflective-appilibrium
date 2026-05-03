@@ -3,6 +3,7 @@ import {
   WORKFLOW_PHASE_LABELS,
 } from "../../utils/workflowUtils.js";
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 
 const workflowBtnStyle = {
   display: "flex",
@@ -25,18 +26,26 @@ export function ProgressWorkflowBtn({
   advanceWorkflow,
 }) {
   if (!workflowPhase) return null;
+  const tooltipText =
+    !nextPhaseIsEnabled && workflowPhase === "elicitJudgments"
+      ? "Add at least 3 judgments to continue"
+      : null;
   return (
-    <button
-      onClick={advanceWorkflow}
-      disabled={!nextPhaseIsEnabled}
-      style={{
-        ...workflowBtnStyle,
-        color: nextPhaseIsEnabled ? C.supports : C.dim,
-        borderColor: nextPhaseIsEnabled ? C.supports : C.border,
-        cursor: nextPhaseIsEnabled ? "pointer" : "not-allowed",
-      }}
-    >
-      {WORKFLOW_PHASE_LABELS[WORKFLOW_NEXT_PHASE[workflowPhase]]} →
-    </button>
+    <Tooltip text={tooltipText}>
+      <span style={{ display: "inline-flex" }}>
+        <button
+          onClick={advanceWorkflow}
+          disabled={!nextPhaseIsEnabled}
+          style={{
+            ...workflowBtnStyle,
+            color: nextPhaseIsEnabled ? C.supports : C.dim,
+            borderColor: nextPhaseIsEnabled ? C.supports : C.border,
+            cursor: nextPhaseIsEnabled ? "pointer" : "not-allowed",
+          }}
+        >
+          {WORKFLOW_PHASE_LABELS[WORKFLOW_NEXT_PHASE[workflowPhase]]} →
+        </button>
+      </span>
+    </Tooltip>
   );
 }

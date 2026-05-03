@@ -223,8 +223,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
             margin: "-16px -16px 12px -16px",
           }}
         >
-          INFO: No LLM API connection — pre-set examples shown in the Analyze
-          Tabs and the Matrix Tab
+          {isSample
+            ? "No LLM API connection — pre-set examples shown in the Assist Tabs and the Matrix Tab"
+            : "No LLM API connection — AI-assistance is disabled"}
         </div>
       )}
       <AppHeader
@@ -251,7 +252,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         showTabNav={showTabNav}
         setShowTabNav={setShowTabNav}
         allExpanded={allExpanded}
-        onExpandAll={() => { setAllExpanded((v) => !v); setExpandAllKey((k) => k + 1); }}
+        onExpandAll={() => {
+          setAllExpanded((v) => !v);
+          setExpandAllKey((k) => k + 1);
+        }}
       />
 
       <div

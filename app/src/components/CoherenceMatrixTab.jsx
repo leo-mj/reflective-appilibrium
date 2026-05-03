@@ -74,8 +74,15 @@ function getPairDesc(pairDescriptions, idA, idB) {
  * @param {Function}        props.onAnalyze
  * @param {string|undefined} props.model
  */
-function Toolbar({ elementCount, loading, hasResult, onAnalyze, model }) {
-  const disabled = loading || elementCount < 2;
+function Toolbar({
+  elementCount,
+  loading,
+  hasResult,
+  onAnalyze,
+  model,
+  suggestionsDisabled,
+}) {
+  const disabled = loading || elementCount < 2 || suggestionsDisabled;
   return (
     <div
       style={{
@@ -332,7 +339,7 @@ function PairDescription({ hovered }) {
  * @param {REState} props.state
  * @returns {React.ReactElement}
  */
-export function CoherenceMatrixTab({ state }) {
+export function CoherenceMatrixTab({ state, suggestionsDisabled = false }) {
   /** @type {[{overview: string, matrix: Object, pairDescriptions: Object, _model: string}|null, Function]} */
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -362,6 +369,7 @@ export function CoherenceMatrixTab({ state }) {
         hasResult={!!result}
         onAnalyze={analyze}
         model={result?._model}
+        suggestionsDisabled={suggestionsDisabled}
       />
 
       {error && <ErrorBanner message={error} />}

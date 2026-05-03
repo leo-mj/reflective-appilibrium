@@ -4,7 +4,7 @@
  */
 
 import { lazy, Suspense, useState } from "react";
-import { APP_ENV } from "../config.js";
+import { APP_ENV, LLM_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
@@ -63,6 +63,7 @@ export function GraphPanel({
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
 
+  const suggestionsDisabled = !LLM_ENABLED && !isSample;
   const autoFetch = !!workflowPhase;
   const isAssistPanel = ASSIST_TABS.includes(tab);
   return (
@@ -75,7 +76,12 @@ export function GraphPanel({
         flexDirection: "column",
       }}
     >
-      {!isAssistPanel && <Legend hiddenLegendKeys={hiddenLegendKeys} setHiddenLegendKeys={setHiddenLegendKeys} />}
+      {!isAssistPanel && (
+        <Legend
+          hiddenLegendKeys={hiddenLegendKeys}
+          setHiddenLegendKeys={setHiddenLegendKeys}
+        />
+      )}
       {APP_ENV === "dev" && isAssistPanel && isSample && (
         <label
           style={{
@@ -124,14 +130,14 @@ export function GraphPanel({
           />
         )}
         {tab === "clusters" && (
-          <ClusterTab
-            state={state}
-            positions={positions}
-          />
+          <ClusterTab state={state} positions={positions} />
         )}
         {tab === "matrix" && (
           <Suspense fallback={null}>
-            <CoherenceMatrixTab state={state} />
+            <CoherenceMatrixTab
+              state={state}
+              suggestionsDisabled={suggestionsDisabled}
+            />
           </Suspense>
         )}
         {tab === "suggestRelations" && (
@@ -146,6 +152,7 @@ export function GraphPanel({
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
+              suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
         )}
@@ -160,6 +167,7 @@ export function GraphPanel({
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
+              suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
         )}
@@ -174,6 +182,7 @@ export function GraphPanel({
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
+              suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
         )}
