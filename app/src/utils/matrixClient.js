@@ -7,7 +7,7 @@
 
 import _dummyMatrix from "../dummy-matrix.js";
 import { LLM_ENABLED } from "../config.js";
-import { getLLMHeaders } from "./openaiClient.js";
+import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -35,6 +35,7 @@ export async function fetchRelatednessMatrix(state) {
     throw new Error(`Backend error ${res.status}: ${body}`);
   }
   const data = await res.json();
+  accumulateUsage(data);
   return {
     overview: data.overview,
     matrix: data.matrix,

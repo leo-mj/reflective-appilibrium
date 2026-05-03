@@ -50,6 +50,8 @@ class SuggestPrinciplesResponse(BaseModel):
 
     suggestions: list[PrincipleSuggestion]
     model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
@@ -119,13 +121,18 @@ async def suggest_principles(
         f"and {len(existing_principles)} existing principles."
     )
     prompt = _build_prompt(request.topic, judgments, existing_principles)
-    raw = await llm.complete(
+    result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,
         json_mode=True,
     )
-    data = json.loads(raw)
+    data = json.loads(result.text)
     suggestions = [PrincipleSuggestion(**s) for s in data.get("suggestions", [])]
     logger.info(f"Received {len(suggestions)} principle suggestions from LLM.")
 
-    return SuggestPrinciplesResponse(suggestions=suggestions, model=llm.model)
+    return SuggestPrinciplesResponse(
+        suggestions=suggestions,
+        model=llm.model,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+    )

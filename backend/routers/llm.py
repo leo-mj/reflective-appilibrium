@@ -34,11 +34,17 @@ class CompletionRequest(BaseModel):
     json_mode: bool = False
 
 
+class TokenUsage(BaseModel):
+    input_tokens: int
+    output_tokens: int
+
+
 class CompletionResponse(BaseModel):
     """Response from ``POST /api/llm/complete``."""
 
     text: str
     model: str
+    usage: TokenUsage
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -71,10 +77,14 @@ async def complete(
 ) -> CompletionResponse:
     """Send a prompt to the configured LLM and return the reply."""
     logger.info("Sending request to LLM.")
-    text = await llm.complete(
+    result = await llm.complete_with_usage(
         messages=[m.model_dump() for m in request.messages],
         temperature=request.temperature,
         json_mode=request.json_mode,
     )
-    logger.info(f"Received response beginning with: {text[:20]}")
-    return CompletionResponse(text=text, model=llm.model)
+    logger.info(f"Received response beginning with: {result.text[:20]}")
+    return CompletionResponse(
+        text=result.text,
+        model=llm.model,
+        usage=TokenUsage(input_tokens=result.input_tokens, output_tokens=result.output_tokens),
+    )

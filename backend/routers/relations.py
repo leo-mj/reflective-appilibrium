@@ -50,6 +50,8 @@ class SuggestResponse(BaseModel):
 
     suggestions: list[RelationSuggestion]
     model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
@@ -124,17 +126,22 @@ async def suggest_relations(
     active = [e for e in request.elements if e.status not in {"withdrawn", "rejected"}]
     prompt = _build_prompt(request.topic, active, request.existing_relations)
     logger.info(f"Requesting relation suggestions from model '{llm.model}' between {len(active)} active elements.")
-    raw = await llm.complete(
+    result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
         json_mode=True,
     )
     try:
-        data = json.loads(raw)
+        data = json.loads(result.text)
     except json.JSONDecodeError:
-        logger.error(f"Failed to parse LLM response as JSON: {raw!r}")
+        logger.error(f"Failed to parse LLM response as JSON: {result.text!r}")
         raise
     suggestions = [RelationSuggestion(**r) for r in data.get("relations", [])]
     logger.info(f"Received LLM suggestions for {len(suggestions)} new relations.")
 
-    return SuggestResponse(suggestions=suggestions, model=llm.model)
+    return SuggestResponse(
+        suggestions=suggestions,
+        model=llm.model,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+    )

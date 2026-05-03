@@ -56,6 +56,13 @@ class LLMConfig:
     model: str
 
 
+@dataclass
+class CompletionResult:
+    text: str
+    input_tokens: int
+    output_tokens: int
+
+
 def _is_anthropic(base_url: str) -> bool:
     return base_url.rstrip("/").startswith(_ANTHROPIC_BASE)
 
@@ -85,18 +92,32 @@ class LLMService:
         temperature: float = 0.3,
         json_mode: bool = False,
     ) -> str:
-        """Send chat messages and return the assistant reply as a string.
+        """Send chat messages and return the text reply.
 
         ``json_mode=True`` requests a JSON object response.  On OpenAI-compatible
         providers this uses ``response_format``; on Anthropic a system instruction
         is appended instead (the native API doesn't expose a JSON mode flag).
         """
+        result = await self.complete_with_usage(messages, temperature, json_mode)
+        return result.text
+
+    async def complete_with_usage(
+        self,
+        messages: list[dict],
+        temperature: float = 0.3,
+        json_mode: bool = False,
+    ) -> CompletionResult:
+        """Send chat messages and return the reply with token usage."""
         if self._anthropic is not None:
-            raw = await self._complete_anthropic(self._anthropic, messages, temperature, json_mode)
+            text, inp, out = await self._complete_anthropic(self._anthropic, messages, temperature, json_mode)
         else:
             assert self._openai is not None
-            raw = await self._complete_openai(self._openai, messages, temperature, json_mode)
-        return _extract_json(raw) if json_mode else raw
+            text, inp, out = await self._complete_openai(self._openai, messages, temperature, json_mode)
+        return CompletionResult(
+            text=_extract_json(text) if json_mode else text,
+            input_tokens=inp,
+            output_tokens=out,
+        )
 
     # ------------------------------------------------------------------
     # Provider implementations
@@ -108,7 +129,7 @@ class LLMService:
         messages: list[dict],
         temperature: float,
         json_mode: bool,
-    ) -> str:
+    ) -> tuple[str, int, int]:
         # Anthropic separates system messages from the conversation turns.
         system_parts: list[str] = []
         turns: list[dict] = []
@@ -131,7 +152,11 @@ class LLMService:
             messages=turns,  # type: ignore[arg-type]
             **kwargs,
         )
-        return response.content[0].text
+        return (
+            response.content[0].text,
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+        )
 
     async def _complete_openai(
         self,
@@ -139,7 +164,7 @@ class LLMService:
         messages: list[dict],
         temperature: float,
         json_mode: bool,
-    ) -> str:
+    ) -> tuple[str, int, int]:
         kwargs: dict = {}
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
@@ -150,4 +175,9 @@ class LLMService:
             temperature=temperature,
             **kwargs,
         )
-        return response.choices[0].message.content
+        usage = response.usage
+        return (
+            response.choices[0].message.content,
+            usage.prompt_tokens if usage else 0,
+            usage.completion_tokens if usage else 0,
+        )

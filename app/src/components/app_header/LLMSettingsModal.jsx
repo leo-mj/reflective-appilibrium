@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { LLM_PROVIDERS } from "../../constants/llmProviders.js";
 import { btn } from "./appHeaderStyles.js";
+import { getSessionUsage, clearSessionUsage } from "../../utils/openaiClient.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -43,6 +44,7 @@ export function LLMSettingsModal({ open, onClose }) {
   const [testStatus, setTestStatus] = useState(null); // null | { ok: boolean, message: string }
   const [testing, setTesting] = useState(false);
   const [serverKeyUrls, setServerKeyUrls] = useState(new Set());
+  const [usage, setUsage] = useState({ input: 0, output: 0 });
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +52,7 @@ export function LLMSettingsModal({ open, onClose }) {
       .then((r) => r.json())
       .then((data) => setServerKeyUrls(new Set(data.base_urls)))
       .catch(() => {});
+    setUsage(getSessionUsage());
   }, [open]);
 
   const hasSessionKey = Boolean(
@@ -113,6 +116,7 @@ export function LLMSettingsModal({ open, onClose }) {
 
   function handleClear() {
     sessionStorage.removeItem("llmSettings");
+    clearSessionUsage();
     setApiKey("");
     setTestStatus(null);
     onClose();
@@ -266,6 +270,13 @@ export function LLMSettingsModal({ open, onClose }) {
             }}
           >
             {testStatus.message}
+          </div>
+        )}
+
+        {/* Session usage */}
+        {(usage.input > 0 || usage.output > 0) && (
+          <div style={{ fontSize: 11, color: C.dim, marginBottom: 12 }}>
+            Session: {usage.input.toLocaleString()} in · {usage.output.toLocaleString()} out tokens
           </div>
         )}
 

@@ -24,12 +24,48 @@ export function getLLMHeaders() {
 }
 
 /**
+ * Returns cumulative token usage for this session from sessionStorage.
+ *
+ * @returns {{ input: number, output: number }}
+ */
+export function getSessionUsage() {
+  try {
+    return JSON.parse(sessionStorage.getItem("llmUsage") || '{"input":0,"output":0}');
+  } catch {
+    return { input: 0, output: 0 };
+  }
+}
+
+/** Resets the session token counter. */
+export function clearSessionUsage() {
+  sessionStorage.removeItem("llmUsage");
+}
+
+/**
+ * Adds token counts from an LLM response to the session accumulator.
+ * Works with any response that has top-level input_tokens / output_tokens fields.
+ *
+ * @param {{ input_tokens?: number, output_tokens?: number }} data
+ */
+export function accumulateUsage(data) {
+  if (!data.input_tokens && !data.output_tokens) return;
+  const prev = getSessionUsage();
+  sessionStorage.setItem(
+    "llmUsage",
+    JSON.stringify({
+      input: prev.input + (data.input_tokens || 0),
+      output: prev.output + (data.output_tokens || 0),
+    })
+  );
+}
+
+/**
  * Sends a prompt to the backend LLM service and returns the raw text response
  * along with the model name used.
  *
  * @param {string} prompt
  * @param {number} [temperature=0.3]
- * @returns {Promise<{ text: string, model: string }>}
+ * @returns {Promise<{ text: string, model: string, usage: { input_tokens: number, output_tokens: number } }>}
  */
 export async function callBackendLLM(prompt, temperature = 0.3) {
   console.log(`Fetching response from LLM`);
@@ -46,5 +82,16 @@ export async function callBackendLLM(prompt, temperature = 0.3) {
     const body = await res.text();
     throw new Error(`Backend error ${res.status}: ${body}`);
   }
-  return res.json();
+  const data = await res.json();
+  if (data.usage) {
+    const prev = getSessionUsage();
+    sessionStorage.setItem(
+      "llmUsage",
+      JSON.stringify({
+        input: prev.input + (data.usage.input_tokens || 0),
+        output: prev.output + (data.usage.output_tokens || 0),
+      })
+    );
+  }
+  return data;
 }

@@ -42,6 +42,8 @@ class MatrixResponse(BaseModel):
     matrix: dict[str, dict[str, float]]
     pair_descriptions: dict[str, str] = Field(alias="pairDescriptions")
     model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
 
     model_config = {"populate_by_name": True}
 
@@ -96,16 +98,18 @@ async def analyze(
     ]
     logger.info(f"Requesting relatedness matrix from model '{llm.model}' for {len(active)} elements.")
     prompt = _build_prompt(request.topic, active)
-    raw = await llm.complete(
+    result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
         json_mode=True,
     )
-    data: dict[str, Any] = json.loads(raw)
+    data: dict[str, Any] = json.loads(result.text)
     logger.info("Received relatedness matrix from LLM.")
     return MatrixResponse(
         overview=data.get("overview", ""),
         matrix=data.get("matrix", {}),
         pairDescriptions=data.get("pairDescriptions", {}),
         model=llm.model,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
     )

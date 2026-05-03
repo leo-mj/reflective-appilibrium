@@ -116,6 +116,9 @@ export function AppHeaderWide({
         <div
           style={{ minWidth: 0, display: "flex", alignItems: "centre", gap: 5 }}
         >
+          <a href="https://www.tuhh.de/ethics/welcome" target="_blank">
+            <img src="ieit_logo.svg" style={{ height: 36 }} />
+          </a>
           <img src="favicon.svg" style={{ height: 36 }} />
           <div>
             <div
@@ -292,7 +295,9 @@ export function AppHeaderWide({
 
                   <button onClick={close(onExpandAll)} style={menuItem}>
                     <span style={icon}>⇅</span>
-                    {allExpanded ? "Minimize all toggles" : "Expand all toggles"}
+                    {allExpanded
+                      ? "Minimize all toggles"
+                      : "Expand all toggles"}
                   </button>
 
                   {menuDivider}

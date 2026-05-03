@@ -62,6 +62,8 @@ class ElicitJudgmentsResponse(BaseModel):
 
     suggestions: list[JudgmentSuggestion]
     model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
@@ -155,12 +157,12 @@ async def elicit_judgments(
         f"with {len(request.elements)} elements."
     )
     prompt = _build_prompt(request.topic, request.elements, request.log)
-    raw = await llm.complete(
+    result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.6,
         json_mode=True,
     )
-    data = json.loads(raw)
+    data = json.loads(result.text)
     suggestions = [JudgmentSuggestion(**s) for s in data.get("suggestions", [])]
     total_judgments = sum(len(s.judgments) for s in suggestions)
     logger.info(
@@ -168,4 +170,9 @@ async def elicit_judgments(
         f"({total_judgments} judgment options) from LLM."
     )
 
-    return ElicitJudgmentsResponse(suggestions=suggestions, model=llm.model)
+    return ElicitJudgmentsResponse(
+        suggestions=suggestions,
+        model=llm.model,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+    )

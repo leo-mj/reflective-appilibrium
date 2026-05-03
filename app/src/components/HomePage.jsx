@@ -429,7 +429,11 @@ export function HomePage({ onStartFresh, onLoadSample, onLoadSession }) {
         <img src="/ieit_logo.svg" style={{ width: "15em" }} />
         <span>
           By the{" "}
-          <a href="https://www.tuhh.de/ethics/welcome" style={{ color: C.dim }}>
+          <a
+            href="https://www.tuhh.de/ethics/welcome"
+            target="_blank"
+            style={{ color: C.dim }}
+          >
             Institute for Ethics in Technology (TUHH)
           </a>
         </span>

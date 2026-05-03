@@ -7,7 +7,7 @@
 
 import dummyRelations from "../dummy-relations.js";
 import { LLM_ENABLED } from "../config.js";
-import { getLLMHeaders } from "./openaiClient.js";
+import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -36,5 +36,7 @@ export async function fetchRelationSuggestions(state, useDummy = false) {
     const body = await res.text();
     throw new Error(`Backend error ${res.status}: ${body}`);
   }
-  return res.json();
+  const data = await res.json();
+  accumulateUsage(data);
+  return data;
 }
