@@ -200,10 +200,11 @@ function SuggestionCard({
         <span
           style={{
             fontSize: 10,
+            lineHeight: 1,
             color: C.principle.high,
             border: `1px solid ${C.principle.high}`,
             borderRadius: 4,
-            padding: "1px 6px",
+            padding: "3px 6px",
           }}
         >
           {suggestion.confidence}

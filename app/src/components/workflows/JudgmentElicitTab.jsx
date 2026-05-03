@@ -179,13 +179,14 @@ function SuggestionCard({
               <span
                 style={{
                   fontSize: 10,
+                  lineHeight: 1,
                   color: C.judgment.high,
                   border: `1px solid ${C.judgment.high}`,
                   borderRadius: 4,
-                  padding: "1px 6px",
+                  padding: "3px 6px",
                   flexShrink: 0,
                   marginTop: 3,
-                  width: "5.5em",
+                  width: "7em",
                   textAlign: "center",
                   display: "inline-block",
                 }}

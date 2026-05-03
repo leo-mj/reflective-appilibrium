@@ -26,7 +26,7 @@ export const WITHDRAW_BTN_STYLE = {
 
 export const CARD_STYLE = {
   paddingBottom: 14,
-  borderBottom: `1px solid ${C.border}66`,
+  borderBottom: `1px solid ${C.border}`,
   marginBottom: 14,
 };
 
@@ -45,5 +45,5 @@ export const CLUSTER_CARD_STYLE = {
   gap: 4,
   fontSize: 12,
   paddingBottom: 3,
-  borderBottom: `1px solid ${C.border}66`,
+  borderBottom: `1px solid ${C.border}`,
 };

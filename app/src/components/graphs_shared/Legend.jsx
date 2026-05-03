@@ -4,6 +4,7 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 
 export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
   const items = [
@@ -51,60 +52,62 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
       }}
     >
       {items.map((it) => (
-        <div
+        <Tooltip
           key={it.key}
-          onClick={() => toggle(it.key)}
-          title={hidden(it.key) ? `Show ${it.label.toLowerCase()}` : `Hide ${it.label.toLowerCase()}`}
-          style={itemStyle(it.key)}
+          text={hidden(it.key) ? `Show ${it.label.toLowerCase()}` : `Hide ${it.label.toLowerCase()}`}
+          delay={100}
         >
-          {it.shape === "circle" && (
-            <div
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: it.color,
-              }}
-            />
-          )}
-          {it.shape === "roundrect" && (
-            <div
-              style={{
-                width: 14,
-                height: 10,
-                borderRadius: 3,
-                background: it.color,
-              }}
-            />
-          )}
-          {it.shape === "diamond" && (
-            <svg width={12} height={12} viewBox="0 0 12 12">
-              <polygon points="6,0 12,6 6,12 0,6" fill={it.color} />
-            </svg>
-          )}
-          {it.label}
-        </div>
+          <div onClick={() => toggle(it.key)} style={itemStyle(it.key)}>
+            {it.shape === "circle" && (
+              <div
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: it.color,
+                }}
+              />
+            )}
+            {it.shape === "roundrect" && (
+              <div
+                style={{
+                  width: 14,
+                  height: 10,
+                  borderRadius: 3,
+                  background: it.color,
+                }}
+              />
+            )}
+            {it.shape === "diamond" && (
+              <svg width={12} height={12} viewBox="0 0 12 12">
+                <polygon points="6,0 12,6 6,12 0,6" fill={it.color} />
+              </svg>
+            )}
+            {it.label}
+          </div>
+        </Tooltip>
       ))}
       {lines.map((l) => (
-        <div
+        <Tooltip
           key={l.key}
-          onClick={() => toggle(l.key)}
-          title={hidden(l.key) ? `Show ${l.label.toLowerCase()}` : `Hide ${l.label.toLowerCase()}`}
-          style={itemStyle(l.key)}
+          text={hidden(l.key) ? `Show ${l.label.toLowerCase()}` : `Hide ${l.label.toLowerCase()}`}
+          delay={100}
         >
-          <svg width={20} height={10}>
-            <line
-              x1={0}
-              y1={5}
-              x2={20}
-              y2={5}
-              stroke={l.color}
-              strokeWidth={2}
-              strokeDasharray={l.dash}
-            />
-          </svg>
-          {l.label}
-        </div>
+          <div onClick={() => toggle(l.key)} style={itemStyle(l.key)}>
+            <svg width={20} height={10}>
+              <line
+                x1={0}
+                y1={5}
+                x2={20}
+                y2={5}
+                stroke={l.color}
+                strokeWidth={2}
+                strokeDasharray={l.dash}
+              />
+            </svg>
+            {l.label}
+          </div>
+        </Tooltip>
       ))}
     </div>
   );
