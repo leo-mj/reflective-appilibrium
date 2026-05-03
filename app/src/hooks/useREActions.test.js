@@ -90,6 +90,11 @@ describe("handleAddElement", () => {
 
   it("sets recentlyAdded to the new element id and clears recentlyAddedRel", () => {
     const { result } = renderHook(() => useREActions(baseState()));
+    // Populate recentlyAddedRel first so the clearing assertion is non-vacuous
+    act(() => {
+      result.current.handleAddRelation({ from: "J1", to: "P1", type: "conflicts", explanation: "" });
+    });
+    expect(result.current.recentlyAddedRel).not.toBeNull();
     act(() => {
       result.current.handleAddElement({ type: "principle", text: "P", confidence: "high", origin: "user" });
     });
@@ -97,13 +102,24 @@ describe("handleAddElement", () => {
     expect(result.current.recentlyAddedRel).toBeNull();
   });
 
-  it("clears selected and selectedRel", () => {
+  it("clears selected", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleSelectNode("J1"));
+    expect(result.current.selected).toBe("J1");
     act(() => {
       result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
     });
     expect(result.current.selected).toBeNull();
+  });
+
+  it("clears selectedRel", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    const rel = result.current.state.relations[0];
+    act(() => result.current.handleSelectRel(rel));
+    expect(result.current.selectedRel).toBe(rel);
+    act(() => {
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+    });
     expect(result.current.selectedRel).toBeNull();
   });
 
@@ -144,26 +160,46 @@ describe("handleAddRelation", () => {
     expect(result.current.state.log[0].decision).toBe("Added");
   });
 
-  it("sets recentlyAddedRel when select=true (default) and clears selected/recentlyAdded", () => {
+  it("sets recentlyAddedRel and clears selected when select=true (default)", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleSelectNode("J1"));
+    expect(result.current.selected).toBe("J1");
     act(() => {
       result.current.handleAddRelation({ from: "J1", to: "P1", type: "supports", explanation: "" });
     });
     expect(result.current.recentlyAddedRel).toMatchObject({ from: "J1", to: "P1", type: "supports", addedRound: 2 });
     expect(result.current.selected).toBeNull();
+  });
+
+  it("clears recentlyAdded when select=true (default)", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    // Populate recentlyAdded via an element add, then add a relation and assert it's cleared
+    act(() => {
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+    });
+    expect(result.current.recentlyAdded).toBe("J2");
+    act(() => {
+      result.current.handleAddRelation({ from: "J1", to: "P1", type: "supports", explanation: "" });
+    });
     expect(result.current.recentlyAdded).toBeNull();
   });
 
-  it("does not set recentlyAddedRel when select=false", () => {
+  it("does not update recentlyAddedRel when select=false", () => {
     const { result } = renderHook(() => useREActions(baseState()));
+    // Set recentlyAddedRel to a known value first
+    act(() => {
+      result.current.handleAddRelation({ from: "J1", to: "P1", type: "conflicts", explanation: "" });
+    });
+    const firstRel = result.current.recentlyAddedRel;
+    expect(firstRel).not.toBeNull();
+    // Adding with select=false should leave recentlyAddedRel unchanged
     act(() => {
       result.current.handleAddRelation(
-        { from: "J1", to: "P1", type: "supports", explanation: "" },
+        { from: "J1", to: "P1", type: "depends", explanation: "" },
         { select: false },
       );
     });
-    expect(result.current.recentlyAddedRel).toBeNull();
+    expect(result.current.recentlyAddedRel).toBe(firstRel);
   });
 });
 
@@ -592,30 +628,67 @@ describe("handleUndo / canUndo", () => {
 // ─── handleSelectNode / handleSelectRel ──────────────────────────────────────
 
 describe("handleSelectNode", () => {
-  it("sets selected and clears selectedRel, recentlyAdded, recentlyAddedRel", () => {
+  it("sets selected and clears recentlyAdded", () => {
     const { result } = renderHook(() => useREActions(baseState()));
-    // Populate recentlyAdded first
     act(() => {
       result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
     });
     expect(result.current.recentlyAdded).toBe("J2");
     act(() => result.current.handleSelectNode("J1"));
     expect(result.current.selected).toBe("J1");
-    expect(result.current.selectedRel).toBeNull();
     expect(result.current.recentlyAdded).toBeNull();
+  });
+
+  it("clears selectedRel", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    const rel = result.current.state.relations[0];
+    act(() => result.current.handleSelectRel(rel));
+    expect(result.current.selectedRel).toBe(rel);
+    act(() => result.current.handleSelectNode("J1"));
+    expect(result.current.selectedRel).toBeNull();
+  });
+
+  it("clears recentlyAddedRel", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => {
+      result.current.handleAddRelation({ from: "J1", to: "P1", type: "conflicts", explanation: "" });
+    });
+    expect(result.current.recentlyAddedRel).not.toBeNull();
+    act(() => result.current.handleSelectNode("J1"));
     expect(result.current.recentlyAddedRel).toBeNull();
   });
 });
 
 describe("handleSelectRel", () => {
-  it("sets selectedRel and clears selected, recentlyAdded, recentlyAddedRel", () => {
+  it("sets selectedRel and clears selected", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleSelectNode("J1"));
+    expect(result.current.selected).toBe("J1");
     const rel = result.current.state.relations[0];
     act(() => result.current.handleSelectRel(rel));
     expect(result.current.selectedRel).toBe(rel);
     expect(result.current.selected).toBeNull();
+  });
+
+  it("clears recentlyAdded", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => {
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+    });
+    expect(result.current.recentlyAdded).toBe("J2");
+    const rel = result.current.state.relations[0];
+    act(() => result.current.handleSelectRel(rel));
     expect(result.current.recentlyAdded).toBeNull();
+  });
+
+  it("clears recentlyAddedRel", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => {
+      result.current.handleAddRelation({ from: "J1", to: "P1", type: "conflicts", explanation: "" });
+    });
+    expect(result.current.recentlyAddedRel).not.toBeNull();
+    const origRel = result.current.state.relations[0];
+    act(() => result.current.handleSelectRel(origRel));
     expect(result.current.recentlyAddedRel).toBeNull();
   });
 });
@@ -630,8 +703,10 @@ describe("handleEditRequest", () => {
     expect(result.current.editingEl).toEqual(result.current.state.elements[0]);
   });
 
-  it("sets editingEl to null when element id is not found", () => {
+  it("resets editingEl to null when element id is not found", () => {
     const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleEditRequest("J1"));
+    expect(result.current.editingEl).not.toBeNull();
     act(() => result.current.handleEditRequest("X99"));
     expect(result.current.editingEl).toBeNull();
   });
@@ -644,11 +719,14 @@ describe("handleImportFile", () => {
     const imported = baseState({ topic: "Imported topic", elements: [] });
     importStateFromFile.mockResolvedValue(imported);
     const { result } = renderHook(() => useREActions(baseState()));
-    // Populate undo stack and selection
+    // Populate undo stack, node selection, and relation selection
     act(() => {
       result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
     });
     act(() => result.current.handleSelectNode("J1"));
+    expect(result.current.selected).toBe("J1");
+    act(() => result.current.handleSelectRel(result.current.state.relations[0]));
+    expect(result.current.selectedRel).not.toBeNull();
     expect(result.current.canUndo).toBe(true);
     await act(async () => {
       await result.current.handleImportFile(new File([], "test.md"));
