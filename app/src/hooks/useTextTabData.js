@@ -30,6 +30,8 @@ export function useTextTabData({
   hiddenLegendKeys,
   selected,
   selectedRel,
+  recentlyAdded,
+  recentlyAddedRel,
   search,
 }) {
   const isElVisible = (el) => {
@@ -109,6 +111,13 @@ export function useTextTabData({
   const clusters = useMemo(() => findCoherentClusters(state), [state]);
   const clusterCount = clusters.length;
 
+  const pinnedEl = recentlyAdded
+    ? (visibleEls.find((e) => e.id === recentlyAdded) ?? null)
+    : null;
+  const pinnedRel = recentlyAddedRel && visRels.includes(recentlyAddedRel)
+    ? recentlyAddedRel
+    : null;
+
   return {
     visibleEls,
     visRels,
@@ -125,5 +134,7 @@ export function useTextTabData({
     hasCoherence,
     clusters,
     clusterCount,
+    pinnedEl,
+    pinnedRel,
   };
 }

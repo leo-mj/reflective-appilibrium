@@ -281,6 +281,7 @@ export function Graph({
   onAddRelation,
   onCtrlSecondSelect,
   ready,
+  recentlyAdded,
 }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
@@ -429,7 +430,7 @@ export function Graph({
           renderNode(
             el,
             positions,
-            graphNodeVisuals(el, wIds, dimNode, selected),
+            graphNodeVisuals(el, wIds, dimNode, selected, undefined, recentlyAdded),
             isDragging,
             setTooltip,
           ),

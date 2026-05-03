@@ -139,11 +139,12 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
  * @param {string|null}                [ctrlFirst] - ID of the ctrl-click first node, or null.
  * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, transition: string, children: React.ReactNode }}
  */
-export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst) {
+export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, recentlyAdded) {
   const isWithdrawn = wIds.has(element.id);
   const isRejected = element.status === "rejected";
   const isSelected = element.id === selected;
   const isCtrlFirst = element.id === ctrlFirst;
+  const isRecentlyAdded = element.id === recentlyAdded;
   const baseOpacity = isWithdrawn
     ? 0.25
     : isRejected
@@ -162,7 +163,7 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst) {
         strokeWidth={2}
         opacity={0.45}
       />
-    ) : isCtrlFirst ? (
+    ) : isCtrlFirst || isRecentlyAdded ? (
       <PulseRing type={element.type} radius={nodeRadius(element.type)} />
     ) : null,
   };

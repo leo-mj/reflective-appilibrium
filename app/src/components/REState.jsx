@@ -8,7 +8,10 @@ import { useREActions } from "../hooks/useREActions.js";
 import { ASSIST_TABS } from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
 import { saveSession } from "../utils/sessionsClient.js";
-import { WORKFLOW_NEXT_PHASE, nextPhaseEnabled } from "../utils/workflowUtils.js";
+import {
+  WORKFLOW_NEXT_PHASE,
+  nextPhaseEnabled,
+} from "../utils/workflowUtils.js";
 import { AppHeader } from "./AppHeader.jsx";
 import { TextPanel } from "./TextPanel.jsx";
 import { GraphPanel } from "./GraphPanel.jsx";
@@ -16,9 +19,11 @@ import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
   const [tab, setTab] = useState("elicitJudgments");
-  const [hiddenLegendKeys, setHiddenLegendKeys] = useState(new Set(["withdrawn", "rejected"]));
+  const [hiddenLegendKeys, setHiddenLegendKeys] = useState(
+    new Set(["withdrawn", "rejected"]),
+  );
   const [showText, setShowText] = useState(true);
-  const [showTabNav, setShowTabNav] = useState(true);
+  const [showTabNav, setShowTabNav] = useState(false);
   const [assistSidePanel, setAssistSidePanel] = useState("text");
   const [historyRound, setHistoryRound] = useState(0);
   const [workflowPhase, setWorkflowPhase] = useState(null);
@@ -29,6 +34,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     state,
     selected,
     selectedRel,
+    recentlyAdded,
+    recentlyAddedRel,
     handleSelectNode,
     handleSelectRel,
     editingEl,
@@ -72,7 +79,11 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const dims = useWindowSize();
   const isWide = dims.w > 768 && dims.h > 500;
   const isAssistTab = ASSIST_TABS.includes(tab);
-  const hasSidePanel = isWide && (isAssistTab ? (assistSidePanel !== "none" && assistSidePanel !== "focus") : showText);
+  const hasSidePanel =
+    isWide &&
+    (isAssistTab
+      ? assistSidePanel !== "none" && assistSidePanel !== "focus"
+      : showText);
   // graphW must match the actual rendered width of the graph SVG so the force
   // simulation centres nodes in the visible area.
   // Focus mode keeps the same graphW as graph mode so switching between the two
@@ -123,16 +134,22 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     if (t === "clusters" && isWide) {
       setShowText(true);
       requestAnimationFrame(() =>
-        clusterSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        clusterSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        }),
       );
     }
   };
 
-  const textState = tab === "history" ? stateAtRound(state, historyRound) : state;
+  const textState =
+    tab === "history" ? stateAtRound(state, historyRound) : state;
 
   // Props shared by both the assist-side and analyze-mode TextPanel instances.
   const showingTextPanel = isWide
-    ? isAssistTab ? assistSidePanel === "text" : showText
+    ? isAssistTab
+      ? assistSidePanel === "text"
+      : showText
     : tab === "text";
   const textPanelProps = {
     isWide,
@@ -148,12 +165,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onEditRelRequest: setEditingRel,
     onWithdrawRequest: handleWithdrawRequest,
     onWithdrawRelRequest: handleWithdrawRelRequest,
-    onAddElement: isWide
-      ? handleAddElement
-      : (d) => { handleAddElement(d); handleSelectNode(() => null); },
-    onAddRelation: isWide
-      ? handleAddRelation
-      : (d) => { handleAddRelation(d); handleSelectRel(() => null); },
+    onAddElement: handleAddElement,
+    onAddRelation: handleAddRelation,
+    recentlyAdded,
+    recentlyAddedRel,
     showTabNav,
   };
 
@@ -168,6 +183,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onSelectRel: handleSelectRel,
     onAddElement: handleAddElement,
     onAddRelation: handleAddRelation,
+    recentlyAdded,
     onScrollToRelations: scrollToRelations,
     onRejectElements: handleRejectElements,
     onRejectRelations: handleRejectRelations,

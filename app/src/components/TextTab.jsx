@@ -9,6 +9,9 @@ import { useTextTabData } from "../hooks/useTextTabData.js";
 import { useActiveSection } from "../hooks/useActiveSection.js";
 import { Ctx } from "./text_panel/TextTabContext.js";
 import {
+  ElementCard,
+  RelationCard,
+  SectionHeader,
   HighlightedSection,
   SectionListing,
 } from "./text_panel/TextTabCards.jsx";
@@ -61,6 +64,8 @@ export function TextTab({
   clusterSectionRef,
   scrollToRelationsKey,
   showTabNav,
+  recentlyAdded,
+  recentlyAddedRel,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   const scrollRef = useRef(null);
@@ -94,11 +99,15 @@ export function TextTab({
     hasCoherence,
     clusters,
     clusterCount,
+    pinnedEl,
+    pinnedRel,
   } = useTextTabData({
     state,
     hiddenLegendKeys,
     selected,
     selectedRel,
+    recentlyAdded,
+    recentlyAddedRel,
     search,
   });
 
@@ -217,6 +226,20 @@ export function TextTab({
               restEls={restEls}
               restRels={restRels}
             />
+          )}
+
+          {!highlightedIds && (pinnedEl || pinnedRel) && (
+            <>
+              <SectionHeader title="Just added" />
+              {pinnedEl && <ElementCard e={pinnedEl} />}
+              {pinnedRel && (
+                <RelationCard
+                  key={`${pinnedRel.from}-${pinnedRel.to}-${pinnedRel.type}-${pinnedRel.addedRound ?? 1}`}
+                  r={pinnedRel}
+                />
+              )}
+              <div style={{ borderTop: `1px solid ${C.border}`, margin: "4px 0 8px" }} />
+            </>
           )}
 
           {!highlightedIds && (

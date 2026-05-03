@@ -59,6 +59,7 @@ export function GraphPanel({
   onCtrlSecondSelect,
   ready,
   isSample,
+  recentlyAdded,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
 
@@ -111,6 +112,7 @@ export function GraphPanel({
             onAddRelation={onAddRelation}
             onCtrlSecondSelect={onCtrlSecondSelect}
             ready={ready}
+            recentlyAdded={recentlyAdded}
           />
         )}
         {tab === "history" && (

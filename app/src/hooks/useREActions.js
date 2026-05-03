@@ -33,14 +33,20 @@ export function useREActions(initialState) {
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
   const [withdrawingId, setWithdrawingId] = useState(null);
+  const [recentlyAdded, setRecentlyAdded] = useState(null);
+  const [recentlyAddedRel, setRecentlyAddedRel] = useState(null);
 
   const handleSelectNode = (updater) => {
     setSelectedRel(null);
     setSelected(updater);
+    setRecentlyAdded(null);
+    setRecentlyAddedRel(null);
   };
   const handleSelectRel = (updater) => {
     setSelected(null);
     setSelectedRel(updater);
+    setRecentlyAdded(null);
+    setRecentlyAddedRel(null);
   };
 
   const handleEditRequest = (elementId) => {
@@ -177,7 +183,10 @@ export function useREActions(initialState) {
         makeLogEntry(newRound, `${newId} was added by the user.`, "Added", `${newId} added`),
       ],
     }));
-    handleSelectNode(() => newId);
+    setSelected(null);
+    setSelectedRel(null);
+    setRecentlyAdded(newId);
+    setRecentlyAddedRel(null);
   };
 
   const handleAddRelation = (formData, { select = true } = {}) => {
@@ -197,7 +206,12 @@ export function useREActions(initialState) {
         ),
       ],
     }));
-    if (select) handleSelectRel(() => newRel);
+    if (select) {
+      setSelected(null);
+      setSelectedRel(null);
+      setRecentlyAddedRel(newRel);
+      setRecentlyAdded(null);
+    }
   };
 
   const handleRejectElements = (formDatas) => {
@@ -273,6 +287,8 @@ export function useREActions(initialState) {
     state,
     selected,
     selectedRel,
+    recentlyAdded,
+    recentlyAddedRel,
     handleSelectNode,
     handleSelectRel,
     editingEl,
