@@ -17,15 +17,12 @@ class Settings(BaseSettings):
     """Pydantic-settings model for the backend configuration.
 
     All fields can be overridden via environment variables or the .env file.
-    The ``openai_base_url`` default points at OpenAI; set it to a local
-    Ollama/vLLM URL to run entirely offline.
     """
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
-    openai_api_key: str = ""
-    openai_base_url: str = "https://api.openai.com/v1"
-    openai_model: str = "gpt-4o-mini"
+    llm_api_keys: dict[str, str] = {}
+    default_model: str = "gpt-4o-mini"
     cors_origins: str = "http://localhost:5173"
     sessions_dir: str = str(Path(__file__).parent.parent / "sessions")
 

@@ -47,14 +47,16 @@ def get_llm_service(
     ``Annotated[LLMService, Depends(get_llm_service)]`` parameter.
     Override in tests with ``app.dependency_overrides[get_llm_service]``.
     """
-    if x_base_url and x_base_url not in ALLOWED_BASE_URLS:
+    if not x_base_url:
+        raise HTTPException(status_code=400, detail="Missing x-base-url header")
+    if x_base_url not in ALLOWED_BASE_URLS:
         raise HTTPException(status_code=400, detail="Unsupported provider URL")
-    api_key = x_api_key or settings.openai_api_key
+    api_key = x_api_key or settings.llm_api_keys.get(x_base_url)
     if not api_key:
         raise HTTPException(status_code=400, detail="No API key configured")
     config = LLMConfig(
         api_key=api_key,
-        base_url=x_base_url or settings.openai_base_url,
-        model=x_model or settings.openai_model,
+        base_url=x_base_url,
+        model=x_model or settings.default_model,
     )
     return LLMService(config)

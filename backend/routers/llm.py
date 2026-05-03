@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from ..config import Settings, get_settings
 from ..dependencies import get_llm_service
 from ..services.llm import LLMService
 
@@ -41,6 +42,14 @@ class CompletionResponse(BaseModel):
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
+
+@router.get("/configured-providers")
+async def configured_providers(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
+    """Return base URLs that have server-side keys configured (keys never exposed)."""
+    return {"base_urls": list(settings.llm_api_keys.keys())}
+
 
 @router.post("/test")
 async def test_connection(

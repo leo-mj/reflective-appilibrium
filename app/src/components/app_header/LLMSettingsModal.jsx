@@ -5,7 +5,7 @@
  * @module components/app_header/LLMSettingsModal
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { LLM_PROVIDERS } from "../../constants/llmProviders.js";
 import { btn } from "./appHeaderStyles.js";
@@ -42,8 +42,17 @@ export function LLMSettingsModal({ open, onClose }) {
   const [apiKey, setApiKey] = useState("");
   const [testStatus, setTestStatus] = useState(null); // null | { ok: boolean, message: string }
   const [testing, setTesting] = useState(false);
+  const [serverKeyUrls, setServerKeyUrls] = useState(new Set());
 
-  const hasSavedKey = Boolean(
+  useEffect(() => {
+    if (!open) return;
+    fetch(`${BACKEND_URL}/api/llm/configured-providers`)
+      .then((r) => r.json())
+      .then((data) => setServerKeyUrls(new Set(data.base_urls)))
+      .catch(() => {});
+  }, [open]);
+
+  const hasSessionKey = Boolean(
     (() => {
       try {
         return JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}")?.apiKey;
@@ -52,6 +61,7 @@ export function LLMSettingsModal({ open, onClose }) {
       }
     })()
   );
+  const hasSavedKey = hasSessionKey || serverKeyUrls.has(provider.baseUrl);
 
   const effectiveApiKey = apiKey || provider.defaultApiKey || "";
   // Save is enabled if: last test succeeded OR a key is already saved (model-only change)
@@ -269,10 +279,10 @@ export function LLMSettingsModal({ open, onClose }) {
           </button>
           <button
             onClick={handleTest}
-            disabled={testing || (!effectiveApiKey && !hasSavedKey)}
+            disabled={testing}
             style={{
               ...btn(false),
-              opacity: testing || (!apiKey && !hasSavedKey) ? 0.4 : 1,
+              opacity: testing ? 0.4 : 1,
             }}
           >
             {testing ? "Testing…" : "Test connection"}
