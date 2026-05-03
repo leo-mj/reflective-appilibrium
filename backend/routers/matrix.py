@@ -94,7 +94,7 @@ async def analyze(
         e for e in request.elements
         if e.status != "withdrawn" and e.type in ("judgment", "principle")
     ]
-    logger.info(f"Requesting relatedness matrix from LLM for {len(active)} elements.")
+    logger.info(f"Requesting relatedness matrix from model '{llm.model}' for {len(active)} elements.")
     prompt = _build_prompt(request.topic, active)
     raw = await llm.complete(
         messages=[{"role": "user", "content": prompt}],

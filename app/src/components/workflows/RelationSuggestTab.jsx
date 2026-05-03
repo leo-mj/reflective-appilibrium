@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
+import { SpinnerIcon } from "../Icons.jsx";
 import { fetchRelationSuggestions } from "../../utils/relationsClient.js";
 import { AddRelationPanel } from "../user_edits/TextTabAddPanel.jsx";
 import {
@@ -96,7 +97,7 @@ function Toolbar({
             gap: 5,
           }}
         >
-          {!loading && <span>↺</span>}
+          {loading ? <SpinnerIcon /> : <span>↺</span>}
           {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
         </button>
         {workflowPhase && (

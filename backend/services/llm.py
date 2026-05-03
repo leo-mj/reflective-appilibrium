@@ -10,6 +10,7 @@ Swap ``base_url`` in .env or via BYOK headers to target OpenAI, Anthropic,
 Mistral, Ollama, vLLM, etc. without changing call sites.
 """
 
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -18,6 +19,34 @@ from openai import AsyncOpenAI
 
 
 _ANTHROPIC_BASE = "https://api.anthropic.com"
+
+
+def _extract_json(text: str) -> str:
+    """Best-effort extraction of a JSON object from a model response.
+
+    Handles three failure modes common in small/reasoning models:
+    - <think>…</think> blocks prepended by reasoning models
+    - Markdown code fences (```json … ```)
+    - Stray text before or after the JSON object
+    """
+    # Strip reasoning blocks
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    # Strip markdown fences
+    text = re.sub(r"^```(?:json)?\s*\n?", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\n?```\s*$", "", text, flags=re.MULTILINE).strip()
+    # Extract outermost { … } by bracket counting
+    start = text.find("{")
+    if start == -1:
+        return text
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return text[start:]
 
 
 @dataclass
@@ -63,9 +92,11 @@ class LLMService:
         is appended instead (the native API doesn't expose a JSON mode flag).
         """
         if self._anthropic is not None:
-            return await self._complete_anthropic(self._anthropic, messages, temperature, json_mode)
-        assert self._openai is not None
-        return await self._complete_openai(self._openai, messages, temperature, json_mode)
+            raw = await self._complete_anthropic(self._anthropic, messages, temperature, json_mode)
+        else:
+            assert self._openai is not None
+            raw = await self._complete_openai(self._openai, messages, temperature, json_mode)
+        return _extract_json(raw) if json_mode else raw
 
     # ------------------------------------------------------------------
     # Provider implementations

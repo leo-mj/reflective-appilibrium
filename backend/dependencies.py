@@ -20,6 +20,7 @@ ALLOWED_BASE_URLS = {
     "https://api.openai.com/v1",
     "https://api.mistral.ai/v1",
     "https://api.anthropic.com/v1",
+    "http://localhost:11434/v1",
 }
 
 

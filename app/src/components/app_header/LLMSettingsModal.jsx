@@ -53,7 +53,7 @@ export function LLMSettingsModal({ open, onClose }) {
     })()
   );
 
-  const canSave = testStatus?.ok || (hasSavedKey && !testStatus?.ok === false);
+  const effectiveApiKey = apiKey || provider.defaultApiKey || "";
   // Save is enabled if: last test succeeded OR a key is already saved (model-only change)
   const saveEnabled = testStatus?.ok || (hasSavedKey && testStatus === null);
 
@@ -74,7 +74,7 @@ export function LLMSettingsModal({ open, onClose }) {
     setTestStatus(null);
     try {
       const headers = { "x-model": model, "x-base-url": provider.baseUrl };
-      if (apiKey) headers["x-api-key"] = apiKey;
+      if (effectiveApiKey) headers["x-api-key"] = effectiveApiKey;
       const res = await fetch(`${BACKEND_URL}/api/llm/test`, {
         method: "POST",
         headers,
@@ -96,7 +96,7 @@ export function LLMSettingsModal({ open, onClose }) {
   function handleSave() {
     sessionStorage.setItem(
       "llmSettings",
-      JSON.stringify({ apiKey, baseUrl: provider.baseUrl, model })
+      JSON.stringify({ apiKey: effectiveApiKey, baseUrl: provider.baseUrl, model })
     );
     onClose();
   }
@@ -203,30 +203,47 @@ export function LLMSettingsModal({ open, onClose }) {
         </div>
 
         {/* API key */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>
-            API key
-            <span
+        {provider.defaultApiKey ? (
+          <div style={fieldStyle}>
+            <label style={labelStyle}>API key</label>
+            <div
               style={{
-                marginLeft: 8,
-                color: hasSavedKey ? C.supports : C.dim,
+                ...inputStyle,
+                display: "flex",
+                alignItems: "center",
+                color: C.dim,
+                fontStyle: "italic",
               }}
             >
-              {hasSavedKey ? "· Key saved" : "· No key saved"}
-            </span>
-          </label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => {
-              setApiKey(e.target.value);
-              setTestStatus(null);
-            }}
-            placeholder={hasSavedKey ? "Enter new key to replace" : "sk-…"}
-            style={inputStyle}
-            autoComplete="off"
-          />
-        </div>
+              No key required — Ollama runs locally
+            </div>
+          </div>
+        ) : (
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              API key
+              <span
+                style={{
+                  marginLeft: 8,
+                  color: hasSavedKey ? C.supports : C.dim,
+                }}
+              >
+                {hasSavedKey ? "· Key saved" : "· No key saved"}
+              </span>
+            </label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => {
+                setApiKey(e.target.value);
+                setTestStatus(null);
+              }}
+              placeholder={hasSavedKey ? "Enter new key to replace" : "sk-…"}
+              style={inputStyle}
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         {/* Test status */}
         {testStatus && (
@@ -252,7 +269,7 @@ export function LLMSettingsModal({ open, onClose }) {
           </button>
           <button
             onClick={handleTest}
-            disabled={testing || (!apiKey && !hasSavedKey)}
+            disabled={testing || (!effectiveApiKey && !hasSavedKey)}
             style={{
               ...btn(false),
               opacity: testing || (!apiKey && !hasSavedKey) ? 0.4 : 1,

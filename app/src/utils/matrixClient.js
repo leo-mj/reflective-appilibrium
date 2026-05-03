@@ -7,6 +7,7 @@
 
 import _dummyMatrix from "../dummy-matrix.js";
 import { LLM_ENABLED } from "../config.js";
+import { getLLMHeaders } from "./openaiClient.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -23,7 +24,7 @@ export async function fetchRelatednessMatrix(state) {
   }
   const res = await fetch(`${BACKEND_URL}/api/matrix/analyze`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       topic: state.topic,
       elements: state.elements,

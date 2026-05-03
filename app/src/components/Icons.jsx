@@ -1,3 +1,20 @@
+export function SpinnerIcon({ size = 13 }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        border: "2px solid rgba(255,255,255,0.2)",
+        borderTopColor: "currentColor",
+        animation: "spin 0.8s linear infinite",
+        display: "inline-block",
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
 export function NetworkIcon({ size = "2em" }) {
   return (
     <svg

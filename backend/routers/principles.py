@@ -115,7 +115,7 @@ async def suggest_principles(
     existing_principles = [e for e in active if e.type == "principle"]
 
     logger.info(
-        f"Requesting principle suggestions from LLM for {len(judgments)} judgments "
+        f"Requesting principle suggestions from model '{llm.model}' for {len(judgments)} judgments "
         f"and {len(existing_principles)} existing principles."
     )
     prompt = _build_prompt(request.topic, judgments, existing_principles)

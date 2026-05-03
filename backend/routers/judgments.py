@@ -151,7 +151,7 @@ async def elicit_judgments(
 ) -> ElicitJudgmentsResponse:
     """Ask the LLM for questions and thought experiments to elicit new judgments."""
     logger.info(
-        f"Requesting judgment elicitation from LLM for topic '{request.topic}' "
+        f"Requesting judgment elicitation from model '{llm.model}' for topic '{request.topic}' "
         f"with {len(request.elements)} elements."
     )
     prompt = _build_prompt(request.topic, request.elements, request.log)

@@ -10,6 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
+import { SpinnerIcon } from "../Icons.jsx";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
 import { AddElementPanel } from "../user_edits/TextTabAddPanel.jsx";
 import {
@@ -81,7 +82,7 @@ function Toolbar({
             gap: 5,
           }}
         >
-          {!loading && <span>↺</span>}
+          {loading ? <SpinnerIcon /> : <span>↺</span>}
           {loading ? "Thinking…" : hasResult ? "Re-elicit" : "Elicit"}
         </button>
         {workflowPhase && (

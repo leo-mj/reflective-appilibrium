@@ -123,13 +123,17 @@ async def suggest_relations(
     """Ask the LLM to identify relations between the provided RE elements."""
     active = [e for e in request.elements if e.status not in {"withdrawn", "rejected"}]
     prompt = _build_prompt(request.topic, active, request.existing_relations)
-    logger.info(f"Requesting relation suggestions from LLM between {len(active)} active elements.")
+    logger.info(f"Requesting relation suggestions from model '{llm.model}' between {len(active)} active elements.")
     raw = await llm.complete(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
         json_mode=True,
     )
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.error(f"Failed to parse LLM response as JSON: {raw!r}")
+        raise
     suggestions = [RelationSuggestion(**r) for r in data.get("relations", [])]
     logger.info(f"Received LLM suggestions for {len(suggestions)} new relations.")
 

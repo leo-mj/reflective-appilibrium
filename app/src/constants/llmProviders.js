@@ -8,18 +8,20 @@
 
 export class LLMProvider {
   /**
-   * @param {string}   id      - Unique identifier, matched against VITE_DEFAULT_PROVIDER
-   * @param {string}   label   - Display name shown in the dropdown
-   * @param {string}   baseUrl - OpenAI-compatible API base URL (never shown to user)
-   * @param {string[]} models  - Ordered list of model ids for this provider
+   * @param {string}      id            - Unique identifier, matched against VITE_DEFAULT_PROVIDER
+   * @param {string}      label         - Display name shown in the dropdown
+   * @param {string}      baseUrl       - OpenAI-compatible API base URL (never shown to user)
+   * @param {string[]}    models        - Ordered list of model ids for this provider
+   * @param {string|null} defaultApiKey - Pre-filled key sent automatically (null = user must supply)
    */
-  constructor(id, label, baseUrl, models) {
+  constructor(id, label, baseUrl, models, defaultApiKey = null) {
     if (!id || !label || !baseUrl || !models.length)
       throw new Error(`Invalid LLMProvider: ${id}`);
     this.id = id;
     this.label = label;
     this.baseUrl = baseUrl;
     this.models = models;
+    this.defaultApiKey = defaultApiKey;
   }
 }
 
@@ -39,4 +41,11 @@ export const LLM_PROVIDERS = [
     "claude-sonnet-4-6",
     "claude-opus-4-7",
   ]),
+  new LLMProvider(
+    "local",
+    "Local (Ollama)",
+    "http://localhost:11434/v1",
+    ["ministral", "ministral-3:8b", "mistral", "llama3.2", "qwen2.5"],
+    "ollama",
+  ),
 ];

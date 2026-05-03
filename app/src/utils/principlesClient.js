@@ -7,6 +7,7 @@
 
 import dummyPrinciples from "../dummy-principles.js";
 import { LLM_ENABLED } from "../config.js";
+import { getLLMHeaders } from "./openaiClient.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -24,7 +25,7 @@ export async function fetchPrincipleSuggestions(state, useDummy = false) {
   }
   const res = await fetch(`${BACKEND_URL}/api/principles/suggest`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       topic: state.topic,
       elements: state.elements,
