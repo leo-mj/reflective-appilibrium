@@ -8,9 +8,8 @@ from backend.config import get_settings, Settings
 @pytest.fixture
 def fake_settings():
     return Settings(
-        openai_api_key="server-key",
-        openai_base_url="https://api.openai.com/v1",
-        openai_model="gpt-4o-mini",
+        llm_api_keys={"https://api.openai.com/v1": "server-key"},
+        default_model="gpt-4o-mini",
     )
 
 
@@ -29,7 +28,8 @@ def mock_llm_complete():
             return_value=type("R", (), {
                 "choices": [type("C", (), {
                     "message": type("M", (), {"content": "OK"})()
-                })()]
+                })()],
+                "usage": type("U", (), {"prompt_tokens": 5, "completion_tokens": 1})(),
             })()
         )
         yield mock
