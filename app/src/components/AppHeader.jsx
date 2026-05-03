@@ -82,6 +82,8 @@ export function AppHeader({
   canUndo,
   showTabNav,
   setShowTabNav,
+  allExpanded,
+  onExpandAll,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -189,6 +191,8 @@ export function AppHeader({
     setShowText,
     showTabNav,
     setShowTabNav,
+    allExpanded,
+    onExpandAll,
     handleImportClick,
     onDownload,
     onSave: handleSave,

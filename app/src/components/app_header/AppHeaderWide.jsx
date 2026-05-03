@@ -60,6 +60,8 @@ export function AppHeaderWide({
   onToggleTutorial,
   showTabNav,
   setShowTabNav,
+  allExpanded,
+  onExpandAll,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
@@ -111,22 +113,27 @@ export function AppHeaderWide({
           marginBottom: 6,
         }}
       >
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: "bold",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            Reflective Equilibrium — Round {round}
+        <div
+          style={{ minWidth: 0, display: "flex", alignItems: "centre", gap: 5 }}
+        >
+          <img src="favicon.svg" style={{ height: 36 }} />
+          <div>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: "bold",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              Reflective Equilibrium — Round {round}
+            </div>
+            <TopicLabel
+              topic={topic}
+              style={{ fontSize: 14, color: C.dim, marginTop: 2 }}
+            />
           </div>
-          <TopicLabel
-            topic={topic}
-            style={{ fontSize: 14, color: C.dim, marginTop: 2 }}
-          />
         </div>
 
         <div
@@ -281,6 +288,11 @@ export function AppHeaderWide({
                       </svg>
                     </span>
                     {showTabNav ? "Hide nav bar" : "Show nav bar"}
+                  </button>
+
+                  <button onClick={close(onExpandAll)} style={menuItem}>
+                    <span style={icon}>⇅</span>
+                    {allExpanded ? "Minimize all toggles" : "Expand all toggles"}
                   </button>
 
                   {menuDivider}

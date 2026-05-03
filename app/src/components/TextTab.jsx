@@ -66,6 +66,8 @@ export function TextTab({
   showTabNav,
   recentlyAdded,
   recentlyAddedRel,
+  expandAllKey,
+  allExpanded,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   const scrollRef = useRef(null);
@@ -83,6 +85,13 @@ export function TextTab({
   const toggle = (key) =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
   const isCollapsed = (key) => (search ? false : !!collapsed[key]);
+
+  useEffect(() => {
+    if (expandAllKey > 0)
+      requestAnimationFrame(() =>
+        setCollapsed(Object.fromEntries(Object.keys(DEFAULT_COLLAPSED_SECTIONS).map((k) => [k, !allExpanded])))
+      );
+  }, [expandAllKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived data ─────────────────────────────────────────────────────────
   const {

@@ -24,6 +24,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   );
   const [showText, setShowText] = useState(true);
   const [showTabNav, setShowTabNav] = useState(false);
+  const [expandAllKey, setExpandAllKey] = useState(0);
+  const [allExpanded, setAllExpanded] = useState(false);
   const [assistSidePanel, setAssistSidePanel] = useState("text");
   const [historyRound, setHistoryRound] = useState(0);
   const [workflowPhase, setWorkflowPhase] = useState(null);
@@ -170,6 +172,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     recentlyAdded,
     recentlyAddedRel,
     showTabNav,
+    expandAllKey,
+    allExpanded,
   };
 
   const graphPanelCommonProps = {
@@ -246,6 +250,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         canUndo={canUndo}
         showTabNav={showTabNav}
         setShowTabNav={setShowTabNav}
+        allExpanded={allExpanded}
+        onExpandAll={() => { setAllExpanded((v) => !v); setExpandAllKey((k) => k + 1); }}
       />
 
       <div

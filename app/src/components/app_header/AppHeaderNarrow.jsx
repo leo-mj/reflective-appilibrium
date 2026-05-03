@@ -44,6 +44,8 @@ export function AppHeaderNarrow({
   onStopWorkflow,
   showTabNav,
   setShowTabNav,
+  allExpanded,
+  onExpandAll,
 }) {
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
@@ -151,6 +153,10 @@ export function AppHeaderNarrow({
                 <line x1="16.5" y1="16.5" x2="22" y2="22"/>
               </svg>
             </span>{showTabNav ? "Hide nav bar" : "Show nav bar"}
+          </button>
+
+          <button onClick={close(onExpandAll)} style={menuBtn()}>
+            <span style={icon}>⇅</span>{allExpanded ? "Minimize all toggles" : "Expand all toggles"}
           </button>
 
           {divider}
