@@ -122,7 +122,10 @@ class MarkdownSessionStore:
     # ── Internal helpers ───────────────────────────────────────────────────────
 
     def _path(self, session_id: str) -> Path:
-        return self._dir / f"{session_id}.md"
+        path = (self._dir / f"{session_id}.md").resolve()
+        if not path.is_relative_to(self._dir.resolve()):
+            raise ValueError(f"Invalid session_id: {session_id!r}")
+        return path
 
     def _unique_id(self, topic: str) -> str:
         slug = _slugify(topic)
