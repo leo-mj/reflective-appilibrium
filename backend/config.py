@@ -8,6 +8,7 @@ OpenAI-compatible endpoint without code changes.
 
 from functools import lru_cache
 from pathlib import Path  # used in default value for sessions_dir
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).parent / ".env"
@@ -25,6 +26,13 @@ class Settings(BaseSettings):
     default_model: str = "gpt-4o-mini"
     cors_origins: str = "http://localhost:5173"
     sessions_dir: str = str(Path(__file__).parent.parent / "sessions")
+
+    @field_validator("cors_origins")
+    @classmethod
+    def no_wildcard(cls, v: str) -> str:
+        if any(o.strip() == "*" for o in v.split(",")):
+            raise ValueError("Wildcard '*' is not permitted in CORS_ORIGINS; list specific origins explicitly.")
+        return v
 
     @property
     def cors_origins_list(self) -> list[str]:
