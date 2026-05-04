@@ -51,6 +51,12 @@ export function ModalShell({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && e.ctrlKey && !saveDisabled) {
+            e.preventDefault();
+            onSave();
+          }
+        }}
         style={{
           background: C.panel,
           border: `1px solid ${C.border}`,

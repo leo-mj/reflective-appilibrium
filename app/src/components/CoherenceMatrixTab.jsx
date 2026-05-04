@@ -9,8 +9,7 @@
 
 import { useState } from "react";
 import { C } from "../constants/colors.js";
-import _dummyMatrix from "../dummy-matrix.js";
-import { callOpenAIAPI, OPENAI_MODEL } from "../utils/openaiClient.js";
+import { fetchRelatednessMatrix } from "../utils/matrixClient.js";
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 
@@ -47,70 +46,6 @@ function getAnalysisElements(state) {
   );
 }
 
-// ─── Prompt building ──────────────────────────────────────────────────────────
-
-/**
- * Builds the prompt string for the relatedness matrix request.
- *
- * @param {string}      topic
- * @param {REElement[]} elements
- * @returns {string}
- */
-function buildPrompt(topic, elements) {
-  const elementList = elements
-    .map((e) => `${e.id} [${e.type}]: ${e.text}`)
-    .join("\n");
-
-  return `\
-You are assisting a reflective equilibrium (RE) analysis in ethics.
-Topic: "${topic}"
-
-Elements (judgments and principles):
-${elementList}
-
-Task: compute a symmetric relatedness matrix.
-- Score each ordered pair (including diagonal) from 0.0 (completely unrelated) to 1.0 (identical or directly equivalent).
-- Diagonal entries must be 1.0.
-- For each off-diagonal unordered pair, provide a one-sentence description. Use the key "A→B" where A and B are sorted according to JavaScript string array sorting (.sort()), \
-so that ["J12", "J10", "J1", "J3"].sort() results in [ 'J1', 'J10', 'J12', 'J3' ].
-- Write a 2–3 sentence overview of the overall element landscape.
-
-Respond with valid JSON only, in exactly this format:
-{
-  "overview": "...",
-  "matrix": { "J1": { "J1": 1.0, "J2": 0.6, "P1": 0.4 }, "J2": { "J1": 0.6, "J2": 1.0, "P1": 0.9 }, "P1": { "J1": 0.4, "J2": 0.9, "P1": 1.0 } },
-  "pairDescriptions": { "J1→J2": "Brief description of how J1 and J2 relate." }
-}`;
-}
-
-// ─── LLM API call ──────────────────────────────────────────────────────────
-
-/**
- * Calls an LLM API and returns the parsed JSON result.
- *
- * @param {string} prompt
- * @returns {Promise<{ overview: string, matrix: Object, pairDescriptions: Object }>}
- */
-async function callLLMAPI(prompt) {
-  const outputText = await callOpenAIAPI(prompt);
-  return JSON.parse(outputText);
-}
-
-/**
- * Builds the prompt, calls an LLM API (or returns the dummy fixture), and
- * returns the parsed relatedness matrix result.
- *
- * @param {string}      topic
- * @param {REElement[]} elements
- * @returns {Promise<{ overview: string, matrix: Object, pairDescriptions: Object }>}
- */
-async function fetchRelatednessMatrix(topic, elements) {
-  if (import.meta.env.VITE_USE_DUMMY_MATRIX) {
-    return JSON.parse(_dummyMatrix);
-  }
-  return callLLMAPI(buildPrompt(topic, elements));
-}
-
 // ─── Pair description lookup ──────────────────────────────────────────────────
 
 /**
@@ -133,13 +68,21 @@ function getPairDesc(pairDescriptions, idA, idB) {
  * Toolbar with element count summary and Analyze button.
  *
  * @param {Object}   props
- * @param {number}   props.elementCount
- * @param {boolean}  props.loading
- * @param {boolean}  props.hasResult
- * @param {Function} props.onAnalyze
+ * @param {number}          props.elementCount
+ * @param {boolean}         props.loading
+ * @param {boolean}         props.hasResult
+ * @param {Function}        props.onAnalyze
+ * @param {string|undefined} props.model
  */
-function Toolbar({ elementCount, loading, hasResult, onAnalyze }) {
-  const disabled = loading || elementCount < 2;
+function Toolbar({
+  elementCount,
+  loading,
+  hasResult,
+  onAnalyze,
+  model,
+  suggestionsDisabled,
+}) {
+  const disabled = loading || elementCount < 2 || suggestionsDisabled;
   return (
     <div
       style={{
@@ -155,7 +98,7 @@ function Toolbar({ elementCount, loading, hasResult, onAnalyze }) {
         <span style={{ color: C.text, fontWeight: "bold" }}>
           {elementCount}
         </span>{" "}
-        elements (judgments + principles), scored by {OPENAI_MODEL}.
+        elements (judgments + principles){model ? `, scored by ${model}` : ""}.
       </div>
       <button
         onClick={onAnalyze}
@@ -396,7 +339,8 @@ function PairDescription({ hovered }) {
  * @param {REState} props.state
  * @returns {React.ReactElement}
  */
-export function CoherenceMatrixTab({ state }) {
+export function CoherenceMatrixTab({ state, suggestionsDisabled = false }) {
+  /** @type {[{overview: string, matrix: Object, pairDescriptions: Object, _model: string}|null, Function]} */
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -409,7 +353,7 @@ export function CoherenceMatrixTab({ state }) {
     setLoading(true);
     setError(null);
     try {
-      setResult(await fetchRelatednessMatrix(state.topic, elements));
+      setResult(await fetchRelatednessMatrix(state));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -424,6 +368,8 @@ export function CoherenceMatrixTab({ state }) {
         loading={loading}
         hasResult={!!result}
         onAnalyze={analyze}
+        model={result?._model}
+        suggestionsDisabled={suggestionsDisabled}
       />
 
       {error && <ErrorBanner message={error} />}

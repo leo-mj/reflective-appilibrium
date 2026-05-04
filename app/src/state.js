@@ -8,9 +8,9 @@
  *    Replace the `elements`, `relations`, `coherence`, and `log` arrays with real
  *    data produced by the Claude RE Skill when generating a visualisation artifact.
  *
- * 2. **Dummy state** (`dummy-state.js`) — a rich fixture used during development.
- *    Activated by setting the `VITE_USE_DUMMY_STATE=true` environment variable
- *    (see `.env` in the project root).
+ * 2. **Dummy state** (`dummy-state.js`) — a rich fixture used in both dev and
+ *    prod.  Always loaded as the initial state so visitors (and developers)
+ *    see a populated example on first load.
  *
  * @module state
  */
@@ -59,15 +59,13 @@ const _inlineState = {
 /**
  * The active RE state used by all components.
  *
- * Source is chosen at build time via the `VITE_USE_DUMMY_STATE` env var:
- * - `"true"` → uses `dummy-state.js` (rich fixture, good for development)
- * - anything else → uses `_inlineState` (the skeleton defined above)
+ * Always the dummy fixture so both dev and prod start with a populated
+ * example.  The inline skeleton above is kept as a copy-paste template for
+ * generating visualisation artifacts from Claude RE Skill output.
  *
  * @type {REState}
  */
-export const SAMPLE_STATE = import.meta.env.VITE_USE_DUMMY_STATE
-  ? _dummyState
-  : _inlineState;
+export const SAMPLE_STATE = _dummyState;
 
 /**
  * Factory that returns a blank RE state for a given topic.

@@ -1,0 +1,34 @@
+# Dependencies and build artifacts
+node_modules/
+app/dist/
+backend/.venv/
+
+# Logs
+backend/server.log
+
+# Dummy/sample data
+app/src/dummy-*.js
+
+# Phase 1 skill files (read directly when needed)
+skill/
+
+# Lock files
+app/package-lock.json
+
+# IDE and CI config
+.vscode/
+.github/
+
+# Static assets
+app/src/assets/
+
+# Env files
+.env
+app/.env
+app/.env.production
+backend/.env
+backend/.env.example
+
+# Docs
+README.md
+app/README.md

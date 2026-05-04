@@ -32,6 +32,7 @@ import { NodeTooltip } from "./NodeTooltip.jsx";
  * @param {REElement}  props.sourceEl     - Source element (used for radius).
  * @param {REElement}  props.targetEl     - Target element (used for radius).
  * @param {boolean}    props.isWithdrawn
+ * @param {boolean}    [props.isRejected]
  * @param {number}     props.opacity
  * @param {number}     [props.strokeWidth=2]
  * @param {string}     [props.transition]
@@ -44,12 +45,17 @@ export function GraphEdge({
   sourceEl,
   targetEl,
   isWithdrawn,
+  isRejected = false,
   opacity,
   strokeWidth = 2,
   transition,
   hitArea = false,
 }) {
-  const color = isWithdrawn ? C.withdrawn : C[relation.type];
+  const color = isRejected
+    ? C.rejected
+    : isWithdrawn
+      ? C.withdrawn
+      : C[relation.type];
   const { x1, y1, x2, y2, tipX, tipY, perpX, perpY } = arrowGeometry(
     sourcePos,
     targetPos,
@@ -137,6 +143,7 @@ export function PulseRing({ type, radius }) {
  * @param {REElement}       props.element
  * @param {Object}          props.position      - `{ x, y }`.
  * @param {boolean}         props.isWithdrawn
+ * @param {boolean}         [props.isRejected]
  * @param {number}          props.opacity
  * @param {string}          [props.transition]
  * @param {string}          [props.cursor]
@@ -148,6 +155,7 @@ export function GraphNode({
   element,
   position,
   isWithdrawn,
+  isRejected = false,
   opacity,
   transition,
   cursor,
@@ -156,7 +164,11 @@ export function GraphNode({
   children,
 }) {
   const { fill, stroke } = getColors(
-    isWithdrawn ? { ...element, status: "withdrawn" } : element,
+    isRejected
+      ? { ...element, status: "rejected" }
+      : isWithdrawn
+        ? { ...element, status: "withdrawn" }
+        : element,
   );
   const radius = nodeRadius(element.type);
   return (
@@ -171,11 +183,11 @@ export function GraphNode({
       <text
         textAnchor="middle"
         dy="0.35em"
-        fill={isWithdrawn ? "#666" : "#fff"}
+        fill={isWithdrawn || isRejected ? "#666" : "#fff"}
         fontSize={element.type === "principle" ? 13 : 11}
         fontWeight="bold"
         style={{
-          textDecoration: isWithdrawn ? "line-through" : "none",
+          textDecoration: isWithdrawn || isRejected ? "line-through" : "none",
           pointerEvents: "none",
         }}
       >

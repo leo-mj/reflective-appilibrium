@@ -11,7 +11,6 @@ export const INPUT_STYLE = /** @type {import('react').CSSProperties} */ ({
   fontSize: 12,
   width: "100%",
   boxSizing: "border-box",
-  fontFamily: "inherit",
 });
 
 /** Label style shared across all modals. */

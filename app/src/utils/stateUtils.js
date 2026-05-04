@@ -90,6 +90,31 @@ export function makeLogEntry(round, findings, decision, changes) {
   return { round, findings, options: "", decision, changes };
 }
 
+/** @import { REState } from '../types.js' */
+
+/**
+ * Returns a filtered view of `state` containing only elements and relations
+ * that existed at the given round. Used to sync the TextTab with the history slider.
+ *
+ * @param {REState} state
+ * @param {number}  round
+ * @returns {REState}
+ */
+export function stateAtRound(state, round) {
+  const { active, withdrawn } = elementsAtRound(state.elements, round);
+  const elements = [...active, ...withdrawn];
+  const visIds = new Set(elements.map((e) => e.id));
+  return {
+    ...state,
+    round,
+    elements,
+    relations: state.relations.filter(
+      (r) =>
+        visIds.has(r.from) && visIds.has(r.to) && (r.addedRound || 1) <= round,
+    ),
+  };
+}
+
 /**
  * Helps compare element IDs for sorting.
  *

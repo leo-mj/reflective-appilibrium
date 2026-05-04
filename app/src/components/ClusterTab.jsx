@@ -141,7 +141,6 @@ export function ClusterTab({ state, positions }) {
           padding: 24,
           color: C.dim,
           fontSize: 13,
-          fontFamily: "system-ui, sans-serif",
         }}
       >
         No coherent clusters found. Add support relations between elements to

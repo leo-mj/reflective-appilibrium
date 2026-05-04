@@ -26,8 +26,9 @@ export {};
  * - `active`    — currently in play
  * - `revised`   — text was changed in a later round; `previousText` and `revisedRound` are set
  * - `withdrawn` — removed from the equilibrium; `reason` and `withdrawnRound` are set
+ * - `rejected`  — a declined LLM suggestion; `rejectedRound` is set
  *
- * @typedef {'active'|'revised'|'withdrawn'} ElementStatus
+ * @typedef {'active'|'revised'|'withdrawn'|'rejected'} ElementStatus
  */
 
 /**
@@ -66,6 +67,7 @@ export {};
  * @property {number}          [revisedRound]  - Round in which text was revised (revised only).
  * @property {string}          [reason]        - Explanation for withdrawal (withdrawn only).
  * @property {number}          [withdrawnRound] - Round in which element was withdrawn (withdrawn only).
+ * @property {number}          [rejectedRound]  - Round in which element was rejected (rejected only).
  */
 
 /**
@@ -80,6 +82,7 @@ export {};
  * @property {ElementStatus} [status]        - Lifecycle status; absence or `"active"` means currently in play.
  * @property {number}        [revisedRound]  - Round in which this relation was last revised.
  * @property {number}        [withdrawnRound] - Round in which this relation was withdrawn.
+ * @property {number}        [rejectedRound]  - Round in which this relation was rejected.
  */
 
 /**

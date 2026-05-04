@@ -9,9 +9,16 @@ npm install
 npm run dev
 ```
 
-## Builds
+For AI features, the FastAPI backend must also be running (see the root README).
 
-The app has two build targets:
+## Build targets
+
+| Command | Environment | LLM / Backend | Intended use |
+|---|---|---|---|
+| `npm run dev` | `.env` | enabled (BYOK) | Local development |
+| `npm run build` | `.env.production` | disabled | Public static deploy |
+| `npm run build:byok` | `.env.byok` | enabled (BYOK) | Public deploy with user-supplied keys |
+| `npm run build:local` | `.env.local` | enabled (backend) | Local build with server-side keys |
 
 ### Public build (no LLM)
 
@@ -19,47 +26,71 @@ The app has two build targets:
 npm run build
 ```
 
-Produces a static site with the Graph, Text, and History tabs. The Matrix tab and
-chat panel are excluded entirely — the OpenAI SDK is tree-shaken out of the bundle.
-Deploy the `dist/` folder to any static host.
+Produces a static site with all tabs present. LLM-dependent features (Assist workflow
+tabs, coherence matrix) fall back to pre-set dummy data and show a "No LLM API
+connection" banner. Deploy the `dist/` folder to any static host.
 
-### Local build (with LLM)
+### BYOK build (user-supplied key)
+
+```bash
+npm run build:byok
+```
+
+Includes all LLM features. Users enter their own API key and choose a provider in the
+LLM settings modal. The key is forwarded as an `x-api-key` header to the backend,
+which proxies the request to the provider — the key is never stored server-side.
+
+Create `app/.env.byok` (already present in the repo as a template):
+
+```env
+VITE_BYOK_ENABLED=true
+VITE_BACKEND_URL=https://<your-deployed-backend>
+VITE_DEFAULT_PROVIDER=openai
+VITE_DEFAULT_MODEL=gpt-4o-mini
+```
+
+### Local build (server-side keys)
 
 ```bash
 npm run build:local
 ```
 
-Includes all LLM-dependent features (Matrix tab, chat panel). Intended for running
-locally, not for public deployment — the OpenAI API key must not be exposed in a
-publicly hosted build (see [Security](#security) below).
+Uses the local FastAPI backend for all LLM calls. API keys live entirely server-side.
+Create `app/.env.local`:
 
-## LLM feature flag
-
-LLM-dependent features are controlled by the `VITE_ENABLE_LLM` environment variable:
-
-| File              | `VITE_ENABLE_LLM` | Used by                                                      |
-| ----------------- | ----------------- | ------------------------------------------------------------ |
-| `.env`            | `true`            | `npm run dev`                                                |
-| `.env.production` | `false`           | `npm run build` (public)                                     |
-| `.env.local`      | `true`            | `npm run build:local` (create this file if it doesn't exist) |
-
-To create `.env.local` for local builds:
-
-```bash
-echo "VITE_ENABLE_LLM=true" > .env.local
+```env
+VITE_APP_ENV=dev
 ```
+
+## Feature flags
+
+LLM features are controlled by two `VITE_*` variables:
+
+| Variable | Values | Effect |
+|---|---|---|
+| `VITE_APP_ENV` | `dev` / `prod` | `dev` enables LLM + backend |
+| `VITE_BYOK_ENABLED` | `true` / `false` | also enables LLM + backend |
+
+`LLM_ENABLED` is `true` when either `VITE_APP_ENV === "dev"` or `VITE_BYOK_ENABLED === "true"`.
 
 ## Security
 
-The OpenAI API key is stored in `.env` and read at build time by Vite. Because `VITE_*`
-variables are inlined into the browser bundle, **never use `npm run build` (public) with
-a real API key** — `VITE_ENABLE_LLM=false` in `.env.production` ensures the key and the
-OpenAI SDK are excluded from the public build.
+API keys are **never stored in the frontend bundle**. There is no `VITE_OPENAI_API_KEY` or
+equivalent — doing so would expose the key to anyone who downloads the page.
 
-For local use (`npm run dev` / `npm run build:local`), set your key in `.env`:
+All LLM calls go through the FastAPI backend at `VITE_BACKEND_URL`. The browser never
+contacts a provider directly.
 
+- **Server-side keys** (dev / local build): keys live in `backend/.env`. The backend
+  rejects LLM requests from non-localhost clients that do not include an `x-api-key` header.
+- **BYOK**: the user enters a key in the LLM settings modal. It is held in `sessionStorage`
+  and forwarded as an `x-api-key` header on each request to the backend. Never persisted
+  server-side.
+
+## Tests
+
+```bash
+npm test              # run once
+npm run test:watch    # watch mode
+npm run test:coverage # coverage report
 ```
-OPENAI_API_KEY=sk-...
-```
-
-`.env` is gitignored and never committed.

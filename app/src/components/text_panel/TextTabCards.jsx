@@ -4,7 +4,8 @@
  * @module components/TextTabCards
  */
 
-import { useContext } from "react";
+import { useContext, useState } from "react";
+import { sortElementIds } from "../../utils/stateUtils.js";
 import { C } from "../../constants/colors.js";
 import {
   GHOST_BTN_STYLE,
@@ -145,6 +146,14 @@ export function StatusLabel({ status }) {
         withdrawn
       </span>
     );
+  if (status === "rejected")
+    return (
+      <span
+        style={{ ...META_LABEL_STYLE, fontSize: 10, color: C.rejectedMark }}
+      >
+        rejected
+      </span>
+    );
   if (status === "revised")
     return (
       <span style={{ ...META_LABEL_STYLE, fontSize: 10, color: C.revised }}>
@@ -177,12 +186,13 @@ export function ElementCard({ e, dim }) {
   const { pCovers, onEditRequest, onWithdrawRequest, badgeColor, search } =
     useContext(Ctx);
   const isW = e.status === "withdrawn";
+  const isR = e.status === "rejected";
   const color = badgeColor(e.id);
   return (
     <div
       style={{
         ...CARD_STYLE,
-        opacity: dim ? 0.4 : isW ? 0.55 : 1,
+        opacity: dim ? 0.4 : isW || isR ? 0.55 : 1,
         borderLeft: `3px solid ${color}`,
         paddingLeft: 10,
       }}
@@ -215,15 +225,15 @@ export function ElementCard({ e, dim }) {
         </div>
         <ActionButtons
           onRevise={() => onEditRequest(e.id)}
-          onWithdraw={!isW ? () => onWithdrawRequest(e.id) : null}
+          onWithdraw={!isW && !isR ? () => onWithdrawRequest(e.id) : null}
         />
       </div>
       <div
         style={{
           fontSize: CONTENT_FONT_SIZE,
-          color: isW ? C.dim : C.text,
+          color: isW || isR ? C.dim : C.text,
           lineHeight: 1.65,
-          textDecoration: isW ? "line-through" : "none",
+          textDecoration: isW || isR ? "line-through" : "none",
         }}
       >
         <Highlight text={e.text} query={search} />
@@ -467,6 +477,38 @@ export function HighlightedSection({
 
 // ─── Section listing (J / P / T / Rel) ───────────────────────────────────────
 
+function SortToggle({ value, onChange }) {
+  return (
+    <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+      {["element", "added"].map((opt) => (
+        <button
+          key={opt}
+          onClick={() => onChange(opt)}
+          style={{
+            ...GHOST_BTN_STYLE,
+            fontSize: 10,
+            padding: "1px 6px",
+            letterSpacing: 0.5,
+            fontWeight: value === opt ? "bold" : "normal",
+            textTransform: "none",
+            opacity: value === opt ? 1 : 0.6,
+          }}
+        >
+          {opt === "element" ? "by element" : "by date"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function sortEls(els, sort) {
+  return [...els].sort((a, b) =>
+    sort === "added"
+      ? (a.addedRound ?? 1) - (b.addedRound ?? 1)
+      : sortElementIds(a.id, b.id),
+  );
+}
+
 export function SectionListing({
   refJudgments,
   refPrinciples,
@@ -477,7 +519,16 @@ export function SectionListing({
   isCollapsed,
   toggle,
 }) {
+  const [judgmentSort, setJudgmentSort] = useState("element");
+  const [principleSort, setPrincipleSort] = useState("element");
+  const [theorySort, setTheorySort] = useState("element");
+  const [relSort, setRelSort] = useState("element");
   const byType = (type) => displayEls.filter((e) => e.type === type);
+  const sortedRels = [...displayRels].sort((a, b) =>
+    relSort === "added"
+      ? (a.addedRound ?? 1) - (b.addedRound ?? 1)
+      : sortElementIds(a.from, b.from),
+  );
   return (
     <>
       <div ref={refJudgments}>
@@ -486,8 +537,14 @@ export function SectionListing({
           collapsed={isCollapsed("judgments")}
           onToggle={() => toggle("judgments")}
         />
-        {!isCollapsed("judgments") &&
-          byType("judgment").map((e) => <ElementCard key={e.id} e={e} />)}
+        {!isCollapsed("judgments") && (
+          <>
+            <SortToggle value={judgmentSort} onChange={setJudgmentSort} />
+            {sortEls(byType("judgment"), judgmentSort).map((e) => (
+              <ElementCard key={e.id} e={e} />
+            ))}
+          </>
+        )}
       </div>
       <div ref={refPrinciples}>
         <SectionHeader
@@ -495,8 +552,14 @@ export function SectionListing({
           collapsed={isCollapsed("principles")}
           onToggle={() => toggle("principles")}
         />
-        {!isCollapsed("principles") &&
-          byType("principle").map((e) => <ElementCard key={e.id} e={e} />)}
+        {!isCollapsed("principles") && (
+          <>
+            <SortToggle value={principleSort} onChange={setPrincipleSort} />
+            {sortEls(byType("principle"), principleSort).map((e) => (
+              <ElementCard key={e.id} e={e} />
+            ))}
+          </>
+        )}
       </div>
       <div ref={refTheories}>
         <SectionHeader
@@ -504,8 +567,14 @@ export function SectionListing({
           collapsed={isCollapsed("theories")}
           onToggle={() => toggle("theories")}
         />
-        {!isCollapsed("theories") &&
-          byType("theory").map((e) => <ElementCard key={e.id} e={e} />)}
+        {!isCollapsed("theories") && (
+          <>
+            <SortToggle value={theorySort} onChange={setTheorySort} />
+            {sortEls(byType("theory"), theorySort).map((e) => (
+              <ElementCard key={e.id} e={e} />
+            ))}
+          </>
+        )}
       </div>
       <div ref={refRelations}>
         <SectionHeader
@@ -513,13 +582,17 @@ export function SectionListing({
           collapsed={isCollapsed("relations")}
           onToggle={() => toggle("relations")}
         />
-        {!isCollapsed("relations") &&
-          displayRels.map((r) => (
-            <RelationCard
-              key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`}
-              r={r}
-            />
-          ))}
+        {!isCollapsed("relations") && (
+          <>
+            <SortToggle value={relSort} onChange={setRelSort} />
+            {sortedRels.map((r) => (
+              <RelationCard
+                key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`}
+                r={r}
+              />
+            ))}
+          </>
+        )}
       </div>
     </>
   );

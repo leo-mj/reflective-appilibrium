@@ -86,13 +86,15 @@ export function historyEdgeVisuals(relation, wIds, snappedRound) {
  * @param {Set<string>}                   wIds
  * @param {function(RERelation): boolean} dimEdge
  * @param {RERelation|null}               selectedRel
- * @returns {{ isWithdrawn: boolean, opacity: number, strokeWidth: number, transition: string, hitArea: boolean }}
+ * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, strokeWidth: number, transition: string, hitArea: boolean }}
  */
 export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRel) {
   const isWithdrawn = wIds.has(relation.from) || wIds.has(relation.to);
-  const baseOpacity = isWithdrawn ? 0.25 : 0.7;
+  const isRejected = relation.status === "rejected";
+  const baseOpacity = isWithdrawn ? 0.25 : isRejected ? 0.35 : 0.7;
   return {
     isWithdrawn,
+    isRejected,
     opacity: dimEdge(relation) ? baseOpacity * 0.12 : baseOpacity,
     strokeWidth: relation === selectedRel ? 3.5 : dimEdge(relation) ? 1.5 : 2,
     transition: TRANSITION,
@@ -133,15 +135,24 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
  * @param {REElement}                  element
  * @param {Set<string>}                wIds
  * @param {function(string): boolean}  dimNode
- * @param {string|null}                selected - ID of the selected element, or null.
- * @returns {{ isWithdrawn: boolean, opacity: number, transition: string, children: React.ReactNode }}
+ * @param {string|null}                selected   - ID of the selected element, or null.
+ * @param {string|null}                [ctrlFirst] - ID of the ctrl-click first node, or null.
+ * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, transition: string, children: React.ReactNode }}
  */
-export function graphNodeVisuals(element, wIds, dimNode, selected) {
+export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, recentlyAdded) {
   const isWithdrawn = wIds.has(element.id);
+  const isRejected = element.status === "rejected";
   const isSelected = element.id === selected;
-  const baseOpacity = isWithdrawn ? 0.25 : confOp[element.confidence];
+  const isCtrlFirst = element.id === ctrlFirst;
+  const isRecentlyAdded = element.id === recentlyAdded;
+  const baseOpacity = isWithdrawn
+    ? 0.25
+    : isRejected
+      ? 0.35
+      : confOp[element.confidence];
   return {
     isWithdrawn,
+    isRejected,
     opacity: dimNode(element.id) ? 0.12 : baseOpacity,
     transition: TRANSITION,
     children: isSelected ? (
@@ -152,6 +163,8 @@ export function graphNodeVisuals(element, wIds, dimNode, selected) {
         strokeWidth={2}
         opacity={0.45}
       />
+    ) : isCtrlFirst || isRecentlyAdded ? (
+      <PulseRing type={element.type} radius={nodeRadius(element.type)} />
     ) : null,
   };
 }

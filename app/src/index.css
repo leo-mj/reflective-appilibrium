@@ -1,5 +1,22 @@
 * {
   box-sizing: border-box;
+  font-family: inherit;
+}
+
+:root {
+  --c-bg: #0f172a;
+  --c-panel: #1e293b;
+  --c-border: #334155;
+  --c-text: #e2e8f0;
+  --c-dim: #94a3b8;
+}
+
+[data-theme="light"] {
+  --c-bg: #f2f3f4;
+  --c-panel: #f1f5f9;
+  --c-border: #e2e8f0;
+  --c-text: #0f172a;
+  --c-dim: #64748b;
 }
 
 @keyframes spin {
@@ -10,7 +27,7 @@
 
 .history-log {
   scrollbar-width: thin;
-  scrollbar-color: #334155 transparent;
+  scrollbar-color: var(--c-border) transparent;
 }
 .history-log::-webkit-scrollbar {
   width: 6px;
@@ -19,16 +36,18 @@
   background: transparent;
 }
 .history-log::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--c-border);
   border-radius: 3px;
 }
 .history-log::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--c-dim);
 }
 
 body {
   margin: 0;
-  background: #0f172a; /* C.bg — prevents white flash during React hydration */
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-family, system-ui, -apple-system, BlinkMacSystemFont, sans-serif);
 }
 
 #root {

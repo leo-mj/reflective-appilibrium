@@ -1,12 +1,26 @@
 /**
  * @fileoverview Build-time feature flags.
  *
- * Set VITE_ENABLE_LLM=true in .env (dev / local build) to enable LLM-dependent
- * features (chat panel, CoherenceMatrixTab).  The public production build leaves
- * this unset, so LLM code is tree-shaken out of the bundle entirely.
+ * Two environments are supported:
+ *   DEV  (vite dev)   — LLM + backend enabled; dummy data available via toggle
+ *   PROD (vite build) — LLM + backend disabled; dummy data always on
+ *
+ * Exception: BYOK builds are PROD builds where the user supplies their own API
+ * key.  Set VITE_BYOK_ENABLED=true in .env.byok to re-enable LLM + backend.
  *
  * @module config
  */
 
-/** Whether LLM-dependent features are enabled in this build. */
-export const LLM_ENABLED = import.meta.env.VITE_ENABLE_LLM === "true";
+/** @type {"dev" | "prod"} */
+export const APP_ENV = import.meta.env.VITE_APP_ENV;
+
+export const BYOK_ENABLED = import.meta.env.VITE_BYOK_ENABLED === "true";
+
+/** LLM features available in dev or when the user brings their own key. */
+export const LLM_ENABLED = APP_ENV === "dev" || BYOK_ENABLED;
+
+/** FastAPI backend available under the same conditions as LLM. */
+export const BACKEND_ENABLED = APP_ENV === "dev" || BYOK_ENABLED;
+
+export const DEFAULT_PROVIDER = import.meta.env.VITE_DEFAULT_PROVIDER ?? "";
+export const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL ?? "";

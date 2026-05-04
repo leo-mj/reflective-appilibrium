@@ -5,7 +5,7 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
@@ -144,6 +144,7 @@ function useGraphClick({
   onSelect,
   onSelectRel,
   setTooltip,
+  onCtrlNodeClick,
 }) {
   const clickOrigin = useRef(null);
 
@@ -201,8 +202,12 @@ function useGraphClick({
       const pos = positions[el.id];
       if (!pos) continue;
       if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitRadius(el.type) ** 2) {
-        onSelectRel(() => null);
-        onSelect((prev) => (prev === el.id ? null : el.id));
+        if (e.ctrlKey || e.metaKey) {
+          onCtrlNodeClick(el.id);
+        } else {
+          onSelectRel(() => null);
+          onSelect((prev) => (prev === el.id ? null : el.id));
+        }
         return;
       }
     }
@@ -250,7 +255,7 @@ function useGraphClick({
  *
  * @param {Object}      props
  * @param {REState}     props.state
- * @param {boolean}     props.showWithdrawn
+ * @param {Set<string>} props.hiddenLegendKeys
  * @param {PositionMap} props.positions
  * @param {string|null} props.selected
  * @param {function(function): void} props.onSelect
@@ -258,11 +263,15 @@ function useGraphClick({
  * @param {function(function): void} props.onSelectRel
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
+ * @param {function}    [props.onCtrlSecondSelect] - Called with a node id when ctrl+click
+ *   happens while another node is already selected. Used to fill the AddBar "to" field.
+ * @param {boolean}     [props.ready] - When false, suppresses auto-fit until the force
+ *   simulation has settled. Prevents fitting against initial clustered positions.
  * @returns {React.ReactElement}
  */
 export function Graph({
   state,
-  showWithdrawn,
+  hiddenLegendKeys,
   positions,
   selected,
   onSelect,
@@ -270,28 +279,54 @@ export function Graph({
   onSelectRel,
   onAddElement,
   onAddRelation,
+  onCtrlSecondSelect,
+  ready,
+  recentlyAdded,
 }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
   const [addingElType, setAddingElType] = useState(null);
   const [addingRel, setAddingRel] = useState(false);
+  const [ctrlSelected, setCtrlSelected] = useState(null);
+
+  // Clear ctrl-selection whenever the primary selection changes.
+  useEffect(() => {
+    setCtrlSelected(null);
+  }, [selected]);
 
   // ── Derived visibility and highlight sets ─────────────────────────────────
 
   const { active, withdrawn } = elementsAtRound(state.elements, state.round);
   const wIds = new Set(withdrawn.map((e) => e.id));
-  const visibleEls = showWithdrawn ? [...active, ...withdrawn] : active;
+  const rejectedEls = state.elements.filter((e) => e.status === "rejected");
+  const isElVisible = (el) => {
+    if (el.status === "withdrawn") return !hiddenLegendKeys?.has("withdrawn");
+    if (el.status === "rejected") return !hiddenLegendKeys?.has("rejected");
+    if (el.type === "judgment") return !hiddenLegendKeys?.has(`J-${el.confidence}`);
+    if (el.type === "principle") return !hiddenLegendKeys?.has("P");
+    if (el.type === "theory") return !hiddenLegendKeys?.has("T");
+    return true;
+  };
+  const visibleEls = [...active, ...withdrawn, ...rejectedEls].filter(isElVisible);
   const visIds = new Set(visibleEls.map((e) => e.id));
   const visRels = state.relations.filter(
-    (r) => visIds.has(r.from) && visIds.has(r.to),
+    (r) =>
+      visIds.has(r.from) &&
+      visIds.has(r.to) &&
+      !hiddenLegendKeys?.has(r.type) &&
+      !(hiddenLegendKeys?.has("withdrawn") && r.status === "withdrawn") &&
+      !(hiddenLegendKeys?.has("rejected") && r.status === "rejected"),
   );
 
-  const highlightedIds = selected
-    ? getNeighbours(selected, visRels)
-    : selectedRel
-      ? new Set([selectedRel.from, selectedRel.to])
-      : null;
+  const highlightedIds =
+    ctrlSelected && selected
+      ? new Set([selected, ctrlSelected])
+      : selected
+        ? getNeighbours(selected, visRels)
+        : selectedRel
+          ? new Set([selectedRel.from, selectedRel.to])
+          : null;
 
   const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
   const dimEdge = (r) => {
@@ -316,7 +351,7 @@ export function Graph({
     resetView,
   } = usePan();
 
-  useAutoFit({ positions, dims, resetView });
+  useAutoFit({ positions, dims, resetView, enabled: ready });
 
   const { onPointerDown, onPointerUp } = useGraphClick({
     panDown,
@@ -329,11 +364,22 @@ export function Graph({
     onSelect,
     onSelectRel,
     setTooltip,
+    onCtrlNodeClick: (id) => {
+      if (selected) {
+        setCtrlSelected(id);
+        onCtrlSecondSelect?.(id);
+      } else {
+        onSelectRel(() => null);
+        onSelect((prev) => (prev === id ? null : id));
+      }
+    },
   });
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const activeEls = state.elements.filter((e) => e.status !== "withdrawn");
+  const activeEls = state.elements.filter(
+    (e) => e.status !== "withdrawn" && e.status !== "rejected",
+  );
 
   return (
     <>
@@ -384,7 +430,7 @@ export function Graph({
           renderNode(
             el,
             positions,
-            graphNodeVisuals(el, wIds, dimNode, selected),
+            graphNodeVisuals(el, wIds, dimNode, selected, undefined, recentlyAdded),
             isDragging,
             setTooltip,
           ),
