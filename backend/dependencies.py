@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Optional
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 
 from .config import Settings, get_settings
 from .services.llm import LLMConfig, LLMService
@@ -35,7 +35,11 @@ def get_session_store() -> MarkdownSessionStore:
     return MarkdownSessionStore(Path(get_settings().sessions_dir))
 
 
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+
 def get_llm_service(
+    request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     x_api_key: Annotated[Optional[str], Header()] = None,
     x_base_url: Annotated[Optional[str], Header()] = None,
@@ -51,6 +55,11 @@ def get_llm_service(
         raise HTTPException(status_code=400, detail="Missing x-base-url header")
     if x_base_url not in ALLOWED_BASE_URLS:
         raise HTTPException(status_code=400, detail="Unsupported provider URL")
+    # Server-side keys are only usable from localhost; remote callers must BYOK.
+    if not x_api_key:
+        client_host = request.client.host if request.client else "127.0.0.1"
+        if client_host not in _LOOPBACK:
+            raise HTTPException(status_code=403, detail="Server-side API keys are only accessible from localhost")
     api_key = x_api_key or settings.llm_api_keys.get(x_base_url)
     if not api_key:
         raise HTTPException(status_code=400, detail="No API key configured")

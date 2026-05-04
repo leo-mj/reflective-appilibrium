@@ -57,4 +57,4 @@ app.include_router(sessions.router)
 @app.get("/api/health", tags=["meta"])
 async def health() -> dict:
     """Return service status and the active LLM model name."""
-    return {"status": "ok", "model": settings.openai_model}
+    return {"status": "ok", "model": settings.default_model}

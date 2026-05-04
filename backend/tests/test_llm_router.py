@@ -17,13 +17,12 @@ def test_test_endpoint_uses_byok_model(client, mock_llm_complete):
     assert res.json()["model"] == "gpt-4o"
 
 
-def test_test_endpoint_falls_back_to_server_api_key(client, mock_llm_complete):
-    # No x-api-key — should fall back to the server-side key from fake_settings.
+def test_server_key_blocked_from_non_localhost(client, mock_llm_complete):
+    # No x-api-key from a non-localhost origin: must be rejected.
     res = client.post("/api/llm/test", headers={
         "x-base-url": "https://api.openai.com/v1",
     })
-    assert res.status_code == 200
-    assert res.json()["model"] == "gpt-4o-mini"  # default_model from fake_settings
+    assert res.status_code == 403
 
 
 def test_rejects_unknown_base_url(client, mock_llm_complete):
