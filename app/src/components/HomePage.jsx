@@ -426,7 +426,7 @@ export function HomePage({ onStartFresh, onLoadSample, onLoadSession }) {
           margin: "5em 0 5em 0",
         }}
       >
-        <img src="/ieit_logo.svg" style={{ width: "15em" }} />
+        <img src="ieit_logo.svg" style={{ width: "15em" }} />
         <span>
           By the{" "}
           <a
