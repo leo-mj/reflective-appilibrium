@@ -274,6 +274,33 @@ export function useREActions(initialState) {
   };
   const canUndo = undoCount > 0;
 
+  const handleApplyRethonEquilibrium = (equilibriumIds) => {
+    const newRound = state.round + 1;
+    mutate((prev) => ({
+      ...prev,
+      round: newRound,
+      elements: prev.elements.map((e) => {
+        if (e.status === "withdrawn" || e.status === "rejected") return e;
+        if (equilibriumIds.has(e.id)) return e;
+        return {
+          ...e,
+          status: "withdrawn",
+          withdrawnRound: newRound,
+          reason: "Withdrawn by rethon equilibrium simulation.",
+        };
+      }),
+      log: [
+        ...prev.log,
+        makeLogEntry(
+          newRound,
+          "Rethon simulation applied: elements outside the equilibrium commitment set withdrawn.",
+          "Applied rethon equilibrium",
+          `Retained: ${[...equilibriumIds].join(", ")}`,
+        ),
+      ],
+    }));
+  };
+
   const handleImportFile = async (file) => {
     const newState = await importStateFromFile(file);
     undoStack.current = [];
@@ -307,6 +334,7 @@ export function useREActions(initialState) {
     handleAddRelation,
     handleRejectElements,
     handleRejectRelations,
+    handleApplyRethonEquilibrium,
     handleImportFile,
     handleUndo,
     canUndo,

@@ -68,6 +68,7 @@ export {};
  * @property {string}          [reason]        - Explanation for withdrawal (withdrawn only).
  * @property {number}          [withdrawnRound] - Round in which element was withdrawn (withdrawn only).
  * @property {number}          [rejectedRound]  - Round in which element was rejected (rejected only).
+ * @property {boolean}         [negated]        - True when this element appears as a negated sentence in a rethon position (simulation only; defaults to false).
  */
 
 /**

@@ -11,9 +11,10 @@ import {
   SuggestIcon,
   PrincipleIcon,
   JudgmentIcon,
+  SimulateIcon,
 } from "../components/Icons.jsx";
 
-export const ASSIST_TABS = ["elicitJudgments", "suggestPrinciples", "suggestRelations"];
+export const ASSIST_TABS = ["elicitJudgments", "suggestPrinciples", "suggestRelations", "simulateRethon"];
 
 export const TAB_ICONS = {
   graph: <NetworkIcon />,
@@ -23,6 +24,7 @@ export const TAB_ICONS = {
   suggestRelations: <SuggestIcon />,
   suggestPrinciples: <PrincipleIcon />,
   elicitJudgments: <JudgmentIcon />,
+  simulateRethon: <SimulateIcon />,
 };
 
 export const TAB_LABELS = {
@@ -33,6 +35,7 @@ export const TAB_LABELS = {
   elicitJudgments: "Judgments",
   suggestPrinciples: "Principles",
   suggestRelations: "Relations",
+  simulateRethon: "Simulate",
 };
 
 export const TAB_TOOLTIPS = {
@@ -43,4 +46,5 @@ export const TAB_TOOLTIPS = {
   elicitJudgments: "AI helps you surface and refine your moral judgments.",
   suggestPrinciples: "AI proposes general principles that systematize your judgments.",
   suggestRelations: "AI suggests missing relations between existing elements.",
+  simulateRethon: "Run the formal rethon RE simulation on your active elements.",
 };

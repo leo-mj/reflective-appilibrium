@@ -35,6 +35,7 @@ class REElement(BaseModel):
     origin: str = Field(max_length=200, default="")
     text: str = Field(max_length=10_000)
     added_round: int = Field(alias="addedRound", ge=1)
+    negated: bool = False
 
     # Revised fields
     previous_text: Optional[str] = Field(None, alias="previousText", max_length=10_000)

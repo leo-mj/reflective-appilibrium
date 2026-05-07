@@ -36,6 +36,12 @@ const JudgmentElicitTab = lazy(() =>
   })),
 );
 
+const SimulateRethonTab = lazy(() =>
+  import("./workflows/SimulateRethonTab.jsx").then((m) => ({
+    default: m.SimulateRethonTab,
+  })),
+);
+
 export function GraphPanel({
   tab,
   state,
@@ -51,6 +57,7 @@ export function GraphPanel({
   onScrollToRelations,
   onRejectElements,
   onRejectRelations,
+  onApplyRethonEquilibrium,
   onRoundChange,
   isWide,
   workflowPhase,
@@ -183,6 +190,15 @@ export function GraphPanel({
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
               suggestionsDisabled={suggestionsDisabled}
+            />
+          </Suspense>
+        )}
+        {tab === "simulateRethon" && (
+          <Suspense fallback={null}>
+            <SimulateRethonTab
+              state={state}
+              useDummy={useDummyAssist}
+              onApplyRethonEquilibrium={onApplyRethonEquilibrium}
             />
           </Suspense>
         )}
