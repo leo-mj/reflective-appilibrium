@@ -248,7 +248,7 @@ export function SimulateRethonTab({
     }
   };
 
-  const disabled = loading || activeCount < 3 || atLeastOneArgument > 0;
+  const disabled = loading || activeCount < 3 || atLeastOneArgument == 0;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -312,7 +312,7 @@ export function SimulateRethonTab({
           </button>
         </div>
 
-        {(activeCount || atLeastOneArgument > 0) < 3 && (
+        {(activeCount || atLeastOneArgument == 0) < 3 && (
           <div style={{ fontSize: 12, color: C.dim }}>
             Add at least three active elements and one argument to run the
             simulation.
