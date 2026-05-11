@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from theodias import StandardPosition, BDDDialecticalStructure
-from rethon import StandardLocalReflectiveEquilibrium, REState
+from rethon import StandardLocalReflectiveEquilibrium, StandardGlobalReflectiveEquilibrium, REState
 from ..models.re_state import REElement, RERelation
 from .arguments import DetectArgumentsResponse, translate_from_lookup
 
@@ -19,6 +19,7 @@ class SimulateRethonRequest(BaseModel):
     round: str = Field(max_length=500)
     elements: list[REElement] = Field(min_length=1, max_length=200)
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
+    local: bool = True
 
 
 class SimulatedRethonState(BaseModel):
@@ -75,8 +76,10 @@ def _get_rethon_final_state(
     numerical_arguments: List[List[int]],
     n_unnegated_sentence_pool: int,
     lookup: Dict[int, REElement],
+    local: bool = True
 ) -> REState:
     logger.info("Beginning rethon simulation.")
+    # Binary decision diagram - necessary for n_unnegated_sentence_pool > 10
     bdd_ds = BDDDialecticalStructure.from_arguments(
         arguments=numerical_arguments,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
@@ -86,11 +89,16 @@ def _get_rethon_final_state(
         position=initial_position,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
     )
-    local_re = StandardLocalReflectiveEquilibrium(bdd_ds, init_coms)
-    local_re.set_initial_state(init_coms)
-    local_re.re_process()
+    if local:
+        # Consider positions close to current positions 
+        re = StandardLocalReflectiveEquilibrium(dialectical_structure=bdd_ds, initial_commitments=init_coms)
+    else:
+        # Consider all positions
+        re = StandardGlobalReflectiveEquilibrium(dialectical_structure=bdd_ds, initial_commitments=init_coms)
+    re.set_initial_state(init_coms)
+    re.re_process()
     logger.info("Completed rethon simulation.")
-    return local_re.state()
+    return re.state()
 
 
 def _translate_re_state(numerical_re_state: REState, lookup: Dict[int, REElement]) -> SimulatedRethonState:
@@ -138,6 +146,7 @@ async def simulate_rethon(
             numerical_arguments=built_arguments.num_arguments,
             n_unnegated_sentence_pool=n_unnegated_sentence_pool,
             lookup=built_arguments.lookup,
+            local=request.local,
         )
         lookup_w_negated = _add_negated_to_lookup(lookup=built_arguments.lookup)
         translated_re_state = _translate_re_state(

@@ -17,7 +17,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @param {boolean} [useDummy=false]
  * @returns {Promise<Object>}
  */
-export async function simulateRethon(state, useDummy = false) {
+export async function simulateRethon(state, local, useDummy = false) {
   const url = useDummy
     ? `${BACKEND_URL}/api/simulate_rethon/simulate?use_dummy=true`
     : `${BACKEND_URL}/api/simulate_rethon/simulate`;
@@ -28,6 +28,7 @@ export async function simulateRethon(state, useDummy = false) {
       elements: state.elements,
       relations: state.relations.filter((r) => r.type === "jointly_entails"),
       round: `${state.round}`,
+      local,
     }),
   });
   if (!res.ok) {

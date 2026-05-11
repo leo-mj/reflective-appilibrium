@@ -210,7 +210,7 @@ export function SimulateRethonTab({
   onApplyRethonEquilibrium,
 }) {
   const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingMode, setLoadingMode] = useState(null); // "local" | "global" | null
   const [error, setError] = useState(null);
   const [evolutionOpen, setEvolutionOpen] = useState(false);
 
@@ -226,12 +226,12 @@ export function SimulateRethonTab({
     [result],
   );
 
-  const simulate = async () => {
-    setLoading(true);
+  const simulate = async (local) => {
+    setLoadingMode(local ? "local" : "global");
     setError(null);
     setEvolutionOpen(false);
     try {
-      const data = await simulateRethon(state, useDummy);
+      const data = await simulateRethon(state, local, useDummy);
       setResult(data);
       const evolution = data.translated_re_state.evolution;
       const lastTwo = evolution.slice(-2);
@@ -244,11 +244,11 @@ export function SimulateRethonTab({
     } catch (e) {
       setError(e.message);
     } finally {
-      setLoading(false);
+      setLoadingMode(null);
     }
   };
 
-  const disabled = loading || activeCount < 3 || atLeastOneArgument == 0;
+  const disabled = loadingMode !== null || activeCount < 3 || !atLeastOneArgument;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -289,30 +289,42 @@ export function SimulateRethonTab({
               </span>
             )}
           </div>
-          <button
-            onClick={simulate}
-            disabled={disabled}
-            style={{
-              background: "transparent",
-              border: `1px solid ${disabled ? C.border : ACCENT}`,
-              color: disabled ? C.dim : ACCENT,
-              borderRadius: 6,
-              padding: "5px 12px",
-              fontSize: 12,
-              fontWeight: "bold",
-              cursor: disabled ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              flexShrink: 0,
-            }}
-          >
-            {loading ? <SpinnerIcon /> : <span>↺</span>}
-            {loading ? "Simulating…" : result ? "Re-simulate" : "Simulate"}
-          </button>
+          <div style={{ display: "flex", gap: 2 }}>
+            {[
+              { label: "Globally", local: false, mode: "global" },
+              { label: "Locally", local: true, mode: "local" },
+            ].map(({ label, local, mode }) => {
+              const isLoading = loadingMode === mode;
+              return (
+                <button
+                  key={mode}
+                  onClick={() => simulate(local)}
+                  disabled={disabled}
+                  style={{
+                    background: "transparent",
+                    border: `1px solid ${disabled ? C.border : ACCENT}`,
+                    color: disabled ? C.dim : ACCENT,
+                    borderRadius: 6,
+                    padding: "5px 12px",
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                    flexShrink: 0,
+                  }}
+                >
+                  {isLoading ? <SpinnerIcon /> : <span>↺</span>}
+                  {label}{" "}
+                  {isLoading ? "Simulating…" : result ? "Re-simulate" : "Simulate"}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {(activeCount || atLeastOneArgument == 0) < 3 && (
+        {(activeCount < 3 || !atLeastOneArgument) && (
           <div style={{ fontSize: 12, color: C.dim }}>
             Add at least three active elements and one argument to run the
             simulation.
