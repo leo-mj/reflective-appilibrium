@@ -5,6 +5,8 @@
 
 /** @import { REState } from '../types.js' */
 
+import { getDummyArguments } from "../dummy-arguments.js";
+import { LLM_ENABLED } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
@@ -17,10 +19,10 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @returns {Promise<Object>}
  */
 export async function detectArguments(state, useDummy = false) {
-  const url = useDummy
-    ? `${BACKEND_URL}/api/arguments/detect?use_dummy=true`
-    : `${BACKEND_URL}/api/arguments/detect`;
-  const res = await fetch(url, {
+  if (!LLM_ENABLED || useDummy) {
+    return getDummyArguments(state.elements, `${state.round}`, state.relations);
+  }
+  const res = await fetch(`${BACKEND_URL}/api/arguments/detect`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({

@@ -262,7 +262,10 @@ function groupRelationsByArgument(rels) {
     if (r.type === "jointly_entails" && r.argumentId) {
       if (seenArgIds.has(r.argumentId)) continue;
       seenArgIds.add(r.argumentId);
-      groups.push({ argId: r.argumentId, rels: rels.filter((x) => x.argumentId === r.argumentId) });
+      groups.push({
+        argId: r.argumentId,
+        rels: rels.filter((x) => x.argumentId === r.argumentId),
+      });
     } else {
       groups.push({ argId: null, rels: [r] });
     }
@@ -307,9 +310,22 @@ export function ArgumentCard({ rels, dim }) {
             background: isSel ? `${C.border}44` : "transparent",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              flexWrap: "wrap",
+            }}
+          >
             <Badge id={r.from} />
-            <span style={{ color: C.jointly_entails, fontSize: 11, fontWeight: "bold" }}>
+            <span
+              style={{
+                color: C.jointly_entails,
+                fontSize: 11,
+                fontWeight: "bold",
+              }}
+            >
               → jointly entails →
             </span>
             <Badge id={r.to} />
@@ -318,7 +334,9 @@ export function ArgumentCard({ rels, dim }) {
           <div onClick={(e) => e.stopPropagation()}>
             <ActionButtons
               onRevise={() => onEditRelRequest(r)}
-              onWithdraw={r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null}
+              onWithdraw={
+                r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null
+              }
             />
           </div>
         </div>
@@ -332,12 +350,26 @@ export function ArgumentCard({ rels, dim }) {
           paddingLeft: 4,
         }}
       >
-        {allNodeIds.map((id) => {
+        {allNodeIds.map((id, index) => {
           const el = state.elements.find((e) => e.id === id);
           if (!el) return null;
           return (
-            <div key={id} style={{ fontSize: CONTENT_FONT_SIZE, color: C.text, lineHeight: 1.5 }}>
-              <span style={{ color: badgeColor(id), fontWeight: "bold", marginRight: 6 }}>
+            <div
+              key={id}
+              style={{
+                fontSize: CONTENT_FONT_SIZE,
+                color: C.text,
+                lineHeight: 1.5,
+              }}
+            >
+              <div>{index == allNodeIds.length - 1 && <b>Therefore:</b>}</div>
+              <span
+                style={{
+                  color: badgeColor(id),
+                  fontWeight: "bold",
+                  marginRight: 6,
+                }}
+              >
                 {id}:
               </span>
               <Highlight text={el.text} query={search} />
