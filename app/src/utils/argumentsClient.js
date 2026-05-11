@@ -27,6 +27,7 @@ export async function detectArguments(state, useDummy = false) {
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       elements: state.elements,
+      relations: state.relations,
       round: `${state.round}`
     }),
   });

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Dict, Annotated
+from typing import List, Dict, Tuple, Set, Annotated
 from ..services.llm import LLMService
 from ..dependencies import get_llm_service
 from pydantic import BaseModel
 import json
 
-from ..models.re_state import REElement
+from ..models.re_state import REElement, RERelation
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/arguments", tags=["arguments"])
 
 class DetectArgumentsRequest(BaseModel):
     elements: List[REElement]
+    relations: List[RERelation] = []
     round: str
 
 class LLMArgumentsResponse(BaseModel):
@@ -33,27 +34,78 @@ def translate_from_lookup(nums: List[int], lookup: Dict[int, REElement]) -> List
     return [lookup[num] for num in nums]
 
 
-def _build_prompt( lookup: Dict[int, REElement]) -> str:
-    """Build the LLM prompt for principle suggestion.
+def _arg_fingerprint(arg: List[int]) -> Tuple:
+    return (tuple(sorted(arg[:-1])), arg[-1])
 
-    Both active judgments and existing principles are included so the model
-    can avoid redundant proposals and estimate how many new principles are
-    warranted (target: roughly one per three elements).
-    """
-    element_lines = (
-        "\n".join(f"  {element_num}: {element.text}" for element_num, element in lookup.items())
+
+def _existing_arg_fingerprints(relations: List[RERelation], reverse_lookup: Dict[str, int]) -> Set[Tuple]:
+    groups: Dict[str, Dict] = {}
+    for r in relations:
+        if r.type != "jointly_entails" or not r.argument_id:
+            continue
+        if r.argument_id not in groups:
+            groups[r.argument_id] = {"froms": [], "to": r.to_id}
+        groups[r.argument_id]["froms"].append(r.from_id)
+
+    fingerprints: Set[Tuple] = set()
+    for group in groups.values():
+        premise_indices = [reverse_lookup[eid] for eid in group["froms"] if eid in reverse_lookup]
+        conclusion_index = reverse_lookup.get(group["to"])
+        if conclusion_index is not None and len(premise_indices) == len(group["froms"]):
+            fingerprints.add(_arg_fingerprint(sorted(premise_indices) + [conclusion_index]))
+    return fingerprints
+
+
+def _filter_existing_arguments(num_arguments: List[List[int]], relations: List[RERelation], lookup: Dict[int, REElement]) -> List[List[int]]:
+    reverse_lookup = {e.id: n for n, e in lookup.items()}
+    existing = _existing_arg_fingerprints(relations, reverse_lookup)
+    filtered = [arg for arg in num_arguments if _arg_fingerprint(arg) not in existing]
+    removed = len(num_arguments) - len(filtered)
+    if removed:
+        logger.info(f"Filtered out {removed} argument(s) already present in the state.")
+    return filtered
+
+
+def _format_existing_args_for_prompt(relations: List[RERelation], reverse_lookup: Dict[str, int]) -> str:
+    groups: Dict[str, Dict] = {}
+    for r in relations:
+        if r.type != "jointly_entails" or not r.argument_id:
+            continue
+        if r.argument_id not in groups:
+            groups[r.argument_id] = {"froms": [], "to": r.to_id}
+        groups[r.argument_id]["froms"].append(r.from_id)
+
+    lines = []
+    for group in groups.values():
+        premise_indices = [reverse_lookup[eid] for eid in group["froms"] if eid in reverse_lookup]
+        conclusion_index = reverse_lookup.get(group["to"])
+        if conclusion_index is not None and len(premise_indices) == len(group["froms"]):
+            arg = sorted(premise_indices) + [conclusion_index]
+            premise_ids = ", ".join(group["froms"])
+            lines.append(f"  {arg}  ({premise_ids} → {group['to']})")
+    return "\n".join(lines)
+
+
+def _build_prompt(lookup: Dict[int, REElement], relations: List[RERelation] = []) -> str:
+    element_lines = "\n".join(f"  {n}: {e.text}" for n, e in lookup.items())
+
+    reverse_lookup = {e.id: n for n, e in lookup.items()}
+    existing_str = _format_existing_args_for_prompt(relations, reverse_lookup)
+    existing_section = (
+        f"\nAlready accepted arguments — do not reproduce these:\n{existing_str}\n"
+        if existing_str else ""
     )
 
     return f"""\
 You are an expert in philosophical logic, semantics, and linguistics.
 
-Existing sentences to map into arguments:
+Sentences to map into arguments:
 {element_lines}
 Each key-value pair consists of the sentence (value) and its numerical representation (key) as a sentence in propositional logic.
-
-Task: 
+{existing_section}
+Task:
 List all of the possible strictly logically valid arguments that can be formed with the sentences.
-If there are arguments with a suppressed premise, add the premise as a dictionary with a unique integer index, the content of the premise, and its type. 
+If there are arguments with a suppressed premise, add the premise as a dictionary with a unique integer index, the content of the premise, and its type.
 The type can take the value "judgment", "principle", or "theory" if it is a background theory.
 Output: Each argument in the list is itself a list, in which the final member is the conclusion and all previous members are the premises.
 In the lists, the sentences are just represented through their key.
@@ -184,9 +236,9 @@ def _dummy_detect_arguments(n_unnegated_sentence_pool: int, elements: List[REEle
 
 
 async def _get_arguments_from_llm(
-    lookup: Dict[int, REElement], llm: LLMService
+    lookup: Dict[int, REElement], llm: LLMService, relations: List[RERelation] = []
 ) -> LLMArgumentsResponse:
-    prompt = _build_prompt(lookup)
+    prompt = _build_prompt(lookup, relations)
     result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,
@@ -223,16 +275,17 @@ async def detect_arguments(
             f"Requesting detected arguments from model '{llm.model}' for {n_unnegated_sentence_pool} elements"
         )
         initial_lookup = {index + 1: e for index, e in enumerate(request.elements)}
-        llm_response = await _get_arguments_from_llm(llm=llm, lookup=initial_lookup)
+        llm_response = await _get_arguments_from_llm(llm=llm, lookup=initial_lookup, relations=request.relations)
         logger.info(f"Received {len(llm_response.detected_arguments)} arguments from LLM.")
 
         lookup_w_premises = _add_new_premises_to_lookup(
             lookup=initial_lookup, added_premises=llm_response.added_premises, elements=request.elements, round=request.round, model=llm.model
         )
-        translated_arguments = _translate_arguments(detected_arguments=llm_response.detected_arguments, lookup=lookup_w_premises)
-        
+        filtered_arguments = _filter_existing_arguments(llm_response.detected_arguments, request.relations, lookup_w_premises)
+        translated_arguments = _translate_arguments(detected_arguments=filtered_arguments, lookup=lookup_w_premises)
+
         return DetectArgumentsResponse(
-            num_arguments=llm_response.detected_arguments,
+            num_arguments=filtered_arguments,
             translated_arguments=translated_arguments,
             lookup=lookup_w_premises,
             input_tokens=llm_response.input_tokens,
