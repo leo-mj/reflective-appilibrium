@@ -19,9 +19,7 @@ import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
   const [tab, setTab] = useState("elicitJudgments");
-  const [hiddenLegendKeys, setHiddenLegendKeys] = useState(
-    new Set(["withdrawn", "rejected"]),
-  );
+  const [hiddenLegendKeys, setHiddenLegendKeys] = useState(new Set());
   const [showText, setShowText] = useState(true);
   const [showTabNav, setShowTabNav] = useState(false);
   const [expandAllKey, setExpandAllKey] = useState(0);
@@ -31,6 +29,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [workflowPhase, setWorkflowPhase] = useState(null);
   const [addBarCtrlTo, setAddBarCtrlTo] = useState(null);
   const [workflowLoops, setWorkflowLoops] = useState(0);
+  const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
 
   const {
     state,
@@ -52,6 +51,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     withdrawingId,
     setWithdrawingId,
     handleWithdrawRelRequest,
+    handleDeleteRelationsByArgId,
     handleAddElement,
     handleAddRelation,
     handleRejectElements,
@@ -114,8 +114,15 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     setWorkflowPhase(null);
     setWorkflowLoops(0);
   };
+  const NON_ENTAILS_TYPES = ["supports", "conflicts", "undermines", "depends"];
+  const effectiveHiddenKeys = hideNonEntailsRels
+    ? new Set([...hiddenLegendKeys, ...NON_ENTAILS_TYPES])
+    : hiddenLegendKeys;
+
   const advanceWorkflow = () => {
-    const next = WORKFLOW_NEXT_PHASE[workflowPhase];
+    let next = WORKFLOW_NEXT_PHASE[workflowPhase];
+    if (hideNonEntailsRels && next === "suggestRelations")
+      next = WORKFLOW_NEXT_PHASE["suggestRelations"];
     if (next === "elicitJudgments") setWorkflowLoops((n) => n + 1);
     setWorkflowPhase(next);
     setTab(next);
@@ -159,7 +166,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     clusterSectionRef,
     scrollToRelationsKey,
     state: textState,
-    hiddenLegendKeys,
+    hiddenLegendKeys: effectiveHiddenKeys,
+    hideNonEntailsRels,
     selected,
     onSelect: handleSelectNode,
     selectedRel,
@@ -180,7 +188,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const graphPanelCommonProps = {
     state,
     positions,
-    hiddenLegendKeys,
+    hiddenLegendKeys: effectiveHiddenKeys,
     setHiddenLegendKeys,
     selected,
     onSelect: handleSelectNode,
@@ -188,6 +196,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onSelectRel: handleSelectRel,
     onAddElement: handleAddElement,
     onAddRelation: handleAddRelation,
+    onDeleteRelationsByArgId: handleDeleteRelationsByArgId,
     recentlyAdded,
     onScrollToRelations: scrollToRelations,
     onRejectElements: handleRejectElements,
@@ -198,6 +207,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onCtrlSecondSelect: setAddBarCtrlTo,
     ready,
     isSample,
+    hideNonEntailsRels,
   };
 
   return (
@@ -258,6 +268,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           setAllExpanded((v) => !v);
           setExpandAllKey((k) => k + 1);
         }}
+        hideNonEntailsRels={hideNonEntailsRels}
+        setHideNonEntailsRels={setHideNonEntailsRels}
       />
 
       <div

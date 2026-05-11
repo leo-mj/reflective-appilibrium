@@ -50,6 +50,7 @@ function Toolbar({
   advanceWorkflow,
   nextPhaseIsEnabled,
   suggestionsDisabled,
+  nextPhaseLabel,
 }) {
   const suggestDisabled = loading || jAndPCount < 1 || suggestionsDisabled;
   return (
@@ -106,6 +107,7 @@ function Toolbar({
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               workflowPhase={workflowPhase}
               advanceWorkflow={advanceWorkflow}
+              nextPhaseLabel={nextPhaseLabel}
             />
           </>
         )}
@@ -240,6 +242,7 @@ export function PrincipleSuggestTab({
   autoFetch,
   workflowPhase,
   onAdvanceWorkflow,
+  workflowNextPhase,
   useDummy = false,
   suggestionsDisabled = false,
 }) {
@@ -323,6 +326,7 @@ export function PrincipleSuggestTab({
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
           suggestionsDisabled={suggestionsDisabled}
+          nextPhaseLabel={workflowNextPhase}
         />
         {error && <ErrorBanner message={error} />}
 

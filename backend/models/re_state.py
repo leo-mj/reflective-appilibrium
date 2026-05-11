@@ -35,7 +35,7 @@ class REElement(BaseModel):
     origin: str = Field(max_length=200, default="")
     text: str = Field(max_length=10_000)
     added_round: int = Field(alias="addedRound", ge=1)
-    negated: bool = False
+    negated: Optional[bool] = False
 
     # Revised fields
     previous_text: Optional[str] = Field(None, alias="previousText", max_length=10_000)
@@ -53,7 +53,7 @@ class REElement(BaseModel):
 
 # ── Relation ───────────────────────────────────────────────────────────────────
 
-RelationType = Literal["supports", "conflicts", "undermines", "depends"]
+RelationType = Literal["supports", "conflicts", "undermines", "depends", "jointly_entails"]
 
 
 class RERelation(BaseModel):
@@ -62,6 +62,10 @@ class RERelation(BaseModel):
     ``from_id`` / ``to_id`` use the JSON aliases ``from`` / ``to`` to match
     the frontend schema.  A single ordered pair can have multiple relations
     (e.g. one ``supports`` and one ``undermines`` entry recorded separately).
+
+    ``argument_id`` is set only for ``(jointly) entails`` relations: all premises of the
+    same detected argument share the same ``argument_id`` so the graph can
+    visually group them.
     """
 
     from_id: str = Field(alias="from", pattern=r"^[JPT]\d+$")
@@ -69,6 +73,7 @@ class RERelation(BaseModel):
     type: RelationType
     explanation: str = Field(max_length=2_000, default="")
     added_round: int = Field(alias="addedRound", ge=1)
+    argument_id: Optional[str] = Field(None, alias="argumentId", max_length=200)
 
     status: Optional[Status] = None
     revised_round: Optional[int] = Field(None, alias="revisedRound", ge=1)

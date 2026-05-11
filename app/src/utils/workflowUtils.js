@@ -14,13 +14,15 @@ export function nextPhaseEnabled(workflowPhase, state) {
 }
 
 export const WORKFLOW_PHASE_LABELS = {
-  elicitJudgments: "Step 1 · Elicit Judgments",
-  suggestPrinciples: "Step 2 · Suggest Principles",
-  suggestRelations: "Step 3 · Suggest Relations",
+  elicitJudgments: "Workflow Step: Elicit Judgments",
+  suggestPrinciples: "Workflow Step: Suggest Principles",
+  suggestRelations: "Workflow Step: Suggest Relations",
+  detectArguments: "Workflow Step: Detect Arguments",
 };
 
 export const WORKFLOW_NEXT_PHASE = {
   elicitJudgments: "suggestPrinciples",
   suggestPrinciples: "suggestRelations",
-  suggestRelations: "elicitJudgments",
+  suggestRelations: "detectArguments",
+  detectArguments: "elicitJudgments",
 };

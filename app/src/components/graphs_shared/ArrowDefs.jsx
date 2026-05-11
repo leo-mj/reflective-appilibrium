@@ -31,7 +31,7 @@ import { C } from "../../constants/colors.js";
 export function ArrowDefs({ prefix }) {
   return (
     <defs>
-      {["supports", "conflicts", "undermines", "depends"].map((t) =>
+      {["supports", "conflicts", "undermines", "depends", "jointly_entails"].map((t) =>
         [false, true].map((w) => (
           <marker
             key={`${prefix}-${t}-${w}`}

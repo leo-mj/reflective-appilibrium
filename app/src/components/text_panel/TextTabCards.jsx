@@ -252,6 +252,115 @@ export function ElementCard({ e, dim }) {
   );
 }
 
+// ─── Argument card (grouped jointly_entails) ──────────────────────────────────
+
+/** Groups an array of relations: jointly_entails with the same argumentId become one entry. */
+function groupRelationsByArgument(rels) {
+  const groups = [];
+  const seenArgIds = new Set();
+  for (const r of rels) {
+    if (r.type === "jointly_entails" && r.argumentId) {
+      if (seenArgIds.has(r.argumentId)) continue;
+      seenArgIds.add(r.argumentId);
+      groups.push({ argId: r.argumentId, rels: rels.filter((x) => x.argumentId === r.argumentId) });
+    } else {
+      groups.push({ argId: null, rels: [r] });
+    }
+  }
+  return groups;
+}
+
+export function ArgumentCard({ rels, dim }) {
+  const {
+    state,
+    selectedRel,
+    onSelectRel,
+    onSelect,
+    onEditRelRequest,
+    onWithdrawRelRequest,
+    badgeColor,
+    search,
+  } = useContext(Ctx);
+  const isSel = rels.some((r) => r === selectedRel);
+  // All rels in an argument share the same conclusion.
+  const conclusionId = rels[0].to;
+  const allNodeIds = [...new Set([...rels.map((r) => r.from), conclusionId])];
+
+  return (
+    <div style={{ ...CARD_STYLE, opacity: dim ? 0.4 : 1 }}>
+      {rels.map((r) => (
+        <div
+          key={r.from}
+          onClick={() => {
+            onSelectRel((prev) => (rels.includes(prev) ? null : r));
+            onSelect(() => null);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 5,
+            cursor: "pointer",
+            borderRadius: 4,
+            padding: "2px 4px",
+            margin: "0 -4px 4px",
+            background: isSel ? `${C.border}44` : "transparent",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+            <Badge id={r.from} />
+            <span style={{ color: C.jointly_entails, fontSize: 11, fontWeight: "bold" }}>
+              → jointly entails →
+            </span>
+            <Badge id={r.to} />
+            <StatusLabel status={r.status} />
+          </div>
+          <div onClick={(e) => e.stopPropagation()}>
+            <ActionButtons
+              onRevise={() => onEditRelRequest(r)}
+              onWithdraw={r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null}
+            />
+          </div>
+        </div>
+      ))}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          marginBottom: 6,
+          paddingLeft: 4,
+        }}
+      >
+        {allNodeIds.map((id) => {
+          const el = state.elements.find((e) => e.id === id);
+          if (!el) return null;
+          return (
+            <div key={id} style={{ fontSize: CONTENT_FONT_SIZE, color: C.text, lineHeight: 1.5 }}>
+              <span style={{ color: badgeColor(id), fontWeight: "bold", marginRight: 6 }}>
+                {id}:
+              </span>
+              <Highlight text={el.text} query={search} />
+            </div>
+          );
+        })}
+      </div>
+      {rels[0].explanation && (
+        <div
+          style={{
+            fontSize: CONTENT_FONT_SIZE,
+            color: C.dim,
+            lineHeight: 1.5,
+            fontStyle: "italic",
+          }}
+        >
+          <Highlight text={rels[0].explanation} query={search} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Relation card ────────────────────────────────────────────────────────────
 
 export function RelationCard({ r, dim }) {
@@ -425,12 +534,19 @@ export function HighlightedSection({
   return (
     <>
       {selectedRel ? (
-        <>
-          <SectionHeader title={`${selectedRel.from} → ${selectedRel.to}`} />
-          <RelationCard r={selectedRel} />
-          {neighbourEls.length > 0 && <SectionHeader title="Elements" />}
-          <ElementCards els={neighbourEls} />
-        </>
+        selectedRel.argumentId ? (
+          <>
+            <SectionHeader title="Argument" />
+            <ArgumentCard rels={hlRels.length > 0 ? hlRels : [selectedRel]} />
+          </>
+        ) : (
+          <>
+            <SectionHeader title={`${selectedRel.from} → ${selectedRel.to}`} />
+            <RelationCard r={selectedRel} />
+            {neighbourEls.length > 0 && <SectionHeader title="Elements" />}
+            <ElementCards els={neighbourEls} />
+          </>
+        )
       ) : (
         <>
           <SectionHeader title={selected} />
@@ -451,12 +567,16 @@ export function HighlightedSection({
               >
                 Relations
               </div>
-              {hlRels.map((r) => (
-                <RelationCard
-                  key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`}
-                  r={r}
-                />
-              ))}
+              {groupRelationsByArgument(hlRels).map((group) =>
+                group.argId ? (
+                  <ArgumentCard key={group.argId} rels={group.rels} />
+                ) : (
+                  <RelationCard
+                    key={`${group.rels[0].from}-${group.rels[0].to}-${group.rels[0].type}-${group.rels[0].addedRound ?? 1}`}
+                    r={group.rels[0]}
+                  />
+                ),
+              )}
             </>
           )}
         </>
@@ -464,13 +584,17 @@ export function HighlightedSection({
       <div style={{ borderTop: `1px solid ${C.border}`, margin: "4px 0 0" }} />
       <SectionHeader title="All elements" />
       <ElementCards els={restEls} dim />
-      {restRels.map((r) => (
-        <RelationCard
-          key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`}
-          r={r}
-          dim
-        />
-      ))}
+      {groupRelationsByArgument(restRels).map((group) =>
+        group.argId ? (
+          <ArgumentCard key={group.argId} rels={group.rels} dim />
+        ) : (
+          <RelationCard
+            key={`${group.rels[0].from}-${group.rels[0].to}-${group.rels[0].type}-${group.rels[0].addedRound ?? 1}`}
+            r={group.rels[0]}
+            dim
+          />
+        ),
+      )}
     </>
   );
 }
@@ -518,6 +642,8 @@ export function SectionListing({
   displayRels,
   isCollapsed,
   toggle,
+  showRelations = true,
+  onAddArgument,
 }) {
   const [judgmentSort, setJudgmentSort] = useState("element");
   const [principleSort, setPrincipleSort] = useState("element");
@@ -576,24 +702,54 @@ export function SectionListing({
           </>
         )}
       </div>
-      <div ref={refRelations}>
-        <SectionHeader
-          title={`Relations (${displayRels.length})`}
-          collapsed={isCollapsed("relations")}
-          onToggle={() => toggle("relations")}
-        />
-        {!isCollapsed("relations") && (
-          <>
-            <SortToggle value={relSort} onChange={setRelSort} />
-            {sortedRels.map((r) => (
-              <RelationCard
-                key={`${r.from}-${r.to}-${r.type}-${r.addedRound ?? 1}`}
-                r={r}
-              />
-            ))}
-          </>
-        )}
-      </div>
+      {showRelations ? (
+        <div ref={refRelations}>
+          <SectionHeader
+            title={`Relations (${displayRels.length})`}
+            collapsed={isCollapsed("relations")}
+            onToggle={() => toggle("relations")}
+          />
+          {!isCollapsed("relations") && (
+            <>
+              <SortToggle value={relSort} onChange={setRelSort} />
+              {groupRelationsByArgument(sortedRels).map((group) =>
+                group.argId ? (
+                  <ArgumentCard key={group.argId} rels={group.rels} />
+                ) : (
+                  <RelationCard
+                    key={`${group.rels[0].from}-${group.rels[0].to}-${group.rels[0].type}-${group.rels[0].addedRound ?? 1}`}
+                    r={group.rels[0]}
+                  />
+                ),
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+        <div ref={refRelations}>
+          <SectionHeader
+            title={`Arguments (${groupRelationsByArgument(sortedRels).length})`}
+            collapsed={isCollapsed("relations")}
+            onToggle={() => toggle("relations")}
+            onAdd={onAddArgument}
+          />
+          {!isCollapsed("relations") && (
+            <>
+              <SortToggle value={relSort} onChange={setRelSort} />
+              {groupRelationsByArgument(sortedRels).map((group) =>
+                group.argId ? (
+                  <ArgumentCard key={group.argId} rels={group.rels} />
+                ) : (
+                  <RelationCard
+                    key={`${group.rels[0].from}-${group.rels[0].to}-${group.rels[0].type}-${group.rels[0].addedRound ?? 1}`}
+                    r={group.rels[0]}
+                  />
+                ),
+              )}
+            </>
+          )}
+        </div>
+      )}
     </>
   );
 }

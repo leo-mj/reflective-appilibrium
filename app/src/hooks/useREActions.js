@@ -149,23 +149,42 @@ export function useREActions(initialState) {
 
   const handleWithdrawRelRequest = (rel) => {
     const newRound = state.round + 1;
+    const isArgRel = rel.type === "jointly_entails" && rel.argumentId;
     mutate((prev) => ({
       ...prev,
       round: newRound,
-      relations: prev.relations.map((r) =>
-        r === rel ? { ...r, status: "withdrawn", withdrawnRound: newRound } : r,
-      ),
+      relations: prev.relations.map((r) => {
+        const inGroup = isArgRel && r.argumentId === rel.argumentId && r.type === "jointly_entails";
+        return r === rel || inGroup
+          ? { ...r, status: "withdrawn", withdrawnRound: newRound }
+          : r;
+      }),
       log: [
         ...prev.log,
         makeLogEntry(
           newRound,
-          `Relation ${rel.from} → ${rel.to} was withdrawn by the user.`,
+          isArgRel
+            ? `Argument (${rel.argumentId}) withdrawn by the user.`
+            : `Relation ${rel.from} → ${rel.to} was withdrawn by the user.`,
           "Withdrawn",
-          `${rel.from} → ${rel.to}: status → withdrawn`,
+          isArgRel
+            ? `All jointly_entails relations of argument ${rel.argumentId}: status → withdrawn`
+            : `${rel.from} → ${rel.to}: status → withdrawn`,
         ),
       ],
     }));
-    if (selectedRel === rel) setSelectedRel(null);
+    if (isArgRel ? selectedRel?.argumentId === rel.argumentId : selectedRel === rel)
+      setSelectedRel(null);
+  };
+
+  const handleDeleteRelationsByArgId = (argumentId) => {
+    mutate((prev) => ({
+      ...prev,
+      relations: prev.relations.filter(
+        (r) => !(r.argumentId === argumentId && r.type === "jointly_entails"),
+      ),
+    }));
+    if (selectedRel?.argumentId === argumentId) setSelectedRel(null);
   };
 
   const handleAddElement = (formData) => {
@@ -189,7 +208,7 @@ export function useREActions(initialState) {
     setRecentlyAddedRel(null);
   };
 
-  const handleAddRelation = (formData, { select = true } = {}) => {
+  const handleAddRelation = (formData, { select = true, pinRecent = false } = {}) => {
     const newRound = state.round + 1;
     const newRel = { ...formData, addedRound: newRound };
     mutate((prev) => ({
@@ -209,6 +228,9 @@ export function useREActions(initialState) {
     if (select) {
       setSelected(null);
       setSelectedRel(null);
+      setRecentlyAddedRel(newRel);
+      setRecentlyAdded(null);
+    } else if (pinRecent) {
       setRecentlyAddedRel(newRel);
       setRecentlyAdded(null);
     }
@@ -330,6 +352,7 @@ export function useREActions(initialState) {
     withdrawingId,
     setWithdrawingId,
     handleWithdrawRelRequest,
+    handleDeleteRelationsByArgId,
     handleAddElement,
     handleAddRelation,
     handleRejectElements,

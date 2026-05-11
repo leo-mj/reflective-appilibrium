@@ -8,9 +8,24 @@ import { Tooltip } from "../Tooltip.jsx";
 
 export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
   const items = [
-    { label: "Judgment (high)", shape: "circle", color: "#2563eb", key: "J-high" },
-    { label: "Judgment (mod)", shape: "circle", color: "#60a5fa", key: "J-moderate" },
-    { label: "Judgment (low)", shape: "circle", color: "#93c5fd", key: "J-low" },
+    {
+      label: "Judgment (high)",
+      shape: "circle",
+      color: "#2563eb",
+      key: "J-high",
+    },
+    {
+      label: "Judgment (mod)",
+      shape: "circle",
+      color: "#60a5fa",
+      key: "J-moderate",
+    },
+    {
+      label: "Judgment (low)",
+      shape: "circle",
+      color: "#93c5fd",
+      key: "J-low",
+    },
     { label: "Principle", shape: "roundrect", color: "#7c3aed", key: "P" },
     { label: "Theory", shape: "diamond", color: "#d97706", key: "T" },
     { label: "Withdrawn", shape: "circle", color: "#64748b", key: "withdrawn" },
@@ -19,7 +34,13 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
   const lines = [
     { label: "Supports", color: C.supports, dash: "", key: "supports" },
     { label: "Conflicts", color: C.conflicts, dash: "8,4", key: "conflicts" },
-    { label: "Undermines", color: C.undermines, dash: "4,4", key: "undermines" },
+    {
+      label: "Undermines",
+      color: C.undermines,
+      dash: "4,4",
+      key: "undermines",
+    },
+    { label: "(Jointly) Entails", color: C.jointly_entails, dash: "", key: "jointly_entails" },
   ];
 
   const hidden = (key) => hiddenLegendKeys?.has(key) ?? false;
@@ -54,7 +75,11 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
       {items.map((it) => (
         <Tooltip
           key={it.key}
-          text={hidden(it.key) ? `Show ${it.label.toLowerCase()}` : `Hide ${it.label.toLowerCase()}`}
+          text={
+            hidden(it.key)
+              ? `Show ${it.label.toLowerCase()}`
+              : `Hide ${it.label.toLowerCase()}`
+          }
           delay={100}
         >
           <div onClick={() => toggle(it.key)} style={itemStyle(it.key)}>
@@ -90,7 +115,11 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
       {lines.map((l) => (
         <Tooltip
           key={l.key}
-          text={hidden(l.key) ? `Show ${l.label.toLowerCase()}` : `Hide ${l.label.toLowerCase()}`}
+          text={
+            hidden(l.key)
+              ? `Show ${l.label.toLowerCase()}`
+              : `Hide ${l.label.toLowerCase()}`
+          }
           delay={100}
         >
           <div onClick={() => toggle(l.key)} style={itemStyle(l.key)}>

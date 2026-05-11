@@ -407,6 +407,196 @@ export function AddElementPanel({ elementType, onAddElement }) {
 }
 
 /**
+ * Persistent bottom panel for manually adding a jointly_entails argument.
+ *
+ * @param {Object}      props
+ * @param {REElement[]} props.elements - Active (non-withdrawn) elements.
+ * @param {function}    props.onAddRelation
+ */
+export function AddArgumentPanel({ elements, onAddRelation }) {
+  const ids = elements.map((e) => e.id).sort(sortElementIds);
+  const [premises, setPremises] = useState([ids[0] ?? ""]);
+  const [conclusion, setConclusion] = useState(ids[1] ?? ids[0] ?? "");
+  const [explanation, setExplanation] = useState("");
+
+  const setPremise = (i, id) =>
+    setPremises((prev) => prev.map((p, j) => (j === i ? id : p)));
+  const addPremise = () =>
+    setPremises((prev) => [
+      ...prev,
+      ids.find((id) => !prev.includes(id) && id !== conclusion) ?? ids[0] ?? "",
+    ]);
+  const removePremise = (i) =>
+    setPremises((prev) => prev.filter((_, j) => j !== i));
+
+  const premiseSet = new Set(premises);
+  const hasDuplicates = premiseSet.size < premises.length;
+  const conclusionClash = premiseSet.has(conclusion);
+  const canSubmit =
+    premises.length >= 1 &&
+    !!conclusion &&
+    premises.every(Boolean) &&
+    !hasDuplicates &&
+    !conclusionClash;
+
+  const handleSubmit = () => {
+    const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+    premises.forEach((premise, i) => {
+      onAddRelation(
+        {
+          from: premise,
+          to: conclusion,
+          type: "jointly_entails",
+          argumentId,
+          explanation,
+        },
+        { select: false, pinRecent: i === premises.length - 1 },
+      );
+    });
+    setPremises([ids[0] ?? ""]);
+    setConclusion(ids[1] ?? ids[0] ?? "");
+    setExplanation("");
+  };
+
+  const ghostBtn = {
+    background: "transparent",
+    border: `1px solid ${C.border}`,
+    borderRadius: 4,
+    color: C.dim,
+    fontSize: 11,
+    padding: "1px 6px",
+    cursor: "pointer",
+    flexShrink: 0,
+  };
+
+  return (
+    <div style={PANEL_STYLE}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+          flexShrink: 0,
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          disabled={!canSubmit}
+          onClick={handleSubmit}
+          style={{
+            padding: "3px 14px",
+            borderRadius: 4,
+            fontSize: 12,
+            fontWeight: "bold",
+            cursor: canSubmit ? "pointer" : "default",
+            border: "none",
+            background: C.jointly_entails,
+            color: "#fff",
+            opacity: canSubmit ? 1 : 0.4,
+            flexShrink: 0,
+            alignSelf: "center",
+          }}
+        >
+          Add argument
+        </button>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            gap: 4,
+            alignItems: "center",
+          }}
+        >
+          {premises.map((p, i) => (
+            <div key={i} style={{ display: "flex", gap: 4 }}>
+              <select
+                value={p}
+                onChange={(e) => setPremise(i, e.target.value)}
+                style={SELECT_STYLE}
+              >
+                {ids.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+              {premises.length > 1 && (
+                <button onClick={() => removePremise(i)} style={ghostBtn}>
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            onClick={addPremise}
+            disabled={ids.length <= premises.length + 1}
+            style={{ ...ghostBtn, padding: "1px 8px" }}
+          >
+            + premise
+          </button>
+          {(hasDuplicates || conclusionClash) && (
+            <span style={{ fontSize: 10, color: C.conflicts }}>
+              {hasDuplicates
+                ? "Premises must be distinct."
+                : "Premise = conclusion."}
+            </span>
+          )}
+        </div>
+
+        <span
+          style={{
+            color: C.jointly_entails,
+            fontSize: 11,
+            fontWeight: "bold",
+            alignSelf: "center",
+          }}
+        >
+          jointly entails →
+        </span>
+
+        <select
+          value={conclusion}
+          onChange={(e) => setConclusion(e.target.value)}
+          style={{ ...SELECT_STYLE, alignSelf: "center" }}
+        >
+          {ids.map((id) => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
+        </select>
+      </div>
+      <textarea
+        value={explanation}
+        onChange={(e) => setExplanation(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && e.ctrlKey && canSubmit) {
+            e.preventDefault();
+            handleSubmit();
+          }
+        }}
+        placeholder="Explanation (optional)…"
+        style={{
+          flex: 1,
+          marginTop: 8,
+          resize: "none",
+          width: "100%",
+          boxSizing: "border-box",
+          background: C.bg,
+          border: `1px solid ${C.border}`,
+          borderRadius: 4,
+          color: C.text,
+          padding: "6px 10px",
+          fontSize: 14,
+          outline: "none",
+        }}
+      />
+    </div>
+  );
+}
+
+/**
  * Minimal add-relation panel for use inside the RelationSuggestTab.
  *
  * @param {Object}      props

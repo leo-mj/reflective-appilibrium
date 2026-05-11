@@ -1,6 +1,6 @@
 /**
- * @fileoverview Backend client for the simulate_rethon endpoint.
- * @module utils/simulateRethonClient
+ * @fileoverview Backend client for the arguments/detect endpoint.
+ * @module utils/argumentsClient
  */
 
 /** @import { REState } from '../types.js' */
@@ -10,24 +10,22 @@ import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 /**
- * Sends active elements to the backend, which runs the rethon RE simulation
- * and returns detected arguments, the RE state evolution, and token usage.
+ * Sends active elements to the backend, which returns detected arguments, added premises, and token usage.
  *
  * @param {REState} state
  * @param {boolean} [useDummy=false]
  * @returns {Promise<Object>}
  */
-export async function simulateRethon(state, useDummy = false) {
+export async function detectArguments(state, useDummy = false) {
   const url = useDummy
-    ? `${BACKEND_URL}/api/simulate_rethon/simulate?use_dummy=true`
-    : `${BACKEND_URL}/api/simulate_rethon/simulate`;
+    ? `${BACKEND_URL}/api/arguments/detect?use_dummy=true`
+    : `${BACKEND_URL}/api/arguments/detect`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       elements: state.elements,
-      relations: state.relations.filter((r) => r.type === "jointly_entails"),
-      round: `${state.round}`,
+      round: `${state.round}`
     }),
   });
   if (!res.ok) {

@@ -62,6 +62,8 @@ export function AppHeaderWide({
   setShowTabNav,
   allExpanded,
   onExpandAll,
+  hideNonEntailsRels,
+  setHideNonEntailsRels,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
@@ -295,9 +297,17 @@ export function AppHeaderWide({
 
                   <button onClick={close(onExpandAll)} style={menuItem}>
                     <span style={icon}>⇅</span>
-                    {allExpanded
-                      ? "Minimize all toggles"
-                      : "Expand all toggles"}
+                    {allExpanded ? "Minimize toggles" : "Expand toggles"}
+                  </button>
+
+                  <button
+                    onClick={close(() => setHideNonEntailsRels((s) => !s))}
+                    style={{ ...menuItem, textAlign: "left " }}
+                  >
+                    <span style={icon}>→</span>
+                    {hideNonEntailsRels
+                      ? "Show all relations"
+                      : "Arguments only"}
                   </button>
 
                   {menuDivider}

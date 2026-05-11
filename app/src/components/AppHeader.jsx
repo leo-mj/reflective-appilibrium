@@ -84,6 +84,8 @@ export function AppHeader({
   setShowTabNav,
   allExpanded,
   onExpandAll,
+  hideNonEntailsRels,
+  setHideNonEntailsRels,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -133,7 +135,8 @@ export function AppHeader({
     "matrix",
   ];
   const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
-  const visibleSubTabs = metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS;
+  const visibleSubTabs = (metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS)
+    .filter((t) => !hideNonEntailsRels || t !== "suggestRelations");
 
   const importModals = (
     <>
@@ -208,6 +211,8 @@ export function AppHeader({
     onStopWorkflow,
     metaTab,
     ANALYZE_TABS,
+    hideNonEntailsRels,
+    setHideNonEntailsRels,
   };
 
   if (!isWide) {

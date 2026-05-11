@@ -29,6 +29,7 @@ import {
 } from "./graphs_shared/graphRender.jsx";
 import { AddElementModal } from "./user_edits/AddElementModal.jsx";
 import { AddRelationModal } from "./user_edits/AddRelationModal.jsx";
+import { AddArgumentModal } from "./user_edits/AddArgumentModal.jsx";
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 
@@ -38,7 +39,12 @@ const TYPE_COLORS = {
   theory: C.theory.high,
 };
 
-function AddButtonsOverlay({ onAddEl, onAddRel }) {
+function AddButtonsOverlay({
+  onAddEl,
+  onAddRel,
+  onAddArg,
+  hideNonEntailsRels,
+}) {
   return (
     <div
       style={{
@@ -71,19 +77,35 @@ function AddButtonsOverlay({ onAddEl, onAddRel }) {
           + {label}
         </button>
       ))}
+      {!hideNonEntailsRels && (
+        <button
+          onClick={onAddRel}
+          style={{
+            background: C.border,
+            border: "none",
+            color: C.text,
+            borderRadius: 6,
+            padding: "8px 12px",
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          + Rel
+        </button>
+      )}
       <button
-        onClick={onAddRel}
+        onClick={onAddArg}
         style={{
-          background: C.border,
-          border: "none",
-          color: C.text,
+          background: C.jointly_entails + "33",
+          border: `1px solid ${C.jointly_entails}`,
+          color: C.jointly_entails,
           borderRadius: 6,
           padding: "8px 12px",
           fontSize: 13,
           cursor: "pointer",
         }}
       >
-        + Rel
+        + Arg
       </button>
     </div>
   );
@@ -94,6 +116,8 @@ function GraphModals({
   setAddingElType,
   addingRel,
   setAddingRel,
+  addingArg,
+  setAddingArg,
   activeEls,
   round,
   onAddElement,
@@ -121,6 +145,29 @@ function GraphModals({
             setAddingRel(false);
           }}
           onCancel={() => setAddingRel(false)}
+        />
+      )}
+      {addingArg && (
+        <AddArgumentModal
+          elements={activeEls}
+          currentRound={round}
+          onSave={({ premises, conclusion, explanation }) => {
+            const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+            premises.forEach((premise, i) => {
+              onAddRelation(
+                {
+                  from: premise,
+                  to: conclusion,
+                  type: "jointly_entails",
+                  argumentId,
+                  explanation,
+                },
+                { select: false, pinRecent: i === premises.length - 1 },
+              );
+            });
+            setAddingArg(false);
+          }}
+          onCancel={() => setAddingArg(false)}
         />
       )}
     </>
@@ -282,12 +329,14 @@ export function Graph({
   onCtrlSecondSelect,
   ready,
   recentlyAdded,
+  hideNonEntailsRels,
 }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
   const [addingElType, setAddingElType] = useState(null);
   const [addingRel, setAddingRel] = useState(false);
+  const [addingArg, setAddingArg] = useState(false);
   const [ctrlSelected, setCtrlSelected] = useState(null);
 
   // Clear ctrl-selection whenever the primary selection changes.
@@ -303,12 +352,15 @@ export function Graph({
   const isElVisible = (el) => {
     if (el.status === "withdrawn") return !hiddenLegendKeys?.has("withdrawn");
     if (el.status === "rejected") return !hiddenLegendKeys?.has("rejected");
-    if (el.type === "judgment") return !hiddenLegendKeys?.has(`J-${el.confidence}`);
+    if (el.type === "judgment")
+      return !hiddenLegendKeys?.has(`J-${el.confidence}`);
     if (el.type === "principle") return !hiddenLegendKeys?.has("P");
     if (el.type === "theory") return !hiddenLegendKeys?.has("T");
     return true;
   };
-  const visibleEls = [...active, ...withdrawn, ...rejectedEls].filter(isElVisible);
+  const visibleEls = [...active, ...withdrawn, ...rejectedEls].filter(
+    isElVisible,
+  );
   const visIds = new Set(visibleEls.map((e) => e.id));
   const visRels = state.relations.filter(
     (r) =>
@@ -319,18 +371,26 @@ export function Graph({
       !(hiddenLegendKeys?.has("rejected") && r.status === "rejected"),
   );
 
+  // All relations belonging to the same argument as selectedRel (or just [selectedRel]).
+  const selectedArgRels = selectedRel?.argumentId
+    ? visRels.filter((r) => r.argumentId === selectedRel.argumentId)
+    : selectedRel
+      ? [selectedRel]
+      : [];
+  const selectedArgRelSet = new Set(selectedArgRels);
+
   const highlightedIds =
     ctrlSelected && selected
       ? new Set([selected, ctrlSelected])
       : selected
         ? getNeighbours(selected, visRels)
-        : selectedRel
-          ? new Set([selectedRel.from, selectedRel.to])
+        : selectedArgRels.length > 0
+          ? new Set(selectedArgRels.flatMap((r) => [r.from, r.to]))
           : null;
 
   const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
   const dimEdge = (r) => {
-    if (selectedRel) return r !== selectedRel;
+    if (selectedRel) return !selectedArgRelSet.has(r);
     if (highlightedIds) return r.from !== selected && r.to !== selected;
     return false;
   };
@@ -403,6 +463,8 @@ export function Graph({
             <AddButtonsOverlay
               onAddEl={setAddingElType}
               onAddRel={() => setAddingRel(true)}
+              onAddArg={() => setAddingArg(true)}
+              hideNonEntailsRels={hideNonEntailsRels}
             />
             <OffscreenIndicators
               els={visibleEls}
@@ -421,7 +483,7 @@ export function Graph({
             r,
             positions,
             state.elements,
-            graphEdgeVisuals(r, wIds, dimEdge, selectedRel),
+            graphEdgeVisuals(r, wIds, dimEdge, selectedArgRelSet),
           ),
         )}
 
@@ -430,7 +492,14 @@ export function Graph({
           renderNode(
             el,
             positions,
-            graphNodeVisuals(el, wIds, dimNode, selected, undefined, recentlyAdded),
+            graphNodeVisuals(
+              el,
+              wIds,
+              dimNode,
+              selected,
+              undefined,
+              recentlyAdded,
+            ),
             isDragging,
             setTooltip,
           ),
@@ -442,6 +511,8 @@ export function Graph({
         setAddingElType={setAddingElType}
         addingRel={addingRel}
         setAddingRel={setAddingRel}
+        addingArg={addingArg}
+        setAddingArg={setAddingArg}
         activeEls={activeEls}
         round={state.round}
         onAddElement={onAddElement}

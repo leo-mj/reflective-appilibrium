@@ -24,8 +24,11 @@ export function ProgressWorkflowBtn({
   nextPhaseIsEnabled,
   workflowPhase,
   advanceWorkflow,
+  nextPhaseLabel,
 }) {
   if (!workflowPhase) return null;
+  const label =
+    nextPhaseLabel ?? WORKFLOW_PHASE_LABELS[WORKFLOW_NEXT_PHASE[workflowPhase]];
   const tooltipText =
     !nextPhaseIsEnabled && workflowPhase === "elicitJudgments"
       ? "Add at least 3 judgments to continue"
@@ -43,7 +46,7 @@ export function ProgressWorkflowBtn({
             cursor: nextPhaseIsEnabled ? "pointer" : "not-allowed",
           }}
         >
-          {WORKFLOW_PHASE_LABELS[WORKFLOW_NEXT_PHASE[workflowPhase]]} →
+          {label} →
         </button>
       </span>
     </Tooltip>

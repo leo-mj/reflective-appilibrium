@@ -45,8 +45,9 @@ export {};
  * - `conflicts` — source and target are incompatible (orange dashed arrow)
  * - `undermines` — source weakens target without flat contradiction (amber dashed arrow)
  * - `depends`   — source presupposes target (grey arrow)
+ * - `jointly_entails` — source (premise) jointly entails target (conclusion) as part of a detected argument (green arrow)
  *
- * @typedef {'supports'|'conflicts'|'undermines'|'depends'} RelationType
+ * @typedef {'supports'|'conflicts'|'undermines'|'depends'|'jointly_entails'} RelationType
  */
 
 // ─── Domain objects ───────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ export {};
  * @property {RelationType}  type           - The kind of relation.
  * @property {string}        explanation    - Human-readable justification of why this relation holds.
  * @property {number}        addedRound     - Round number in which this relation was first recorded.
+ * @property {string}        [argumentId]    - Set on `entails` relations only; all premises of the same detected argument share this ID.
  * @property {ElementStatus} [status]        - Lifecycle status; absence or `"active"` means currently in play.
  * @property {number}        [revisedRound]  - Round in which this relation was last revised.
  * @property {number}        [withdrawnRound] - Round in which this relation was withdrawn.

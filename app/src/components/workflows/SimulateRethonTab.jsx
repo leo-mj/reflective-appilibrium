@@ -189,7 +189,7 @@ export function SimulateRethonTab({ state, useDummy = false, onApplyRethonEquili
                 {" · "}{equilibrium.finished ? `converged` : `did not converge`}{` in ${equilibrium.steps} step${equilibrium.steps !== 1 ? "s" : ""}`}
               </span>
             )}
-            {result && <span style={{ color: C.dim }}>{" · "}{result.model}</span>}
+            {result?.model && <span style={{ color: C.dim }}>{" · "}{result.model}</span>}
           </div>
           <button
             onClick={simulate}

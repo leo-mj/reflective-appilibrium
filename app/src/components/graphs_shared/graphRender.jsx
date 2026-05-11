@@ -85,10 +85,10 @@ export function historyEdgeVisuals(relation, wIds, snappedRound) {
  * @param {RERelation}                    relation
  * @param {Set<string>}                   wIds
  * @param {function(RERelation): boolean} dimEdge
- * @param {RERelation|null}               selectedRel
+ * @param {Set<RERelation>|null}          selectedRelGroup - set of relations in the selected argument group
  * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, strokeWidth: number, transition: string, hitArea: boolean }}
  */
-export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRel) {
+export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRelGroup) {
   const isWithdrawn = wIds.has(relation.from) || wIds.has(relation.to);
   const isRejected = relation.status === "rejected";
   const baseOpacity = isWithdrawn ? 0.25 : isRejected ? 0.35 : 0.7;
@@ -96,7 +96,7 @@ export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRel) {
     isWithdrawn,
     isRejected,
     opacity: dimEdge(relation) ? baseOpacity * 0.12 : baseOpacity,
-    strokeWidth: relation === selectedRel ? 3.5 : dimEdge(relation) ? 1.5 : 2,
+    strokeWidth: selectedRelGroup?.has(relation) ? 3.5 : dimEdge(relation) ? 1.5 : 2,
     transition: TRANSITION,
     hitArea: true,
   };

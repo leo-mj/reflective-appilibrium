@@ -183,7 +183,7 @@ export function GraphNode({
       <text
         textAnchor="middle"
         dy="0.35em"
-        fill={isWithdrawn || isRejected ? "#666" : "#fff"}
+        fill={"#fff"}
         fontSize={element.type === "principle" ? 13 : 11}
         fontWeight="bold"
         style={{

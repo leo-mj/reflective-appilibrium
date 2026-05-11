@@ -18,9 +18,9 @@ const CoherenceMatrixTab = lazy(() =>
   })),
 );
 
-const RelationSuggestTab = lazy(() =>
-  import("./workflows/RelationSuggestTab.jsx").then((m) => ({
-    default: m.RelationSuggestTab,
+const JudgmentElicitTab = lazy(() =>
+  import("./workflows/JudgmentElicitTab.jsx").then((m) => ({
+    default: m.JudgmentElicitTab,
   })),
 );
 
@@ -30,9 +30,16 @@ const PrincipleSuggestTab = lazy(() =>
   })),
 );
 
-const JudgmentElicitTab = lazy(() =>
-  import("./workflows/JudgmentElicitTab.jsx").then((m) => ({
-    default: m.JudgmentElicitTab,
+const RelationSuggestTab = lazy(() =>
+  import("./workflows/RelationSuggestTab.jsx").then((m) => ({
+    default: m.RelationSuggestTab,
+  })),
+);
+
+// Replace RelationsSuggestTab with DetectArgumentsTab?
+const DetectArgumentsTab = lazy(() =>
+  import("./workflows/DetectArgumentsTab.jsx").then((m) => ({
+    default: m.DetectArgumentsTab,
   })),
 );
 
@@ -54,6 +61,7 @@ export function GraphPanel({
   onSelectRel,
   onAddElement,
   onAddRelation,
+  onDeleteRelationsByArgId,
   onScrollToRelations,
   onRejectElements,
   onRejectRelations,
@@ -63,6 +71,7 @@ export function GraphPanel({
   workflowPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
+  hideNonEntailsRels,
   onCtrlSecondSelect,
   ready,
   isSample,
@@ -72,6 +81,10 @@ export function GraphPanel({
 
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
   const autoFetch = !!workflowPhase;
+  const workflowNextPhase =
+    hideNonEntailsRels && workflowPhase === "suggestPrinciples"
+      ? "Workflow Step: Detect Arguments"
+      : undefined;
   const isAssistPanel = ASSIST_TABS.includes(tab);
   return (
     <div
@@ -126,6 +139,7 @@ export function GraphPanel({
             onCtrlSecondSelect={onCtrlSecondSelect}
             ready={ready}
             recentlyAdded={recentlyAdded}
+            hideNonEntailsRels={hideNonEntailsRels}
           />
         )}
         {tab === "history" && (
@@ -173,6 +187,7 @@ export function GraphPanel({
               workflowPhase={workflowPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
+              workflowNextPhase={workflowNextPhase}
               useDummy={useDummyAssist}
               suggestionsDisabled={suggestionsDisabled}
             />
@@ -199,6 +214,17 @@ export function GraphPanel({
               state={state}
               useDummy={useDummyAssist}
               onApplyRethonEquilibrium={onApplyRethonEquilibrium}
+            />
+          </Suspense>
+        )}
+        {tab === "detectArguments" && (
+          <Suspense fallback={null}>
+            <DetectArgumentsTab
+              state={state}
+              useDummy={useDummyAssist}
+              onAddElement={onAddElement}
+              onAddRelation={onAddRelation}
+              onDeleteRelationsByArgId={onDeleteRelationsByArgId}
             />
           </Suspense>
         )}

@@ -9,6 +9,7 @@ import { useTextTabData } from "../hooks/useTextTabData.js";
 import { useActiveSection } from "../hooks/useActiveSection.js";
 import { Ctx } from "./text_panel/TextTabContext.js";
 import {
+  ArgumentCard,
   ElementCard,
   RelationCard,
   SectionHeader,
@@ -20,6 +21,7 @@ import { NavBar } from "./text_panel/TextTabNavBar.jsx";
 import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
 import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
+import { AddArgumentModal } from "./user_edits/AddArgumentModal.jsx";
 
 // ─── Module-level constants ───────────────────────────────────────────────────
 
@@ -39,7 +41,7 @@ const NAV_SECTIONS = [
   { key: "principles", label: "P" },
   { key: "theories", label: "T" },
   { key: "relations", label: "Relations" },
-  { key: "coherence", label: "Coherence" },
+  // { key: "coherence", label: "Coherence" },
   { key: "clusters", label: "Clusters" },
   { key: "log", label: "Log" },
 ];
@@ -68,6 +70,7 @@ export function TextTab({
   recentlyAddedRel,
   expandAllKey,
   allExpanded,
+  hideNonEntailsRels,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   const scrollRef = useRef(null);
@@ -81,6 +84,7 @@ export function TextTab({
   // ── State ───────────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState(DEFAULT_COLLAPSED_SECTIONS);
+  const [addingArg, setAddingArg] = useState(false);
 
   const toggle = (key) =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -89,7 +93,14 @@ export function TextTab({
   useEffect(() => {
     if (expandAllKey > 0)
       requestAnimationFrame(() =>
-        setCollapsed(Object.fromEntries(Object.keys(DEFAULT_COLLAPSED_SECTIONS).map((k) => [k, !allExpanded])))
+        setCollapsed(
+          Object.fromEntries(
+            Object.keys(DEFAULT_COLLAPSED_SECTIONS).map((k) => [
+              k,
+              !allExpanded,
+            ]),
+          ),
+        ),
       );
   }, [expandAllKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -110,6 +121,7 @@ export function TextTab({
     clusterCount,
     pinnedEl,
     pinnedRel,
+    pinnedArgRels,
   } = useTextTabData({
     state,
     hiddenLegendKeys,
@@ -167,14 +179,14 @@ export function TextTab({
       count: displayEls.filter((e) => e.type === "theory").length,
       show: !highlightedIds,
     },
-    relations: { count: displayRels.length, show: !highlightedIds },
+    relations: { count: displayRels.length, show: !highlightedIds && (!hideNonEntailsRels || displayRels.length > 0) },
     coherence: { count: null, show: !highlightedIds && hasCoherence },
     clusters: { count: clusterCount || null, show: clusterCount > 0 },
     log: { count: state.log.length || null, show: state.log.length > 0 },
   };
   const navItems = NAV_SECTIONS.map(({ key, label }) => ({
     key,
-    label,
+    label: key === "relations" && hideNonEntailsRels ? "Arguments" : label,
     ...sectionMeta[key],
   })).filter((i) => i.show);
 
@@ -241,13 +253,21 @@ export function TextTab({
             <>
               <SectionHeader title="Just added" />
               {pinnedEl && <ElementCard e={pinnedEl} />}
-              {pinnedRel && (
-                <RelationCard
-                  key={`${pinnedRel.from}-${pinnedRel.to}-${pinnedRel.type}-${pinnedRel.addedRound ?? 1}`}
-                  r={pinnedRel}
-                />
-              )}
-              <div style={{ borderTop: `1px solid ${C.border}`, margin: "4px 0 8px" }} />
+              {pinnedRel &&
+                (pinnedArgRels ? (
+                  <ArgumentCard rels={pinnedArgRels} />
+                ) : (
+                  <RelationCard
+                    key={`${pinnedRel.from}-${pinnedRel.to}-${pinnedRel.type}-${pinnedRel.addedRound ?? 1}`}
+                    r={pinnedRel}
+                  />
+                ))}
+              <div
+                style={{
+                  borderTop: `1px solid ${C.border}`,
+                  margin: "4px 0 8px",
+                }}
+              />
             </>
           )}
 
@@ -261,17 +281,19 @@ export function TextTab({
               displayRels={displayRels}
               isCollapsed={isCollapsed}
               toggle={toggle}
+              showRelations={!hideNonEntailsRels}
+              onAddArgument={hideNonEntailsRels ? () => setAddingArg(true) : undefined}
             />
           )}
 
-          {hasCoherence && (
+          {/* {hasCoherence && (
             <CoherenceSection
               state={state}
               sectionRef={refCoherence}
               isCollapsed={isCollapsed("coherence")}
               onToggle={() => toggle("coherence")}
             />
-          )}
+          )} */}
 
           <ClusterSection
             state={state}
@@ -322,6 +344,25 @@ export function TextTab({
           />
         )}
       </div>
+      {addingArg && (
+        <AddArgumentModal
+          elements={state.elements.filter(
+            (e) => e.status !== "withdrawn" && e.status !== "rejected",
+          )}
+          currentRound={state.round}
+          onSave={({ premises, conclusion, explanation }) => {
+            const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+            premises.forEach((premise, i) => {
+              onAddRelation(
+                { from: premise, to: conclusion, type: "jointly_entails", argumentId, explanation },
+                { select: false, pinRecent: i === premises.length - 1 },
+              );
+            });
+            setAddingArg(false);
+          }}
+          onCancel={() => setAddingArg(false)}
+        />
+      )}
     </Ctx.Provider>
   );
 }
