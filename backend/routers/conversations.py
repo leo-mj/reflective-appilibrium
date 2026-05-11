@@ -58,19 +58,29 @@ def _get_session(session_id: str) -> _Session:
 
 def _build_system(state: REState, suggestion: dict) -> str:
     active = [e for e in state.elements if e.status not in ("withdrawn", "rejected")]
-    active_rels = [r for r in state.relations if r.status not in ("withdrawn", "rejected")]
+    active_rels = [
+        r for r in state.relations if r.status not in ("withdrawn", "rejected")
+    ]
 
-    elements_text = "\n".join(
-        f"  [{e.id}] ({e.type}, {e.confidence}) {e.text}" for e in active
-    ) or "  (none)"
+    elements_text = (
+        "\n".join(f"  [{e.id}] ({e.type}, {e.confidence}) {e.text}" for e in active)
+        or "  (none)"
+    )
 
-    relations_text = "\n".join(
-        f"  {r.from_id} --{r.type}--> {r.to_id}: {r.explanation}" for r in active_rels
-    ) or "  (none)"
+    relations_text = (
+        "\n".join(
+            f"  {r.from_id} --{r.type}--> {r.to_id}: {r.explanation}"
+            for r in active_rels
+        )
+        or "  (none)"
+    )
 
-    log_text = "\n".join(
-        f"  Round {e.round}: {e.findings}" for e in state.log[-5:] if e.findings
-    ) or "  (none)"
+    log_text = (
+        "\n".join(
+            f"  Round {e.round}: {e.findings}" for e in state.log[-5:] if e.findings
+        )
+        or "  (none)"
+    )
 
     suggestion_block = "```json\n" + json.dumps(suggestion, indent=2) + "\n```"
 

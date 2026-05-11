@@ -4,6 +4,7 @@ Principles router — /api/principles
 Asks the configured LLM to suggest new principles that would systematise
 existing judgments in the RE state.
 """
+
 import logging
 import json
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── Request / response models ──────────────────────────────────────────────────
+
 
 class SuggestPrinciplesRequest(BaseModel):
     """Payload for ``POST /api/principles/suggest``."""
@@ -55,6 +57,7 @@ class SuggestPrinciplesResponse(BaseModel):
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
+
 
 def _build_prompt(
     topic: str,
@@ -105,6 +108,7 @@ If the existing principles already cover all judgments well, return {{"suggestio
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
+
 
 @router.post("/suggest", response_model=SuggestPrinciplesResponse)
 async def suggest_principles(

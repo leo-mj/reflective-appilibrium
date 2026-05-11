@@ -11,16 +11,19 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/arguments", tags=["arguments"])
 
+
 class DetectArgumentsRequest(BaseModel):
     elements: List[REElement]
     relations: List[RERelation] = []
     round: str
+
 
 class LLMArgumentsResponse(BaseModel):
     detected_arguments: List[List[int]]
     added_premises: List[Dict]
     input_tokens: int
     output_tokens: int
+
 
 class DetectArgumentsResponse(BaseModel):
     num_arguments: List[List[int]]
@@ -30,7 +33,9 @@ class DetectArgumentsResponse(BaseModel):
     output_tokens: int = 0
 
 
-def translate_from_lookup(nums: List[int], lookup: Dict[int, REElement]) -> List[REElement]:
+def translate_from_lookup(
+    nums: List[int], lookup: Dict[int, REElement]
+) -> List[REElement]:
     return [lookup[num] for num in nums]
 
 
@@ -38,7 +43,9 @@ def _arg_fingerprint(arg: List[int]) -> Tuple:
     return (tuple(sorted(arg[:-1])), arg[-1])
 
 
-def _existing_arg_fingerprints(relations: List[RERelation], reverse_lookup: Dict[str, int]) -> Set[Tuple]:
+def _existing_arg_fingerprints(
+    relations: List[RERelation], reverse_lookup: Dict[str, int]
+) -> Set[Tuple]:
     groups: Dict[str, Dict] = {}
     for r in relations:
         if r.type != "jointly_entails" or not r.argument_id:
@@ -49,14 +56,22 @@ def _existing_arg_fingerprints(relations: List[RERelation], reverse_lookup: Dict
 
     fingerprints: Set[Tuple] = set()
     for group in groups.values():
-        premise_indices = [reverse_lookup[eid] for eid in group["froms"] if eid in reverse_lookup]
+        premise_indices = [
+            reverse_lookup[eid] for eid in group["froms"] if eid in reverse_lookup
+        ]
         conclusion_index = reverse_lookup.get(group["to"])
         if conclusion_index is not None and len(premise_indices) == len(group["froms"]):
-            fingerprints.add(_arg_fingerprint(sorted(premise_indices) + [conclusion_index]))
+            fingerprints.add(
+                _arg_fingerprint(sorted(premise_indices) + [conclusion_index])
+            )
     return fingerprints
 
 
-def _filter_existing_arguments(num_arguments: List[List[int]], relations: List[RERelation], lookup: Dict[int, REElement]) -> List[List[int]]:
+def _filter_existing_arguments(
+    num_arguments: List[List[int]],
+    relations: List[RERelation],
+    lookup: Dict[int, REElement],
+) -> List[List[int]]:
     reverse_lookup = {e.id: n for n, e in lookup.items()}
     existing = _existing_arg_fingerprints(relations, reverse_lookup)
     filtered = [arg for arg in num_arguments if _arg_fingerprint(arg) not in existing]
@@ -66,7 +81,9 @@ def _filter_existing_arguments(num_arguments: List[List[int]], relations: List[R
     return filtered
 
 
-def _format_existing_args_for_prompt(relations: List[RERelation], reverse_lookup: Dict[str, int]) -> str:
+def _format_existing_args_for_prompt(
+    relations: List[RERelation], reverse_lookup: Dict[str, int]
+) -> str:
     groups: Dict[str, Dict] = {}
     for r in relations:
         if r.type != "jointly_entails" or not r.argument_id:
@@ -77,7 +94,9 @@ def _format_existing_args_for_prompt(relations: List[RERelation], reverse_lookup
 
     lines = []
     for group in groups.values():
-        premise_indices = [reverse_lookup[eid] for eid in group["froms"] if eid in reverse_lookup]
+        premise_indices = [
+            reverse_lookup[eid] for eid in group["froms"] if eid in reverse_lookup
+        ]
         conclusion_index = reverse_lookup.get(group["to"])
         if conclusion_index is not None and len(premise_indices) == len(group["froms"]):
             arg = sorted(premise_indices) + [conclusion_index]
@@ -86,14 +105,17 @@ def _format_existing_args_for_prompt(relations: List[RERelation], reverse_lookup
     return "\n".join(lines)
 
 
-def _build_prompt(lookup: Dict[int, REElement], relations: List[RERelation] = []) -> str:
+def _build_prompt(
+    lookup: Dict[int, REElement], relations: List[RERelation] = []
+) -> str:
     element_lines = "\n".join(f"  {n}: {e.text}" for n, e in lookup.items())
 
     reverse_lookup = {e.id: n for n, e in lookup.items()}
     existing_str = _format_existing_args_for_prompt(relations, reverse_lookup)
     existing_section = (
         f"\nAlready accepted arguments — do not reproduce these:\n{existing_str}\n"
-        if existing_str else ""
+        if existing_str
+        else ""
     )
 
     return f"""\
@@ -129,7 +151,14 @@ Respond with valid JSON only, in exactly this format:
 }}
 ."""
 
-def _add_new_premises_to_lookup(lookup: Dict[int, REElement], added_premises: List[Dict], elements: List[REElement], round: str, model: str) -> Dict:
+
+def _add_new_premises_to_lookup(
+    lookup: Dict[int, REElement],
+    added_premises: List[Dict],
+    elements: List[REElement],
+    round: str,
+    model: str,
+) -> Dict:
     if not added_premises:
         logger.info("No new premises to add to lookup.")
         return lookup
@@ -138,15 +167,15 @@ def _add_new_premises_to_lookup(lookup: Dict[int, REElement], added_premises: Li
     max_ids_dict = {
         "J": len([e for e in elements if e.type == "judgment"]),
         "P": len([e for e in elements if e.type == "principle"]),
-        "T": len([e for e in elements if e.type == "theory"])
+        "T": len([e for e in elements if e.type == "theory"]),
     }
 
     for premise in added_premises:
         id_type = premise["type"][0].upper()
         id_int = max_ids_dict[id_type] + 1
         new_element = REElement(
-            id = id_type + str(id_int),
-            text = premise["text"],
+            id=id_type + str(id_int),
+            text=premise["text"],
             type=premise["type"],
             addedRound=int(round) + 1,
             status="active",
@@ -156,7 +185,7 @@ def _add_new_premises_to_lookup(lookup: Dict[int, REElement], added_premises: Li
             reason=None,
             withdrawnRound=None,
             rejectedRound=None,
-            revisedRound=None
+            revisedRound=None,
         )
         updated_lookup[premise["index"]] = new_element
         max_ids_dict[id_type] += 1
@@ -164,7 +193,9 @@ def _add_new_premises_to_lookup(lookup: Dict[int, REElement], added_premises: Li
     return updated_lookup
 
 
-def _translate_arguments(detected_arguments: List[List[int]], lookup: Dict[int, REElement]) -> List[List[REElement]]:
+def _translate_arguments(
+    detected_arguments: List[List[int]], lookup: Dict[int, REElement]
+) -> List[List[REElement]]:
     logger.info("Translating arguments.")
     result = [translate_from_lookup(arg, lookup) for arg in detected_arguments]
     logger.info("Completed translating arguments.")
@@ -180,26 +211,36 @@ _DUMMY_ARGUMENTS: List[List[int]] = [
     # 21:J (radioactive waste leaves future generations worse off — bridge for P1→J1)
     # 22:P (well-being capacity grounds justice obligations — bridge for T1→P5)
     # 23:J (people in 2100 are causally affected by today's climate policy — bridge for P5→J2)
-    [13, 21, 1],    # P1 + J21 → J1 (sufficientarian + factual bridge → radioactive waste wrong)
-    [13, 3],        # P1 → J3 (sufficientarian → resource depletion)
-    [13, 4],        # P1 → J4 (sufficientarian → liveable environment)
-    [14, 8],        # P2 → J8 (probabilistic obligation → extinction prevention)
-    [14, 5],        # P2 → J5 (probabilistic obligation → uncertainty discounting)
-    [15, 10],       # P3 → J10 (uncertainty not temporal → equal counting)
-    [17, 23, 2],    # P5 + J23 → J2 (Rawlsian + causal bridge → climate policy)
-    [17, 12],       # P5 → J12 (Rawlsian → democratic institutions)
-    [17, 10],       # P5 → J10 (Rawlsian → equal counting)
-    [18, 7],        # P6 → J7 (proximity modulates → parental obligations)
-    [19, 22, 17],   # T1 + P22 → P5 (well-being capacity + justice bridge → Rawlsian valid)
-    [19, 14],       # T1 → P2 (identity not required → probabilistic obligation)
-    [20, 14],       # T2 → P2 (class determinacy → probabilistic obligation)
-    [19, 20, 14],   # T1 + T2 → P2 (conjunction)
-    [13, 17, 10],   # P1 + P5 → J10 (sufficientarian + Rawlsian → equal counting)
-    [14, 15, 5],    # P2 + P3 → J5 (probabilistic + uncertainty threshold → discounting)
+    [
+        13,
+        21,
+        1,
+    ],  # P1 + J21 → J1 (sufficientarian + factual bridge → radioactive waste wrong)
+    [13, 3],  # P1 → J3 (sufficientarian → resource depletion)
+    [13, 4],  # P1 → J4 (sufficientarian → liveable environment)
+    [14, 8],  # P2 → J8 (probabilistic obligation → extinction prevention)
+    [14, 5],  # P2 → J5 (probabilistic obligation → uncertainty discounting)
+    [15, 10],  # P3 → J10 (uncertainty not temporal → equal counting)
+    [17, 23, 2],  # P5 + J23 → J2 (Rawlsian + causal bridge → climate policy)
+    [17, 12],  # P5 → J12 (Rawlsian → democratic institutions)
+    [17, 10],  # P5 → J10 (Rawlsian → equal counting)
+    [18, 7],  # P6 → J7 (proximity modulates → parental obligations)
+    [
+        19,
+        22,
+        17,
+    ],  # T1 + P22 → P5 (well-being capacity + justice bridge → Rawlsian valid)
+    [19, 14],  # T1 → P2 (identity not required → probabilistic obligation)
+    [20, 14],  # T2 → P2 (class determinacy → probabilistic obligation)
+    [19, 20, 14],  # T1 + T2 → P2 (conjunction)
+    [13, 17, 10],  # P1 + P5 → J10 (sufficientarian + Rawlsian → equal counting)
+    [14, 15, 5],  # P2 + P3 → J5 (probabilistic + uncertainty threshold → discounting)
 ]
 
 
-def _dummy_detect_arguments(n_unnegated_sentence_pool: int, elements: List[REElement], round: str) -> DetectArgumentsResponse:
+def _dummy_detect_arguments(
+    n_unnegated_sentence_pool: int, elements: List[REElement], round: str
+) -> DetectArgumentsResponse:
     initial_lookup = {index + 1: e for index, e in enumerate(elements)}
     added_premises = [
         {
@@ -219,7 +260,9 @@ def _dummy_detect_arguments(n_unnegated_sentence_pool: int, elements: List[REEle
         },
     ]
     pool_size = n_unnegated_sentence_pool + len(added_premises)
-    num_arguments = [arg for arg in _DUMMY_ARGUMENTS if all(n <= pool_size for n in arg)]
+    num_arguments = [
+        arg for arg in _DUMMY_ARGUMENTS if all(n <= pool_size for n in arg)
+    ]
     lookup_w_premises = _add_new_premises_to_lookup(
         added_premises=added_premises,
         lookup=initial_lookup,
@@ -227,11 +270,13 @@ def _dummy_detect_arguments(n_unnegated_sentence_pool: int, elements: List[REEle
         round=round,
         model="dummy",
     )
-    translated_arguments = _translate_arguments(detected_arguments=num_arguments, lookup=lookup_w_premises)
+    translated_arguments = _translate_arguments(
+        detected_arguments=num_arguments, lookup=lookup_w_premises
+    )
     return DetectArgumentsResponse(
         num_arguments=num_arguments,
         translated_arguments=translated_arguments,
-        lookup=lookup_w_premises
+        lookup=lookup_w_premises,
     )
 
 
@@ -246,10 +291,10 @@ async def _get_arguments_from_llm(
     )
     data = json.loads(result.text)
     return LLMArgumentsResponse(
-        detected_arguments = data.get("arguments", []),
-        added_premises = data.get("added_premises", []),
+        detected_arguments=data.get("arguments", []),
+        added_premises=data.get("added_premises", []),
         input_tokens=result.input_tokens,
-        output_tokens=result.output_tokens
+        output_tokens=result.output_tokens,
     )
 
 
@@ -258,31 +303,48 @@ async def detect_arguments(
     request: DetectArgumentsRequest,
     llm: Annotated[LLMService, Depends(get_llm_service)],
     use_dummy: bool = False,
-    sentence_pool_minimum: int = 3, 
+    sentence_pool_minimum: int = 3,
 ) -> DetectArgumentsResponse:
     n_unnegated_sentence_pool = len(request.elements)
     if n_unnegated_sentence_pool < sentence_pool_minimum:
-        raise HTTPException(status_code=422, detail=f"There are fewer than {sentence_pool_minimum} elements forming the sentence pool.")
+        raise HTTPException(
+            status_code=422,
+            detail=f"There are fewer than {sentence_pool_minimum} elements forming the sentence pool.",
+        )
     try:
         if use_dummy:
             logger.info("Returning dummy arguments")
             detected_arguments_response = _dummy_detect_arguments(
-                n_unnegated_sentence_pool=n_unnegated_sentence_pool, elements=request.elements, round=request.round
+                n_unnegated_sentence_pool=n_unnegated_sentence_pool,
+                elements=request.elements,
+                round=request.round,
             )
             return detected_arguments_response
-        
+
         logger.info(
             f"Requesting detected arguments from model '{llm.model}' for {n_unnegated_sentence_pool} elements"
         )
         initial_lookup = {index + 1: e for index, e in enumerate(request.elements)}
-        llm_response = await _get_arguments_from_llm(llm=llm, lookup=initial_lookup, relations=request.relations)
-        logger.info(f"Received {len(llm_response.detected_arguments)} arguments from LLM.")
+        llm_response = await _get_arguments_from_llm(
+            llm=llm, lookup=initial_lookup, relations=request.relations
+        )
+        logger.info(
+            f"Received {len(llm_response.detected_arguments)} arguments from LLM."
+        )
 
         lookup_w_premises = _add_new_premises_to_lookup(
-            lookup=initial_lookup, added_premises=llm_response.added_premises, elements=request.elements, round=request.round, model=llm.model
+            lookup=initial_lookup,
+            added_premises=llm_response.added_premises,
+            elements=request.elements,
+            round=request.round,
+            model=llm.model,
         )
-        filtered_arguments = _filter_existing_arguments(llm_response.detected_arguments, request.relations, lookup_w_premises)
-        translated_arguments = _translate_arguments(detected_arguments=filtered_arguments, lookup=lookup_w_premises)
+        filtered_arguments = _filter_existing_arguments(
+            llm_response.detected_arguments, request.relations, lookup_w_premises
+        )
+        translated_arguments = _translate_arguments(
+            detected_arguments=filtered_arguments, lookup=lookup_w_premises
+        )
 
         return DetectArgumentsResponse(
             num_arguments=filtered_arguments,
@@ -291,7 +353,7 @@ async def detect_arguments(
             input_tokens=llm_response.input_tokens,
             output_tokens=llm_response.output_tokens,
         )
-    
+
     except Exception as e:
         logger.error(f"Detecing arguments failed: {e}", exc_info=True)
         raise

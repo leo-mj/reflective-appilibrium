@@ -3,6 +3,7 @@ Relations router — /api/relations
 
 Asks the configured LLM to identify relations between existing RE elements.
 """
+
 import logging
 import json
 
@@ -19,8 +20,8 @@ router = APIRouter(prefix="/api/relations", tags=["relations"])
 logger = logging.getLogger(__name__)
 
 
-
 # ── Request / response models ──────────────────────────────────────────────────
+
 
 class SuggestRequest(BaseModel):
     """Payload for ``POST /api/relations/suggest``.
@@ -79,9 +80,7 @@ def _build_prompt(
     check both directions for every element pair and to err on the side of
     inclusion — the user can reject spurious suggestions in the UI.
     """
-    element_lines = "\n".join(
-        f"{e.id} [{e.type}]: {e.text}" for e in elements
-    )
+    element_lines = "\n".join(f"{e.id} [{e.type}]: {e.text}" for e in elements)
 
     skip_pairs: set[tuple[str, str]] = set()
     for r in existing_relations:
@@ -117,6 +116,7 @@ If no new relations are found, return {{"relations": []}}."""
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/suggest", response_model=SuggestResponse)
 async def suggest_relations(
     request: SuggestRequest,
@@ -125,7 +125,9 @@ async def suggest_relations(
     """Ask the LLM to identify relations between the provided RE elements."""
     active = [e for e in request.elements if e.status not in {"withdrawn", "rejected"}]
     prompt = _build_prompt(request.topic, active, request.existing_relations)
-    logger.info(f"Requesting relation suggestions from model '{llm.model}' between {len(active)} active elements.")
+    logger.info(
+        f"Requesting relation suggestions from model '{llm.model}' between {len(active)} active elements."
+    )
     result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,

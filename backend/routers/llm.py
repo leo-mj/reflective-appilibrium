@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # ── Request / response models ──────────────────────────────────────────────────
 
+
 class Message(BaseModel):
     """A single chat message with a role and text content."""
 
@@ -48,6 +49,7 @@ class CompletionResponse(BaseModel):
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/configured-providers")
 async def configured_providers(
@@ -86,5 +88,7 @@ async def complete(
     return CompletionResponse(
         text=result.text,
         model=llm.model,
-        usage=TokenUsage(input_tokens=result.input_tokens, output_tokens=result.output_tokens),
+        usage=TokenUsage(
+            input_tokens=result.input_tokens, output_tokens=result.output_tokens
+        ),
     )

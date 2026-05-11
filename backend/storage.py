@@ -160,7 +160,9 @@ class MarkdownSessionStore:
         path = self._path(session_id)
         if not path.exists():
             raise KeyError(session_id)
-        return REState.model_validate_json(_extract_json(path.read_text(encoding="utf-8")))
+        return REState.model_validate_json(
+            _extract_json(path.read_text(encoding="utf-8"))
+        )
 
     def list_sessions(self) -> list[SessionMeta]:
         """Return metadata for all sessions, newest first.
@@ -174,12 +176,14 @@ class MarkdownSessionStore:
                 text = path.read_text(encoding="utf-8")
                 state = REState.model_validate_json(_extract_json(text))
                 saved_at = _saved_at_from_stem(path.stem)
-                results.append(SessionMeta(
-                    session_id=path.stem,
-                    topic=state.topic,
-                    round=state.round,
-                    saved_at=saved_at,
-                ))
+                results.append(
+                    SessionMeta(
+                        session_id=path.stem,
+                        topic=state.topic,
+                        round=state.round,
+                        saved_at=saved_at,
+                    )
+                )
             except Exception:  # noqa: BLE001
                 pass
         return results

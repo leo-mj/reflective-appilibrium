@@ -13,7 +13,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import conversations, judgments, llm, matrix, principles, relations, sessions, simulate_rethon, arguments
+from .routers import (
+    conversations,
+    judgments,
+    llm,
+    matrix,
+    principles,
+    relations,
+    sessions,
+    simulate_rethon,
+    arguments,
+)
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +64,7 @@ app.include_router(simulate_rethon.router)
 
 
 # ── Health ─────────────────────────────────────────────────────────────────────
+
 
 @app.get("/api/health", tags=["meta"])
 async def health() -> dict:

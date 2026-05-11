@@ -53,7 +53,9 @@ class REElement(BaseModel):
 
 # ── Relation ───────────────────────────────────────────────────────────────────
 
-RelationType = Literal["supports", "conflicts", "undermines", "depends", "jointly_entails"]
+RelationType = Literal[
+    "supports", "conflicts", "undermines", "depends", "jointly_entails"
+]
 
 
 class RERelation(BaseModel):
@@ -85,6 +87,7 @@ class RERelation(BaseModel):
 
 # ── Log ────────────────────────────────────────────────────────────────────────
 
+
 class RELogEntry(BaseModel):
     """Structured record of what happened in a single RE round.
 
@@ -102,6 +105,7 @@ class RELogEntry(BaseModel):
 
 # ── Coherence ──────────────────────────────────────────────────────────────────
 
+
 class RECoherence(BaseModel):
     """Snapshot of the coherence analysis at the end of a review round.
 
@@ -118,6 +122,7 @@ class RECoherence(BaseModel):
 
 
 # ── State ──────────────────────────────────────────────────────────────────────
+
 
 class REState(BaseModel):
     """Complete serialisable state of a wide reflective equilibrium process.

@@ -4,6 +4,7 @@ Matrix router — /api/matrix
 Asks the configured LLM to produce a symmetric relatedness matrix for the
 judgments and principles in the RE state.
 """
+
 import json
 import logging
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── Request / response models ──────────────────────────────────────────────────
+
 
 class MatrixRequest(BaseModel):
     """Payload for ``POST /api/matrix/analyze``."""
@@ -49,6 +51,7 @@ class MatrixResponse(BaseModel):
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
+
 
 def _build_prompt(topic: str, elements: list[REElement]) -> str:
     """Build the LLM prompt for relatedness matrix computation.
@@ -86,6 +89,7 @@ Respond with valid JSON only, in exactly this format:
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/analyze", response_model=MatrixResponse)
 async def analyze(
     request: MatrixRequest,
@@ -93,10 +97,13 @@ async def analyze(
 ) -> MatrixResponse:
     """Compute a relatedness matrix for the provided RE elements."""
     active = [
-        e for e in request.elements
+        e
+        for e in request.elements
         if e.status != "withdrawn" and e.type in ("judgment", "principle")
     ]
-    logger.info(f"Requesting relatedness matrix from model '{llm.model}' for {len(active)} elements.")
+    logger.info(
+        f"Requesting relatedness matrix from model '{llm.model}' for {len(active)} elements."
+    )
     prompt = _build_prompt(request.topic, active)
     result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],

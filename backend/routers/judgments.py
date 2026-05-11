@@ -4,6 +4,7 @@ Judgments router — /api/judgments
 Asks the configured LLM to present questions and thought experiments that
 may elicit new moral judgments the user has not yet articulated.
 """
+
 import logging
 import json
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── Request / response models ──────────────────────────────────────────────────
+
 
 class ElicitJudgmentsRequest(BaseModel):
     """Payload for ``POST /api/judgments/elicit``.
@@ -68,6 +70,7 @@ class ElicitJudgmentsResponse(BaseModel):
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
 
+
 def _build_prompt(
     topic: str,
     elements: list[REElement],
@@ -84,18 +87,20 @@ def _build_prompt(
 
     active_lines = (
         "\n".join(f"  {e.id} [{e.type}]: {e.text}" for e in active)
-        if active else "  (none)"
+        if active
+        else "  (none)"
     )
     withdrawn_lines = (
-        "\n".join(f"  {e.id}: {e.text}" for e in withdrawn)
-        if withdrawn else "  (none)"
+        "\n".join(f"  {e.id}: {e.text}" for e in withdrawn) if withdrawn else "  (none)"
     )
     log_lines = (
         "\n".join(
-            f"  Round {entry.round}: {entry.findings}" for entry in log[-5:]
+            f"  Round {entry.round}: {entry.findings}"
+            for entry in log[-5:]
             if entry.findings
         )
-        if log else "  (none)"
+        if log
+        else "  (none)"
     )
 
     return f"""\
@@ -145,6 +150,7 @@ Respond with valid JSON only, in exactly this format:
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
+
 
 @router.post("/elicit", response_model=ElicitJudgmentsResponse)
 async def elicit_judgments(

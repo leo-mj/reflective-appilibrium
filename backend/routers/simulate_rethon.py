@@ -5,7 +5,11 @@ from pydantic import BaseModel, Field
 import logging
 
 from theodias import StandardPosition, BDDDialecticalStructure
-from rethon import StandardLocalReflectiveEquilibrium, StandardGlobalReflectiveEquilibrium, REState
+from rethon import (
+    StandardLocalReflectiveEquilibrium,
+    StandardGlobalReflectiveEquilibrium,
+    REState,
+)
 from ..models.re_state import REElement, RERelation
 from .arguments import DetectArgumentsResponse, translate_from_lookup
 
@@ -58,25 +62,32 @@ def _build_numerical_arguments(
         if conclusion_idx is None or any(idx is None for idx in premise_indices):
             logger.warning("Skipping argument with unknown element IDs.")
             continue
-        numerical_arguments.append([idx for idx in premise_indices if idx is not None] + [conclusion_idx])
+        numerical_arguments.append(
+            [idx for idx in premise_indices if idx is not None] + [conclusion_idx]
+        )
 
-    translated_arguments = [translate_from_lookup(arg, lookup) for arg in numerical_arguments]
+    translated_arguments = [
+        translate_from_lookup(arg, lookup) for arg in numerical_arguments
+    ]
     return DetectArgumentsResponse(
         num_arguments=numerical_arguments,
         translated_arguments=translated_arguments,
-        lookup=lookup
+        lookup=lookup,
     )
 
 
 def _add_negated_to_lookup(lookup: Dict) -> Dict:
-    return {**lookup, **{-k: e.model_copy(update={"negated": True}) for k, e in lookup.items()}}
+    return {
+        **lookup,
+        **{-k: e.model_copy(update={"negated": True}) for k, e in lookup.items()},
+    }
 
 
 def _get_rethon_final_state(
     numerical_arguments: List[List[int]],
     n_unnegated_sentence_pool: int,
     lookup: Dict[int, REElement],
-    local: bool = True
+    local: bool = True,
 ) -> REState:
     logger.info("Beginning rethon simulation.")
     # Binary decision diagram - necessary for n_unnegated_sentence_pool > 10
@@ -84,29 +95,42 @@ def _get_rethon_final_state(
         arguments=numerical_arguments,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
     )
-    initial_position = {index for index, element in lookup.items() if element.status in ["active", "revised"]}
+    initial_position = {
+        index
+        for index, element in lookup.items()
+        if element.status in ["active", "revised"]
+    }
     init_coms = StandardPosition.from_set(
         position=initial_position,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
     )
     if local:
-        # Consider positions close to current positions 
-        re = StandardLocalReflectiveEquilibrium(dialectical_structure=bdd_ds, initial_commitments=init_coms)
+        # Consider positions close to current positions
+        re = StandardLocalReflectiveEquilibrium(
+            dialectical_structure=bdd_ds, initial_commitments=init_coms
+        )
     else:
         # Consider all positions; slow for n_unnegated_sentence_pool > 10
-        re = StandardGlobalReflectiveEquilibrium(dialectical_structure=bdd_ds, initial_commitments=init_coms)
+        re = StandardGlobalReflectiveEquilibrium(
+            dialectical_structure=bdd_ds, initial_commitments=init_coms
+        )
     re.set_initial_state(init_coms)
     re.re_process()
     logger.info("Completed rethon simulation.")
     return re.state()
 
 
-def _translate_re_state(numerical_re_state: REState, lookup: Dict[int, REElement]) -> SimulatedRethonState:
+def _translate_re_state(
+    numerical_re_state: REState, lookup: Dict[int, REElement]
+) -> SimulatedRethonState:
     logger.info("Translating rethon RE state.")
     re_state_dict = numerical_re_state.as_dict()
     result = SimulatedRethonState(
         finished=re_state_dict["finished"],
-        evolution=[translate_from_lookup(pos.as_list(), lookup) for pos in re_state_dict["evolution"]],
+        evolution=[
+            translate_from_lookup(pos.as_list(), lookup)
+            for pos in re_state_dict["evolution"]
+        ],
         alternatives=[
             translate_from_lookup(alt.as_list(), lookup)
             for alt_set in re_state_dict["alternatives"]
