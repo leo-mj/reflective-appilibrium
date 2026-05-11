@@ -675,7 +675,6 @@ export function SectionListing({
   isCollapsed,
   toggle,
   showRelations = true,
-  onAddArgument,
 }) {
   const [judgmentSort, setJudgmentSort] = useState("element");
   const [principleSort, setPrincipleSort] = useState("element");
@@ -763,7 +762,7 @@ export function SectionListing({
             title={`Arguments (${groupRelationsByArgument(sortedRels).length})`}
             collapsed={isCollapsed("relations")}
             onToggle={() => toggle("relations")}
-            onAdd={onAddArgument}
+
           />
           {!isCollapsed("relations") && (
             <>

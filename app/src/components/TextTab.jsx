@@ -21,7 +21,6 @@ import { NavBar } from "./text_panel/TextTabNavBar.jsx";
 import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
 import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
-import { AddArgumentModal } from "./user_edits/AddArgumentModal.jsx";
 
 // ─── Module-level constants ───────────────────────────────────────────────────
 
@@ -84,7 +83,6 @@ export function TextTab({
   // ── State ───────────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState(DEFAULT_COLLAPSED_SECTIONS);
-  const [addingArg, setAddingArg] = useState(false);
 
   const toggle = (key) =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -179,7 +177,10 @@ export function TextTab({
       count: displayEls.filter((e) => e.type === "theory").length,
       show: !highlightedIds,
     },
-    relations: { count: displayRels.length, show: !highlightedIds && (!hideNonEntailsRels || displayRels.length > 0) },
+    relations: {
+      count: displayRels.length,
+      show: !highlightedIds && (!hideNonEntailsRels || displayRels.length > 0),
+    },
     coherence: { count: null, show: !highlightedIds && hasCoherence },
     clusters: { count: clusterCount || null, show: clusterCount > 0 },
     log: { count: state.log.length || null, show: state.log.length > 0 },
@@ -282,7 +283,6 @@ export function TextTab({
               isCollapsed={isCollapsed}
               toggle={toggle}
               showRelations={!hideNonEntailsRels}
-              onAddArgument={hideNonEntailsRels ? () => setAddingArg(true) : undefined}
             />
           )}
 
@@ -344,25 +344,6 @@ export function TextTab({
           />
         )}
       </div>
-      {addingArg && (
-        <AddArgumentModal
-          elements={state.elements.filter(
-            (e) => e.status !== "withdrawn" && e.status !== "rejected",
-          )}
-          currentRound={state.round}
-          onSave={({ premises, conclusion, explanation }) => {
-            const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
-            premises.forEach((premise, i) => {
-              onAddRelation(
-                { from: premise, to: conclusion, type: "jointly_entails", argumentId, explanation },
-                { select: false, pinRecent: i === premises.length - 1 },
-              );
-            });
-            setAddingArg(false);
-          }}
-          onCancel={() => setAddingArg(false)}
-        />
-      )}
     </Ctx.Provider>
   );
 }
