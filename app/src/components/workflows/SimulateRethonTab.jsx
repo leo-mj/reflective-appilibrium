@@ -203,16 +203,19 @@ function EvolutionStep({ step, position }) {
  * @param {REState}  props.state
  * @param {boolean}  [props.useDummy]
  * @param {Function} [props.onApplyRethonEquilibrium]
+ * @param {Function} [props.onSetEquilibriumPreview]
  */
 export function SimulateRethonTab({
   state,
   useDummy = false,
   onApplyRethonEquilibrium,
+  onSetEquilibriumPreview,
 }) {
   const [result, setResult] = useState(null);
   const [loadingMode, setLoadingMode] = useState(null); // "local" | "global" | null
   const [error, setError] = useState(null);
   const [evolutionOpen, setEvolutionOpen] = useState(false);
+  const [decision, setDecision] = useState(null); // "accepted" | "rejected" | null
 
   const activeCount = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.status !== "rejected",
@@ -230,17 +233,13 @@ export function SimulateRethonTab({
     setLoadingMode(local ? "local" : "global");
     setError(null);
     setEvolutionOpen(false);
+    setDecision(null);
+    onSetEquilibriumPreview?.(null);
     try {
       const data = await simulateRethon(state, local, useDummy);
       setResult(data);
-      const evolution = data.translated_re_state.evolution;
-      const lastTwo = evolution.slice(-2);
-      const equilibriumIds = new Set(
-        lastTwo.flatMap((pos) =>
-          pos.filter((e) => !e.negated).map((e) => e.id),
-        ),
-      );
-      onApplyRethonEquilibrium?.(equilibriumIds);
+      const eq = deriveEquilibrium(data);
+      onSetEquilibriumPreview?.(new Set(eq.withdrawn.map((e) => e.id)));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -248,7 +247,8 @@ export function SimulateRethonTab({
     }
   };
 
-  const disabled = loadingMode !== null || activeCount < 3 || !atLeastOneArgument;
+  const disabled =
+    loadingMode !== null || activeCount < 3 || !atLeastOneArgument;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -295,30 +295,46 @@ export function SimulateRethonTab({
               { label: "Locally", local: true, mode: "local" },
             ].map(({ label, local, mode }) => {
               const isLoading = loadingMode === mode;
+              // global simulation becomes too slow with more than 10 elements
+              const globalTooLarge =
+                mode === "global" && state.elements.length > 10;
+              const disableSimulation = disabled || globalTooLarge;
+              const tooltip = globalTooLarge
+                ? `Global simulation is disabled for more than 10 elements (current: ${state.elements.length})`
+                : undefined;
               return (
-                <button
+                <span
                   key={mode}
-                  onClick={() => simulate(local)}
-                  disabled={disabled}
-                  style={{
-                    background: "transparent",
-                    border: `1px solid ${disabled ? C.border : ACCENT}`,
-                    color: disabled ? C.dim : ACCENT,
-                    borderRadius: 6,
-                    padding: "5px 12px",
-                    fontSize: 12,
-                    fontWeight: "bold",
-                    cursor: disabled ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    flexShrink: 0,
-                  }}
+                  title={tooltip}
+                  style={{ display: "inline-flex" }}
                 >
-                  {isLoading ? <SpinnerIcon /> : <span>↺</span>}
-                  {label}{" "}
-                  {isLoading ? "Simulating…" : result ? "Re-simulate" : "Simulate"}
-                </button>
+                  <button
+                    onClick={() => simulate(local)}
+                    disabled={disableSimulation}
+                    style={{
+                      background: "transparent",
+                      border: `1px solid ${disableSimulation ? C.border : ACCENT}`,
+                      color: disableSimulation ? C.dim : ACCENT,
+                      borderRadius: 6,
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: "bold",
+                      cursor: disableSimulation ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isLoading ? <SpinnerIcon /> : <span>↺</span>}
+                    {label}{" "}
+                    {isLoading
+                      ? "Simulating…"
+                      : result
+                        ? "Re-simulate"
+                        : "Simulate"}
+                  </button>
+                </span>
               );
             })}
           </div>
@@ -332,6 +348,64 @@ export function SimulateRethonTab({
         )}
 
         {error && <ErrorBanner message={error} />}
+
+        {/* Accept / Reject */}
+        {equilibrium &&
+          (decision === "accepted" ? (
+            <div style={{ fontSize: 12, color: C.supports, marginTop: 12 }}>
+              ✓ Applied to state
+            </div>
+          ) : decision === "rejected" ? (
+            <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>
+              Result discarded
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+              <button
+                onClick={() => {
+                  const evolution = result.translated_re_state.evolution;
+                  const lastTwo = evolution.slice(-2);
+                  const equilibriumIds = new Set(
+                    lastTwo.flatMap((pos) =>
+                      pos.filter((e) => !e.negated).map((e) => e.id),
+                    ),
+                  );
+                  onApplyRethonEquilibrium?.(equilibriumIds);
+                  onSetEquilibriumPreview?.(null);
+                  setDecision("accepted");
+                }}
+                style={{
+                  background: C.supports + "18",
+                  border: `1px solid ${C.supports}`,
+                  color: C.supports,
+                  borderRadius: 6,
+                  padding: "5px 14px",
+                  fontSize: 12,
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => {
+                  onSetEquilibriumPreview?.(null);
+                  setDecision("rejected");
+                }}
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  color: C.dim,
+                  borderRadius: 6,
+                  padding: "5px 14px",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Reject
+              </button>
+            </div>
+          ))}
 
         {equilibrium && (
           <>

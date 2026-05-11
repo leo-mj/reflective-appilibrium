@@ -66,6 +66,8 @@ export function GraphPanel({
   onRejectElements,
   onRejectRelations,
   onApplyRethonEquilibrium,
+  equilibriumPreviewWithdrawnIds,
+  onSetEquilibriumPreview,
   onRoundChange,
   isWide,
   workflowPhase,
@@ -140,6 +142,7 @@ export function GraphPanel({
             ready={ready}
             recentlyAdded={recentlyAdded}
             hideNonEntailsRels={hideNonEntailsRels}
+            equilibriumPreviewWithdrawnIds={equilibriumPreviewWithdrawnIds}
           />
         )}
         {tab === "history" && (
@@ -214,6 +217,7 @@ export function GraphPanel({
               state={state}
               useDummy={useDummyAssist}
               onApplyRethonEquilibrium={onApplyRethonEquilibrium}
+              onSetEquilibriumPreview={onSetEquilibriumPreview}
             />
           </Suspense>
         )}

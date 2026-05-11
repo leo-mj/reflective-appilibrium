@@ -30,6 +30,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [addBarCtrlTo, setAddBarCtrlTo] = useState(null);
   const [workflowLoops, setWorkflowLoops] = useState(0);
   const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
+  const [equilibriumPreviewWithdrawnIds, setEquilibriumPreviewWithdrawnIds] =
+    useState(null);
 
   const {
     state,
@@ -202,6 +204,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onRejectElements: handleRejectElements,
     onRejectRelations: handleRejectRelations,
     onApplyRethonEquilibrium: handleApplyRethonEquilibrium,
+    equilibriumPreviewWithdrawnIds:
+      tab === "simulateRethon" ? equilibriumPreviewWithdrawnIds : null,
+    onSetEquilibriumPreview: setEquilibriumPreviewWithdrawnIds,
     onRoundChange: setHistoryRound,
     isWide,
     onCtrlSecondSelect: setAddBarCtrlTo,

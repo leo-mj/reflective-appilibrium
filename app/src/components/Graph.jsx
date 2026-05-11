@@ -396,6 +396,7 @@ export function Graph({
   ready,
   recentlyAdded,
   hideNonEntailsRels,
+  equilibriumPreviewWithdrawnIds,
 }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
@@ -433,7 +434,11 @@ export function Graph({
       visIds.has(r.to) &&
       !hiddenLegendKeys?.has(r.type) &&
       !(hiddenLegendKeys?.has("withdrawn") && r.status === "withdrawn") &&
-      !(hiddenLegendKeys?.has("rejected") && r.status === "rejected"),
+      !(hiddenLegendKeys?.has("rejected") && r.status === "rejected") &&
+      !(
+        equilibriumPreviewWithdrawnIds?.has(r.from) ||
+        equilibriumPreviewWithdrawnIds?.has(r.to)
+      ),
   );
 
   // All relations belonging to the same argument as selectedRel (or just [selectedRel]).
@@ -578,6 +583,7 @@ export function Graph({
               selected,
               undefined,
               recentlyAdded,
+              equilibriumPreviewWithdrawnIds,
             ),
             isDragging,
             setTooltip,

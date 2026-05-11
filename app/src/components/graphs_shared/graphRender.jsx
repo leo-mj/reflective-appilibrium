@@ -10,7 +10,7 @@
 
 /** @import { REElement, RERelation, PositionMap } from '../../types.js' */
 
-import { confOp, TRANSITION } from "../../constants/colors.js";
+import { C, confOp, TRANSITION } from "../../constants/colors.js";
 import { nodeRadius } from "../../utils/graphHelpers.js";
 import { GraphEdge, GraphNode, PulseRing } from "./GraphElements.jsx";
 
@@ -137,34 +137,44 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
  * @param {function(string): boolean}  dimNode
  * @param {string|null}                selected   - ID of the selected element, or null.
  * @param {string|null}                [ctrlFirst] - ID of the ctrl-click first node, or null.
+ * @param {string|null}                [recentlyAdded]
+ * @param {Set<string>|null}           [previewWithdrawnIds] - IDs that would be withdrawn by the simulated equilibrium.
  * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, transition: string, children: React.ReactNode }}
  */
-export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, recentlyAdded) {
+export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, recentlyAdded, previewWithdrawnIds) {
   const isWithdrawn = wIds.has(element.id);
   const isRejected = element.status === "rejected";
   const isSelected = element.id === selected;
   const isCtrlFirst = element.id === ctrlFirst;
   const isRecentlyAdded = element.id === recentlyAdded;
-  const baseOpacity = isWithdrawn
-    ? 0.25
-    : isRejected
-      ? 0.35
-      : confOp[element.confidence];
+  const isPreviewWithdrawn = previewWithdrawnIds?.has(element.id) ?? false;
+  const baseOpacity =
+    isWithdrawn || isPreviewWithdrawn ? 0.25 : isRejected ? 0.35 : confOp[element.confidence];
+  const r = nodeRadius(element.type);
   return {
-    isWithdrawn,
+    isWithdrawn: isWithdrawn || isPreviewWithdrawn,
     isRejected,
     opacity: dimNode(element.id) ? 0.12 : baseOpacity,
     transition: TRANSITION,
     children: isSelected ? (
       <circle
-        r={nodeRadius(element.type) + 8}
+        r={r + 8}
         fill="none"
         stroke="#fff"
         strokeWidth={2}
         opacity={0.45}
       />
+    ) : isPreviewWithdrawn ? (
+      <circle
+        r={r + 6}
+        fill="none"
+        stroke={C.conflicts}
+        strokeWidth={1.5}
+        strokeDasharray="4 3"
+        opacity={0.7}
+      />
     ) : isCtrlFirst || isRecentlyAdded ? (
-      <PulseRing type={element.type} radius={nodeRadius(element.type)} />
+      <PulseRing type={element.type} radius={r} />
     ) : null,
   };
 }

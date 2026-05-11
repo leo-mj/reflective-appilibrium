@@ -84,7 +84,7 @@ def _get_rethon_final_state(
         arguments=numerical_arguments,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
     )
-    initial_position = {index for index, element in lookup.items() if element.status == "active"}
+    initial_position = {index for index, element in lookup.items() if element.status in ["active", "revised"]}
     init_coms = StandardPosition.from_set(
         position=initial_position,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
@@ -93,7 +93,7 @@ def _get_rethon_final_state(
         # Consider positions close to current positions 
         re = StandardLocalReflectiveEquilibrium(dialectical_structure=bdd_ds, initial_commitments=init_coms)
     else:
-        # Consider all positions
+        # Consider all positions; slow for n_unnegated_sentence_pool > 10
         re = StandardGlobalReflectiveEquilibrium(dialectical_structure=bdd_ds, initial_commitments=init_coms)
     re.set_initial_state(init_coms)
     re.re_process()
