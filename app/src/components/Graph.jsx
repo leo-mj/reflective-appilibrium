@@ -5,7 +5,7 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
@@ -111,6 +111,69 @@ function AddButtonsOverlay({
   );
 }
 
+function ArgAccumulatorBar({ selected, ctrlArgNodes, onConfirm, onCancel }) {
+  if (!selected || ctrlArgNodes.length === 0) return null;
+  const all = [selected, ...ctrlArgNodes];
+  const premises = all.slice(0, -1);
+  const conclusion = all.at(-1);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 48,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: C.panel,
+        border: `1px solid ${C.jointly_entails}`,
+        borderRadius: 8,
+        padding: "8px 12px",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        fontSize: 12,
+        color: C.text,
+        whiteSpace: "nowrap",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+        zIndex: 10,
+      }}
+    >
+      <span style={{ color: C.dim }}>
+        {premises.join(", ")}
+        <span style={{ color: C.jointly_entails, fontWeight: "bold", margin: "0 6px" }}>→</span>
+        {conclusion}
+      </span>
+      <button
+        onClick={onConfirm}
+        style={{
+          background: C.jointly_entails + "22",
+          border: `1px solid ${C.jointly_entails}`,
+          borderRadius: 4,
+          color: C.jointly_entails,
+          fontSize: 12,
+          padding: "2px 10px",
+          cursor: "pointer",
+        }}
+      >
+        Add Argument
+      </button>
+      <button
+        onClick={onCancel}
+        style={{
+          background: "transparent",
+          border: "none",
+          color: C.dim,
+          fontSize: 14,
+          cursor: "pointer",
+          padding: "0 2px",
+          lineHeight: 1,
+        }}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 function GraphModals({
   addingElType,
   setAddingElType,
@@ -118,6 +181,7 @@ function GraphModals({
   setAddingRel,
   addingArg,
   setAddingArg,
+  addingArgPrefill,
   activeEls,
   round,
   onAddElement,
@@ -151,6 +215,8 @@ function GraphModals({
         <AddArgumentModal
           elements={activeEls}
           currentRound={round}
+          initialPremises={addingArgPrefill?.premises}
+          initialConclusion={addingArgPrefill?.conclusion}
           onSave={({ premises, conclusion, explanation }) => {
             const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
             premises.forEach((premise, i) => {
@@ -337,12 +403,11 @@ export function Graph({
   const [addingElType, setAddingElType] = useState(null);
   const [addingRel, setAddingRel] = useState(false);
   const [addingArg, setAddingArg] = useState(false);
-  const [ctrlSelected, setCtrlSelected] = useState(null);
-
-  // Clear ctrl-selection whenever the primary selection changes.
-  useEffect(() => {
-    setCtrlSelected(null);
-  }, [selected]);
+  const [addingArgPrefill, setAddingArgPrefill] = useState(null);
+  // { base: string|null, nodes: string[] } — nodes invalidate automatically when selected !== base
+  const [ctrlArgState, setCtrlArgState] = useState({ base: null, nodes: [] });
+  const ctrlArgNodes = ctrlArgState.base === selected ? ctrlArgState.nodes : [];
+  const clearCtrlArg = () => setCtrlArgState({ base: null, nodes: [] });
 
   // ── Derived visibility and highlight sets ─────────────────────────────────
 
@@ -380,8 +445,8 @@ export function Graph({
   const selectedArgRelSet = new Set(selectedArgRels);
 
   const highlightedIds =
-    ctrlSelected && selected
-      ? new Set([selected, ctrlSelected])
+    ctrlArgNodes.length > 0 && selected
+      ? new Set([selected, ...ctrlArgNodes])
       : selected
         ? getNeighbours(selected, visRels)
         : selectedArgRels.length > 0
@@ -425,10 +490,13 @@ export function Graph({
     onSelectRel,
     setTooltip,
     onCtrlNodeClick: (id) => {
-      if (selected) {
-        setCtrlSelected(id);
+      if (selected && id !== selected && !ctrlArgNodes.includes(id)) {
+        setCtrlArgState((prev) => ({
+          base: selected,
+          nodes: prev.base === selected ? [...prev.nodes, id] : [id],
+        }));
         onCtrlSecondSelect?.(id);
-      } else {
+      } else if (!selected) {
         onSelectRel(() => null);
         onSelect((prev) => (prev === id ? null : id));
       }
@@ -465,6 +533,17 @@ export function Graph({
               onAddRel={() => setAddingRel(true)}
               onAddArg={() => setAddingArg(true)}
               hideNonEntailsRels={hideNonEntailsRels}
+            />
+            <ArgAccumulatorBar
+              selected={selected}
+              ctrlArgNodes={ctrlArgNodes}
+              onConfirm={() => {
+                const all = [selected, ...ctrlArgNodes];
+                setAddingArgPrefill({ premises: all.slice(0, -1), conclusion: all.at(-1) });
+                setAddingArg(true);
+                clearCtrlArg();
+              }}
+              onCancel={clearCtrlArg}
             />
             <OffscreenIndicators
               els={visibleEls}
@@ -512,7 +591,8 @@ export function Graph({
         addingRel={addingRel}
         setAddingRel={setAddingRel}
         addingArg={addingArg}
-        setAddingArg={setAddingArg}
+        setAddingArg={(v) => { if (!v) setAddingArgPrefill(null); setAddingArg(v); }}
+        addingArgPrefill={addingArgPrefill}
         activeEls={activeEls}
         round={state.round}
         onAddElement={onAddElement}

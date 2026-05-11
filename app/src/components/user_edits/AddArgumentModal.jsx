@@ -29,11 +29,21 @@ const ghostBtn = {
  * @param {number}      props.currentRound
  * @param {function({ premises: string[], conclusion: string, explanation: string }): void} props.onSave
  * @param {function(): void} props.onCancel
+ * @param {string[]}    [props.initialPremises]
+ * @param {string}      [props.initialConclusion]
  */
-export function AddArgumentModal({ elements, currentRound, onSave, onCancel }) {
+export function AddArgumentModal({ elements, currentRound, onSave, onCancel, initialPremises, initialConclusion }) {
   const ids = elements.map((e) => e.id).sort(sortElementIds);
-  const [premises, setPremises] = useState([ids[0] ?? ""]);
-  const [conclusion, setConclusion] = useState(ids[1] ?? ids[0] ?? "");
+  const [premises, setPremises] = useState(
+    initialPremises?.filter((id) => ids.includes(id)).length
+      ? initialPremises.filter((id) => ids.includes(id))
+      : [ids[0] ?? ""]
+  );
+  const [conclusion, setConclusion] = useState(
+    initialConclusion && ids.includes(initialConclusion)
+      ? initialConclusion
+      : (ids[1] ?? ids[0] ?? "")
+  );
   const [explanation, setExplanation] = useState("");
 
   const setPremise = (i, id) =>
