@@ -54,7 +54,12 @@ class REElement(BaseModel):
 # ── Relation ───────────────────────────────────────────────────────────────────
 
 RelationType = Literal[
-    "supports", "conflicts", "undermines", "depends", "jointly_entails"
+    "supports",
+    "conflicts",
+    "undermines",
+    "depends",
+    "jointly_entails",
+    "jointly_precludes",
 ]
 
 

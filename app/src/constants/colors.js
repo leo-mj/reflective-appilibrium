@@ -9,7 +9,8 @@
  * - conflicts → orange (`#f97316`)
  * - undermines → amber (`#eab308`)
  * - depends   → grey  (`#6b7280`)
- * - jointly_entails → green (`#16a34a`)
+ * - jointly_entails   → green (`#16a34a`)
+ * - jointly_precludes → rose  (`#e11d48`)
  *
  * Node colours by element type, shaded by confidence level:
  * - judgment  → blue shades
@@ -42,6 +43,7 @@
  *   undermines: string,
  *   depends: string,
  *   jointly_entails: string,
+ *   jointly_precludes: string,
  *   added: string,
  *   revised: string,
  *   withdrawnMark: string,
@@ -64,6 +66,7 @@ export const C = {
   undermines: "#eab308",
   depends: "#6b7280",
   jointly_entails: "#16a34a",
+  jointly_precludes: "#e11d48",
   added: "#06b6d4", // pulse ring colour for newly-added nodes in the History tab
   revised: "#eab308", // label colour for "revised" annotations
   withdrawnMark: "#f97316", // label colour for "withdrawn" annotations

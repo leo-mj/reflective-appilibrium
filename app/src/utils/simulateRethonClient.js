@@ -26,7 +26,7 @@ export async function simulateRethon(state, local, useDummy = false) {
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       elements: state.elements,
-      relations: state.relations.filter((r) => r.type === "jointly_entails"),
+      relations: state.relations.filter((r) => r.type === "jointly_entails" || r.type === "jointly_precludes"),
       round: `${state.round}`,
       local,
     }),

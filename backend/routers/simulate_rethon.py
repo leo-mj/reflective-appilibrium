@@ -52,7 +52,7 @@ def _build_numerical_arguments(
 
     args_by_id: Dict[str, List[RERelation]] = defaultdict(list)
     for rel in relations:
-        if rel.type == "jointly_entails" and rel.argument_id:
+        if rel.type in ("jointly_entails", "jointly_precludes") and rel.argument_id:
             args_by_id[rel.argument_id].append(rel)
 
     numerical_arguments: List[List[int]] = []
@@ -62,6 +62,8 @@ def _build_numerical_arguments(
         if conclusion_idx is None or any(idx is None for idx in premise_indices):
             logger.warning("Skipping argument with unknown element IDs.")
             continue
+        if arg_rels[0].type == "jointly_precludes":
+            conclusion_idx = -conclusion_idx
         numerical_arguments.append(
             [idx for idx in premise_indices if idx is not None] + [conclusion_idx]
         )
@@ -152,16 +154,20 @@ async def simulate_rethon(
             detail=f"There are fewer than {sentence_pool_minimum} elements forming the sentence pool.",
         )
 
-    jointly_entails = [r for r in request.relations if r.type == "jointly_entails"]
-    if not jointly_entails:
+    arg_relations = [
+        r
+        for r in request.relations
+        if r.type in ("jointly_entails", "jointly_precludes")
+    ]
+    if not arg_relations:
         raise HTTPException(
             status_code=422,
-            detail="No jointly_entails relations found. Accept arguments in the Detect Arguments tab first.",
+            detail="No argument relations found. Accept arguments in the Detect Arguments tab first.",
         )
 
     built_arguments = _build_numerical_arguments(
         elements=request.elements,
-        relations=jointly_entails,
+        relations=arg_relations,
     )
 
     try:

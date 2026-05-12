@@ -254,12 +254,12 @@ export function ElementCard({ e, dim }) {
 
 // ─── Argument card (grouped jointly_entails) ──────────────────────────────────
 
-/** Groups an array of relations: jointly_entails with the same argumentId become one entry. */
+/** Groups an array of relations: jointly_entails/jointly_precludes with the same argumentId become one entry. */
 function groupRelationsByArgument(rels) {
   const groups = [];
   const seenArgIds = new Set();
   for (const r of rels) {
-    if (r.type === "jointly_entails" && r.argumentId) {
+    if ((r.type === "jointly_entails" || r.type === "jointly_precludes") && r.argumentId) {
       if (seenArgIds.has(r.argumentId)) continue;
       seenArgIds.add(r.argumentId);
       groups.push({
@@ -321,12 +321,12 @@ export function ArgumentCard({ rels, dim }) {
             <Badge id={r.from} />
             <span
               style={{
-                color: C.jointly_entails,
+                color: C[rels[0].type] ?? C.jointly_entails,
                 fontSize: 11,
                 fontWeight: "bold",
               }}
             >
-              → jointly entails →
+              {rels[0].type === "jointly_precludes" ? "⇒ jointly precludes ⇒" : "→ jointly entails →"}
             </span>
             <Badge id={r.to} />
             <StatusLabel status={r.status} />
@@ -362,7 +362,11 @@ export function ArgumentCard({ rels, dim }) {
                 lineHeight: 1.5,
               }}
             >
-              <div>{index == allNodeIds.length - 1 && <b>Therefore:</b>}</div>
+              <div>{index == allNodeIds.length - 1 && (
+                <b>Therefore{rels[0].type === "jointly_precludes" && (
+                  <span style={{ color: C.jointly_precludes, fontStyle: "italic", fontWeight: "normal" }}> not</span>
+                )}:</b>
+              )}</div>
               <span
                 style={{
                   color: badgeColor(id),

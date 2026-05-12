@@ -89,7 +89,7 @@ export function historyEdgeVisuals(relation, wIds, snappedRound) {
  * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, strokeWidth: number, transition: string, hitArea: boolean }}
  */
 export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRelGroup) {
-  const isWithdrawn = wIds.has(relation.from) || wIds.has(relation.to);
+  const isWithdrawn = wIds.has(relation.from) || wIds.has(relation.to) || relation.status === "withdrawn";
   const isRejected = relation.status === "rejected";
   const baseOpacity = isWithdrawn ? 0.25 : isRejected ? 0.35 : 0.7;
   return {

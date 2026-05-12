@@ -149,12 +149,12 @@ export function useREActions(initialState) {
 
   const handleWithdrawRelRequest = (rel) => {
     const newRound = state.round + 1;
-    const isArgRel = rel.type === "jointly_entails" && rel.argumentId;
+    const isArgRel = (rel.type === "jointly_entails" || rel.type === "jointly_precludes") && rel.argumentId;
     mutate((prev) => ({
       ...prev,
       round: newRound,
       relations: prev.relations.map((r) => {
-        const inGroup = isArgRel && r.argumentId === rel.argumentId && r.type === "jointly_entails";
+        const inGroup = isArgRel && r.argumentId === rel.argumentId && (r.type === "jointly_entails" || r.type === "jointly_precludes");
         return r === rel || inGroup
           ? { ...r, status: "withdrawn", withdrawnRound: newRound }
           : r;
@@ -168,7 +168,7 @@ export function useREActions(initialState) {
             : `Relation ${rel.from} → ${rel.to} was withdrawn by the user.`,
           "Withdrawn",
           isArgRel
-            ? `All jointly_entails relations of argument ${rel.argumentId}: status → withdrawn`
+            ? `All argument relations of ${rel.argumentId}: status → withdrawn`
             : `${rel.from} → ${rel.to}: status → withdrawn`,
         ),
       ],
@@ -181,7 +181,7 @@ export function useREActions(initialState) {
     mutate((prev) => ({
       ...prev,
       relations: prev.relations.filter(
-        (r) => !(r.argumentId === argumentId && r.type === "jointly_entails"),
+        (r) => !(r.argumentId === argumentId && (r.type === "jointly_entails" || r.type === "jointly_precludes")),
       ),
     }));
     if (selectedRel?.argumentId === argumentId) setSelectedRel(null);

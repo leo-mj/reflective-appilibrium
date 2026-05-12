@@ -13,6 +13,14 @@ A React SPA backed by a FastAPI server. Features: session save/load, multi-provi
 
 The React SPA also works by itself. However, only the Analyze tabs are usable while the Assist tabs' LLM features are only demoed via sample data.
 
+**Phase 3 - Integration of rethon (computational RE)**
+Integrating the computational model of RE from [rethon](https://re-models.github.io/rethon/). Uses an LLM to detect arguments among the existing elements and suggest additional premises.
+
+See:
+
+Beisbart, Claus; Betz, Gregor & Brun, Georg (2021). Making Reflective Equlibrium Precise: A Formal Model. Ergo: An Open Access Journal of Philosophy 8:441–472.
+Freivogel, Andreas & Cacean, Sebastian (2024). Assessing a Formal Model of Reflective Equilibrium.
+
 ## Quick Start (Phase 1 — Claude Skill)
 
 1. Create a new Project in [claude.ai](https://claude.ai)
@@ -22,7 +30,7 @@ The React SPA also works by itself. However, only the Analyze tabs are usable wh
 
 ---
 
-## Quick Start (Phase 2 — Frontend Web App)
+## Frontend Quick Start (Phase 2)
 
 ```bash
 cd app

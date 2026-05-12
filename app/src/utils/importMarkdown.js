@@ -26,6 +26,7 @@ const RELATION_TYPES = new Set([
   "undermines",
   "depends",
   "jointly_entails",
+  "jointly_precludes",
 ]);
 
 // ─── Field validators ─────────────────────────────────────────────────────────

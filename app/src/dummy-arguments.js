@@ -2,6 +2,7 @@
 // Topic: obligations to future generations (matches dummy-state.js).
 // Mirrors the Python _dummy_detect_arguments logic from backend/routers/arguments.py.
 
+// Negative indices represent negations: -n = ¬sentence-n
 const _DUMMY_ARGUMENTS = [
   // Indices 21–23 are added premises:
   // 21:J (radioactive waste bridge for P1→J1)
@@ -23,6 +24,11 @@ const _DUMMY_ARGUMENTS = [
   [19, 20, 14],
   [13, 17, 10],
   [14, 15, 5],
+  // Negation arguments:
+  [5, -10],      // J5 → ¬J10 (permissible discounting entails rejection of strict equal counting)
+  [16, -1],      // P4 → ¬J1 (if only current beings matter, radioactive waste is not wrong)
+  [14, -6],      // P2 → ¬J6 (probabilistic obligation entails rejection of "no obligations to non-existent")
+  [18, 7, -10],  // P6 + J7 → ¬J10 (if proximity modulates and parents > strangers, strict equal counting fails)
 ];
 
 const _ADDED_PREMISES = [
@@ -75,7 +81,7 @@ function addNewPremisesToLookup(lookup, addedPremises, elements, round, model) {
 function buildExistingArgFingerprints(relations) {
   const groups = {};
   for (const r of relations) {
-    if (r.type !== "jointly_entails" || !r.argumentId) continue;
+    if ((r.type !== "jointly_entails" && r.type !== "jointly_precludes") || !r.argumentId) continue;
     if (!groups[r.argumentId]) groups[r.argumentId] = { froms: [], to: r.to };
     groups[r.argumentId].froms.push(r.from);
   }
@@ -85,10 +91,14 @@ function buildExistingArgFingerprints(relations) {
 }
 
 function argFingerprint(arg, lookup) {
-  const els = arg.map((n) => lookup[n]);
-  if (els.some((e) => !e)) return null;
-  const premises = els.slice(0, -1).map((e) => e.id).sort();
-  const conclusion = els.at(-1).id;
+  const ids = arg.map((n) => {
+    const el = lookup[Math.abs(n)];
+    if (!el) return null;
+    return (n < 0 ? "¬" : "") + el.id;
+  });
+  if (ids.some((id) => !id)) return null;
+  const premises = ids.slice(0, -1).sort();
+  const conclusion = ids.at(-1);
   return `${premises.join(",")}->${conclusion}`;
 }
 
@@ -108,11 +118,16 @@ export function getDummyArguments(elements, round, relations = []) {
   const existingFingerprints = buildExistingArgFingerprints(relations);
   const numArguments = _DUMMY_ARGUMENTS.filter(
     (arg) =>
-      arg.every((n) => n <= poolSize) &&
+      arg.every((n) => Math.abs(n) <= poolSize) &&
       argFingerprint(arg, lookup) !== null &&
       !existingFingerprints.has(argFingerprint(arg, lookup))
   );
-  const translatedArguments = numArguments.map((arg) => arg.map((n) => lookup[n]));
+  const translatedArguments = numArguments.map((arg) =>
+    arg.map((n) => {
+      const el = lookup[Math.abs(n)];
+      return n < 0 ? { ...el, negated: true } : el;
+    })
+  );
   return {
     num_arguments: numArguments,
     translated_arguments: translatedArguments,

@@ -36,7 +36,13 @@ class DetectArgumentsResponse(BaseModel):
 def translate_from_lookup(
     nums: List[int], lookup: Dict[int, REElement]
 ) -> List[REElement]:
-    return [lookup[num] for num in nums]
+    result = []
+    for num in nums:
+        if num in lookup:
+            result.append(lookup[num])
+        else:
+            result.append(lookup[abs(num)].model_copy(update={"negated": True}))
+    return result
 
 
 def _arg_fingerprint(arg: List[int]) -> Tuple:
@@ -48,10 +54,10 @@ def _existing_arg_fingerprints(
 ) -> Set[Tuple]:
     groups: Dict[str, Dict] = {}
     for r in relations:
-        if r.type != "jointly_entails" or not r.argument_id:
+        if r.type not in ("jointly_entails", "jointly_precludes") or not r.argument_id:
             continue
         if r.argument_id not in groups:
-            groups[r.argument_id] = {"froms": [], "to": r.to_id}
+            groups[r.argument_id] = {"froms": [], "to": r.to_id, "type": r.type}
         groups[r.argument_id]["froms"].append(r.from_id)
 
     fingerprints: Set[Tuple] = set()
@@ -61,6 +67,8 @@ def _existing_arg_fingerprints(
         ]
         conclusion_index = reverse_lookup.get(group["to"])
         if conclusion_index is not None and len(premise_indices) == len(group["froms"]):
+            if group["type"] == "jointly_precludes":
+                conclusion_index = -conclusion_index
             fingerprints.add(
                 _arg_fingerprint(sorted(premise_indices) + [conclusion_index])
             )
@@ -86,10 +94,10 @@ def _format_existing_args_for_prompt(
 ) -> str:
     groups: Dict[str, Dict] = {}
     for r in relations:
-        if r.type != "jointly_entails" or not r.argument_id:
+        if r.type not in ("jointly_entails", "jointly_precludes") or not r.argument_id:
             continue
         if r.argument_id not in groups:
-            groups[r.argument_id] = {"froms": [], "to": r.to_id}
+            groups[r.argument_id] = {"froms": [], "to": r.to_id, "type": r.type}
         groups[r.argument_id]["froms"].append(r.from_id)
 
     lines = []
@@ -99,6 +107,8 @@ def _format_existing_args_for_prompt(
         ]
         conclusion_index = reverse_lookup.get(group["to"])
         if conclusion_index is not None and len(premise_indices) == len(group["froms"]):
+            if group["type"] == "jointly_precludes":
+                conclusion_index = -conclusion_index
             arg = sorted(premise_indices) + [conclusion_index]
             premise_ids = ", ".join(group["froms"])
             lines.append(f"  {arg}  ({premise_ids} → {group['to']})")
@@ -124,14 +134,18 @@ You are an expert in philosophical logic, semantics, and linguistics.
 Sentences to map into arguments:
 {element_lines}
 Each key-value pair consists of the sentence (value) and its numerical representation (key) as a sentence in propositional logic.
+The negation of sentence n is represented by -n (e.g. -3 means "it is not the case that [sentence 3]").
 {existing_section}
 Task:
-List all of the possible strictly logically valid arguments that can be formed with the sentences.
+List all of the possible strictly logically valid arguments that can be formed with the sentences, including arguments that use negations.
+Arguments may include negated premises (e.g. [-3, 4, 7] means ¬sentence-3 and sentence-4 together entail sentence-7) and arguments whose conclusion is the negation of an existing sentence (e.g. [3, 4, -7] means sentence-3 and sentence-4 jointly entail ¬sentence-7).
 If there are arguments with a suppressed premise, add the premise as a dictionary with a unique integer index, the content of the premise, and its type.
 The type can take the value "judgment", "principle", or "theory" if it is a background theory.
 Output: Each argument in the list is itself a list, in which the final member is the conclusion and all previous members are the premises.
 In the lists, the sentences are just represented through their key.
 For example, in [3, 4, 7], 7 is the conclusion and [3, 4] are the premises.
+In [-3, 4, 7], the conclusion is sentence 7 and the premises are ¬sentence-3 and sentence-4.
+In [3, 4, -7], the conclusion is ¬sentence-7 and the premises are sentence-3 and sentence-4.
 
 Respond with valid JSON only, in exactly this format:
 {{
@@ -139,6 +153,8 @@ Respond with valid JSON only, in exactly this format:
         [1, 5],
         [3, 4, 7],
         [1, 3, 6],
+        [2, -5],
+        [3, 4, -7],
         ...
   ],
   "added_premises": [
@@ -206,6 +222,7 @@ def _translate_arguments(
 # Full element order (all 20, including withdrawn):
 # 1:J1  2:J2  3:J3  4:J4  5:J5  6:J6(w)  7:J7  8:J8  9:J9  10:J10  11:J11(w)  12:J12
 # 13:P1  14:P2  15:P3  16:P4(w)  17:P5  18:P6  19:T1  20:T2
+# Negative indices represent negations: -n = ¬sentence-n
 _DUMMY_ARGUMENTS: List[List[int]] = [
     # Suppressed-premise arguments (indices 21–23 added by _dummy_detect_arguments):
     # 21:J (radioactive waste leaves future generations worse off — bridge for P1→J1)
@@ -235,6 +252,24 @@ _DUMMY_ARGUMENTS: List[List[int]] = [
     [19, 20, 14],  # T1 + T2 → P2 (conjunction)
     [13, 17, 10],  # P1 + P5 → J10 (sufficientarian + Rawlsian → equal counting)
     [14, 15, 5],  # P2 + P3 → J5 (probabilistic + uncertainty threshold → discounting)
+    # Negation arguments:
+    [
+        5,
+        -10,
+    ],  # J5 → ¬J10 (permissible discounting entails rejection of strict equal counting)
+    [
+        16,
+        -1,
+    ],  # P4 → ¬J1 (if only current beings matter, radioactive waste is not wrong)
+    [
+        14,
+        -6,
+    ],  # P2 → ¬J6 (probabilistic obligation entails rejection of "no obligations to non-existent")
+    [
+        18,
+        7,
+        -10,
+    ],  # P6 + J7 → ¬J10 (if proximity modulates and parents > strangers, strict equal counting fails)
 ]
 
 
@@ -261,7 +296,7 @@ def _dummy_detect_arguments(
     ]
     pool_size = n_unnegated_sentence_pool + len(added_premises)
     num_arguments = [
-        arg for arg in _DUMMY_ARGUMENTS if all(n <= pool_size for n in arg)
+        arg for arg in _DUMMY_ARGUMENTS if all(abs(n) <= pool_size for n in arg)
     ]
     lookup_w_premises = _add_new_premises_to_lookup(
         added_premises=added_premises,

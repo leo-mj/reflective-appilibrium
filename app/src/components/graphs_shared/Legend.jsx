@@ -41,6 +41,7 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
       key: "undermines",
     },
     { label: "(Jointly) Entails", color: C.jointly_entails, dash: "", key: "jointly_entails" },
+    { label: "Jointly Precludes", color: C.jointly_precludes, dash: "", key: "jointly_precludes" },
   ];
 
   const hidden = (key) => hiddenLegendKeys?.has(key) ?? false;

@@ -59,7 +59,7 @@ function IdBadge({ element, isAdded = false }) {
       display: "inline-block",
       flexShrink: 0,
     }}>
-      {element.id}
+      {element.negated ? "¬" : ""}{element.id}
     </span>
   );
 }
@@ -77,6 +77,11 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
         />
       ) : (
         <span style={{ color: C.text, fontSize: 11, lineHeight: 1.5, flex: 1 }}>
+          {element.negated && (
+            <span style={{ color: C.conflicts, fontSize: 10, fontWeight: "bold", fontStyle: "italic", marginRight: 4 }}>
+              not
+            </span>
+          )}
           {draft ?? element.text}
           {isAdded && (
             <span style={{ color: ACCENT, fontSize: 10, fontStyle: "italic", marginLeft: 6 }}>
@@ -260,13 +265,15 @@ export function DetectArgumentsTab({ state, useDummy = false, onAddElement, onAd
     const resolveId = (el) =>
       addedIds.has(el.id) ? newSubmittedIds[el.id] : el.id;
 
-    // Add one entails relation per premise → conclusion, grouped by a shared argumentId.
+    // Add one relation per premise → conclusion, grouped by a shared argumentId.
+    // Negated conclusions become jointly_precludes; positive conclusions jointly_entails.
     const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
     if (premises.length > 0) {
       const conclusionId = resolveId(conclusion);
+      const relationType = conclusion.negated ? "jointly_precludes" : "jointly_entails";
       for (const premise of premises) {
         onAddRelation?.(
-          { from: resolveId(premise), to: conclusionId, type: "jointly_entails", argumentId, explanation: "" },
+          { from: resolveId(premise), to: conclusionId, type: relationType, argumentId, explanation: "" },
           { select: false, pinRecent: true },
         );
       }

@@ -99,7 +99,8 @@ function ElementRow({ element, faded = false }) {
   );
 }
 
-function IdBadge({ element, negated = false }) {
+function IdBadge({ element }) {
+  const negated = element.negated;
   const color = elementColor(element.type);
   return (
     <span
@@ -110,12 +111,15 @@ function IdBadge({ element, negated = false }) {
         border: `1px solid ${negated ? C.border : color}`,
         borderRadius: 4,
         padding: "1px 5px",
-        textDecoration: negated ? "line-through" : "none",
       }}
     >
-      {element.id}
+      {negated ? "¬" : ""}{element.id}
     </span>
   );
+}
+
+function elementLabel(element) {
+  return element.negated ? `not ${element.text}` : element.text;
 }
 
 function ArgumentCard({ argument }) {
@@ -154,9 +158,9 @@ function ArgumentCard({ argument }) {
         <IdBadge element={conclusion} />
       </div>
       <div style={{ color: C.dim, lineHeight: 1.5 }}>
-        {premises.map((p) => p.text).join(" + ")}
+        {premises.map((p) => elementLabel(p)).join(" + ")}
         <span style={{ color: C.dim }}> → </span>
-        {conclusion.text}
+        {elementLabel(conclusion)}
       </div>
     </div>
   );
@@ -222,7 +226,7 @@ export function SimulateRethonTab({
   ).length;
 
   const atLeastOneArgument =
-    state.relations.filter((r) => r.type === "jointly_entails").length > 0;
+    state.relations.filter((r) => r.type === "jointly_entails" || r.type === "jointly_precludes").length > 0;
 
   const equilibrium = useMemo(
     () => (result ? deriveEquilibrium(result) : null),
