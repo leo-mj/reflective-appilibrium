@@ -9,7 +9,10 @@
 import { useState, useMemo } from "react";
 import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
-import { simulateRethon } from "../../utils/simulateRethonClient.js";
+import {
+  simulateRethon,
+  simulateRethonStep,
+} from "../../utils/simulateRethonClient.js";
 import { ErrorBanner } from "../SuggestionActions.jsx";
 
 const ACCENT = C.principle.high;
@@ -113,7 +116,8 @@ function IdBadge({ element }) {
         padding: "1px 5px",
       }}
     >
-      {negated ? "¬" : ""}{element.id}
+      {negated ? "¬" : ""}
+      {element.id}
     </span>
   );
 }
@@ -216,7 +220,12 @@ export function SimulateRethonTab({
   onSetEquilibriumPreview,
 }) {
   const [result, setResult] = useState(null);
-  const [loadingMode, setLoadingMode] = useState(null); // "local" | "global" | null
+  const [resultMode, setResultMode] = useState(null); // "simulate" | "step" | null
+  // Step-mode tracking: confirmed = accepted evolution; pending = awaiting accept/reject
+  const [confirmedEvolution, setConfirmedEvolution] = useState(null);
+  const [confirmedResult, setConfirmedResult] = useState(null);
+  const [stepPending, setStepPending] = useState(false);
+  const [loadingMode, setLoadingMode] = useState(null); // "simulate" | "step" | null
   const [error, setError] = useState(null);
   const [evolutionOpen, setEvolutionOpen] = useState(false);
   const [decision, setDecision] = useState(null); // "accepted" | "rejected" | null
@@ -226,22 +235,29 @@ export function SimulateRethonTab({
   ).length;
 
   const atLeastOneArgument =
-    state.relations.filter((r) => r.type === "jointly_entails" || r.type === "jointly_precludes").length > 0;
+    state.relations.filter(
+      (r) => r.type === "jointly_entails" || r.type === "jointly_precludes",
+    ).length > 0;
 
   const equilibrium = useMemo(
     () => (result ? deriveEquilibrium(result) : null),
     [result],
   );
 
-  const simulate = async (local) => {
-    setLoadingMode(local ? "local" : "global");
+  const simulate = async () => {
+    const startingEvolution = confirmedEvolution;
+    setLoadingMode("simulate");
     setError(null);
     setEvolutionOpen(false);
     setDecision(null);
+    setConfirmedEvolution(null);
+    setConfirmedResult(null);
+    setStepPending(false);
     onSetEquilibriumPreview?.(null);
     try {
-      const data = await simulateRethon(state, local, useDummy);
+      const data = await simulateRethon(state, true, startingEvolution, useDummy);
       setResult(data);
+      setResultMode("simulate");
       const eq = deriveEquilibrium(data);
       onSetEquilibriumPreview?.(new Set(eq.withdrawn.map((e) => e.id)));
     } catch (e) {
@@ -251,7 +267,62 @@ export function SimulateRethonTab({
     }
   };
 
-  const disabled =
+  const step = async () => {
+    setLoadingMode("step");
+    setError(null);
+    if (confirmedEvolution === null) {
+      setEvolutionOpen(false);
+      setDecision(null);
+      setConfirmedResult(null);
+      onSetEquilibriumPreview?.(null);
+    }
+    try {
+      const data = await simulateRethonStep(state, true, confirmedEvolution);
+      setResult(data);
+      setResultMode("step");
+      setStepPending(true);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoadingMode(null);
+    }
+  };
+
+  const handleAccept = () => {
+    const evolution = result.translated_re_state.evolution;
+    const lastTwo = evolution.slice(-2);
+    const equilibriumIds = new Set(
+      lastTwo.flatMap((pos) => pos.filter((e) => !e.negated).map((e) => e.id)),
+    );
+    if (resultMode === "step") {
+      setConfirmedEvolution(evolution);
+      setConfirmedResult(result);
+      setStepPending(false);
+      if (result.translated_re_state.finished) {
+        onApplyRethonEquilibrium?.(equilibriumIds);
+        onSetEquilibriumPreview?.(null);
+        setDecision("accepted");
+      }
+    } else {
+      onApplyRethonEquilibrium?.(equilibriumIds);
+      onSetEquilibriumPreview?.(null);
+      setDecision("accepted");
+    }
+  };
+
+  const handleReject = () => {
+    if (resultMode === "step") {
+      setResult(confirmedResult);
+      setStepPending(false);
+      onSetEquilibriumPreview?.(null);
+    } else {
+      onSetEquilibriumPreview?.(null);
+      setDecision("rejected");
+    }
+  };
+
+  const stepFinished = confirmedResult?.translated_re_state.finished ?? false;
+  const baseDisabled =
     loadingMode !== null || activeCount < 3 || !atLeastOneArgument;
 
   return (
@@ -275,6 +346,13 @@ export function SimulateRethonTab({
               {" · "}
               {activeCount} active element{activeCount !== 1 ? "s" : ""}
             </span>
+            {confirmedEvolution !== null && !stepFinished && (
+              <span style={{ color: C.dim }}>
+                {" · "}
+                {confirmedEvolution.length - 1} step
+                {confirmedEvolution.length - 1 !== 1 ? "s" : ""}
+              </span>
+            )}
             {equilibrium && (
               <span
                 style={{
@@ -282,8 +360,9 @@ export function SimulateRethonTab({
                 }}
               >
                 {" · "}
-                {equilibrium.finished ? `converged` : `did not converge`}
-                {` in ${equilibrium.steps} step${equilibrium.steps !== 1 ? "s" : ""}`}
+                {equilibrium.finished
+                  ? "Equilibrium reached"
+                  : "Equilibrium not reached yet"}
               </span>
             )}
             {result?.model && (
@@ -293,54 +372,82 @@ export function SimulateRethonTab({
               </span>
             )}
           </div>
+
           <div style={{ display: "flex", gap: 2 }}>
-            {[
-              { label: "Globally", local: false, mode: "global" },
-              { label: "Locally", local: true, mode: "local" },
-            ].map(({ label, local, mode }) => {
-              const isLoading = loadingMode === mode;
-              // global simulation becomes too slow with more than 10 elements
-              const globalTooLarge =
-                mode === "global" && state.elements.length > 10;
-              const disableSimulation = disabled || globalTooLarge;
-              const tooltip = globalTooLarge
-                ? `Global simulation is disabled for more than 10 elements (current: ${state.elements.length})`
-                : undefined;
+            {/* Simulate button */}
+            <button
+              onClick={simulate}
+              disabled={baseDisabled}
+              style={{
+                background: "transparent",
+                border: `1px solid ${baseDisabled ? C.border : ACCENT}`,
+                color: baseDisabled ? C.dim : ACCENT,
+                borderRadius: 6,
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: "bold",
+                cursor: baseDisabled ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+                flexShrink: 0,
+              }}
+            >
+              {loadingMode === "simulate" ? <SpinnerIcon /> : <span>↺</span>}
+              {loadingMode === "simulate" ? "Equilibrating..." : "Equilibrate"}
+            </button>
+
+            {/* Divider */}
+            <div
+              style={{
+                width: 1,
+                height: 24,
+                background: C.border,
+                margin: "0 4px",
+                alignSelf: "center",
+              }}
+            />
+
+            {/* Step button */}
+            {(() => {
+              const stepDisabled = baseDisabled || stepPending || stepFinished;
+              const stepLabel =
+                loadingMode === "step"
+                  ? "Stepping…"
+                  : confirmedEvolution !== null
+                    ? "Next Step"
+                    : "Step";
               return (
-                <span
-                  key={mode}
-                  title={tooltip}
-                  style={{ display: "inline-flex" }}
+                <button
+                  onClick={step}
+                  disabled={stepDisabled}
+                  title={
+                    stepFinished
+                      ? "The RE process has reached a fixed point"
+                      : stepPending
+                        ? "Accept or reject this step first"
+                        : undefined
+                  }
+                  style={{
+                    background: "transparent",
+                    border: `1px solid ${stepDisabled ? C.border : ACCENT}`,
+                    color: stepDisabled ? C.dim : ACCENT,
+                    borderRadius: 6,
+                    padding: "5px 12px",
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    cursor: stepDisabled ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                    flexShrink: 0,
+                  }}
                 >
-                  <button
-                    onClick={() => simulate(local)}
-                    disabled={disableSimulation}
-                    style={{
-                      background: "transparent",
-                      border: `1px solid ${disableSimulation ? C.border : ACCENT}`,
-                      color: disableSimulation ? C.dim : ACCENT,
-                      borderRadius: 6,
-                      padding: "5px 12px",
-                      fontSize: 12,
-                      fontWeight: "bold",
-                      cursor: disableSimulation ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {isLoading ? <SpinnerIcon /> : <span>↺</span>}
-                    {label}{" "}
-                    {isLoading
-                      ? "Simulating…"
-                      : result
-                        ? "Re-simulate"
-                        : "Simulate"}
-                  </button>
-                </span>
+                  {loadingMode === "step" ? <SpinnerIcon /> : <span>→</span>}
+                  {stepLabel}
+                </button>
               );
-            })}
+            })()}
           </div>
         </div>
 
@@ -363,21 +470,10 @@ export function SimulateRethonTab({
             <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>
               Result discarded
             </div>
-          ) : (
+          ) : stepPending || resultMode === "simulate" ? (
             <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
               <button
-                onClick={() => {
-                  const evolution = result.translated_re_state.evolution;
-                  const lastTwo = evolution.slice(-2);
-                  const equilibriumIds = new Set(
-                    lastTwo.flatMap((pos) =>
-                      pos.filter((e) => !e.negated).map((e) => e.id),
-                    ),
-                  );
-                  onApplyRethonEquilibrium?.(equilibriumIds);
-                  onSetEquilibriumPreview?.(null);
-                  setDecision("accepted");
-                }}
+                onClick={handleAccept}
                 style={{
                   background: C.supports + "18",
                   border: `1px solid ${C.supports}`,
@@ -392,10 +488,7 @@ export function SimulateRethonTab({
                 Accept
               </button>
               <button
-                onClick={() => {
-                  onSetEquilibriumPreview?.(null);
-                  setDecision("rejected");
-                }}
+                onClick={handleReject}
                 style={{
                   background: "transparent",
                   border: `1px solid ${C.border}`,
@@ -409,7 +502,7 @@ export function SimulateRethonTab({
                 Reject
               </button>
             </div>
-          ))}
+          ) : null)}
 
         {equilibrium && (
           <>
@@ -453,7 +546,11 @@ export function SimulateRethonTab({
                 ))}
               </div>
             </div>
+          </>
+        )}
 
+        {result && (
+          <>
             {/* Arguments */}
             <SectionHead
               title="Arguments"

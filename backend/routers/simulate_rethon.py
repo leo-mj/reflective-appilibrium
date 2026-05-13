@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict
+from typing import List, Dict, Optional, Union
 from collections import defaultdict
 from pydantic import BaseModel, Field
 import logging
 
-from theodias import StandardPosition, BDDDialecticalStructure
+from theodias import Position, StandardPosition, BDDDialecticalStructure
 from rethon import (
     StandardLocalReflectiveEquilibrium,
     StandardGlobalReflectiveEquilibrium,
@@ -16,6 +16,10 @@ from .arguments import DetectArgumentsResponse, translate_from_lookup
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/simulate_rethon", tags=["simulate_rethon"])
 
+_REProcess = Union[
+    StandardLocalReflectiveEquilibrium, StandardGlobalReflectiveEquilibrium
+]
+
 
 class SimulateRethonRequest(BaseModel):
     """Payload for ``POST /api/simulate_rethon/simulate``."""
@@ -24,6 +28,7 @@ class SimulateRethonRequest(BaseModel):
     elements: list[REElement] = Field(min_length=1, max_length=200)
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
     local: bool = True
+    evolution: Optional[List[List[REElement]]] = None
 
 
 class SimulatedRethonState(BaseModel):
@@ -122,6 +127,58 @@ def _get_rethon_final_state(
     return re.state()
 
 
+def _build_re(
+    numerical_arguments: List[List[int]],
+    n_unnegated_sentence_pool: int,
+    init_coms: Position,
+    local: bool = True,
+) -> _REProcess:
+    """Build and initialise a rethon RE object without running any steps."""
+    bdd_ds = BDDDialecticalStructure.from_arguments(
+        arguments=numerical_arguments,
+        n_unnegated_sentence_pool=n_unnegated_sentence_pool,
+    )
+    if local:
+        re: _REProcess = StandardLocalReflectiveEquilibrium(
+            dialectical_structure=bdd_ds, initial_commitments=init_coms
+        )
+    else:
+        re = StandardGlobalReflectiveEquilibrium(
+            dialectical_structure=bdd_ds, initial_commitments=init_coms
+        )
+    return re
+
+
+def _reconstruct_re_state(
+    evolution: List[List[REElement]],
+    id_to_index: Dict[str, int],
+    n_unnegated_sentence_pool: int,
+) -> REState:
+    """Rebuild an REState from a previously translated evolution.
+
+    Each position is a list of REElements (with negated=True for negated
+    sentences). We map element IDs back to numerical sentence indices and
+    reconstruct a StandardPosition for each step.  The alternatives are left
+    empty — they are informational only and do not affect future steps.
+    """
+    positions = []
+    for pos_elements in evolution:
+        indices: set[int] = set()
+        for el in pos_elements:
+            idx = id_to_index.get(el.id)
+            if idx is None:
+                logger.warning("Unknown element id %s in evolution; skipping.", el.id)
+                continue
+            indices.add(-idx if el.negated else idx)
+        positions.append(StandardPosition.from_set(indices, n_unnegated_sentence_pool))
+    return REState(
+        finished=False,
+        evolution=positions,
+        alternatives=[set() for _ in positions],
+        time_line=list(range(len(positions))),
+    )
+
+
 def _translate_re_state(
     numerical_re_state: REState, lookup: Dict[int, REElement]
 ) -> SimulatedRethonState:
@@ -143,52 +200,134 @@ def _translate_re_state(
     return result
 
 
-@router.post("/simulate", response_model=SimulatedRethonResponse)
-async def simulate_rethon(
-    request: SimulateRethonRequest,
+def _validate_and_build(
+    elements: List[REElement],
+    relations: List[RERelation],
     sentence_pool_minimum: int = 3,
-) -> SimulatedRethonResponse:
-    if len(request.elements) < sentence_pool_minimum:
+) -> tuple[DetectArgumentsResponse, Dict[int, REElement], int]:
+    """Validate the request payload and build the numerical argument structures.
+
+    Raises HTTPException on invalid input.  Returns the built arguments, the
+    negated lookup, and the sentence pool size.
+    """
+    n = len(elements)
+    if n < sentence_pool_minimum:
         raise HTTPException(
             status_code=422,
             detail=f"There are fewer than {sentence_pool_minimum} elements forming the sentence pool.",
         )
-
     arg_relations = [
-        r
-        for r in request.relations
-        if r.type in ("jointly_entails", "jointly_precludes")
+        r for r in relations if r.type in ("jointly_entails", "jointly_precludes")
     ]
     if not arg_relations:
         raise HTTPException(
             status_code=422,
             detail="No argument relations found. Accept arguments in the Detect Arguments tab first.",
         )
-
     built_arguments = _build_numerical_arguments(
-        elements=request.elements,
-        relations=arg_relations,
+        elements=elements, relations=arg_relations
     )
+    lookup_w_negated = _add_negated_to_lookup(lookup=built_arguments.lookup)
+    return built_arguments, lookup_w_negated, n
 
+
+@router.post("/simulate", response_model=SimulatedRethonResponse)
+async def simulate_rethon(
+    request: SimulateRethonRequest,
+    sentence_pool_minimum: int = 3,
+) -> SimulatedRethonResponse:
+    built_arguments, lookup_w_negated, n = _validate_and_build(
+        request.elements, request.relations, sentence_pool_minimum
+    )
     try:
-        n_unnegated_sentence_pool = len(request.elements)
-        numerical_re_state = _get_rethon_final_state(
-            numerical_arguments=built_arguments.num_arguments,
-            n_unnegated_sentence_pool=n_unnegated_sentence_pool,
-            lookup=built_arguments.lookup,
-            local=request.local,
-        )
-        lookup_w_negated = _add_negated_to_lookup(lookup=built_arguments.lookup)
-        translated_re_state = _translate_re_state(
-            numerical_re_state=numerical_re_state,
-            lookup=lookup_w_negated,
-        )
+        if request.evolution:
+            id_to_index: Dict[str, int] = {
+                el.id: i + 1 for i, el in enumerate(request.elements)
+            }
+            reconstructed = _reconstruct_re_state(request.evolution, id_to_index, n)
+            init_coms = reconstructed.initial_commitments()
+            re = _build_re(built_arguments.num_arguments, n, init_coms, request.local)
+            re.set_state(reconstructed)
+            re.re_process()
+            re_state = re.state()
+        else:
+            re_state = _get_rethon_final_state(
+                numerical_arguments=built_arguments.num_arguments,
+                n_unnegated_sentence_pool=n,
+                lookup=built_arguments.lookup,
+                local=request.local,
+            )
     except Exception as e:
-        logger.error(f"Simulation failed: {e}", exc_info=True)
+        logger.error("Simulation failed: %s", e, exc_info=True)
         raise
-
-    logger.info("Returning rethon simulation response.")
     return SimulatedRethonResponse(
         translated_arguments=built_arguments.translated_arguments,
-        translated_re_state=translated_re_state,
+        translated_re_state=_translate_re_state(re_state, lookup_w_negated),
+    )
+
+
+class SimulateRethonStepRequest(BaseModel):
+    """Payload for ``POST /api/simulate_rethon/step``.
+
+    On the first call omit ``evolution`` (or pass an empty list).  On every
+    subsequent call pass the ``evolution`` from the previous response so the
+    server can reconstruct the RE state and advance exactly one more step.
+    All fields except ``evolution`` must be identical across calls for a given
+    stepping session.
+    """
+
+    round: str = Field(max_length=500)
+    elements: list[REElement] = Field(min_length=1, max_length=200)
+    relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
+    local: bool = True
+    evolution: Optional[List[List[REElement]]] = None
+
+
+@router.post("/step", response_model=SimulatedRethonResponse)
+async def simulate_rethon_step(
+    request: SimulateRethonStepRequest,
+    sentence_pool_minimum: int = 3,
+) -> SimulatedRethonResponse:
+    built_arguments, lookup_w_negated, n = _validate_and_build(
+        request.elements, request.relations, sentence_pool_minimum
+    )
+    try:
+        id_to_index: Dict[str, int] = {
+            el.id: i + 1 for i, el in enumerate(request.elements)
+        }
+        if request.evolution:
+            reconstructed = _reconstruct_re_state(request.evolution, id_to_index, n)
+            init_coms = reconstructed.initial_commitments()
+        else:
+            init_coms = StandardPosition.from_set(
+                position={
+                    idx
+                    for el in request.elements
+                    if el.status in ("active", "revised")
+                    for idx in (id_to_index[el.id],)
+                },
+                n_unnegated_sentence_pool=n,
+            )
+        re = _build_re(
+            numerical_arguments=built_arguments.num_arguments,
+            n_unnegated_sentence_pool=n,
+            init_coms=init_coms,
+            local=request.local,
+        )
+        if request.evolution:
+            re.set_state(reconstructed)
+        if re.state().finished:
+            raise HTTPException(
+                status_code=400,
+                detail="The RE process has already reached a fixed point.",
+            )
+        re.next_step()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Step simulation failed: %s", e, exc_info=True)
+        raise
+    return SimulatedRethonResponse(
+        translated_arguments=built_arguments.translated_arguments,
+        translated_re_state=_translate_re_state(re.state(), lookup_w_negated),
     )
