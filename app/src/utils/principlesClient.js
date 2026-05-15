@@ -5,7 +5,7 @@
 
 /** @import { REState } from '../types.js' */
 
-import dummyPrinciples from "../dummy-principles.js";
+import dummyPrinciples from "../dummy-data/dummy-principles.js";
 import { LLM_ENABLED } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 

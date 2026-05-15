@@ -5,7 +5,7 @@
 
 /** @import { REState } from '../types.js' */
 
-import { getDummyArguments } from "../dummy-arguments.js";
+import { getDummyArguments } from "../dummy-data/dummy-arguments.js";
 import { LLM_ENABLED } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 

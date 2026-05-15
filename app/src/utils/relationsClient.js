@@ -5,7 +5,7 @@
 
 /** @import { REState } from '../types.js' */
 
-import dummyRelations from "../dummy-relations.js";
+import dummyRelations from "../dummy-data/dummy-relations.js";
 import { LLM_ENABLED } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 

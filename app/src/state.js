@@ -17,7 +17,7 @@
 
 /** @import { REState } from './types.js' */
 
-import _dummyState from "./dummy-state.js"; // dev fixture — not used in production builds
+import _dummyState from "./dummy-data/dummy-state.js"; // dev fixture — not used in production builds
 
 // ============================================================
 // REPLACE THIS OBJECT WITH CURRENT STATE DATA WHEN GENERATING

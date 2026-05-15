@@ -5,7 +5,7 @@
 
 /** @import { REState } from '../types.js' */
 
-import _dummyMatrix from "../dummy-matrix.js";
+import _dummyMatrix from "../dummy-data/dummy-matrix.js";
 import { LLM_ENABLED } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 
