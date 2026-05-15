@@ -42,6 +42,7 @@ function getAnalysisElements(state) {
   return state.elements.filter(
     (e) =>
       e.status !== "withdrawn" &&
+      e.status !== "possible" &&
       (e.type === "judgment" || e.type === "principle"),
   );
 }

@@ -28,7 +28,15 @@ Directional; a pair can have multiple. Full matrix in `skill/re-relations-refere
 ```javascript
 {
   topic: String, phase: Number, round: Number,
-  elements: [{ id, type, status, confidence, origin, text, addedRound, ?previousText, ?revisedRound, ?reason, ?withdrawnRound }],
+  ?model: "questionnaire",          // present only in questionnaire mode
+  ?questionnaireSpec: {             // present only in questionnaire mode
+    name: String,
+    card: { title, description, buttonLabel },
+    suggestions: [{ question, judgments: [{ index, id, confidence, answer, text }] }],
+    participantArguments: Array,    // index arrays, last entry = conclusion
+    furtherArguments: Array,
+  },
+  elements: [{ id, type, status, confidence, origin, text, addedRound, ?previousText, ?revisedRound, ?reason, ?withdrawnRound, ?questionnaireIndex }],
   relations: [{ from, to, type, explanation, addedRound }],
   coherence: { tensions: [], orphans: [], clusters: [] },
   log: [{ round, findings, options, decision, changes }]

@@ -35,6 +35,7 @@ export function useTextTabData({
   search,
 }) {
   const isElVisible = (el) => {
+    if (el.status === "possible") return false;
     if (el.status === "withdrawn") return !hiddenLegendKeys?.has("withdrawn");
     if (el.status === "rejected") return !hiddenLegendKeys?.has("rejected");
     if (el.type === "judgment") return !hiddenLegendKeys?.has(`J-${el.confidence}`);

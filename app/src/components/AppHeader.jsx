@@ -62,6 +62,7 @@ import { C } from "../constants/colors.js";
 export function AppHeader({
   round,
   topic,
+  model,
   tab,
   setTab,
   showText,
@@ -136,7 +137,8 @@ export function AppHeader({
   ];
   const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
   const visibleSubTabs = (metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS)
-    .filter((t) => !hideNonEntailsRels || t !== "suggestRelations");
+    .filter((t) => !hideNonEntailsRels || t !== "suggestRelations")
+    .filter((t) => model === "questionnaire" || t !== "questionnaire");
 
   const importModals = (
     <>

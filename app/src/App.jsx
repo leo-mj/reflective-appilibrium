@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { HomePage } from "./components/HomePage.jsx";
 import REState from "./components/REState.jsx";
-import { SAMPLE_STATE, makeEmptyState } from "./state.js";
+import { SAMPLE_STATE, makeEmptyState, makeQuestionnaireState } from "./state.js";
 import { C } from "./constants/colors.js";
 
 function Spinner() {
@@ -46,6 +46,7 @@ export default function App() {
       <HomePage
         onStartFresh={(topic) => navigate(makeEmptyState(topic))}
         onLoadSample={() => navigate(SAMPLE_STATE, true)}
+        onLoadQuestionnaire={(spec) => navigate(makeQuestionnaireState(spec), true)}
         onLoadSession={(state) => navigate(state)}
       />
     );

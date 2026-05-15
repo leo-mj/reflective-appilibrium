@@ -321,6 +321,7 @@ export function JudgmentElicitTab({
       text: resolvedText(judgment),
       confidence: judgment.confidence,
       origin: "llm",
+      ...(judgment.index != null && { questionnaireIndex: judgment.index }),
     });
     setEditing(null);
     setSuggestions((prev) => removeJudgment(prev, suggestion, judgment));

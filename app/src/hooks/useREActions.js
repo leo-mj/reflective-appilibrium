@@ -332,6 +332,61 @@ export function useREActions(initialState) {
     setSelectedRel(null);
   };
 
+  /**
+   * Records the user's answer to a questionnaire and propagates conclusion
+   * activations throughout the arguments behind the questionnaire (must be pre-set).
+   *
+   * 1. Activates `selectedId` and resets unchosen `siblingIds` to `"possible"`.
+   * 2. Rebuilds a questionnaireIndex → element lookup over the updated element list.
+   * 3. Checks every argument in the questionnaire whose conclusion is a
+   *    pure-conclusion element: if all premises
+   *    are now `"active"`, the conclusion is activated; otherwise it stays/becomes
+   *    `"possible"`.
+   *
+   * @param {string}   selectedId  - Element id of the chosen answer.
+   * @param {string[]} siblingIds  - Element ids of the unchosen answers for the same question.
+   */
+  const handleQuestionnaireSelectAnswer = (selectedId, siblingIds) => {
+    mutate((prev) => {
+      const allArgs = [
+        ...prev.questionnaireSpec.participantArguments,
+        ...prev.questionnaireSpec.furtherArguments,
+      ];
+      const premiseIndices = new Set(allArgs.flatMap((arg) => arg.slice(0, -1).map(Math.abs)));
+      const conclusionIndices = new Set(
+        allArgs.map((arg) => Math.abs(arg.at(-1))).filter((i) => !premiseIndices.has(i))
+      );
+
+      const updated = prev.elements.map((el) => {
+        if (el.id === selectedId) return { ...el, status: "active" };
+        if (siblingIds.includes(el.id)) return { ...el, status: "possible" };
+        return el;
+      });
+
+      const lookup = {};
+      for (const el of updated) if (el.questionnaireIndex != null) lookup[el.questionnaireIndex] = el;
+
+      const shouldBeActive = new Set();
+      for (const arg of allArgs) {
+        if (!arg.every((n) => lookup[Math.abs(n)] != null)) continue;
+        const conclusionIdx = Math.abs(arg.at(-1));
+        if (!conclusionIndices.has(conclusionIdx)) continue;
+        if (arg.slice(0, -1).every((n) => lookup[Math.abs(n)]?.status === "active")) {
+          shouldBeActive.add(conclusionIdx);
+        }
+      }
+
+      return {
+        ...prev,
+        elements: updated.map((el) => {
+          if (!conclusionIndices.has(el.questionnaireIndex)) return el;
+          const active = shouldBeActive.has(el.questionnaireIndex);
+          return { ...el, status: active ? "active" : "possible" };
+        }),
+      };
+    });
+  };
+
   return {
     state,
     selected,
@@ -355,6 +410,7 @@ export function useREActions(initialState) {
     handleDeleteRelationsByArgId,
     handleAddElement,
     handleAddRelation,
+    handleQuestionnaireSelectAnswer,
     handleRejectElements,
     handleRejectRelations,
     handleApplyRethonEquilibrium,

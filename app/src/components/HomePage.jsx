@@ -136,6 +136,41 @@ function SampleProcessCard({ onLoad }) {
   );
 }
 
+const questionnaireModules = import.meta.glob("../questionnaires/*.js", {
+  eager: true,
+});
+const QUESTIONNAIRE_SPECS = Object.values(questionnaireModules)
+  .map((m) => m.default)
+  .filter(Boolean);
+
+function renderDescription(description) {
+  const parts = Array.isArray(description) ? description : [description];
+  return parts.map((part, i) =>
+    typeof part === "string" ? (
+      part
+    ) : (
+      <a key={i} href={part.href} target="_blank" style={{ color: C.dim }}>
+        {part.link}
+      </a>
+    )
+  );
+}
+
+function QuestionnaireCard({ spec, onLoad }) {
+  return (
+    <div style={{ ...CARD_STYLE, minWidth: 300 }}>
+      <div style={TITLE_STYLE}>{spec.card.title}</div>
+      <div style={DESC_STYLE}>{renderDescription(spec.card.description)}</div>
+      <button
+        style={{ ...BTN_STYLE, background: C.theory.high, color: "#fff" }}
+        onClick={onLoad}
+      >
+        {spec.card.buttonLabel}
+      </button>
+    </div>
+  );
+}
+
 // ─── SessionsCard ─────────────────────────────────────────────────────────────
 
 /**
@@ -308,7 +343,12 @@ function SessionsCard({ onLoad }) {
  * @param {Function} props.onLoadSample   - Called to load the sample RE process.
  * @param {Function} props.onLoadSession  - Called with a full REState loaded from the backend.
  */
-export function HomePage({ onStartFresh, onLoadSample, onLoadSession }) {
+export function HomePage({
+  onStartFresh,
+  onLoadSample,
+  onLoadQuestionnaire,
+  onLoadSession,
+}) {
   const { isDark, toggle: toggleTheme } = useTheme();
   return (
     <div
@@ -415,6 +455,13 @@ export function HomePage({ onStartFresh, onLoadSample, onLoadSession }) {
       >
         <NewProcessCard onStart={onStartFresh} />
         <SampleProcessCard onLoad={onLoadSample} />
+        {QUESTIONNAIRE_SPECS.map((spec) => (
+          <QuestionnaireCard
+            key={spec.name}
+            spec={spec}
+            onLoad={() => onLoadQuestionnaire(spec)}
+          />
+        ))}
         {BACKEND_ENABLED && <SessionsCard onLoad={onLoadSession} />}
       </div>
       <div

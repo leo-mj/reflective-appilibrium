@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 # ── Element ────────────────────────────────────────────────────────────────────
 
 ElementType = Literal["judgment", "principle", "theory"]
-Status = Literal["active", "revised", "withdrawn", "rejected"]
+Status = Literal["active", "revised", "withdrawn", "rejected", "possible"]
 Confidence = Literal["high", "moderate", "low"]
 
 

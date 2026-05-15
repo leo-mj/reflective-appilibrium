@@ -139,7 +139,15 @@ function ArgAccumulatorBar({ selected, ctrlArgNodes, onConfirm, onCancel }) {
     >
       <span style={{ color: C.dim }}>
         {premises.join(", ")}
-        <span style={{ color: C.jointly_entails, fontWeight: "bold", margin: "0 6px" }}>→</span>
+        <span
+          style={{
+            color: C.jointly_entails,
+            fontWeight: "bold",
+            margin: "0 6px",
+          }}
+        >
+          →
+        </span>
         {conclusion}
       </span>
       <button
@@ -416,6 +424,7 @@ export function Graph({
   const wIds = new Set(withdrawn.map((e) => e.id));
   const rejectedEls = state.elements.filter((e) => e.status === "rejected");
   const isElVisible = (el) => {
+    if (el.status === "possible") return false;
     if (el.status === "withdrawn") return !hiddenLegendKeys?.has("withdrawn");
     if (el.status === "rejected") return !hiddenLegendKeys?.has("rejected");
     if (el.type === "judgment")
@@ -510,8 +519,8 @@ export function Graph({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const activeEls = state.elements.filter(
-    (e) => e.status !== "withdrawn" && e.status !== "rejected",
+  const activeEls = state.elements.filter((e) =>
+    ["active", "revised"].includes(e.status),
   );
 
   return (
@@ -544,7 +553,10 @@ export function Graph({
               ctrlArgNodes={ctrlArgNodes}
               onConfirm={() => {
                 const all = [selected, ...ctrlArgNodes];
-                setAddingArgPrefill({ premises: all.slice(0, -1), conclusion: all.at(-1) });
+                setAddingArgPrefill({
+                  premises: all.slice(0, -1),
+                  conclusion: all.at(-1),
+                });
                 setAddingArg(true);
                 clearCtrlArg();
               }}
@@ -597,7 +609,10 @@ export function Graph({
         addingRel={addingRel}
         setAddingRel={setAddingRel}
         addingArg={addingArg}
-        setAddingArg={(v) => { if (!v) setAddingArgPrefill(null); setAddingArg(v); }}
+        setAddingArg={(v) => {
+          if (!v) setAddingArgPrefill(null);
+          setAddingArg(v);
+        }}
         addingArgPrefill={addingArgPrefill}
         activeEls={activeEls}
         round={state.round}

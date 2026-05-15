@@ -78,7 +78,7 @@ function addNewPremisesToLookup(lookup, addedPremises, elements, round, model) {
   return updated;
 }
 
-function buildExistingArgFingerprints(relations) {
+export function buildExistingArgFingerprints(relations) {
   const groups = {};
   for (const r of relations) {
     if ((r.type !== "jointly_entails" && r.type !== "jointly_precludes") || !r.argumentId) continue;
@@ -90,7 +90,7 @@ function buildExistingArgFingerprints(relations) {
   );
 }
 
-function argFingerprint(arg, lookup) {
+export function argFingerprint(arg, lookup) {
   const ids = arg.map((n) => {
     const el = lookup[Math.abs(n)];
     if (!el) return null;

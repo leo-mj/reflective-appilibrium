@@ -76,3 +76,59 @@ export const SAMPLE_STATE = _dummyState;
 export function makeEmptyState(topic) {
   return { ..._inlineState, topic, phase: 1, round: 1 };
 }
+
+/**
+ * Factory that returns a pre-populated questionnaire RE state from a spec.
+ *
+ * All judgment elements are created with `status: "possible"` so they are
+ * invisible until the user selects them via the Questionnaire tab.  All
+ * argument relations are pre-computed from the spec and stored in `relations`,
+ * so the full argument graph is present without a separate detect-arguments step.
+ *
+ * When the user answers a question, `handleQuestionnaireSelectAnswer` activates
+ * the chosen element and keeps unchosen siblings as `"possible"`. Pure-conclusion
+ * elements are automatically activated whenever every premise of at least one
+ * argument leading to them is active.
+ *
+ * @returns {REState}
+ */
+export function makeQuestionnaireState(spec) {
+  const elements = spec.suggestions.flatMap(({ judgments }) =>
+    judgments.map(({ id, index, confidence, text }) => ({
+      id,
+      type: "judgment",
+      status: "possible",
+      confidence,
+      origin: spec.id,
+      text,
+      addedRound: 1,
+      questionnaireIndex: index,
+    }))
+  );
+
+  const lookup = {};
+  for (const el of elements) lookup[el.questionnaireIndex] = el;
+
+  const relations = [];
+  const allArgs = [...spec.participantArguments, ...spec.furtherArguments];
+  for (let i = 0; i < allArgs.length; i++) {
+    const arg = allArgs[i];
+    if (!arg.every((n) => lookup[Math.abs(n)] != null)) continue;
+    const conclusionIdx = arg.at(-1);
+    const conclusion = lookup[Math.abs(conclusionIdx)];
+    const relationType = conclusionIdx < 0 ? "jointly_precludes" : "jointly_entails";
+    const argumentId = `questionnaire-arg-${i}`;
+    for (const n of arg.slice(0, -1)) {
+      relations.push({
+        from: lookup[Math.abs(n)].id,
+        to: conclusion.id,
+        type: relationType,
+        argumentId,
+        explanation: "",
+        addedRound: 1,
+      });
+    }
+  }
+
+  return { ..._inlineState, topic: spec.name, phase: 1, round: 1, model: "questionnaire", questionnaireSpec: spec, elements, relations };
+}

@@ -49,6 +49,12 @@ const SimulateRethonTab = lazy(() =>
   })),
 );
 
+const QuestionnaireTab = lazy(() =>
+  import("./workflows/QuestionnaireTab.jsx").then((m) => ({
+    default: m.QuestionnaireTab,
+  })),
+);
+
 export function GraphPanel({
   tab,
   state,
@@ -62,6 +68,7 @@ export function GraphPanel({
   onAddElement,
   onAddRelation,
   onDeleteRelationsByArgId,
+  onQuestionnaireSelectAnswer,
   onScrollToRelations,
   onRejectElements,
   onRejectRelations,
@@ -104,7 +111,7 @@ export function GraphPanel({
           setHiddenLegendKeys={setHiddenLegendKeys}
         />
       )}
-      {APP_ENV === "dev" && isAssistPanel && isSample && (
+      {APP_ENV === "dev" && isAssistPanel && isSample && state.model !== "questionnaire" && (
         <label
           style={{
             display: "flex",
@@ -229,6 +236,14 @@ export function GraphPanel({
               onAddElement={onAddElement}
               onAddRelation={onAddRelation}
               onDeleteRelationsByArgId={onDeleteRelationsByArgId}
+            />
+          </Suspense>
+        )}
+        {tab === "questionnaire" && (
+          <Suspense fallback={null}>
+            <QuestionnaireTab
+              state={state}
+              onSelectAnswer={onQuestionnaireSelectAnswer}
             />
           </Suspense>
         )}

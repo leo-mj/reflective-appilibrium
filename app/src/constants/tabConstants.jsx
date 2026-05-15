@@ -15,6 +15,7 @@ import {
 } from "../components/Icons.jsx";
 
 export const ASSIST_TABS = [
+  "questionnaire",
   "elicitJudgments",
   "suggestPrinciples",
   "suggestRelations",
@@ -23,6 +24,7 @@ export const ASSIST_TABS = [
 ];
 
 export const TAB_ICONS = {
+  questionnaire: <JudgmentIcon />,
   graph: <NetworkIcon />,
   history: <HistoryIcon />,
   matrix: <MatrixIcon />,
@@ -35,6 +37,7 @@ export const TAB_ICONS = {
 };
 
 export const TAB_LABELS = {
+  questionnaire: "Questions",
   graph: "Graph",
   history: "History",
   matrix: "Matrix",
@@ -47,6 +50,8 @@ export const TAB_LABELS = {
 };
 
 export const TAB_TOOLTIPS = {
+  questionnaire:
+    "Answer a questionnaire based on pre-set questions to conduct a guided RE process.",
   graph:
     "Force-directed graph. Click a node to select; Ctrl+click to start a relation.",
   history: "Replay your RE process round by round using the history slider.",

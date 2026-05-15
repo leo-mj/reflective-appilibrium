@@ -230,8 +230,8 @@ export function SimulateRethonTab({
   const [evolutionOpen, setEvolutionOpen] = useState(false);
   const [decision, setDecision] = useState(null); // "accepted" | "rejected" | null
 
-  const activeCount = state.elements.filter(
-    (e) => e.status !== "withdrawn" && e.status !== "rejected",
+  const activeCount = state.elements.filter((e) =>
+    ["active", "revised"].includes(e.status),
   ).length;
 
   const atLeastOneArgument =
@@ -255,7 +255,12 @@ export function SimulateRethonTab({
     setStepPending(false);
     onSetEquilibriumPreview?.(null);
     try {
-      const data = await simulateRethon(state, true, startingEvolution, useDummy);
+      const data = await simulateRethon(
+        state,
+        true,
+        startingEvolution,
+        useDummy,
+      );
       setResult(data);
       setResultMode("simulate");
       const eq = deriveEquilibrium(data);

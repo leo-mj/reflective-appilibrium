@@ -7,8 +7,8 @@ export function nextPhaseEnabled(workflowPhase, state) {
     state.elements.filter(
       (e) =>
         e.type === "judgment" &&
-        e.status !== "withdrawn" &&
-        e.status !== "rejected",
+        ["active", "revised"].includes(e.status),
+
     ).length >= 3
   );
 }

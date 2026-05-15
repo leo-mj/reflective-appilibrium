@@ -33,7 +33,7 @@ export const clusterColor = (i) => CLUSTER_COLORS[i % CLUSTER_COLORS.length];
  *             conflictSet: Set<string>, compatAdj: Map<string,Set<string>> }}
  */
 function buildGraphs(state) {
-  const activeElements = state.elements.filter((e) => e.status !== "withdrawn");
+  const activeElements = state.elements.filter((e) => e.status !== "withdrawn" && e.status !== "possible");
   const activeIds = new Set(activeElements.map((e) => e.id));
 
   const supportEdges = state.relations.filter(
@@ -223,7 +223,7 @@ function findClusters_BFS(state) {
  */
 export function findCoherentClusters(state) {
   const activeCount = state.elements.filter(
-    (e) => e.status !== "withdrawn",
+    (e) => e.status !== "withdrawn" && e.status !== "possible",
   ).length;
   return activeCount < 50
     ? findClusters_BronKerbosch(state)

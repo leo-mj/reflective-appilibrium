@@ -18,7 +18,9 @@ import { GraphPanel } from "./GraphPanel.jsx";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
-  const [tab, setTab] = useState("elicitJudgments");
+  const [tab, setTab] = useState(
+    initialState.model === "questionnaire" ? "questionnaire" : "elicitJudgments",
+  );
   const [hiddenLegendKeys, setHiddenLegendKeys] = useState(new Set());
   const [showText, setShowText] = useState(true);
   const [showTabNav, setShowTabNav] = useState(false);
@@ -56,6 +58,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleDeleteRelationsByArgId,
     handleAddElement,
     handleAddRelation,
+    handleQuestionnaireSelectAnswer,
     handleRejectElements,
     handleRejectRelations,
     handleApplyRethonEquilibrium,
@@ -199,6 +202,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onAddElement: handleAddElement,
     onAddRelation: handleAddRelation,
     onDeleteRelationsByArgId: handleDeleteRelationsByArgId,
+    onQuestionnaireSelectAnswer: handleQuestionnaireSelectAnswer,
     recentlyAdded,
     onScrollToRelations: scrollToRelations,
     onRejectElements: handleRejectElements,
@@ -248,6 +252,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
       <AppHeader
         round={state.round}
         topic={state.topic}
+        model={state.model}
         tab={tab}
         setTab={handleSetTab}
         showText={showText}
@@ -322,8 +327,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
       {isWide && !isAssistTab && (
         <AddBar
-          elements={state.elements.filter(
-            (e) => e.status !== "withdrawn" && e.status !== "rejected",
+          elements={state.elements.filter((e) =>
+            ["active", "revised"].includes(e.status),
           )}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}

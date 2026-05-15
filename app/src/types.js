@@ -27,8 +27,9 @@ export {};
  * - `revised`   — text was changed in a later round; `previousText` and `revisedRound` are set
  * - `withdrawn` — removed from the equilibrium; `reason` and `withdrawnRound` are set
  * - `rejected`  — a declined LLM suggestion; `rejectedRound` is set
+ * - `possible`  — pre-loaded but not yet affirmed by the user; invisible in graph and text tab
  *
- * @typedef {'active'|'revised'|'withdrawn'|'rejected'} ElementStatus
+ * @typedef {'active'|'revised'|'withdrawn'|'rejected'|'possible'} ElementStatus
  */
 
 /**
