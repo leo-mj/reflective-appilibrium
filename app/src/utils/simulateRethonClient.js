@@ -30,7 +30,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @param {Array[]|null} evolution  - translated_re_state.evolution from the previous response
  * @returns {Promise<{translated_arguments: Array, translated_re_state: Object}>}
  */
-export async function simulateRethonStep(state, local, evolution = null) {
+export async function simulateRethonStep(state, local, evolution = null, weights = null) {
   const url = `${BACKEND_URL}/api/simulate_rethon/step`;
   const res = await fetch(url, {
     method: "POST",
@@ -43,6 +43,7 @@ export async function simulateRethonStep(state, local, evolution = null) {
       round: `${state.round}`,
       local,
       evolution,
+      weights,
     }),
   });
   if (!res.ok) {
@@ -52,7 +53,7 @@ export async function simulateRethonStep(state, local, evolution = null) {
   return res.json();
 }
 
-export async function simulateRethon(state, local, evolution = null, useDummy = false) {
+export async function simulateRethon(state, local, evolution = null, useDummy = false, weights = null) {
   const url = useDummy
     ? `${BACKEND_URL}/api/simulate_rethon/simulate?use_dummy=true`
     : `${BACKEND_URL}/api/simulate_rethon/simulate`;
@@ -65,6 +66,7 @@ export async function simulateRethon(state, local, evolution = null, useDummy = 
       round: `${state.round}`,
       local,
       evolution,
+      weights,
     }),
   });
   if (!res.ok) {

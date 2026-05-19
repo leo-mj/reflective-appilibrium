@@ -236,6 +236,10 @@ export function GraphPanel({
               onAddElement={onAddElement}
               onAddRelation={onAddRelation}
               onDeleteRelationsByArgId={onDeleteRelationsByArgId}
+              autoFetch={autoFetch}
+              workflowPhase={workflowPhase}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
             />
           </Suspense>
         )}

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Optional, Union
 from collections import defaultdict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 import logging
 
 from theodias import Position, StandardPosition, BDDDialecticalStructure
@@ -21,6 +21,18 @@ _REProcess = Union[
 ]
 
 
+class ModelWeights(BaseModel):
+    account: float = Field(default=0.35, ge=0, le=1)
+    systematicity: float = Field(default=0.55, ge=0, le=1)
+    faithfulness: float = Field(default=0.1, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def weights_not_all_zero(self) -> "ModelWeights":
+        if self.account == 0 and self.systematicity == 0 and self.faithfulness == 0:
+            raise ValueError("At least one weight must be greater than 0.")
+        return self
+
+
 class SimulateRethonRequest(BaseModel):
     """Payload for ``POST /api/simulate_rethon/simulate``."""
 
@@ -29,6 +41,7 @@ class SimulateRethonRequest(BaseModel):
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
     local: bool = True
     evolution: Optional[List[List[REElement]]] = None
+    weights: Optional[ModelWeights] = None
 
 
 class SimulatedRethonState(BaseModel):
@@ -95,6 +108,7 @@ def _get_rethon_final_state(
     n_unnegated_sentence_pool: int,
     lookup: Dict[int, REElement],
     local: bool = True,
+    weights: Optional[ModelWeights] = None,
 ) -> REState:
     logger.info("Beginning rethon simulation.")
     # Binary decision diagram - necessary for n_unnegated_sentence_pool > 10
@@ -121,6 +135,8 @@ def _get_rethon_final_state(
         re = StandardGlobalReflectiveEquilibrium(
             dialectical_structure=bdd_ds, initial_commitments=init_coms
         )
+    if weights is not None:
+        re.set_model_parameters({"weights": weights.model_dump()})
     re.set_initial_state(init_coms)
     re.re_process()
     logger.info("Completed rethon simulation.")
@@ -132,6 +148,7 @@ def _build_re(
     n_unnegated_sentence_pool: int,
     init_coms: Position,
     local: bool = True,
+    weights: Optional[ModelWeights] = None,
 ) -> _REProcess:
     """Build and initialise a rethon RE object without running any steps."""
     bdd_ds = BDDDialecticalStructure.from_arguments(
@@ -146,6 +163,8 @@ def _build_re(
         re = StandardGlobalReflectiveEquilibrium(
             dialectical_structure=bdd_ds, initial_commitments=init_coms
         )
+    if weights is not None:
+        re.set_model_parameters({"weights": weights.model_dump()})
     return re
 
 
@@ -246,7 +265,13 @@ async def simulate_rethon(
             }
             reconstructed = _reconstruct_re_state(request.evolution, id_to_index, n)
             init_coms = reconstructed.initial_commitments()
-            re = _build_re(built_arguments.num_arguments, n, init_coms, request.local)
+            re = _build_re(
+                built_arguments.num_arguments,
+                n,
+                init_coms,
+                request.local,
+                request.weights,
+            )
             re.set_state(reconstructed)
             re.re_process()
             re_state = re.state()
@@ -256,6 +281,7 @@ async def simulate_rethon(
                 n_unnegated_sentence_pool=n,
                 lookup=built_arguments.lookup,
                 local=request.local,
+                weights=request.weights,
             )
     except Exception as e:
         logger.error("Simulation failed: %s", e, exc_info=True)
@@ -281,6 +307,7 @@ class SimulateRethonStepRequest(BaseModel):
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
     local: bool = True
     evolution: Optional[List[List[REElement]]] = None
+    weights: Optional[ModelWeights] = None
 
 
 @router.post("/step", response_model=SimulatedRethonResponse)
@@ -313,6 +340,7 @@ async def simulate_rethon_step(
             n_unnegated_sentence_pool=n,
             init_coms=init_coms,
             local=request.local,
+            weights=request.weights,
         )
         if request.evolution:
             re.set_state(reconstructed)

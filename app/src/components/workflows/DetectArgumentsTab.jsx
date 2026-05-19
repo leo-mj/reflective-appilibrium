@@ -6,7 +6,7 @@
 
 /** @import { REState } from '../../types.js' */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { detectArguments } from "../../utils/argumentsClient.js";
@@ -20,6 +20,7 @@ import {
   ErrorBanner,
 } from "../SuggestionActions.jsx";
 import { AddArgumentPanel } from "../user_edits/TextTabAddPanel.jsx";
+import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 
 const ACCENT = C.judgment.high;
 
@@ -274,6 +275,10 @@ export function DetectArgumentsTab({
   onAddElement,
   onAddRelation,
   onDeleteRelationsByArgId,
+  autoFetch,
+  workflowPhase,
+  onAdvanceWorkflow,
+  nextPhaseIsEnabled,
 }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -325,6 +330,11 @@ export function DetectArgumentsTab({
       setLoading(false);
     }
   };
+
+  const autoFetchRef = useRef(autoFetch);
+  useEffect(() => {
+    if (autoFetchRef.current) detect();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAccept = (argIndex, drafts) => {
     const arg = result.translated_arguments[argIndex];
@@ -432,27 +442,45 @@ export function DetectArgumentsTab({
               </span>
             )}
           </div>
-          <button
-            onClick={detect}
-            disabled={disabled}
-            style={{
-              background: "transparent",
-              border: `1px solid ${disabled ? C.border : ACCENT}`,
-              color: disabled ? C.dim : ACCENT,
-              borderRadius: 6,
-              padding: "5px 12px",
-              fontSize: 12,
-              fontWeight: "bold",
-              cursor: disabled ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              flexShrink: 0,
-            }}
-          >
-            {loading ? <SpinnerIcon /> : <span>↺</span>}
-            {loading ? "Detecting…" : result ? "Re-detect" : "Detect"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+            <button
+              onClick={detect}
+              disabled={disabled}
+              style={{
+                background: "transparent",
+                border: `1px solid ${disabled ? C.border : ACCENT}`,
+                color: disabled ? C.dim : ACCENT,
+                borderRadius: 6,
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: "bold",
+                cursor: disabled ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              {loading ? <SpinnerIcon /> : <span>↺</span>}
+              {loading ? "Detecting…" : result ? "Re-detect" : "Detect"}
+            </button>
+            {workflowPhase && (
+              <>
+                <div
+                  style={{
+                    width: 1,
+                    height: 18,
+                    background: C.border,
+                    margin: "0 8px",
+                  }}
+                />
+                <ProgressWorkflowBtn
+                  nextPhaseIsEnabled={nextPhaseIsEnabled}
+                  workflowPhase={workflowPhase}
+                  advanceWorkflow={onAdvanceWorkflow}
+                />
+              </>
+            )}
+          </div>
         </div>
 
         {activeCount < 3 && (

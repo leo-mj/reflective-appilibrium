@@ -14,6 +14,7 @@ import {
   simulateRethonStep,
 } from "../../utils/simulateRethonClient.js";
 import { ErrorBanner } from "../SuggestionActions.jsx";
+import { Tooltip } from "../Tooltip.jsx";
 
 const ACCENT = C.principle.high;
 
@@ -219,6 +220,12 @@ export function SimulateRethonTab({
   onApplyRethonEquilibrium,
   onSetEquilibriumPreview,
 }) {
+  const DEFAULT_WEIGHTS = {
+    account: 0.35,
+    systematicity: 0.55,
+    faithfulness: 0.1,
+  };
+
   const [result, setResult] = useState(null);
   const [resultMode, setResultMode] = useState(null); // "simulate" | "step" | null
   // Step-mode tracking: confirmed = accepted evolution; pending = awaiting accept/reject
@@ -229,6 +236,42 @@ export function SimulateRethonTab({
   const [error, setError] = useState(null);
   const [evolutionOpen, setEvolutionOpen] = useState(false);
   const [decision, setDecision] = useState(null); // "accepted" | "rejected" | null
+  const [weightsOpen, setWeightsOpen] = useState(false);
+  const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
+
+  const weightsChanged =
+    weights.account !== DEFAULT_WEIGHTS.account ||
+    weights.systematicity !== DEFAULT_WEIGHTS.systematicity ||
+    weights.faithfulness !== DEFAULT_WEIGHTS.faithfulness;
+
+  const weightsSum = +(
+    weights.account +
+    weights.systematicity +
+    weights.faithfulness
+  ).toFixed(4);
+  const allWeightsZero = weightsSum === 0;
+
+  function handleWeightChange(key, raw) {
+    const val = Math.max(0, Math.min(1, parseFloat(raw) || 0));
+    setWeights((w) => ({ ...w, [key]: val }));
+  }
+
+  function normalizeWeights() {
+    const total =
+      weights.account + weights.systematicity + weights.faithfulness;
+    if (total === 0) return;
+    setWeights({
+      account: +(weights.account / total).toFixed(4),
+      systematicity: +(weights.systematicity / total).toFixed(4),
+      faithfulness: +(weights.faithfulness / total).toFixed(4),
+    });
+  }
+
+  function resetWeights() {
+    setWeights(DEFAULT_WEIGHTS);
+  }
+
+  const effectiveWeights = weightsChanged ? weights : null;
 
   const activeCount = state.elements.filter((e) =>
     ["active", "revised"].includes(e.status),
@@ -260,6 +303,7 @@ export function SimulateRethonTab({
         true,
         startingEvolution,
         useDummy,
+        effectiveWeights,
       );
       setResult(data);
       setResultMode("simulate");
@@ -282,10 +326,17 @@ export function SimulateRethonTab({
       onSetEquilibriumPreview?.(null);
     }
     try {
-      const data = await simulateRethonStep(state, true, confirmedEvolution);
+      const data = await simulateRethonStep(
+        state,
+        true,
+        confirmedEvolution,
+        effectiveWeights,
+      );
       setResult(data);
       setResultMode("step");
       setStepPending(true);
+      const eq = deriveEquilibrium(data);
+      onSetEquilibriumPreview?.(new Set(eq.withdrawn.map((e) => e.id)));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -319,7 +370,12 @@ export function SimulateRethonTab({
     if (resultMode === "step") {
       setResult(confirmedResult);
       setStepPending(false);
-      onSetEquilibriumPreview?.(null);
+      if (confirmedResult) {
+        const eq = deriveEquilibrium(confirmedResult);
+        onSetEquilibriumPreview?.(new Set(eq.withdrawn.map((e) => e.id)));
+      } else {
+        onSetEquilibriumPreview?.(null);
+      }
     } else {
       onSetEquilibriumPreview?.(null);
       setDecision("rejected");
@@ -328,7 +384,10 @@ export function SimulateRethonTab({
 
   const stepFinished = confirmedResult?.translated_re_state.finished ?? false;
   const baseDisabled =
-    loadingMode !== null || activeCount < 3 || !atLeastOneArgument;
+    loadingMode !== null ||
+    activeCount < 3 ||
+    !atLeastOneArgument ||
+    allWeightsZero;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -454,6 +513,129 @@ export function SimulateRethonTab({
               );
             })()}
           </div>
+        </div>
+
+        {/* Weights panel */}
+        <div style={{ marginBottom: 8 }}>
+          <button
+            onClick={() => setWeightsOpen((o) => !o)}
+            style={{
+              background: "transparent",
+              border: `1px solid ${weightsChanged ? ACCENT : C.border}`,
+              color: weightsChanged ? ACCENT : C.dim,
+              borderRadius: 6,
+              padding: "3px 10px",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            Weights{weightsChanged ? " *" : ""}
+          </button>
+          {weightsOpen && (
+            <div
+              style={{
+                marginTop: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              {[
+                {
+                  key: "account",
+                  tooltip:
+                    "How well the principles account for the current elements. Higher values push toward principles that explain more of your accepted elements.",
+                },
+                {
+                  key: "systematicity",
+                  tooltip:
+                    "The systematising power of the theory. Higher values favour using fewer principles to cover more elements.",
+                },
+                {
+                  key: "faithfulness",
+                  tooltip:
+                    "How closely the revised elements stay to the initial ones. Higher values resist dropping elements that were initially accepted.",
+                },
+              ].map(({ key, tooltip }) => (
+                <label
+                  key={key}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 11,
+                  }}
+                >
+                  <Tooltip text={tooltip}>
+                    <span style={{ color: C.dim, textTransform: "capitalize" }}>
+                      {key}
+                    </span>
+                  </Tooltip>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={weights[key]}
+                    onChange={(e) => handleWeightChange(key, e.target.value)}
+                    style={{
+                      width: 60,
+                      background: C.panel,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 4,
+                      color: C.text,
+                      fontSize: 11,
+                      padding: "2px 5px",
+                    }}
+                  />
+                </label>
+              ))}
+              <span
+                style={{
+                  fontSize: 11,
+                  color: allWeightsZero
+                    ? C.conflicts
+                    : Math.abs(weightsSum - 1) > 0.001
+                      ? C.conflicts
+                      : C.dim,
+                }}
+              >
+                {allWeightsZero ? "All weights are 0" : `Σ = ${weightsSum}`}
+              </span>
+              <button
+                onClick={normalizeWeights}
+                disabled={allWeightsZero}
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  color: allWeightsZero ? C.border : C.dim,
+                  borderRadius: 4,
+                  padding: "2px 8px",
+                  fontSize: 11,
+                  cursor: allWeightsZero ? "not-allowed" : "pointer",
+                }}
+              >
+                Normalize
+              </button>
+              {weightsChanged && (
+                <button
+                  onClick={resetWeights}
+                  style={{
+                    background: "transparent",
+                    border: `1px solid ${C.border}`,
+                    color: C.dim,
+                    borderRadius: 4,
+                    padding: "2px 8px",
+                    fontSize: 11,
+                    cursor: "pointer",
+                  }}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {(activeCount < 3 || !atLeastOneArgument) && (
