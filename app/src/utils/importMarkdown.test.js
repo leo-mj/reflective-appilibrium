@@ -444,3 +444,442 @@ describe("importStateFromFile — size limit", () => {
     }
   });
 });
+
+// ─── Element: new optional fields (arguments, simulate, questionnaire) ────────
+
+const BASE_EL = {
+  id: "J1",
+  type: "judgment",
+  status: "active",
+  confidence: "high",
+  origin: "",
+  text: "Test.",
+  addedRound: 1,
+};
+
+describe("importStateFromFile — element: rejected / possible statuses", () => {
+  it("accepts status 'rejected'", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, status: "rejected" }],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.elements[0].status).toBe("rejected");
+  });
+
+  it("accepts status 'possible'", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, status: "possible" }],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.elements[0].status).toBe("possible");
+  });
+});
+
+describe("importStateFromFile — element: rejectedRound", () => {
+  it("preserves rejectedRound", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, status: "rejected", rejectedRound: 2 }],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.elements[0].rejectedRound).toBe(2);
+  });
+
+  it("does not set rejectedRound when absent", async () => {
+    const state = { ...MINIMAL_STATE, elements: [{ ...BASE_EL }] };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.elements[0]).not.toHaveProperty("rejectedRound");
+  });
+
+  it("rejects a non-number rejectedRound", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, rejectedRound: "2" }],
+    };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow(/rejectedRound/);
+  });
+});
+
+describe("importStateFromFile — element: negated (simulate feature)", () => {
+  it("preserves negated: true", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, negated: true }],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.elements[0].negated).toBe(true);
+  });
+
+  it("preserves negated: false", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, negated: false }],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.elements[0].negated).toBe(false);
+  });
+
+  it("does not set negated when absent", async () => {
+    const state = { ...MINIMAL_STATE, elements: [{ ...BASE_EL }] };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.elements[0]).not.toHaveProperty("negated");
+  });
+
+  it("rejects a non-boolean negated", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, negated: "true" }],
+    };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow(/negated/);
+  });
+
+  it("rejects negated: 1 (number, not boolean)", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, negated: 1 }],
+    };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow(/negated/);
+  });
+});
+
+describe("importStateFromFile — element: questionnaireIndex", () => {
+  it("preserves questionnaireIndex", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, status: "possible", questionnaireIndex: 3 }],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.elements[0].questionnaireIndex).toBe(3);
+  });
+
+  it("does not set questionnaireIndex when absent", async () => {
+    const state = { ...MINIMAL_STATE, elements: [{ ...BASE_EL }] };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.elements[0]).not.toHaveProperty("questionnaireIndex");
+  });
+
+  it("rejects a string questionnaireIndex", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      elements: [{ ...BASE_EL, questionnaireIndex: "0" }],
+    };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow(/questionnaireIndex/);
+  });
+});
+
+// ─── Relation: argumentId and rejectedRound (argument feature) ────────────────
+
+const BASE_REL = {
+  from: "J1",
+  to: "P1",
+  type: "jointly_entails",
+  explanation: "Because.",
+  addedRound: 1,
+};
+
+describe("importStateFromFile — relation: argumentId", () => {
+  it("preserves argumentId", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      relations: [{ ...BASE_REL, argumentId: "arg-1" }],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.relations[0].argumentId).toBe("arg-1");
+  });
+
+  it("does not set argumentId when absent", async () => {
+    const state = { ...MINIMAL_STATE, relations: [{ ...BASE_REL }] };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.relations[0]).not.toHaveProperty("argumentId");
+  });
+
+  it("rejects argumentId exceeding 200 characters", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      relations: [{ ...BASE_REL, argumentId: "x".repeat(201) }],
+    };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow("exceeds");
+  });
+
+  it("rejects a non-string argumentId", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      relations: [{ ...BASE_REL, argumentId: 42 }],
+    };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow(/argumentId/);
+  });
+});
+
+describe("importStateFromFile — relation: rejectedRound", () => {
+  it("preserves rejectedRound", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      relations: [{ ...BASE_REL, status: "rejected", rejectedRound: 2 }],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.relations[0].rejectedRound).toBe(2);
+  });
+
+  it("does not set rejectedRound when absent", async () => {
+    const state = { ...MINIMAL_STATE, relations: [{ ...BASE_REL }] };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.relations[0]).not.toHaveProperty("rejectedRound");
+  });
+
+  it("rejects a non-number rejectedRound", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      relations: [{ ...BASE_REL, rejectedRound: "2" }],
+    };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow(/rejectedRound/);
+  });
+});
+
+// ─── Questionnaire mode ───────────────────────────────────────────────────────
+
+const MINIMAL_SPEC = {
+  id: "darca",
+  name: "DARCA",
+  model: "darca",
+  card: {
+    title: "DARCA Questionnaire",
+    description: "A test questionnaire.",
+    buttonLabel: "Start",
+  },
+  suggestions: [
+    {
+      question: "Q1. A question?",
+      judgments: [
+        {
+          index: 1,
+          id: "J1",
+          confidence: "high",
+          answer: "Yes",
+          text: "Yes answer.",
+        },
+        {
+          index: 2,
+          id: "J2",
+          confidence: "high",
+          answer: "No",
+          text: "No answer.",
+        },
+      ],
+    },
+  ],
+  participantArguments: [[1, 3]],
+  furtherArguments: [[2, 4]],
+};
+
+describe("importStateFromFile — questionnaire: model field", () => {
+  it("preserves model: 'questionnaire'", async () => {
+    const state = { ...MINIMAL_STATE, model: "questionnaire" };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.model).toBe("questionnaire");
+  });
+
+  it("does not set model when absent", async () => {
+    const result = await importStateFromFile(
+      makeFile(wrapInMarkdown(MINIMAL_STATE)),
+    );
+    expect(result).not.toHaveProperty("model");
+  });
+
+  it("rejects an unknown model value", async () => {
+    const state = { ...MINIMAL_STATE, model: "classic" };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow(/"model"/);
+  });
+});
+
+describe("importStateFromFile — questionnaire: questionnaireSpec round-trip", () => {
+  it("round-trips a complete spec", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      model: "questionnaire",
+      questionnaireSpec: MINIMAL_SPEC,
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    const spec = result.questionnaireSpec;
+    expect(spec.id).toBe("darca");
+    expect(spec.name).toBe("DARCA");
+    expect(spec.card.title).toBe("DARCA Questionnaire");
+    expect(spec.card.description).toBe("A test questionnaire.");
+    expect(spec.card.buttonLabel).toBe("Start");
+    expect(spec.suggestions).toHaveLength(1);
+    expect(spec.suggestions[0].judgments).toHaveLength(2);
+    expect(spec.suggestions[0].judgments[0].index).toBe(1);
+    expect(spec.participantArguments).toEqual([[1, 3]]);
+    expect(spec.furtherArguments).toEqual([[2, 4]]);
+  });
+
+  it("accepts card.description as an array mixing strings and link objects", async () => {
+    const spec = {
+      ...MINIMAL_SPEC,
+      card: {
+        ...MINIMAL_SPEC.card,
+        description: [
+          "Some text. ",
+          { link: "a link", href: "https://example.com" },
+          " more text.",
+        ],
+      },
+    };
+    const state = {
+      ...MINIMAL_STATE,
+      model: "questionnaire",
+      questionnaireSpec: spec,
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    const desc = result.questionnaireSpec.card.description;
+    expect(Array.isArray(desc)).toBe(true);
+    expect(desc[0]).toBe("Some text. ");
+    expect(desc[1]).toEqual({ link: "a link", href: "https://example.com" });
+    expect(desc[2]).toBe(" more text.");
+  });
+
+  it("accepts empty participantArguments and furtherArguments", async () => {
+    const spec = {
+      ...MINIMAL_SPEC,
+      participantArguments: [],
+      furtherArguments: [],
+    };
+    const state = {
+      ...MINIMAL_STATE,
+      model: "questionnaire",
+      questionnaireSpec: spec,
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.questionnaireSpec.participantArguments).toEqual([]);
+    expect(result.questionnaireSpec.furtherArguments).toEqual([]);
+  });
+
+  it("accepts questionnaireSpec without model field (independent fields)", async () => {
+    const state = { ...MINIMAL_STATE, questionnaireSpec: MINIMAL_SPEC };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.questionnaireSpec.id).toBe("darca");
+    expect(result).not.toHaveProperty("model");
+  });
+
+  it("does not pass through unknown fields in questionnaireSpec", async () => {
+    const spec = { ...MINIMAL_SPEC, injected: "evil" };
+    const state = { ...MINIMAL_STATE, questionnaireSpec: spec };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.questionnaireSpec).not.toHaveProperty("injected");
+  });
+});
+
+describe("importStateFromFile — questionnaire: spec validation errors", () => {
+  it("rejects questionnaireSpec that is not an object", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      questionnaireSpec: "invalid",
+    };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow("questionnaireSpec must be a JSON object");
+  });
+
+  it("rejects questionnaireSpec that is an array", async () => {
+    const state = { ...MINIMAL_STATE, questionnaireSpec: [] };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow("questionnaireSpec must be a JSON object");
+  });
+
+  it("rejects a non-number judgment index", async () => {
+    const spec = {
+      ...MINIMAL_SPEC,
+      suggestions: [
+        {
+          question: "Q1. A question?",
+          judgments: [
+            {
+              index: "not-a-number",
+              id: "J1",
+              confidence: "high",
+              answer: "Yes",
+              text: "Yes.",
+            },
+          ],
+        },
+      ],
+    };
+    const state = { ...MINIMAL_STATE, questionnaireSpec: spec };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow();
+  });
+
+  it("rejects an invalid item type in card.description array", async () => {
+    const spec = {
+      ...MINIMAL_SPEC,
+      card: { ...MINIMAL_SPEC.card, description: [42] },
+    };
+    const state = { ...MINIMAL_STATE, questionnaireSpec: spec };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow("must be a string or link object");
+  });
+
+  it("rejects a non-number in a participantArguments inner array", async () => {
+    const spec = {
+      ...MINIMAL_SPEC,
+      participantArguments: [[1, "two"]],
+    };
+    const state = { ...MINIMAL_STATE, questionnaireSpec: spec };
+    await expect(
+      importStateFromFile(makeFile(wrapInMarkdown(state))),
+    ).rejects.toThrow();
+  });
+});
+
+describe("importStateFromFile — questionnaire: elements with possible status", () => {
+  it("round-trips a full questionnaire state with possible elements", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      model: "questionnaire",
+      questionnaireSpec: MINIMAL_SPEC,
+      elements: [
+        {
+          ...BASE_EL,
+          status: "possible",
+          origin: "darca",
+          text: "Yes answer.",
+          questionnaireIndex: 1,
+        },
+        {
+          ...BASE_EL,
+          id: "J2",
+          status: "possible",
+          origin: "darca",
+          text: "No answer.",
+          questionnaireIndex: 2,
+        },
+      ],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.model).toBe("questionnaire");
+    expect(result.elements).toHaveLength(2);
+    expect(result.elements[0].status).toBe("possible");
+    expect(result.elements[0].questionnaireIndex).toBe(1);
+    expect(result.elements[1].questionnaireIndex).toBe(2);
+  });
+});

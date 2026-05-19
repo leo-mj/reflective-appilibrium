@@ -8,7 +8,7 @@ these models; the import security logic mirrors importMarkdown.js.
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -47,6 +47,9 @@ class REElement(BaseModel):
 
     # Rejected fields
     rejected_round: Optional[int] = Field(None, alias="rejectedRound", ge=1)
+
+    # Questionnaire fields
+    questionnaire_index: Optional[int] = Field(None, alias="questionnaireIndex", ge=0)
 
     model_config = {"populate_by_name": True}
 
@@ -141,7 +144,9 @@ class REState(BaseModel):
     topic: str = Field(max_length=500, default="")
     phase: int = Field(default=2, ge=1)
     round: int = Field(ge=1)
+    model: Optional[Literal["questionnaire"]] = None
     elements: list[REElement] = Field(default_factory=list, max_length=1_000)
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
     coherence: RECoherence = Field(default_factory=RECoherence)
     log: list[RELogEntry] = Field(default_factory=list, max_length=1_000)
+    questionnaire_spec: Optional[Any] = Field(None, alias="questionnaireSpec")
