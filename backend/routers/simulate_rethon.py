@@ -190,12 +190,24 @@ def _reconstruct_re_state(
                 continue
             indices.add(-idx if el.negated else idx)
         positions.append(StandardPosition.from_set(indices, n_unnegated_sentence_pool))
-    return REState(
+    state = REState(
         finished=False,
         evolution=positions,
         alternatives=[set() for _ in positions],
         time_line=list(range(len(positions))),
     )
+    # Re-evaluate the fixed-point condition on the reconstructed positions.
+    # StandardReflectiveEquilibrium.finished() checks this same logic, but
+    # requires an RE object we don't have here.  The condition is a pure
+    # function of the evolution (no dialectical structure access needed), so
+    # it is safe to compute inline.
+    state.finished = (
+        len(state) > 3
+        and not state.next_step_is_theory()
+        and state.last_commitments() == state.past_commitments(-1)
+        and state.last_theory() == state.past_theory(-1)
+    )
+    return state
 
 
 def _translate_re_state(
