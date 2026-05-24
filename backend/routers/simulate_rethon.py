@@ -27,9 +27,12 @@ class ModelWeights(BaseModel):
     faithfulness: float = Field(default=0.1, ge=0, le=1)
 
     @model_validator(mode="after")
-    def weights_not_all_zero(self) -> "ModelWeights":
-        if self.account == 0 and self.systematicity == 0 and self.faithfulness == 0:
-            raise ValueError("At least one weight must be greater than 0.")
+    def weights_sum_to_one(self) -> "ModelWeights":
+        total = self.account + self.systematicity + self.faithfulness
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(
+                f"Weights must sum to 1.0 (account + systematicity + faithfulness = {total:.6f})."
+            )
         return self
 
 
