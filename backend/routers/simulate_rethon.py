@@ -140,7 +140,6 @@ def _get_rethon_final_state(
         )
     if weights is not None:
         re.set_model_parameters({"weights": weights.model_dump()})
-    re.set_initial_state(init_coms)
     re.re_process()
     logger.info("Completed rethon simulation.")
     return re.state()
