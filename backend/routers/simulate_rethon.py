@@ -47,6 +47,15 @@ class SimulateRethonRequest(BaseModel):
     weights: Optional[ModelWeights] = None
 
 
+class ZScores(BaseModel):
+    """Achievement (Z) score and its three components for one evolution step."""
+
+    z: float
+    account: float
+    systematicity: float
+    faithfulness: float
+
+
 class SimulatedRethonState(BaseModel):
     finished: bool
     evolution: List[List[REElement]]
@@ -54,6 +63,8 @@ class SimulatedRethonState(BaseModel):
     # "theory" for odd indices (T₀, T₁, …).
     step_types: List[Literal["commitments", "theory"]]
     alternatives: List[List[REElement]]
+    # Parallel to evolution: None for step 0 (no theory yet), scores otherwise.
+    scores: List[Optional[ZScores]]
 
 
 class SimulatedRethonResponse(BaseModel):
@@ -115,7 +126,7 @@ def _get_rethon_final_state(
     lookup: Dict[int, REElement],
     local: bool = True,
     weights: Optional[ModelWeights] = None,
-) -> REState:
+) -> _REProcess:
     logger.info("Beginning rethon simulation.")
     # Binary decision diagram - necessary for n_unnegated_sentence_pool > 10
     bdd_ds = BDDDialecticalStructure.from_arguments(
@@ -145,7 +156,7 @@ def _get_rethon_final_state(
         re.set_model_parameters({"weights": weights.model_dump()})
     re.re_process()
     logger.info("Completed rethon simulation.")
-    return re.state()
+    return re
 
 
 def _build_re(
@@ -215,8 +226,63 @@ def _reconstruct_re_state(
     return state
 
 
+def _compute_evolution_scores(re: _REProcess) -> List[Optional[ZScores]]:
+    """Compute Z-score and its three components for each step in the evolution.
+
+    Even-indexed steps are commitments positions; odd-indexed steps are theory
+    positions.  Step 0 has no theory yet so its score is ``None``.  Every other
+    step gets a ``ZScores`` computed from the most recent (commitments, theory)
+    pair and the initial commitments (C₀ = evolution[0]).
+    """
+    evolution = re.state().evolution
+    if not evolution:
+        return []
+    initial_commitments = evolution[0]
+    scores: List[Optional[ZScores]] = []
+    last_commitments = None
+    last_theory = None
+    for i, pos in enumerate(evolution):
+        if i % 2 == 0:  # commitments step
+            last_commitments = pos
+            if last_theory is None:
+                scores.append(None)  # C₀ — no theory available yet
+            else:
+                scores.append(
+                    ZScores(
+                        z=re.achievement(
+                            last_commitments, last_theory, initial_commitments
+                        ),
+                        account=re.account(last_commitments, last_theory),
+                        systematicity=re.systematicity(last_theory),
+                        faithfulness=re.faithfulness(
+                            last_commitments, initial_commitments
+                        ),
+                    )
+                )
+        else:  # theory step
+            last_theory = pos
+            if last_commitments is None:
+                scores.append(None)  # shouldn't happen but guard for type safety
+            else:
+                scores.append(
+                    ZScores(
+                        z=re.achievement(
+                            last_commitments, last_theory, initial_commitments
+                        ),
+                        account=re.account(last_commitments, last_theory),
+                        systematicity=re.systematicity(last_theory),
+                        faithfulness=re.faithfulness(
+                            last_commitments, initial_commitments
+                        ),
+                    )
+                )
+    return scores
+
+
 def _translate_re_state(
-    numerical_re_state: REState, lookup: Dict[int, REElement]
+    numerical_re_state: REState,
+    lookup: Dict[int, REElement],
+    scores: Optional[List[Optional[ZScores]]] = None,
 ) -> SimulatedRethonState:
     logger.info("Translating rethon RE state.")
     re_state_dict = numerical_re_state.as_dict()
@@ -232,6 +298,7 @@ def _translate_re_state(
             for alt_set in re_state_dict["alternatives"]
             for alt in alt_set
         ],
+        scores=scores if scores is not None else [None] * len(evolution),
     )
     logger.info("Completed translating rethon RE state.")
     return result
@@ -292,9 +359,8 @@ async def simulate_rethon(
             )
             re.set_state(reconstructed)
             re.re_process()
-            re_state = re.state()
         else:
-            re_state = _get_rethon_final_state(
+            re = _get_rethon_final_state(
                 numerical_arguments=built_arguments.num_arguments,
                 n_unnegated_sentence_pool=n,
                 lookup=built_arguments.lookup,
@@ -304,9 +370,10 @@ async def simulate_rethon(
     except Exception as e:
         logger.error("Simulation failed: %s", e, exc_info=True)
         raise
+    scores = _compute_evolution_scores(re)
     return SimulatedRethonResponse(
         translated_arguments=built_arguments.translated_arguments,
-        translated_re_state=_translate_re_state(re_state, lookup_w_negated),
+        translated_re_state=_translate_re_state(re.state(), lookup_w_negated, scores),
     )
 
 
@@ -376,7 +443,8 @@ async def simulate_rethon_step(
     except Exception as e:
         logger.error("Step simulation failed: %s", e, exc_info=True)
         raise
+    scores = _compute_evolution_scores(re)
     return SimulatedRethonResponse(
         translated_arguments=built_arguments.translated_arguments,
-        translated_re_state=_translate_re_state(re.state(), lookup_w_negated),
+        translated_re_state=_translate_re_state(re.state(), lookup_w_negated, scores),
     )
