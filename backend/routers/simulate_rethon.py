@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Literal, Optional, Union
 from collections import defaultdict
 from pydantic import BaseModel, Field, model_validator
 import logging
@@ -50,6 +50,9 @@ class SimulateRethonRequest(BaseModel):
 class SimulatedRethonState(BaseModel):
     finished: bool
     evolution: List[List[REElement]]
+    # Parallel to evolution: "commitments" for even indices (C₀, C₁, …),
+    # "theory" for odd indices (T₀, T₁, …).
+    step_types: List[Literal["commitments", "theory"]]
     alternatives: List[List[REElement]]
 
 
@@ -120,9 +123,9 @@ def _get_rethon_final_state(
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
     )
     initial_position = {
-        index
+        index if element.status in ("active", "revised") else -index
         for index, element in lookup.items()
-        if element.status in ["active", "revised"]
+        if element.status in ("active", "revised", "rejected")
     }
     init_coms = StandardPosition.from_set(
         position=initial_position,
@@ -217,11 +220,12 @@ def _translate_re_state(
 ) -> SimulatedRethonState:
     logger.info("Translating rethon RE state.")
     re_state_dict = numerical_re_state.as_dict()
+    evolution = re_state_dict["evolution"]
     result = SimulatedRethonState(
         finished=re_state_dict["finished"],
-        evolution=[
-            translate_from_lookup(pos.as_list(), lookup)
-            for pos in re_state_dict["evolution"]
+        evolution=[translate_from_lookup(pos.as_list(), lookup) for pos in evolution],
+        step_types=[
+            "commitments" if i % 2 == 0 else "theory" for i in range(len(evolution))
         ],
         alternatives=[
             translate_from_lookup(alt.as_list(), lookup)
@@ -342,10 +346,13 @@ async def simulate_rethon_step(
         else:
             init_coms = StandardPosition.from_set(
                 position={
-                    idx
+                    (
+                        id_to_index[el.id]
+                        if el.status in ("active", "revised")
+                        else -id_to_index[el.id]
+                    )
                     for el in request.elements
-                    if el.status in ("active", "revised")
-                    for idx in (id_to_index[el.id],)
+                    if el.status in ("active", "revised", "rejected")
                 },
                 n_unnegated_sentence_pool=n,
             )

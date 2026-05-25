@@ -171,7 +171,10 @@ function ArgumentCard({ argument }) {
   );
 }
 
-function EvolutionStep({ step, position }) {
+function EvolutionStep({ step, stepType, position }) {
+  const isCommitments = stepType === "commitments";
+  const typeColor = isCommitments ? C.judgment.high : C.principle.high;
+  const typeLabel = isCommitments ? "C" : "T";
   return (
     <div
       style={{
@@ -182,16 +185,36 @@ function EvolutionStep({ step, position }) {
         fontSize: 11,
       }}
     >
+      {/* Step index */}
       <span
         style={{
           color: C.dim,
-          minWidth: 24,
+          minWidth: 16,
           textAlign: "right",
           paddingTop: 2,
+          flexShrink: 0,
         }}
       >
         {step}
       </span>
+      {/* Commitments / Theory label */}
+      <span
+        title={isCommitments ? "Commitments position" : "Theory position"}
+        style={{
+          color: typeColor,
+          border: `1px solid ${typeColor}`,
+          borderRadius: 3,
+          padding: "0 4px",
+          fontSize: 10,
+          fontWeight: "bold",
+          lineHeight: "17px",
+          flexShrink: 0,
+          opacity: 0.75,
+        }}
+      >
+        {typeLabel}
+      </span>
+      {/* Element badges */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
         {position.length === 0 ? (
           <span style={{ color: C.dim }}>∅</span>
@@ -672,7 +695,12 @@ export function SimulateRethonTab({
             </button>
             {evolutionOpen &&
               result.translated_re_state.evolution.map((pos, i) => (
-                <EvolutionStep key={i} step={i} position={pos} />
+                <EvolutionStep
+                  key={i}
+                  step={i}
+                  stepType={result.translated_re_state.step_types?.[i]}
+                  position={pos}
+                />
               ))}
           </>
         )}
