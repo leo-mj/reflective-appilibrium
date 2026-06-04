@@ -34,6 +34,14 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
   const [equilibriumPreviewWithdrawnIds, setEquilibriumPreviewWithdrawnIds] =
     useState(null);
+  const DEFAULT_WEIGHTS = { account: 0.35, systematicity: 0.55, faithfulness: 0.1 };
+  const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
+  const weightsChanged =
+    weights.account !== DEFAULT_WEIGHTS.account ||
+    weights.systematicity !== DEFAULT_WEIGHTS.systematicity ||
+    weights.faithfulness !== DEFAULT_WEIGHTS.faithfulness;
+  // Pass null when weights are default so backend uses its own defaults.
+  const effectiveWeights = weightsChanged ? weights : null;
 
   const {
     state,
@@ -173,6 +181,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     state: textState,
     hiddenLegendKeys: effectiveHiddenKeys,
     hideNonEntailsRels,
+    weights: effectiveWeights,
     selected,
     onSelect: handleSelectNode,
     selectedRel,
@@ -208,6 +217,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onRejectElements: handleRejectElements,
     onRejectRelations: handleRejectRelations,
     onApplyRethonEquilibrium: handleApplyRethonEquilibrium,
+    weights: effectiveWeights,
     equilibriumPreviewWithdrawnIds:
       tab === "simulateRethon" ? equilibriumPreviewWithdrawnIds : null,
     onSetEquilibriumPreview: setEquilibriumPreviewWithdrawnIds,
@@ -280,6 +290,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         }}
         hideNonEntailsRels={hideNonEntailsRels}
         setHideNonEntailsRels={setHideNonEntailsRels}
+        weights={weights}
+        weightsChanged={weightsChanged}
+        onWeightsChange={setWeights}
+        onResetWeights={() => setWeights(DEFAULT_WEIGHTS)}
       />
 
       <div

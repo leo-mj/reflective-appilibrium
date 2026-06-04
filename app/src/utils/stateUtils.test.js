@@ -98,8 +98,8 @@ describe("makeDiff", () => {
   it("returns changed fields formatted as 'field: old → new'", () => {
     const result = makeDiff(
       ["status", "confidence"],
-      { status: "active", confidence: "high" },
-      { status: "revised", confidence: "high" },
+      { status: "active", confidence: 1.0 },
+      { status: "revised", confidence: 1.0 },
     );
     expect(result).toEqual(["status: active → revised"]);
   });
@@ -107,8 +107,8 @@ describe("makeDiff", () => {
   it("reports multiple changed fields", () => {
     const result = makeDiff(
       ["status", "confidence"],
-      { status: "active", confidence: "high" },
-      { status: "revised", confidence: "low" },
+      { status: "active", confidence: 1.0 },
+      { status: "revised", confidence: 0.33 },
     );
     expect(result).toHaveLength(2);
   });

@@ -11,30 +11,33 @@
 
 // ─── Node sizing ─────────────────────────────────────────────────────────────
 
+/** Base visual radii by element type (at confidence = 1). */
+const BASE_RADIUS = { principle: 28, theory: 22, judgment: 18 };
+
 /**
- * Visual radius of a node by element type.
- * Used for rendering and arrowhead inset calculation.
+ * Visual radius of a node scaled by confidence.
+ * Confidence 1.0 → full base radius; confidence 0.0 → 50% of base radius.
  *
- * @param {string} type - Element type ('judgment' | 'principle' | 'theory').
+ * @param {string} type       - Element type ('judgment' | 'principle' | 'theory').
+ * @param {number} [confidence=1] - Element confidence in [0, 1].
  * @returns {number} Radius in SVG pixels.
  */
-export function nodeRadius(type) {
-  if (type === "principle") return 28;
-  if (type === "theory") return 22;
-  return 18; // judgment
+export function nodeRadius(type, confidence = 1) {
+  const base = BASE_RADIUS[type] ?? 18;
+  const t = Math.max(0, Math.min(1, confidence));
+  return base * (0.5 + 0.5 * t);
 }
 
 /**
  * Hit-test radius for pointer click detection — slightly larger than the
  * visual radius so small nodes are easier to tap.
  *
- * @param {string} type - Element type.
+ * @param {string} type       - Element type.
+ * @param {number} [confidence=1] - Element confidence in [0, 1].
  * @returns {number}
  */
-export function hitRadius(type) {
-  if (type === "principle") return 36;
-  if (type === "theory") return 30;
-  return 24;
+export function hitRadius(type, confidence = 1) {
+  return nodeRadius(type, confidence) + 6;
 }
 
 // ─── Edge styling ─────────────────────────────────────────────────────────────

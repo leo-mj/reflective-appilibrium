@@ -10,6 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
+import { quickScore } from "../../utils/simulateRethonClient.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
 import { AddElementPanel } from "../user_edits/TextTabAddPanel.jsx";
@@ -26,6 +27,69 @@ import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+/**
+ * Shows account (A) and systematicity (S) deltas for accepting one suggestion.
+ * Calls ``quick_score`` with a temporary element appended and subtracts the
+ * pre-computed baseline.  Renders nothing while loading or when scoring is
+ * unavailable.
+ *
+ * @param {Object}                            props
+ * @param {REState}                           props.state       Current RE state.
+ * @param {string}                            props.text        Suggested element text.
+ * @param {string}                            props.type        "judgment" | "principle".
+ * @param {number}                            props.confidence  Confidence in [0, 1].
+ * @param {{account:number,systematicity:number}|null} props.baseline
+ *   Scores for the current state (without the suggestion), or null if not yet ready.
+ */
+function ScoreDeltaBadge({ state, text, type, confidence, baseline, weights }) {
+  const [delta, setDelta] = useState(null);
+
+  useEffect(() => {
+    if (baseline == null) return;
+    let cancelled = false;
+    const prefix = type === "principle" ? "P" : "J";
+    const maxNum = Math.max(
+      0,
+      ...state.elements
+        .map((e) => parseInt(e.id.slice(1)))
+        .filter((n) => !isNaN(n)),
+    );
+    const tempElement = {
+      id: `${prefix}${maxNum + 1}`,
+      type,
+      status: "active",
+      confidence: confidence ?? 0.67,
+      origin: "llm",
+      text,
+      addedRound: state.round,
+    };
+    quickScore([...state.elements, tempElement], state.relations, weights).then((scores) => {
+      if (!cancelled && scores != null) {
+        setDelta({
+          account: scores.account - baseline.account,
+          systematicity: scores.systematicity - baseline.systematicity,
+        });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [text, baseline, weights]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (delta == null) return null;
+
+  const fmtDelta = (v) => `${v > 0 ? "+" : ""}${v.toFixed(3)}`;
+  const color = (v) => (v > 0.001 ? C.supports : v < -0.001 ? C.conflicts : C.dim);
+  return (
+    <span style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+      <span style={{ fontSize: 10, fontWeight: "bold", color: color(delta.account) }}>
+        A {fmtDelta(delta.account)}
+      </span>
+      <span style={{ fontSize: 10, fontWeight: "bold", color: color(delta.systematicity) }}>
+        S {fmtDelta(delta.systematicity)}
+      </span>
+    </span>
+  );
+}
 
 /**
  * @param {Object}           props
@@ -115,7 +179,7 @@ function Toolbar({
  * inline before a decision is made.
  *
  * @param {Object}   props
- * @param {{question: string, judgments: Array<{text: string, confidence: string}>}} props.suggestion
+ * @param {{question: string, judgments: Array<{text: string, confidence: number}>}} props.suggestion
  * @param {{judgment: Object, draft: string}|null} props.editing
  *   The judgment currently being edited and its draft text, or null.
  * @param {Function} props.onAcceptJudgment   Called with the judgment object.
@@ -128,6 +192,8 @@ function SuggestionCard({
   suggestion,
   editing,
   state,
+  baseline,
+  weights,
   onAcceptJudgment,
   onRejectJudgment,
   onModify,
@@ -197,7 +263,7 @@ function SuggestionCard({
                   display: "inline-block",
                 }}
               >
-                {j.confidence}
+                {typeof j.confidence === "number" ? j.confidence.toFixed(2) : j.confidence}
               </span>
               {isEditing ? (
                 <ModifyTextarea
@@ -213,6 +279,7 @@ function SuggestionCard({
               <div
                 style={{
                   display: "flex",
+                  alignItems: "center",
                   gap: 4,
                   flexShrink: 0,
                   alignSelf: "flex-start",
@@ -221,6 +288,14 @@ function SuggestionCard({
                   transition: "opacity 0.12s",
                 }}
               >
+                <ScoreDeltaBadge
+                  state={state}
+                  text={isEditing ? editing.draft : j.text}
+                  type="judgment"
+                  confidence={j.confidence}
+                  baseline={baseline}
+                  weights={weights}
+                />
                 <AcceptButton
                   onClick={() => onAcceptJudgment(j)}
                   accentColor={C.judgment.high}
@@ -282,6 +357,7 @@ export function JudgmentElicitTab({
   nextPhaseIsEnabled,
   useDummy = false,
   suggestionsDisabled = false,
+  weights = null,
 }) {
   /** @type {[Array<{question: string, judgments: Array<{text: string, confidence: string}>}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -290,6 +366,17 @@ export function JudgmentElicitTab({
   const [model, setModel] = useState(null);
   /** @type {[{suggestion: Object, judgment: Object, draft: string}|null, Function]} */
   const [editing, setEditing] = useState(null);
+
+  // Baseline account + systematicity for the current state — used by
+  // ScoreDeltaBadge to compute per-suggestion acceptance deltas.
+  const [baseline, setBaseline] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    quickScore(state.elements, state.relations, weights).then((scores) => {
+      if (!cancelled) setBaseline(scores ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [state.elements, state.relations, weights]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const elicit = async () => {
     setLoading(true);
@@ -373,6 +460,8 @@ export function JudgmentElicitTab({
             suggestion={s}
             editing={editing?.suggestion === s ? editing : null}
             state={state}
+            baseline={baseline}
+            weights={weights}
             onAcceptJudgment={(j) => accept(s, j)}
             onRejectJudgment={(j) => reject(s, j)}
             onModify={(j) =>

@@ -195,13 +195,14 @@ def _add_new_premises_to_lookup(
             type=premise["type"],
             addedRound=int(round) + 1,
             status="active",
-            confidence="moderate",
+            confidence=0.67,
             origin=model,
             previousText=None,
             reason=None,
             withdrawnRound=None,
             rejectedRound=None,
             revisedRound=None,
+            questionnaireIndex=None,
         )
         updated_lookup[premise["index"]] = new_element
         max_ids_dict[id_type] += 1

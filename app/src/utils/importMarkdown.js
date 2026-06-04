@@ -19,7 +19,7 @@
 const MAX_FILE_SIZE = 500_000; // 500 KB
 const ELEMENT_TYPES = new Set(["judgment", "principle", "theory"]);
 const STATUSES = new Set(["active", "revised", "withdrawn", "rejected", "possible"]);
-const CONFIDENCES = new Set(["high", "moderate", "low"]);
+const LEGACY_CONFIDENCE = { high: 1.0, moderate: 0.67, low: 0.33 };
 const RELATION_TYPES = new Set([
   "supports",
   "conflicts",
@@ -60,10 +60,20 @@ function bool(v, field) {
 // ─── Questionnaire spec validator ─────────────────────────────────────────────
 
 function validateQuestionnaireJudgment(j, ctx) {
+  let confidence;
+  if (typeof j.confidence === "string") {
+    if (!(j.confidence in LEGACY_CONFIDENCE))
+      throw new Error(`${ctx}.confidence "${j.confidence}" is not valid`);
+    confidence = LEGACY_CONFIDENCE[j.confidence];
+  } else {
+    confidence = num(j.confidence, `${ctx}.confidence`);
+    if (confidence < 0 || confidence > 1)
+      throw new Error(`${ctx}.confidence must be in [0, 1], got ${confidence}`);
+  }
   return {
     index: num(j.index, `${ctx}.index`),
     id: str(j.id, `${ctx}.id`, 10),
-    confidence: str(j.confidence, `${ctx}.confidence`, 20),
+    confidence,
     answer: str(j.answer, `${ctx}.answer`, 200),
     text: str(j.text, `${ctx}.text`, 10_000),
   };
@@ -169,9 +179,16 @@ function validateElement(e, i) {
   if (!STATUSES.has(status))
     throw new Error(`${ctx}.status "${status}" is not valid`);
 
-  const confidence = str(e.confidence, `${ctx}.confidence`, 20);
-  if (!CONFIDENCES.has(confidence))
-    throw new Error(`${ctx}.confidence "${confidence}" is not valid`);
+  let confidence;
+  if (typeof e.confidence === "string") {
+    if (!(e.confidence in LEGACY_CONFIDENCE))
+      throw new Error(`${ctx}.confidence "${e.confidence}" is not valid`);
+    confidence = LEGACY_CONFIDENCE[e.confidence];
+  } else {
+    confidence = num(e.confidence, `${ctx}.confidence`);
+    if (confidence < 0 || confidence > 1)
+      throw new Error(`${ctx}.confidence must be in [0, 1], got ${confidence}`);
+  }
 
   const result = {
     id,

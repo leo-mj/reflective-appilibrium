@@ -77,6 +77,54 @@ class SimulatedRethonResponse(BaseModel):
     output_tokens: int = 0
 
 
+class QuickScoreRequest(BaseModel):
+    """Payload for ``POST /api/simulate_rethon/quick_score``."""
+
+    elements: list[REElement] = Field(min_length=1, max_length=201)
+    relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
+    weights: Optional[ModelWeights] = None
+
+
+class QuickScoreResponse(BaseModel):
+    """Response from ``POST /api/simulate_rethon/quick_score``.
+
+    Returns only account and systematicity — faithfulness is omitted because
+    in the type-based approach C₀ = C (no prior state), so faithfulness is
+    always 1.0 and adds no information.
+    """
+
+    account: Optional[float]
+    systematicity: Optional[float]
+
+
+class RoundScores(BaseModel):
+    """Equilibrium Z-score snapshot for one workflow round."""
+
+    round: int
+    scores: Optional[ZScores]
+
+
+class ScorePerRoundResponse(BaseModel):
+    """Response from ``POST /api/simulate_rethon/score_per_round``."""
+
+    round_scores: List[RoundScores]
+
+
+class ScorePerRoundRequest(BaseModel):
+    """Payload for ``POST /api/simulate_rethon/score_per_round``.
+
+    The server filters ``elements`` and ``relations`` to those present at each
+    round before running the rethon simulation, so the full current lists should
+    be sent.
+    """
+
+    elements: list[REElement] = Field(min_length=1, max_length=200)
+    relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
+    round: int = Field(ge=1)
+    local: bool = True
+    weights: Optional[ModelWeights] = None
+
+
 def _build_numerical_arguments(
     elements: List[REElement],
     relations: List[RERelation],
@@ -279,6 +327,55 @@ def _compute_evolution_scores(re: _REProcess) -> List[Optional[ZScores]]:
     return scores
 
 
+def _get_final_score(
+    elements: List[REElement],
+    relations: List[RERelation],
+    local: bool = True,
+    weights: Optional[ModelWeights] = None,
+) -> Optional[ZScores]:
+    """Run a full RE simulation and return only the final equilibrium Z-score.
+
+    Returns ``None`` when the simulation cannot be run (too few elements, no
+    arguments, or any other error).
+    """
+    try:
+        built, _, n = _validate_and_build(elements, relations, sentence_pool_minimum=3)
+        re = _get_rethon_final_state(
+            numerical_arguments=built.num_arguments,
+            n_unnegated_sentence_pool=n,
+            lookup=built.lookup,
+            local=local,
+            weights=weights,
+        )
+        scores_list = _compute_evolution_scores(re)
+        return next((s for s in reversed(scores_list) if s is not None), None)
+    except Exception:
+        return None
+
+
+class ElementDelta(BaseModel):
+    """Account and systematicity deltas for withdrawing one element."""
+
+    element_id: str
+    delta_account: Optional[float]
+    delta_systematicity: Optional[float]
+
+
+class ScoreChangesRequest(BaseModel):
+    """Payload for ``POST /api/simulate_rethon/score_changes``."""
+
+    elements: list[REElement] = Field(min_length=1, max_length=200)
+    relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
+    local: bool = True
+    weights: Optional[ModelWeights] = None
+
+
+class ScoreChangesResponse(BaseModel):
+    """Response from ``POST /api/simulate_rethon/score_changes``."""
+
+    withdrawal_deltas: list[ElementDelta]
+
+
 def _translate_re_state(
     numerical_re_state: REState,
     lookup: Dict[int, REElement],
@@ -448,3 +545,261 @@ async def simulate_rethon_step(
         translated_arguments=built_arguments.translated_arguments,
         translated_re_state=_translate_re_state(re.state(), lookup_w_negated, scores),
     )
+
+
+@router.post("/score_per_round", response_model=ScorePerRoundResponse)
+async def score_per_round(
+    request: ScorePerRoundRequest,
+) -> ScorePerRoundResponse:
+    """Compute the equilibrium Z-score for each workflow round from 1 to *request.round*.
+
+    Elements and relations are filtered to those present at each round before
+    running the rethon simulation.  Rounds where the simulation fails (e.g. not
+    enough elements or no arguments yet) are returned with ``scores=None``.
+    """
+    results: List[RoundScores] = []
+    for r in range(1, request.round + 1):
+        # Elements present at round r: added by r AND not yet withdrawn at r
+        elements_at_r = [
+            el
+            for el in request.elements
+            if (el.added_round or 1) <= r
+            and not (el.withdrawn_round and el.withdrawn_round <= r)
+        ]
+        el_ids = {el.id for el in elements_at_r}
+        # Relations present at round r: added by r, both endpoints still exist
+        relations_at_r = [
+            rel
+            for rel in request.relations
+            if (rel.added_round or 1) <= r
+            and rel.from_id in el_ids
+            and rel.to_id in el_ids
+        ]
+        results.append(
+            RoundScores(
+                round=r,
+                scores=_get_final_score(
+                    elements_at_r, relations_at_r, request.local, request.weights
+                ),
+            )
+        )
+    return ScorePerRoundResponse(round_scores=results)
+
+
+@router.post("/score_changes", response_model=ScoreChangesResponse)
+async def score_changes(request: ScoreChangesRequest) -> ScoreChangesResponse:
+    """Batch-compute withdrawal Z-score deltas for all active/revised elements.
+
+    Uses an analytical approach: judgment elements form the commitment position
+    (C) and principle/theory elements form the theory position (T).  Z is
+    computed directly from ``re_obj.achievement(C, T, C₀)`` — no full RE
+    simulation is run.
+
+    - Withdrawing a **judgment** removes it from C; T is held fixed.
+    - Withdrawing a **principle** or **theory** removes it from T; C is held fixed.
+
+    This gives distinct, meaningful deltas per element and no longer requires
+    the simulation evolution to be available.
+    """
+    elements = request.elements
+    n = len(elements)
+
+    target_elements = [
+        el
+        for el in elements
+        if el.status in ("active", "revised")
+        and el.type in ("judgment", "principle", "theory")
+    ]
+    empty = ScoreChangesResponse(
+        withdrawal_deltas=[
+            ElementDelta(element_id=el.id, delta_account=None, delta_systematicity=None)
+            for el in target_elements
+        ],
+    )
+
+    if n < 3:
+        return empty
+    arg_relations = [
+        r
+        for r in request.relations
+        if r.type in ("jointly_entails", "jointly_precludes")
+    ]
+    if not arg_relations:
+        return empty
+
+    try:
+        built = _build_numerical_arguments(elements=elements, relations=arg_relations)
+        id_to_index: Dict[str, int] = {el.id: i + 1 for i, el in enumerate(elements)}
+
+        bdd_ds = BDDDialecticalStructure.from_arguments(
+            arguments=built.num_arguments,
+            n_unnegated_sentence_pool=n,
+        )
+
+        # C₀: all active/revised (positive) and rejected (negative) elements.
+        # T*: only principle and theory elements that are active/revised.
+        # Principles and background theories appear in both C₀ and T*.
+        c0_set: set[int] = {
+            (
+                id_to_index[el.id]
+                if el.status in ("active", "revised")
+                else -id_to_index[el.id]
+            )
+            for el in elements
+            if el.status in ("active", "revised", "rejected")
+        }
+        t_set: set[int] = {
+            id_to_index[el.id]
+            for el in elements
+            if el.type in ("principle", "theory") and el.status in ("active", "revised")
+        }
+        if not t_set:
+            return empty  # No theory position — Z cannot be computed.
+
+        c0_pos = StandardPosition.from_set(c0_set, n)
+        t_pos = StandardPosition.from_set(t_set, n)
+
+        re_obj: _REProcess = StandardLocalReflectiveEquilibrium(
+            dialectical_structure=bdd_ds, initial_commitments=c0_pos
+        )
+        if request.weights is not None:
+            re_obj.set_model_parameters({"weights": request.weights.model_dump()})
+
+        # Baseline account and systematicity: C = C₀, T = T*.
+        baseline_account = re_obj.account(c0_pos, t_pos)
+        baseline_systematicity = re_obj.systematicity(t_pos)
+
+        withdrawal_deltas: List[ElementDelta] = []
+        for el in target_elements:
+            try:
+                idx = id_to_index[el.id]  # always positive for active/revised
+                if el.type == "judgment":
+                    # Judgments live only in C — remove from C, T unchanged.
+                    c_mod_pos = StandardPosition.from_set(c0_set - {idx}, n)
+                    delta_account = re_obj.account(c_mod_pos, t_pos) - baseline_account
+                    delta_systematicity = 0.0  # T unchanged
+                else:
+                    # Principles/theories live in both C and T — remove from both.
+                    c_mod_pos = StandardPosition.from_set(c0_set - {idx}, n)
+                    t_mod_pos = StandardPosition.from_set(t_set - {idx}, n)
+                    delta_account = (
+                        re_obj.account(c_mod_pos, t_mod_pos) - baseline_account
+                    )
+                    delta_systematicity = (
+                        re_obj.systematicity(t_mod_pos) - baseline_systematicity
+                    )
+            except Exception:
+                delta_account = None
+                delta_systematicity = None
+            withdrawal_deltas.append(
+                ElementDelta(
+                    element_id=el.id,
+                    delta_account=delta_account,
+                    delta_systematicity=delta_systematicity,
+                )
+            )
+
+        return ScoreChangesResponse(withdrawal_deltas=withdrawal_deltas)
+    except Exception:
+        return empty
+
+
+def _build_type_positions(
+    elements: List[REElement],
+    id_to_index: Dict[str, int],
+    n: int,
+) -> tuple[Position, Position]:
+    """Build commitment (C) and theory (T) positions from element types.
+
+    - **All** elements (judgments, principles, background theories) that are
+      active/revised (→ positive) or rejected (→ negative) form the commitment
+      position.  An agent can be committed to a principle just as much as to a
+      particular judgment.
+    - Only principle and background-theory (type "theory") elements that are
+      active/revised form the theory position, because these are the elements
+      that constitute the explanatory framework.
+
+    Principles and background theories therefore appear in *both* C and T.
+
+    Allows Z to be computed analytically without running a full RE simulation.
+    Returns ``(c_pos, t_pos)``.
+    """
+    c_set: set[int] = {
+        (
+            id_to_index[el.id]
+            if el.status in ("active", "revised")
+            else -id_to_index[el.id]
+        )
+        for el in elements
+        if el.status in ("active", "revised", "rejected") and el.id in id_to_index
+    }
+    t_set: set[int] = {
+        id_to_index[el.id]
+        for el in elements
+        if el.type in ("principle", "theory")
+        and el.status in ("active", "revised")
+        and el.id in id_to_index
+    }
+    return (
+        StandardPosition.from_set(c_set, n),
+        StandardPosition.from_set(t_set, n),
+    )
+
+
+@router.post("/quick_score", response_model=QuickScoreResponse)
+async def quick_score(request: QuickScoreRequest) -> QuickScoreResponse:
+    """Compute account and systematicity for the current element set analytically.
+
+    Derives C (all active/revised/rejected elements) and T (active/revised
+    principle/theory elements) directly from element types — no simulation or
+    prior evolution is required.
+
+    Returns ``account=null, systematicity=null`` when there are fewer than 3
+    elements, no argument relations, or no active principle/theory elements.
+    """
+    try:
+        n = len(request.elements)
+        if n < 3:
+            return QuickScoreResponse(account=None, systematicity=None)
+
+        arg_relations = [
+            r
+            for r in request.relations
+            if r.type in ("jointly_entails", "jointly_precludes")
+        ]
+        if not arg_relations:
+            return QuickScoreResponse(account=None, systematicity=None)
+
+        if not any(
+            el.type in ("principle", "theory") and el.status in ("active", "revised")
+            for el in request.elements
+        ):
+            return QuickScoreResponse(account=None, systematicity=None)
+
+        built = _build_numerical_arguments(
+            elements=request.elements, relations=arg_relations
+        )
+        id_to_index: Dict[str, int] = {
+            el.id: i + 1 for i, el in enumerate(request.elements)
+        }
+
+        bdd_ds = BDDDialecticalStructure.from_arguments(
+            arguments=built.num_arguments,
+            n_unnegated_sentence_pool=n,
+        )
+
+        c_pos, t_pos = _build_type_positions(request.elements, id_to_index, n)
+
+        # RE object used only for its scoring methods — no re_process() call.
+        re_obj: _REProcess = StandardLocalReflectiveEquilibrium(
+            dialectical_structure=bdd_ds, initial_commitments=c_pos
+        )
+        if request.weights:
+            re_obj.set_model_parameters({"weights": request.weights.model_dump()})
+
+        return QuickScoreResponse(
+            account=re_obj.account(c_pos, t_pos),
+            systematicity=re_obj.systematicity(t_pos),
+        )
+    except Exception:
+        return QuickScoreResponse(account=None, systematicity=None)

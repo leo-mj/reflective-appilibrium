@@ -8,24 +8,7 @@ import { Tooltip } from "../Tooltip.jsx";
 
 export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
   const items = [
-    {
-      label: "Judgment (high)",
-      shape: "circle",
-      color: "#2563eb",
-      key: "J-high",
-    },
-    {
-      label: "Judgment (mod)",
-      shape: "circle",
-      color: "#60a5fa",
-      key: "J-moderate",
-    },
-    {
-      label: "Judgment (low)",
-      shape: "circle",
-      color: "#93c5fd",
-      key: "J-low",
-    },
+    { label: "Judgment", shape: "judgment-gradient", key: "J" },
     { label: "Principle", shape: "roundrect", color: "#7c3aed", key: "P" },
     { label: "Theory", shape: "diamond", color: "#d97706", key: "T" },
     { label: "Withdrawn", shape: "circle", color: "#64748b", key: "withdrawn" },
@@ -84,6 +67,17 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
           delay={100}
         >
           <div onClick={() => toggle(it.key)} style={itemStyle(it.key)}>
+            {it.shape === "judgment-gradient" && (
+              <div
+                style={{
+                  width: 22,
+                  height: 10,
+                  borderRadius: 5,
+                  background: "linear-gradient(to right, #93c5fd, #2563eb)",
+                  border: "1px solid #2563eb",
+                }}
+              />
+            )}
             {it.shape === "circle" && (
               <div
                 style={{

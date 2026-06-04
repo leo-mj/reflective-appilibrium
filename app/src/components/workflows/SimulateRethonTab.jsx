@@ -15,7 +15,6 @@ import {
   simulateRethonStep,
 } from "../../utils/simulateRethonClient.js";
 import { ErrorBanner } from "../SuggestionActions.jsx";
-import { WeightTriangle } from "./WeightTriangle.jsx";
 
 const ACCENT = C.principle.high;
 
@@ -592,13 +591,8 @@ export function SimulateRethonTab({
   useDummy = false,
   onApplyRethonEquilibrium,
   onSetEquilibriumPreview,
+  weights = null,
 }) {
-  const DEFAULT_WEIGHTS = {
-    account: 0.35,
-    systematicity: 0.55,
-    faithfulness: 0.1,
-  };
-
   const [result, setResult] = useState(null);
   const [resultMode, setResultMode] = useState(null); // "simulate" | "step" | null
   // Step-mode tracking: confirmed = accepted evolution; pending = awaiting accept/reject
@@ -609,19 +603,6 @@ export function SimulateRethonTab({
   const [error, setError] = useState(null);
   const [evolutionOpen, setEvolutionOpen] = useState(false);
   const [decision, setDecision] = useState(null); // "accepted" | "rejected" | null
-  const [weightsOpen, setWeightsOpen] = useState(false);
-  const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
-
-  const weightsChanged =
-    weights.account !== DEFAULT_WEIGHTS.account ||
-    weights.systematicity !== DEFAULT_WEIGHTS.systematicity ||
-    weights.faithfulness !== DEFAULT_WEIGHTS.faithfulness;
-
-  function resetWeights() {
-    setWeights(DEFAULT_WEIGHTS);
-  }
-
-  const effectiveWeights = weightsChanged ? weights : null;
 
   const activeCount = state.elements.filter((e) =>
     ["active", "revised"].includes(e.status),
@@ -653,7 +634,7 @@ export function SimulateRethonTab({
         true,
         startingEvolution,
         useDummy,
-        effectiveWeights,
+        weights,
       );
       setResult(data);
       setResultMode("simulate");
@@ -680,7 +661,7 @@ export function SimulateRethonTab({
         state,
         true,
         confirmedEvolution,
-        effectiveWeights,
+        weights,
       );
       setResult(data);
       setResultMode("step");
@@ -860,50 +841,6 @@ export function SimulateRethonTab({
               );
             })()}
           </div>
-        </div>
-
-        {/* Weights panel */}
-        <div style={{ marginBottom: 8 }}>
-          <button
-            onClick={() => setWeightsOpen((o) => !o)}
-            style={{
-              background: "transparent",
-              border: `1px solid ${weightsChanged ? ACCENT : C.border}`,
-              color: weightsChanged ? ACCENT : C.dim,
-              borderRadius: 6,
-              padding: "3px 10px",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            Weights{weightsChanged ? " *" : ""}
-          </button>
-          {weightsOpen && (
-            <div style={{ marginTop: 8 }}>
-              <WeightTriangle
-                weights={weights}
-                onChange={setWeights}
-                weightsChanged={weightsChanged}
-              />
-              {weightsChanged && (
-                <button
-                  onClick={resetWeights}
-                  style={{
-                    marginTop: 6,
-                    background: "transparent",
-                    border: `1px solid ${C.border}`,
-                    color: C.dim,
-                    borderRadius: 4,
-                    padding: "2px 8px",
-                    fontSize: 11,
-                    cursor: "pointer",
-                  }}
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          )}
         </div>
 
         {(activeCount < 3 || !atLeastOneArgument) && (

@@ -33,10 +33,11 @@ export {};
  */
 
 /**
- * How strongly the user holds an element.
- * Maps directly to node opacity in the graph via {@link module:constants/colors.confOp}.
+ * How strongly the user holds an element, as a float in [0, 1].
+ * Maps to node opacity and size in the graph via {@link module:constants/colors.confOp}
+ * and {@link module:utils/graphHelpers.nodeRadius}.
  *
- * @typedef {'high'|'moderate'|'low'} ConfidenceLevel
+ * @typedef {number} ConfidenceLevel
  */
 
 /**
@@ -61,7 +62,7 @@ export {};
  * @property {string}          id            - Unique identifier, e.g. `"J1"`, `"P3"`, `"T2"`.
  * @property {ElementType}     type          - Element category.
  * @property {ElementStatus}   status        - Current lifecycle status.
- * @property {ConfidenceLevel} confidence    - How strongly the user holds this element.
+ * @property {ConfidenceLevel} confidence    - How strongly the user holds this element (0–1).
  * @property {string}          origin        - Who introduced it, e.g. `"user"` or
  *                                            `"assistant-suggested → user-adopted"`.
  * @property {string}          text          - The moral claim or principle statement.

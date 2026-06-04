@@ -14,7 +14,7 @@ import { sortElementIds } from "../../utils/stateUtils.js";
 
 const ELEMENT_DEFAULTS = {
   type: "judgment",
-  confidence: "moderate",
+  confidence: 0.67,
   origin: "user",
   text: "",
 };
@@ -196,15 +196,34 @@ export function AddBar({
                 <option value="principle">Principle</option>
                 <option value="theory">Theory</option>
               </select>
-              <select
+              {[{ l: "L", v: 0.33 }, { l: "M", v: 0.67 }, { l: "H", v: 1.0 }].map(({ l, v }) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setEl("confidence", v)}
+                  style={{
+                    ...SELECT_STYLE,
+                    padding: "3px 7px",
+                    background: Math.abs(elementForm.confidence - v) < 0.01 ? C.border : "transparent",
+                    fontWeight: Math.abs(elementForm.confidence - v) < 0.01 ? "bold" : "normal",
+                    cursor: "pointer",
+                  }}
+                >
+                  {l}
+                </button>
+              ))}
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
                 value={elementForm.confidence}
-                onChange={(e) => setEl("confidence", e.target.value)}
-                style={SELECT_STYLE}
-              >
-                <option value="high">High</option>
-                <option value="moderate">Moderate</option>
-                <option value="low">Low</option>
-              </select>
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!Number.isNaN(v)) setEl("confidence", Math.max(0, Math.min(1, v)));
+                }}
+                style={{ ...SELECT_STYLE, width: 55 }}
+              />
               <input
                 value={elementForm.origin}
                 onChange={(e) => setEl("origin", e.target.value)}
@@ -322,7 +341,7 @@ const PANEL_STYLE = {
  */
 export function AddElementPanel({ elementType, onAddElement }) {
   const [form, setForm] = useState({
-    confidence: "moderate",
+    confidence: 0.67,
     origin: "user",
     text: "",
   });
@@ -331,7 +350,7 @@ export function AddElementPanel({ elementType, onAddElement }) {
   const canSubmit = form.text.trim().length > 0;
   const handleSubmit = () => {
     onAddElement({ type: elementType, ...form });
-    setForm({ confidence: "moderate", origin: "user", text: "" });
+    setForm({ confidence: 0.67, origin: "user", text: "" });
   };
   return (
     <div style={PANEL_STYLE}>
@@ -361,15 +380,34 @@ export function AddElementPanel({ elementType, onAddElement }) {
         >
           Add {elementType}
         </button>
-        <select
+        {[{ l: "L", v: 0.33 }, { l: "M", v: 0.67 }, { l: "H", v: 1.0 }].map(({ l, v }) => (
+          <button
+            key={l}
+            type="button"
+            onClick={() => set("confidence", v)}
+            style={{
+              ...SELECT_STYLE,
+              padding: "3px 7px",
+              background: Math.abs(form.confidence - v) < 0.01 ? C.border : "transparent",
+              fontWeight: Math.abs(form.confidence - v) < 0.01 ? "bold" : "normal",
+              cursor: "pointer",
+            }}
+          >
+            {l}
+          </button>
+        ))}
+        <input
+          type="number"
+          min={0}
+          max={1}
+          step={0.05}
           value={form.confidence}
-          onChange={(e) => set("confidence", e.target.value)}
-          style={SELECT_STYLE}
-        >
-          <option value="high">High</option>
-          <option value="moderate">Moderate</option>
-          <option value="low">Low</option>
-        </select>
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (!Number.isNaN(v)) set("confidence", Math.max(0, Math.min(1, v)));
+          }}
+          style={{ ...SELECT_STYLE, width: 55 }}
+        />
         <input
           value={form.origin}
           onChange={(e) => set("origin", e.target.value)}

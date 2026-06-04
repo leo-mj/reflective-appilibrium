@@ -65,7 +65,7 @@ function addNewPremisesToLookup(lookup, addedPremises, elements, round, model) {
       type: premise.type,
       addedRound: parseInt(round) + 1,
       status: "active",
-      confidence: "moderate",
+      confidence: 0.67,
       origin: model,
       previousText: null,
       reason: null,

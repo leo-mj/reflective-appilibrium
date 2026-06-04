@@ -8,7 +8,7 @@ these models; the import security logic mirrors importMarkdown.js.
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 ElementType = Literal["judgment", "principle", "theory"]
 Status = Literal["active", "revised", "withdrawn", "rejected", "possible"]
-Confidence = Literal["high", "moderate", "low"]
+Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class REElement(BaseModel):

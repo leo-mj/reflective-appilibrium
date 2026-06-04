@@ -11,15 +11,15 @@ const dummyJudgments = {
       judgments: [
         {
           text: "Knowingly creating serious hazards for future people is morally wrong, even when no currently living person will be affected.",
-          confidence: "high",
+          confidence: 1.0,
         },
         {
           text: "The action is permissible provided the company discloses the risk and sets aside remediation funds.",
-          confidence: "moderate",
+          confidence: 0.67,
         },
         {
           text: "Without a determinate victim, no wrong is committed — future people's interests cannot yet ground obligations.",
-          confidence: "low",
+          confidence: 0.33,
         },
       ],
     },
@@ -29,11 +29,11 @@ const dummyJudgments = {
       judgments: [
         {
           text: "Replacing one set of future people with a different, equally well-off set does not by itself constitute a moral wrong.",
-          confidence: "moderate",
+          confidence: 0.67,
         },
         {
           text: "We have a special obligation to the future humans who would have existed, so the substitution is wrong regardless of aggregate welfare.",
-          confidence: "moderate",
+          confidence: 0.67,
         },
       ],
     },
@@ -43,15 +43,15 @@ const dummyJudgments = {
       judgments: [
         {
           text: "It is unjust to impose significantly higher costs on future generations for meeting basic needs, even if those needs can still be met.",
-          confidence: "moderate",
+          confidence: 0.67,
         },
         {
           text: "Intergenerational resource use is just as long as future generations are left with equivalent overall opportunities (the sustainability criterion).",
-          confidence: "moderate",
+          confidence: 0.67,
         },
         {
           text: "There is no injustice: each generation is entitled to use available resources for its own flourishing.",
-          confidence: "low",
+          confidence: 0.33,
         },
       ],
     },
@@ -61,11 +61,11 @@ const dummyJudgments = {
       judgments: [
         {
           text: "Democratic institutions have a duty to formally represent the interests of future generations in their decision-making processes.",
-          confidence: "low",
+          confidence: 0.33,
         },
         {
           text: "Future generations' interests should inform policy but should not override democratically expressed preferences of living citizens.",
-          confidence: "moderate",
+          confidence: 0.67,
         },
       ],
     },

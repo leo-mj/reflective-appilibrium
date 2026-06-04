@@ -35,9 +35,9 @@ const _inlineState = {
   phase: 0,
   round: 0,
   elements: [
-    // { id: "J1", type: "judgment", status: "active", confidence: "high", origin: "user", text: "...", addedRound: 1 },
-    // { id: "P1", type: "principle", status: "active", confidence: "moderate", origin: "user", text: "...", addedRound: 1 },
-    // { id: "T1", type: "theory", status: "active", confidence: "high", origin: "assistant-suggested → user-adopted", text: "...", addedRound: 5 },
+    // { id: "J1", type: "judgment", status: "active", confidence: 1.0, origin: "user", text: "...", addedRound: 1 },
+    // { id: "P1", type: "principle", status: "active", confidence: 0.67, origin: "user", text: "...", addedRound: 1 },
+    // { id: "T1", type: "theory", status: "active", confidence: 1.0, origin: "assistant-suggested → user-adopted", text: "...", addedRound: 5 },
     // For revised elements, add: previousText: "...", revisedRound: N
     // For withdrawn elements, add: reason: "...", withdrawnRound: N
   ],

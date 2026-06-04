@@ -8,7 +8,7 @@ existing judgments in the RE state.
 import logging
 import json
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -31,7 +31,7 @@ class SuggestPrinciplesRequest(BaseModel):
     elements: list[REElement] = Field(min_length=1, max_length=200)
 
 
-Confidence = Literal["high", "moderate", "low"]
+Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class PrincipleSuggestion(BaseModel):
@@ -97,7 +97,7 @@ Respond with valid JSON only, in exactly this format:
   "suggestions": [
     {{
       "text": "One-sentence statement of the principle.",
-      "confidence": "high" | "moderate" | "low",
+      "confidence": 1.0,
       "covers": ["J1", "J3"],
       "explanation": "One sentence explaining how this principle systematises the listed judgments."
     }}

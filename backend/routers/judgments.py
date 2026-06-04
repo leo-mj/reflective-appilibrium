@@ -8,7 +8,7 @@ may elicit new moral judgments the user has not yet articulated.
 import logging
 import json
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -37,7 +37,7 @@ class ElicitJudgmentsRequest(BaseModel):
     log: list[RELogEntry] = Field(default_factory=list, max_length=1_000)
 
 
-Confidence = Literal["high", "moderate", "low"]
+Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class JudgmentOption(BaseModel):
@@ -140,9 +140,9 @@ Respond with valid JSON only, in exactly this format:
     {{
       "question": "A brief thought experiment or question.",
       "judgments": [
-        {{"text": "One plausible position in response to the question.", "confidence": "high"}},
-        {{"text": "Another plausible position.", "confidence": "moderate"}},
-        {{"text": "A more cautious or defeasible position.", "confidence": "low"}}
+        {{"text": "One plausible position in response to the question.", "confidence": 1.0}},
+        {{"text": "Another plausible position.", "confidence": 0.67}},
+        {{"text": "A more cautious or defeasible position.", "confidence": 0.33}}
       ]
     }}
   ]

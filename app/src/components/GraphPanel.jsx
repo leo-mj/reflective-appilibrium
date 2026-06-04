@@ -3,7 +3,7 @@
  * @module components/GraphPanel
  */
 
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, useRef } from "react";
 import { APP_ENV, LLM_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { Graph } from "./Graph.jsx";
@@ -85,10 +85,10 @@ export function GraphPanel({
   ready,
   isSample,
   recentlyAdded,
+  weights,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
-
-  const suggestionsDisabled = !LLM_ENABLED && !isSample;
+const suggestionsDisabled = !LLM_ENABLED && !isSample;
   const autoFetch = !!workflowPhase;
   const workflowNextPhase =
     hideNonEntailsRels && workflowPhase === "suggestPrinciples"
@@ -200,6 +200,7 @@ export function GraphPanel({
               workflowNextPhase={workflowNextPhase}
               useDummy={useDummyAssist}
               suggestionsDisabled={suggestionsDisabled}
+              weights={weights}
             />
           </Suspense>
         )}
@@ -215,6 +216,7 @@ export function GraphPanel({
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
               suggestionsDisabled={suggestionsDisabled}
+              weights={weights}
             />
           </Suspense>
         )}
@@ -225,6 +227,7 @@ export function GraphPanel({
               useDummy={useDummyAssist}
               onApplyRethonEquilibrium={onApplyRethonEquilibrium}
               onSetEquilibriumPreview={onSetEquilibriumPreview}
+              weights={weights}
             />
           </Suspense>
         )}

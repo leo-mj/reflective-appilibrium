@@ -59,8 +59,8 @@ export function GraphEdge({
   const { x1, y1, x2, y2, tipX, tipY, perpX, perpY } = arrowGeometry(
     sourcePos,
     targetPos,
-    nodeRadius(sourceEl?.type),
-    nodeRadius(targetEl?.type),
+    nodeRadius(sourceEl?.type, sourceEl?.confidence),
+    nodeRadius(targetEl?.type, targetEl?.confidence),
   );
   return (
     <g opacity={opacity} style={{ transition }}>
@@ -170,7 +170,7 @@ export function GraphNode({
         ? { ...element, status: "withdrawn" }
         : element,
   );
-  const radius = nodeRadius(element.type);
+  const radius = nodeRadius(element.type, element.confidence);
   return (
     <g
       transform={`translate(${position.x},${position.y})`}
@@ -346,7 +346,7 @@ export function OffscreenIndicators({
   els.forEach((el) => {
     const pos = positions[el.id];
     if (!pos) return;
-    const r = nodeRadius(el.type) * zoom;
+    const r = nodeRadius(el.type, el.confidence) * zoom;
     const sx = pos.x * zoom + pan.x;
     const sy = pos.y * zoom + pan.y;
     if (sx - r < 0) hidden.left = true;

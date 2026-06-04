@@ -3,7 +3,8 @@
  * @module components/TextTab
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { scoreChanges } from "../utils/simulateRethonClient.js";
 import { C } from "../constants/colors.js";
 import { useTextTabData } from "../hooks/useTextTabData.js";
 import { useActiveSection } from "../hooks/useActiveSection.js";
@@ -70,6 +71,7 @@ export function TextTab({
   expandAllKey,
   allExpanded,
   hideNonEntailsRels,
+  weights,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   const scrollRef = useRef(null);
@@ -83,6 +85,55 @@ export function TextTab({
   // ── State ───────────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState(DEFAULT_COLLAPSED_SECTIONS);
+  /**
+   * @type {[Record<string,{delta_account:number,delta_systematicity:number}|null>|null, Function]}
+   * null = not yet computed
+   */
+  const [withdrawalDeltas, setWithdrawalDeltas] = useState(null);
+
+  // Recompute withdrawal deltas whenever active/revised J/P/T elements or
+  // their argument relations change. Stable string key avoids spurious fires.
+  const withdrawalKey = useMemo(
+    () =>
+      [
+        ...state.elements
+          .filter(
+            (e) =>
+              (e.status === "active" || e.status === "revised") &&
+              (e.type === "judgment" || e.type === "principle" || e.type === "theory"),
+          )
+          .map((e) => `${e.id}:${e.status}`),
+        `rels:${
+          state.relations.filter(
+            (r) =>
+              r.type === "jointly_entails" || r.type === "jointly_precludes",
+          ).length
+        }`,
+      ]
+        .sort()
+        .join(","),
+    [state.elements, state.relations],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    scoreChanges(state, true, weights).then((result) => {
+      if (cancelled || !result) return;
+      setWithdrawalDeltas(
+        Object.fromEntries(
+          result.withdrawal_deltas.map((d) => [
+            d.element_id,
+            d.delta_account != null
+              ? { delta_account: d.delta_account, delta_systematicity: d.delta_systematicity }
+              : null,
+          ]),
+        ),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [withdrawalKey, weights]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = (key) =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -207,6 +258,7 @@ export function TextTab({
         badgeColor,
         pCovers,
         search,
+        withdrawalDeltas,
       }}
     >
       <div

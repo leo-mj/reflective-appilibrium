@@ -42,6 +42,29 @@ export function Highlight({ text, query }) {
   );
 }
 
+// ─── MetaChip ─────────────────────────────────────────────────────────────────
+
+/** Consistently-styled bordered pill for element metadata (confidence, status, scores). */
+function MetaChip({ color = C.dim, title, children }) {
+  return (
+    <span
+      title={title}
+      style={{
+        fontSize: 10,
+        padding: "2px 6px",
+        borderRadius: 4,
+        border: `1px solid ${color}55`,
+        color,
+        lineHeight: 1.6,
+        flexShrink: 0,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 // ─── Section header ───────────────────────────────────────────────────────────
 
 export function SectionHeader({ title, onAdd, collapsed, onToggle }) {
@@ -139,27 +162,11 @@ export function Badge({ id }) {
 
 export function StatusLabel({ status }) {
   if (status === "withdrawn")
-    return (
-      <span
-        style={{ ...META_LABEL_STYLE, fontSize: 10, color: C.withdrawnMark }}
-      >
-        withdrawn
-      </span>
-    );
+    return <MetaChip color={C.withdrawnMark}>withdrawn</MetaChip>;
   if (status === "rejected")
-    return (
-      <span
-        style={{ ...META_LABEL_STYLE, fontSize: 10, color: C.rejectedMark }}
-      >
-        rejected
-      </span>
-    );
+    return <MetaChip color={C.rejectedMark}>rejected</MetaChip>;
   if (status === "revised")
-    return (
-      <span style={{ ...META_LABEL_STYLE, fontSize: 10, color: C.revised }}>
-        revised
-      </span>
-    );
+    return <MetaChip color={C.revised}>revised</MetaChip>;
   return null;
 }
 
@@ -183,10 +190,22 @@ export function ActionButtons({ onRevise, onWithdraw }) {
 // ─── Element card ─────────────────────────────────────────────────────────────
 
 export function ElementCard({ e, dim }) {
-  const { pCovers, onEditRequest, onWithdrawRequest, badgeColor, search } =
-    useContext(Ctx);
+  const {
+    pCovers,
+    onEditRequest,
+    onWithdrawRequest,
+    badgeColor,
+    search,
+    withdrawalDeltas,
+  } = useContext(Ctx);
   const isW = e.status === "withdrawn";
   const isR = e.status === "rejected";
+  const isActive = e.status === "active" || e.status === "revised";
+  // withdrawalDelta = how account and systematicity change if this element is withdrawn.
+  // Negative account delta → removing hurts account (element is well-covered by theory).
+  // Positive systematicity delta (for principles) → theory becomes leaner without this element.
+  const withdrawalDelta =
+    isActive && withdrawalDeltas ? (withdrawalDeltas[e.id] ?? null) : null;
   const color = badgeColor(e.id);
   return (
     <div
@@ -210,18 +229,39 @@ export function ElementCard({ e, dim }) {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 6,
+            gap: 4,
             flexWrap: "wrap",
           }}
         >
           <Badge id={e.id} />
-          <span style={{ fontSize: 10, color: C.dim }}>{e.confidence}</span>
+          <MetaChip>{typeof e.confidence === "number" ? e.confidence.toFixed(2) : e.confidence}</MetaChip>
           <StatusLabel status={e.status} />
           {pCovers[e.id]?.length > 0 && (
-            <span style={{ fontSize: 11, color: C.dim }}>
-              covers: {pCovers[e.id].join(", ")}
-            </span>
+            <MetaChip>covers: {pCovers[e.id].join(", ")}</MetaChip>
           )}
+          {withdrawalDelta != null &&
+            (() => {
+              const { delta_account: dA, delta_systematicity: dS } =
+                withdrawalDelta;
+              const fmt = (v) => `${v > 0 ? "+" : ""}${v.toFixed(3)}`;
+              const col = (v) =>
+                v < -0.001 ? C.supports : v > 0.001 ? C.conflicts : C.dim;
+              return (
+                <>
+                  <MetaChip color={col(dA)} title="Account change if withdrawn">
+                    if withdrawn: Account {fmt(dA)}
+                  </MetaChip>
+                  {dS !== 0 && (
+                    <MetaChip
+                      color={col(dS)}
+                      title="Systematicity change if withdrawn"
+                    >
+                      if withdrawn Systematicity {fmt(dS)}
+                    </MetaChip>
+                  )}
+                </>
+              );
+            })()}
         </div>
         <ActionButtons
           onRevise={() => onEditRequest(e.id)}
@@ -259,7 +299,10 @@ function groupRelationsByArgument(rels) {
   const groups = [];
   const seenArgIds = new Set();
   for (const r of rels) {
-    if ((r.type === "jointly_entails" || r.type === "jointly_precludes") && r.argumentId) {
+    if (
+      (r.type === "jointly_entails" || r.type === "jointly_precludes") &&
+      r.argumentId
+    ) {
       if (seenArgIds.has(r.argumentId)) continue;
       seenArgIds.add(r.argumentId);
       groups.push({
@@ -326,7 +369,9 @@ export function ArgumentCard({ rels, dim }) {
                 fontWeight: "bold",
               }}
             >
-              {rels[0].type === "jointly_precludes" ? "⇒ jointly precludes ⇒" : "→ jointly entails →"}
+              {rels[0].type === "jointly_precludes"
+                ? "⇒ jointly precludes ⇒"
+                : "→ jointly entails →"}
             </span>
             <Badge id={r.to} />
             <StatusLabel status={r.status} />
@@ -362,11 +407,26 @@ export function ArgumentCard({ rels, dim }) {
                 lineHeight: 1.5,
               }}
             >
-              <div>{index == allNodeIds.length - 1 && (
-                <b>Therefore{rels[0].type === "jointly_precludes" && (
-                  <span style={{ color: C.jointly_precludes, fontStyle: "italic", fontWeight: "normal" }}> not</span>
-                )}:</b>
-              )}</div>
+              <div>
+                {index == allNodeIds.length - 1 && (
+                  <b>
+                    Therefore
+                    {rels[0].type === "jointly_precludes" && (
+                      <span
+                        style={{
+                          color: C.jointly_precludes,
+                          fontStyle: "italic",
+                          fontWeight: "normal",
+                        }}
+                      >
+                        {" "}
+                        not
+                      </span>
+                    )}
+                    :
+                  </b>
+                )}
+              </div>
               <span
                 style={{
                   color: badgeColor(id),
@@ -766,7 +826,6 @@ export function SectionListing({
             title={`Arguments (${groupRelationsByArgument(sortedRels).length})`}
             collapsed={isCollapsed("relations")}
             onToggle={() => toggle("relations")}
-
           />
           {!isCollapsed("relations") && (
             <>

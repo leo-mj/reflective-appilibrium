@@ -87,6 +87,10 @@ export function AppHeader({
   onExpandAll,
   hideNonEntailsRels,
   setHideNonEntailsRels,
+  weights,
+  weightsChanged,
+  onWeightsChange,
+  onResetWeights,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -215,6 +219,10 @@ export function AppHeader({
     ANALYZE_TABS,
     hideNonEntailsRels,
     setHideNonEntailsRels,
+    weights,
+    weightsChanged,
+    onWeightsChange,
+    onResetWeights,
   };
 
   if (!isWide) {

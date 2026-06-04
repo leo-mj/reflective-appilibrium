@@ -12,11 +12,12 @@ import {
   FIELD_STYLE,
 } from "../../constants/modalConstants.js";
 import { ModalShell } from "./ModalShell.jsx";
+import { ConfidenceInput } from "./ConfidenceInput.jsx";
 
 /**
  * @typedef {Object} EditFormData
  * @property {'judgment'|'principle'|'theory'} type
- * @property {'high'|'moderate'|'low'}         confidence
+ * @property {number} confidence
  * @property {string} origin
  * @property {string} text
  */
@@ -63,18 +64,10 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
         </select>
       </div>
 
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Confidence</label>
-        <select
-          value={form.confidence}
-          onChange={(e) => set("confidence", e.target.value)}
-          style={INPUT_STYLE}
-        >
-          <option value="high">High</option>
-          <option value="moderate">Moderate</option>
-          <option value="low">Low</option>
-        </select>
-      </div>
+      <ConfidenceInput
+        value={form.confidence}
+        onChange={(v) => set("confidence", v)}
+      />
 
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Origin</label>

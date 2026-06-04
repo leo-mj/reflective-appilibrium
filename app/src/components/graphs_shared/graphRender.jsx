@@ -119,11 +119,11 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
   const isNew = newIds.has(element.id);
   return {
     isWithdrawn,
-    opacity: isFuture ? 0 : isWithdrawn ? 0.25 : confOp[element.confidence],
+    opacity: isFuture ? 0 : isWithdrawn ? 0.25 : confOp(element.confidence),
     transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
     children:
       isNew && !isWithdrawn ? (
-        <PulseRing type={element.type} radius={nodeRadius(element.type)} />
+        <PulseRing type={element.type} radius={nodeRadius(element.type, element.confidence)} />
       ) : null,
   };
 }
@@ -149,8 +149,8 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
   const isRecentlyAdded = element.id === recentlyAdded;
   const isPreviewWithdrawn = previewWithdrawnIds?.has(element.id) ?? false;
   const baseOpacity =
-    isWithdrawn || isPreviewWithdrawn ? 0.25 : isRejected ? 0.35 : confOp[element.confidence];
-  const r = nodeRadius(element.type);
+    isWithdrawn || isPreviewWithdrawn ? 0.25 : isRejected ? 0.35 : confOp(element.confidence);
+  const r = nodeRadius(element.type, element.confidence);
   return {
     isWithdrawn: isWithdrawn || isPreviewWithdrawn,
     isRejected,

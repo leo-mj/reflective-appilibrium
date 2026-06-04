@@ -18,6 +18,7 @@ import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
+import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
 
 const inlineDivider = (
   <div
@@ -64,10 +65,15 @@ export function AppHeaderWide({
   onExpandAll,
   hideNonEntailsRels,
   setHideNonEntailsRels,
+  weights,
+  weightsChanged,
+  onWeightsChange,
+  onResetWeights,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
+  const [weightsOpen, setWeightsOpen] = useState(false);
   const { isDark, toggle: toggleTheme } = useTheme();
 
   const llmSaved = (() => {
@@ -246,7 +252,7 @@ export function AppHeaderWide({
                     display: "flex",
                     flexDirection: "column",
                     gap: 2,
-                    minWidth: 180,
+                    minWidth: weightsOpen ? 248 : 180,
                     boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
                   }}
                 >
@@ -309,6 +315,50 @@ export function AppHeaderWide({
                       ? "Show all relations"
                       : "Arguments only"}
                   </button>
+
+                  {menuDivider}
+
+                  <button
+                    onClick={() => setWeightsOpen((o) => !o)}
+                    style={{
+                      ...menuItem,
+                      color: weightsChanged ? C.principle.high : undefined,
+                    }}
+                  >
+                    <span style={icon}>⚖</span>
+                    Model weights{weightsChanged ? " *" : ""}
+                    <span
+                      style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}
+                    >
+                      {weightsOpen ? "▲" : "▼"}
+                    </span>
+                  </button>
+                  {weightsOpen && (
+                    <div style={{ padding: "4px 8px 8px 8px" }}>
+                      <WeightTriangle
+                        weights={weights}
+                        onChange={onWeightsChange}
+                        weightsChanged={weightsChanged}
+                      />
+                      {weightsChanged && (
+                        <button
+                          onClick={onResetWeights}
+                          style={{
+                            marginTop: 4,
+                            background: "transparent",
+                            border: `1px solid ${C.border}`,
+                            color: C.dim,
+                            borderRadius: 4,
+                            padding: "2px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {menuDivider}
 
