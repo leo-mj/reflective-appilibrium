@@ -5,6 +5,8 @@
 
 /** @import { REState } from '../types.js' */
 
+import { BACKEND_ENABLED } from "../config.js";
+import { dummyRoundScores, dummyWithdrawalDeltas, dummySimulationResult } from "../dummy-data/dummy-rethon-scores.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
@@ -31,6 +33,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @returns {Promise<{translated_arguments: Array, translated_re_state: Object}>}
  */
 export async function simulateRethonStep(state, local, evolution = null, weights = null) {
+  if (!BACKEND_ENABLED) return dummySimulationResult;
   const url = `${BACKEND_URL}/api/simulate_rethon/step`;
   const res = await fetch(url, {
     method: "POST",
@@ -90,6 +93,7 @@ export async function simulateRethonStep(state, local, evolution = null, weights
  * @returns {Promise<{account: number, systematicity: number}|null>}
  */
 export async function quickScore(elements, relations, weights = null) {
+  if (!BACKEND_ENABLED) return null;
   try {
     const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/quick_score`, {
       method: "POST",
@@ -105,6 +109,9 @@ export async function quickScore(elements, relations, weights = null) {
 }
 
 export async function scorePerRound(state, local = true, weights = null) {
+  if (!BACKEND_ENABLED) {
+    return { round_scores: dummyRoundScores };
+  }
   const url = `${BACKEND_URL}/api/simulate_rethon/score_per_round`;
   const res = await fetch(url, {
     method: "POST",
@@ -151,6 +158,9 @@ export async function scorePerRound(state, local = true, weights = null) {
  * @returns {Promise<{withdrawal_deltas: Array}|null>}
  */
 export async function scoreChanges(state, local = true, weights = null) {
+  if (!BACKEND_ENABLED) {
+    return { withdrawal_deltas: dummyWithdrawalDeltas };
+  }
   try {
     const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/score_changes`, {
       method: "POST",
@@ -172,6 +182,7 @@ export async function scoreChanges(state, local = true, weights = null) {
 }
 
 export async function simulateRethon(state, local, evolution = null, useDummy = false, weights = null) {
+  if (!BACKEND_ENABLED) return dummySimulationResult;
   const url = useDummy
     ? `${BACKEND_URL}/api/simulate_rethon/simulate?use_dummy=true`
     : `${BACKEND_URL}/api/simulate_rethon/simulate`;

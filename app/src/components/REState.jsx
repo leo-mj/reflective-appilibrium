@@ -19,14 +19,16 @@ import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
   const [tab, setTab] = useState(
-    initialState.model === "questionnaire" ? "questionnaire" : "elicitJudgments",
+    initialState.model === "questionnaire"
+      ? "questionnaire"
+      : "elicitJudgments",
   );
   const [hiddenLegendKeys, setHiddenLegendKeys] = useState(new Set());
   const [showText, setShowText] = useState(true);
   const [showTabNav, setShowTabNav] = useState(false);
   const [expandAllKey, setExpandAllKey] = useState(0);
   const [allExpanded, setAllExpanded] = useState(false);
-  const [assistSidePanel, setAssistSidePanel] = useState("text");
+  const [assistSidePanel, setAssistSidePanel] = useState("graph");
   const [historyRound, setHistoryRound] = useState(0);
   const [workflowPhase, setWorkflowPhase] = useState(null);
   const [addBarCtrlTo, setAddBarCtrlTo] = useState(null);
@@ -34,7 +36,11 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
   const [equilibriumPreviewWithdrawnIds, setEquilibriumPreviewWithdrawnIds] =
     useState(null);
-  const DEFAULT_WEIGHTS = { account: 0.35, systematicity: 0.55, faithfulness: 0.1 };
+  const DEFAULT_WEIGHTS = {
+    account: 0.35,
+    systematicity: 0.55,
+    faithfulness: 0.1,
+  };
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const weightsChanged =
     weights.account !== DEFAULT_WEIGHTS.account ||
