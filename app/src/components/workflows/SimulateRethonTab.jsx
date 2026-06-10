@@ -582,13 +582,11 @@ function EvolutionStep({ step, stepType, position, scores }) {
 /**
  * @param {Object}   props
  * @param {REState}  props.state
- * @param {boolean}  [props.useDummy]
  * @param {Function} [props.onApplyRethonEquilibrium]
  * @param {Function} [props.onSetEquilibriumPreview]
  */
 export function SimulateRethonTab({
   state,
-  useDummy = false,
   onApplyRethonEquilibrium,
   onSetEquilibriumPreview,
   weights = null,
@@ -633,7 +631,6 @@ export function SimulateRethonTab({
         state,
         true,
         startingEvolution,
-        useDummy,
         weights,
       );
       setResult(data);

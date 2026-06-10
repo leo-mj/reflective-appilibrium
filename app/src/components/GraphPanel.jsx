@@ -224,7 +224,6 @@ const suggestionsDisabled = !LLM_ENABLED && !isSample;
           <Suspense fallback={null}>
             <SimulateRethonTab
               state={state}
-              useDummy={useDummyAssist}
               onApplyRethonEquilibrium={onApplyRethonEquilibrium}
               onSetEquilibriumPreview={onSetEquilibriumPreview}
               weights={weights}
