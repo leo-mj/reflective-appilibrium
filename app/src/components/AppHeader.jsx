@@ -31,6 +31,7 @@ import { ASSIST_TABS } from "../constants/tabConstants.jsx";
 import { AppHeaderNarrow } from "./app_header/AppHeaderNarrow.jsx";
 import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
 import { C } from "../constants/colors.js";
+import { BACKEND_ENABLED } from "../config.js";
 
 /**
  * @param {Object}   props
@@ -142,7 +143,8 @@ export function AppHeader({
   const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
   const visibleSubTabs = (metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS)
     .filter((t) => !hideNonEntailsRels || t !== "suggestRelations")
-    .filter((t) => model === "questionnaire" || t !== "questionnaire");
+    .filter((t) => model === "questionnaire" || t !== "questionnaire")
+    .filter((t) => BACKEND_ENABLED || t !== "simulateRethon");
 
   const importModals = (
     <>
