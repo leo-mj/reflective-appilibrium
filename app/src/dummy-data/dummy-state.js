@@ -449,7 +449,7 @@ export default {
       addedRound: 5,
     },
 
-    // Arguments (jointly_entails)
+    // Arguments (entails for single-premise; jointly_entails for multi-premise)
     // arg-dummy-1: T1 + T2 → P2
     {
       from: "T1", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1",
@@ -482,6 +482,36 @@ export default {
       from: "P3", to: "J5", type: "jointly_entails", argumentId: "arg-dummy-3",
       explanation: "Probabilistic obligation (P2) allows uncertain future existence to ground present duties; the diminution principle (P3) says only existence-uncertainty (not temporal distance) may reduce obligation strength; together they permit the slight welfare discounting asserted by J5.",
       addedRound: 8,
+    },
+    // arg-dummy-4: P1 → J3
+    {
+      from: "P1", to: "J3", type: "entails", argumentId: "arg-dummy-4",
+      explanation: "The sufficientarian threshold directly entails that depleting all natural resources for short-term economic gain is wrong, since it leaves future generations worse off.",
+      addedRound: 2,
+    },
+    // arg-dummy-5: P1 → J4
+    {
+      from: "P1", to: "J4", type: "entails", argumentId: "arg-dummy-5",
+      explanation: "The sufficientarian duty requires leaving the next generation no worse off, which entails owing a liveable environment but not necessarily the same standard of living.",
+      addedRound: 2,
+    },
+    // arg-dummy-6: P2 → J5
+    {
+      from: "P2", to: "J5", type: "entails", argumentId: "arg-dummy-6",
+      explanation: "If obligations can attach to probable future people, then existence uncertainty (but not mere temporal distance) is a legitimate basis for slight welfare discounting.",
+      addedRound: 3,
+    },
+    // arg-dummy-7: P2 → J8
+    {
+      from: "P2", to: "J8", type: "entails", argumentId: "arg-dummy-7",
+      explanation: "Probabilistic obligation to future people who will probably exist grounds the duty not to allow their extinction when prevention is available at modest cost.",
+      addedRound: 4,
+    },
+    // arg-dummy-8: J5 → ¬J10
+    {
+      from: "J5", to: "J10", type: "precludes", argumentId: "arg-dummy-8",
+      explanation: "If permissible discounting by existence uncertainty is accepted (J5), then the strict equal temporal counting of future interests (J10) cannot hold without qualification.",
+      addedRound: 5,
     },
   ],
   coherence: {

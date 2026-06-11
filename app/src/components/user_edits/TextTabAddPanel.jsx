@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 
 import { C } from "../../constants/colors.js";
 import { sortElementIds } from "../../utils/stateUtils.js";
+import { Tooltip } from "../Tooltip.jsx";
 
 const ELEMENT_DEFAULTS = {
   type: "judgment",
@@ -196,7 +197,11 @@ export function AddBar({
                 <option value="principle">Principle</option>
                 <option value="theory">Theory</option>
               </select>
-              {[{ l: "L", v: 0.33 }, { l: "M", v: 0.67 }, { l: "H", v: 1.0 }].map(({ l, v }) => (
+              {[
+                { l: "L", v: 0.33 },
+                { l: "M", v: 0.67 },
+                { l: "H", v: 1.0 },
+              ].map(({ l, v }) => (
                 <button
                   key={l}
                   type="button"
@@ -204,8 +209,14 @@ export function AddBar({
                   style={{
                     ...SELECT_STYLE,
                     padding: "3px 7px",
-                    background: Math.abs(elementForm.confidence - v) < 0.01 ? C.border : "transparent",
-                    fontWeight: Math.abs(elementForm.confidence - v) < 0.01 ? "bold" : "normal",
+                    background:
+                      Math.abs(elementForm.confidence - v) < 0.01
+                        ? C.border
+                        : "transparent",
+                    fontWeight:
+                      Math.abs(elementForm.confidence - v) < 0.01
+                        ? "bold"
+                        : "normal",
                     cursor: "pointer",
                   }}
                 >
@@ -220,7 +231,8 @@ export function AddBar({
                 value={elementForm.confidence}
                 onChange={(e) => {
                   const v = parseFloat(e.target.value);
-                  if (!Number.isNaN(v)) setEl("confidence", Math.max(0, Math.min(1, v)));
+                  if (!Number.isNaN(v))
+                    setEl("confidence", Math.max(0, Math.min(1, v)));
                 }}
                 style={{ ...SELECT_STYLE, width: 55 }}
               />
@@ -380,7 +392,11 @@ export function AddElementPanel({ elementType, onAddElement }) {
         >
           Add {elementType}
         </button>
-        {[{ l: "L", v: 0.33 }, { l: "M", v: 0.67 }, { l: "H", v: 1.0 }].map(({ l, v }) => (
+        {[
+          { l: "L", v: 0.33 },
+          { l: "M", v: 0.67 },
+          { l: "H", v: 1.0 },
+        ].map(({ l, v }) => (
           <button
             key={l}
             type="button"
@@ -388,8 +404,10 @@ export function AddElementPanel({ elementType, onAddElement }) {
             style={{
               ...SELECT_STYLE,
               padding: "3px 7px",
-              background: Math.abs(form.confidence - v) < 0.01 ? C.border : "transparent",
-              fontWeight: Math.abs(form.confidence - v) < 0.01 ? "bold" : "normal",
+              background:
+                Math.abs(form.confidence - v) < 0.01 ? C.border : "transparent",
+              fontWeight:
+                Math.abs(form.confidence - v) < 0.01 ? "bold" : "normal",
               cursor: "pointer",
             }}
           >
@@ -404,7 +422,8 @@ export function AddElementPanel({ elementType, onAddElement }) {
           value={form.confidence}
           onChange={(e) => {
             const v = parseFloat(e.target.value);
-            if (!Number.isNaN(v)) set("confidence", Math.max(0, Math.min(1, v)));
+            if (!Number.isNaN(v))
+              set("confidence", Math.max(0, Math.min(1, v)));
           }}
           style={{ ...SELECT_STYLE, width: 55 }}
         />
@@ -456,6 +475,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
   const [premises, setPremises] = useState([ids[0] ?? ""]);
   const [conclusion, setConclusion] = useState(ids[1] ?? ids[0] ?? "");
   const [explanation, setExplanation] = useState("");
+  const [mode, setMode] = useState("entails"); // "entails" | "precludes"
 
   const setPremise = (i, id) =>
     setPremises((prev) => prev.map((p, j) => (j === i ? id : p)));
@@ -477,6 +497,15 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
     !hasDuplicates &&
     !conclusionClash;
 
+  const relationType =
+    mode === "entails"
+      ? premises.length === 1
+        ? "entails"
+        : "jointly_entails"
+      : premises.length === 1
+        ? "precludes"
+        : "jointly_precludes";
+
   const handleSubmit = () => {
     const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
     premises.forEach((premise, i) => {
@@ -484,7 +513,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
         {
           from: premise,
           to: conclusion,
-          type: "jointly_entails",
+          type: relationType,
           argumentId,
           explanation,
         },
@@ -528,7 +557,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
             fontWeight: "bold",
             cursor: canSubmit ? "pointer" : "default",
             border: "none",
-            background: C.jointly_entails,
+            background: mode === "entails" ? C.jointly_entails : C.jointly_precludes,
             color: "#fff",
             opacity: canSubmit ? 1 : 0.4,
             flexShrink: 0,
@@ -582,16 +611,26 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
           )}
         </div>
 
-        <span
-          style={{
-            color: C.jointly_entails,
-            fontSize: 11,
-            fontWeight: "bold",
-            alignSelf: "center",
-          }}
-        >
-          jointly entails →
-        </span>
+        <Tooltip text="Click to switch between entails and precludes">
+          <button
+            type="button"
+            onClick={() => setMode((m) => (m === "entails" ? "precludes" : "entails"))}
+            style={{
+              background: "transparent",
+              border: `1px solid ${mode === "entails" ? C.jointly_entails : C.jointly_precludes}`,
+              borderRadius: 4,
+              color: mode === "entails" ? C.jointly_entails : C.jointly_precludes,
+              fontSize: 11,
+              fontWeight: "bold",
+              padding: "2px 6px",
+              cursor: "pointer",
+              alignSelf: "center",
+              flexShrink: 0,
+            }}
+          >
+            {mode === "entails" ? "(jointly) entails →" : "(jointly) precludes →"}
+          </button>
+        </Tooltip>
 
         <select
           value={conclusion}

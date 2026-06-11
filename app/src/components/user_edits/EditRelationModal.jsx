@@ -62,7 +62,10 @@ export function EditRelationModal({
           <option value="conflicts">Conflicts</option>
           <option value="undermines">Undermines</option>
           <option value="depends">Depends</option>
+          <option value="entails">Entails</option>
+          <option value="precludes">Precludes</option>
           <option value="jointly_entails">Jointly Entails</option>
+          <option value="jointly_precludes">Jointly Precludes</option>
         </select>
       </div>
 

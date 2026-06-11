@@ -11,7 +11,7 @@
 /** @import { REElement, RERelation, PositionMap } from '../../types.js' */
 
 import { C, confOp, TRANSITION } from "../../constants/colors.js";
-import { nodeRadius } from "../../utils/graphHelpers.js";
+import { nodeRadius, computeJunction } from "../../utils/graphHelpers.js";
 import { GraphEdge, GraphNode, PulseRing } from "./GraphElements.jsx";
 
 // ─── Tooltip handler factory ──────────────────────────────────────────────────
@@ -182,6 +182,73 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
 // ─── Shared render functions ──────────────────────────────────────────────────
 
 /**
+ * Renders a multi-premise joint argument as converging lines → junction dot → conclusion arrow.
+ *
+ * All relations in `rels` share the same `argumentId` and conclusion (`to`).
+ * Returns `null` when any required position is missing.
+ *
+ * @param {RERelation[]}        rels
+ * @param {PositionMap}         positions
+ * @param {Map<string,REElement>} elementById
+ * @param {Object}              visuals  - Output of `graphEdgeVisuals` for the group.
+ * @returns {React.ReactElement|null}
+ */
+export function renderJointArgument(rels, positions, elementById, visuals) {
+  const conclusionId = rels[0].to;
+  const conclusionEl = elementById.get(conclusionId);
+  const conclusionPos = positions[conclusionId];
+  if (!conclusionPos || !conclusionEl) return null;
+
+  const { isWithdrawn, opacity, strokeWidth = 2, transition } = visuals;
+  const color = isWithdrawn ? C.withdrawn : C[rels[0].type];
+
+  const premises = rels
+    .map((r) => ({ r, el: elementById.get(r.from), pos: positions[r.from] }))
+    .filter((d) => d.el && d.pos);
+  if (premises.length === 0) return null;
+
+  // Conclusion node radius — needed for junction clamping and arrow geometry.
+  const tr = nodeRadius(conclusionEl.type, conclusionEl.confidence);
+
+  const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
+  const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
+  const { jx, jy } = computeJunction(centX, centY, conclusionPos, tr);
+
+  // Conclusion arrow geometry
+  const adx = conclusionPos.x - jx, ady = conclusionPos.y - jy;
+  const adist = Math.hypot(adx, ady) || 1;
+  const aux = adx / adist, auy = ady / adist;
+  const tipX = conclusionPos.x - aux * tr;
+  const tipY = conclusionPos.y - auy * tr;
+  const bx = tipX - aux * 10, by = tipY - auy * 10;
+  const aperpX = -auy, aperpY = aux;
+
+  return (
+    <g key={rels[0].argumentId} opacity={opacity} style={{ transition }}>
+      {premises.map(({ r, el, pos }) => {
+        const sr = nodeRadius(el.type, el.confidence);
+        const dx = jx - pos.x, dy = jy - pos.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        return (
+          <line
+            key={r.from}
+            x1={pos.x + (dx / dist) * sr} y1={pos.y + (dy / dist) * sr}
+            x2={jx} y2={jy}
+            stroke={color} strokeWidth={strokeWidth}
+          />
+        );
+      })}
+      <circle cx={jx} cy={jy} r={4} fill={color} />
+      <line x1={jx} y1={jy} x2={bx} y2={by} stroke={color} strokeWidth={strokeWidth} />
+      <polygon
+        points={`${tipX},${tipY} ${bx + aperpX * 5},${by + aperpY * 5} ${bx - aperpX * 5},${by - aperpY * 5}`}
+        fill={color}
+      />
+    </g>
+  );
+}
+
+/**
  * Renders a single edge given pre-computed visual props.
  * Returns `null` when either endpoint position is missing.
  *
@@ -191,7 +258,7 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
  * @param {Object}      visuals   - Output of `historyEdgeVisuals` or `graphEdgeVisuals`.
  * @returns {React.ReactElement|null}
  */
-export function renderEdge(relation, positions, elements, visuals) {
+export function renderEdge(relation, positions, elements, visuals, parallelOffset = 0) {
   const resolved = resolveEdge(relation, positions, elements);
   if (!resolved) return null;
   const { sourcePos, targetPos, sourceEl, targetEl } = resolved;
@@ -203,6 +270,7 @@ export function renderEdge(relation, positions, elements, visuals) {
       targetPos={targetPos}
       sourceEl={sourceEl}
       targetEl={targetEl}
+      parallelOffset={parallelOffset}
       {...visuals}
     />
   );

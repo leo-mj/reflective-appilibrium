@@ -224,6 +224,7 @@ export function AppHeaderWide({
           <div style={{ position: "relative" }}>
             <Tooltip text="Settings — theme, font, import, export, and LLM configuration.">
               <button
+                data-tutorial="btn-menu"
                 onClick={() => setMenuOpen((o) => !o)}
                 style={{ ...btn(menuOpen), border: `1px solid ${C.text}` }}
               >
@@ -314,48 +315,52 @@ export function AppHeaderWide({
                       : "Arguments only"}
                   </button>
 
-                  {menuDivider}
+                  {BACKEND_ENABLED && (
+                    <>
+                      {menuDivider}
 
-                  <button
-                    onClick={() => setWeightsOpen((o) => !o)}
-                    style={{
-                      ...menuItem,
-                      color: weightsChanged ? C.principle.high : undefined,
-                    }}
-                  >
-                    <span style={icon}>⚖</span>
-                    Model weights{weightsChanged ? " *" : ""}
-                    <span
-                      style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}
-                    >
-                      {weightsOpen ? "▲" : "▼"}
-                    </span>
-                  </button>
-                  {weightsOpen && (
-                    <div style={{ padding: "4px 8px 8px 8px" }}>
-                      <WeightTriangle
-                        weights={weights}
-                        onChange={onWeightsChange}
-                        weightsChanged={weightsChanged}
-                      />
-                      {weightsChanged && (
-                        <button
-                          onClick={onResetWeights}
-                          style={{
-                            marginTop: 4,
-                            background: "transparent",
-                            border: `1px solid ${C.border}`,
-                            color: C.dim,
-                            borderRadius: 4,
-                            padding: "2px 8px",
-                            fontSize: 11,
-                            cursor: "pointer",
-                          }}
+                      <button
+                        onClick={() => setWeightsOpen((o) => !o)}
+                        style={{
+                          ...menuItem,
+                          color: weightsChanged ? C.principle.high : undefined,
+                        }}
+                      >
+                        <span style={icon}>⚖</span>
+                        Model weights{weightsChanged ? " *" : ""}
+                        <span
+                          style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}
                         >
-                          Reset
-                        </button>
+                          {weightsOpen ? "▲" : "▼"}
+                        </span>
+                      </button>
+                      {weightsOpen && (
+                        <div style={{ padding: "4px 8px 8px 8px" }}>
+                          <WeightTriangle
+                            weights={weights}
+                            onChange={onWeightsChange}
+                            weightsChanged={weightsChanged}
+                          />
+                          {weightsChanged && (
+                            <button
+                              onClick={onResetWeights}
+                              style={{
+                                marginTop: 4,
+                                background: "transparent",
+                                border: `1px solid ${C.border}`,
+                                color: C.dim,
+                                borderRadius: 4,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
                       )}
-                    </div>
+                    </>
                   )}
 
                   {menuDivider}
@@ -512,6 +517,18 @@ export function AppHeaderWide({
             Analyze
           </button>
         </Tooltip>
+        {BACKEND_ENABLED && (
+          <Tooltip text="Run the formal rethon RE simulation on your active elements.">
+            <button
+              style={metaTabBtn(metaTab === "simulate")}
+              onClick={() => {
+                if (metaTab !== "simulate") setTab("simulateRethon");
+              }}
+            >
+              Simulate
+            </button>
+          </Tooltip>
+        )}
         <div
           style={{
             width: 1,

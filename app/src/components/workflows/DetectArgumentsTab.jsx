@@ -366,13 +366,13 @@ export function DetectArgumentsTab({
       addedIds.has(el.id) ? newSubmittedIds[el.id] : el.id;
 
     // Add one relation per premise → conclusion, grouped by a shared argumentId.
-    // Negated conclusions become jointly_precludes; positive conclusions jointly_entails.
+    // Single-premise args use entails/precludes; multi-premise use jointly_entails/jointly_precludes.
     const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
     if (premises.length > 0) {
       const conclusionId = resolveId(conclusion);
-      const relationType = conclusion.negated
-        ? "jointly_precludes"
-        : "jointly_entails";
+      const relationType = premises.length === 1
+        ? (conclusion.negated ? "precludes" : "entails")
+        : (conclusion.negated ? "jointly_precludes" : "jointly_entails");
       for (const premise of premises) {
         onAddRelation?.(
           {

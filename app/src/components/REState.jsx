@@ -5,7 +5,7 @@ import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
 import { stateAtRound } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
-import { ASSIST_TABS } from "../constants/tabConstants.jsx";
+import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
 import { saveSession } from "../utils/sessionsClient.js";
 import {
@@ -101,6 +101,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const dims = useWindowSize();
   const isWide = dims.w > 768 && dims.h > 500;
   const isAssistTab = ASSIST_TABS.includes(tab);
+  const isSimulateTab = SIMULATE_TABS.includes(tab);
   const hasSidePanel =
     isWide &&
     (isAssistTab
@@ -261,8 +262,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           }}
         >
           {isSample
-            ? "No LLM API connection — pre-set examples shown in the Assist Tabs and the Matrix Tab"
-            : "No LLM API connection — AI-assistance is disabled"}
+            ? "No LLM API connection — pre-set examples shown in the Assist Tabs"
+            : "No LLM API connection — AI-assistance is disabled, but you can still manually use the app"}
         </div>
       )}
       <AppHeader
@@ -345,7 +346,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         )}
       </div>
 
-      {isWide && !isAssistTab && (
+      {isWide && !isAssistTab && !isSimulateTab && (
         <AddBar
           elements={state.elements.filter((e) =>
             ["active", "revised"].includes(e.status),

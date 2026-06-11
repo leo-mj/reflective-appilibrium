@@ -3,7 +3,7 @@
  * @module components/GraphPanel
  */
 
-import { lazy, Suspense, useState, useRef } from "react";
+import { lazy, Suspense, useState } from "react";
 import { APP_ENV, LLM_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { Graph } from "./Graph.jsx";
@@ -109,6 +109,7 @@ const suggestionsDisabled = !LLM_ENABLED && !isSample;
         <Legend
           hiddenLegendKeys={hiddenLegendKeys}
           setHiddenLegendKeys={setHiddenLegendKeys}
+          hideNonEntailsRels={hideNonEntailsRels}
         />
       )}
       {APP_ENV === "dev" && isAssistPanel && isSample && state.model !== "questionnaire" && (
@@ -158,6 +159,7 @@ const suggestionsDisabled = !LLM_ENABLED && !isSample;
             positions={positions}
             onRoundChange={onRoundChange}
             isWide={isWide}
+            hideNonEntailsRels={hideNonEntailsRels}
           />
         )}
         {tab === "clusters" && (

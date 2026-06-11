@@ -18,109 +18,148 @@ const CARD_W = 280;
 const RING_PAD = 5;
 const GAP = 14;
 
-const STEPS = [
-  {
-    id: "welcome",
-    title: "Welcome to Reflective APPilibrium",
-    text: "This tour walks you through the main sections of the interface. \n Warning: Using the appilibrium does not guarantee finding moral truth!",
-    target: null,
-    tab: "graph",
-  },
-  {
-    id: "meta-analyze",
-    title: "Analyze your RE state",
-    text: "The Analyze section shows your current position. \n Switch between graph, history, and clusters.",
-    target: "meta-analyze",
-    tab: "graph",
-  },
-  {
-    id: "tab-graph",
-    title: "Graph view",
-    text: "A directed graph of all your elements. \n Click a node to select it; hold Ctrl and click a second node to create a relation between them.",
-    target: "tab-graph",
-    tab: "graph",
-  },
-  {
-    id: "tab-history",
-    title: "History",
-    text: "Replay your RE process round by round. \n Drag the slider or press Play to animate each change and see how your position evolved.",
-    target: "tab-history",
-    tab: "history",
-  },
-  {
-    id: "tab-clusters",
-    title: "Coherence clusters",
-    text: "Here you find the largest sets of currently accepted connected elements with no internal conflicts.",
-    target: "tab-clusters",
-    tab: "clusters",
-  },
-  ...(LLM_ENABLED
-    ? [
-        {
-          id: "tab-matrix",
-          title: "Relation matrix",
-          text: "See the relation type between every pair of elements at a glance — a quick overview of the full argument structure.",
-          target: "tab-matrix",
-          tab: "matrix",
-        },
-      ]
-    : []),
-  {
-    id: "meta-assist",
-    title: "AI-guided assistance",
-    text: "The Assist tab drives the iterative RE process. \nCycle through Judgments → Principles → Arguments repeatedly — each pass lets you refine your position until it is coherent.",
-    target: "meta-assist",
-    tab: "elicitJudgments",
-  },
-  {
-    id: "tab-elicit",
-    title: "1 — Elicit Judgments",
-    text: "Start here. Articulate your initial moral judgments on the topic.\n If you use the LLM feature, the LLM will suggest thought-experiments and questions to prompt your judgments.",
-    target: "tab-elicitJudgments",
-    tab: "elicitJudgments",
-  },
-  {
-    id: "tab-principles",
-    title: "2 — Suggest Principles",
-    text: "With judgments in place, find general principles that systematize them.\n The LLM feature can help suggest candidate principles which you can accept, reject, or modify.",
-    target: "tab-suggestPrinciples",
-    tab: "elicitJudgments",
-  },
-  {
-    id: "tab-arguments",
-    title: "3 — Detect Arguments",
-    text: "Find valid argument structures among your elements.\n New arguments may reveal missing premises or expose tensions. \n The LLM feature can help you identify them.",
-    target: "tab-detectArguments",
-    tab: "elicitJudgments",
-  },
-  {
-    id: "btn-workflow",
-    title: "Start Workflow",
-    text: "Runs the full Judgments → Principles → Arguments cycle automatically and repeatedly, round by round.",
-    target: "btn-workflow",
-    tab: "elicitJudgments",
-  },
-  {
-    id: "btn-undo",
-    title: "Undo",
-    text: "Undo the last change at any time with this button or Ctrl+Z. Changes are grouped by round.",
-    target: "btn-undo",
-    tab: null,
-  },
-  {
-    id: "done",
-    title: "You're all set",
-    text: "Press ? at any time to replay this tour. \n You can also hover over a button or tab to get some information on its function.",
-    target: null,
-    tab: null,
-  },
-];
+function buildSteps(hideNonEntailsRels) {
+  const withRels = !hideNonEntailsRels;
+  const cycle = withRels
+    ? "Judgments → Principles → Relations → Arguments"
+    : "Judgments → Principles → Arguments";
 
-export function TutorialStepper({ active, onClose, onSetTab }) {
+  return [
+    {
+      id: "welcome",
+      title: "Welcome to Reflective APPilibrium",
+      text: "This tour walks you through the main sections of the interface. \n Warning: Using the appilibrium does not guarantee finding moral truth!",
+      target: null,
+      tab: "graph",
+    },
+    {
+      id: "meta-analyze",
+      title: "Analyze your RE state",
+      text: "The Analyze section shows your current position. \n Switch between graph, history, and clusters.",
+      target: "meta-analyze",
+      tab: "graph",
+    },
+    {
+      id: "tab-graph",
+      title: "Graph view",
+      text: "A directed graph of all your elements. \n Click a node to select it; hold Ctrl and click a second node to create a relation between them.",
+      target: "tab-graph",
+      tab: "graph",
+    },
+    {
+      id: "graph-interaction",
+      title: "Interacting with the graph",
+      text: "Click a node to highlight it and its direct neighbours.\nClick a relation arrow to highlight the full argument it belongs to — premises, conclusion, and all connecting arrows.",
+      target: null,
+      tab: "graph",
+    },
+    {
+      id: "tab-history",
+      title: "History",
+      text: "Replay your RE process round by round. \n Drag the slider or press Play to animate each change and see how your position evolved.",
+      target: "tab-history",
+      tab: "history",
+    },
+    {
+      id: "tab-clusters",
+      title: "Coherence clusters",
+      text: "Here you find the largest sets of currently accepted connected elements with no internal conflicts.",
+      target: "tab-clusters",
+      tab: "clusters",
+    },
+    ...(LLM_ENABLED
+      ? [
+          {
+            id: "tab-matrix",
+            title: "Relation matrix",
+            text: "See the relation type between every pair of elements at a glance — a quick overview of the full argument structure.",
+            target: "tab-matrix",
+            tab: "matrix",
+          },
+        ]
+      : []),
+    {
+      id: "meta-assist",
+      title: "AI-guided assistance",
+      text: `The Assist tab drives the iterative RE process. \nCycle through ${cycle} repeatedly — each pass lets you refine your position until it is coherent.`,
+      target: "meta-assist",
+      tab: "elicitJudgments",
+    },
+    {
+      id: "tab-elicit",
+      title: "1 — Elicit Judgments",
+      text: "Start here. Articulate your initial moral judgments on the topic.\n If you use the LLM feature, the LLM will suggest thought-experiments and questions to prompt your judgments.",
+      target: "tab-elicitJudgments",
+      tab: "elicitJudgments",
+    },
+    {
+      id: "tab-principles",
+      title: "2 — Suggest Principles",
+      text: "With judgments in place, find general principles that systematize them.\n The LLM feature can help suggest candidate principles which you can accept, reject, or modify.",
+      target: "tab-suggestPrinciples",
+      tab: "elicitJudgments",
+    },
+    {
+      id: "tab-arguments",
+      title: `3 — Detect Arguments`,
+      text: "Find valid argument structures among your elements.\n New arguments may reveal missing premises or expose tensions. \n The LLM feature can help you identify them.",
+      target: "tab-detectArguments",
+      tab: "elicitJudgments",
+    },
+    ...(withRels
+      ? [
+          {
+            id: "tab-relations",
+            title: "4 — Suggest Relations",
+            text: "AI suggests missing relations besides logical (joint) entailment between existing elements. Helps build a denser network.",
+            target: "tab-suggestRelations",
+            tab: "elicitJudgments",
+          },
+        ]
+      : []),
+
+    {
+      id: "btn-workflow",
+      title: "Start Workflow",
+      text: `Runs the full ${cycle} cycle automatically and repeatedly, round by round.`,
+      target: "btn-workflow",
+      tab: "elicitJudgments",
+    },
+    {
+      id: "btn-undo",
+      title: "Undo",
+      text: "Undo the last change at any time with this button or Ctrl+Z. Changes are grouped by round.",
+      target: "btn-undo",
+      tab: null,
+    },
+    {
+      id: "btn-menu",
+      title: "Settings menu",
+      text: "The ☰ menu gives access to: show/hide text panel, expand/collapse toggles, relations beyond logical entailment, font selection, dark/light theme, and import/export.",
+      target: "btn-menu",
+      tab: null,
+    },
+    {
+      id: "done",
+      title: "You're all set",
+      text: "Press ? at any time to replay this tour. \n You can also hover over a button or tab to get some information on its function.",
+      target: null,
+      tab: null,
+    },
+  ];
+}
+
+export function TutorialStepper({
+  active,
+  onClose,
+  onSetTab,
+  hideNonEntailsRels,
+}) {
+  const steps = buildSteps(hideNonEntailsRels);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState(null);
 
-  const step = STEPS[stepIdx];
+  const step = steps[stepIdx];
 
   const measure = useCallback(() => {
     if (!step.target) {
@@ -155,7 +194,7 @@ export function TutorialStepper({ active, onClose, onSetTab }) {
 
   const prev = () => setStepIdx((i) => Math.max(0, i - 1));
   const next = () => {
-    if (stepIdx < STEPS.length - 1) setStepIdx((i) => i + 1);
+    if (stepIdx < steps.length - 1) setStepIdx((i) => i + 1);
     else handleClose();
   };
 
@@ -164,7 +203,7 @@ export function TutorialStepper({ active, onClose, onSetTab }) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const isFirst = stepIdx === 0;
-  const isLast = stepIdx === STEPS.length - 1;
+  const isLast = stepIdx === steps.length - 1;
 
   // Position the card near the target or centered
   let cardTop, cardLeft;
@@ -240,7 +279,7 @@ export function TutorialStepper({ active, onClose, onSetTab }) {
             {step.title}
           </div>
           <div style={{ fontSize: 10, color: C.dim }}>
-            {stepIdx + 1} / {STEPS.length}
+            {stepIdx + 1} / {steps.length}
           </div>
         </div>
 

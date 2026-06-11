@@ -9,8 +9,10 @@
  * - conflicts → orange (`#f97316`)
  * - undermines → amber (`#eab308`)
  * - depends   → grey  (`#6b7280`)
- * - jointly_entails   → green (`#16a34a`)
- * - jointly_precludes → rose  (`#e11d48`)
+ * - entails           → green (`#16a34a`), hollow arrowhead
+ * - precludes         → rose  (`#e11d48`), hollow arrowhead
+ * - jointly_entails   → green (`#16a34a`), filled arrowhead
+ * - jointly_precludes → rose  (`#e11d48`), filled arrowhead
  *
  * Node colours by element type, shaded by confidence level:
  * - judgment  → blue shades
@@ -45,6 +47,8 @@
  *   conflicts: string,
  *   undermines: string,
  *   depends: string,
+ *   entails: string,
+ *   precludes: string,
  *   jointly_entails: string,
  *   jointly_precludes: string,
  *   added: string,
@@ -68,6 +72,8 @@ export const C = {
   conflicts: "#f97316",
   undermines: "#eab308",
   depends: "#6b7280",
+  entails: "#16a34a",
+  precludes: "#e11d48",
   jointly_entails: "#16a34a",
   jointly_precludes: "#e11d48",
   added: "#06b6d4", // pulse ring colour for newly-added nodes in the History tab

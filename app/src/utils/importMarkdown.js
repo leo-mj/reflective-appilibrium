@@ -25,6 +25,8 @@ const RELATION_TYPES = new Set([
   "conflicts",
   "undermines",
   "depends",
+  "entails",
+  "precludes",
   "jointly_entails",
   "jointly_precludes",
 ]);

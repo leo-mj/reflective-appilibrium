@@ -106,7 +106,7 @@ export function TextTab({
         `rels:${
           state.relations.filter(
             (r) =>
-              r.type === "jointly_entails" || r.type === "jointly_precludes",
+              r.type === "entails" || r.type === "precludes" || r.type === "jointly_entails" || r.type === "jointly_precludes",
           ).length
         }`,
       ]

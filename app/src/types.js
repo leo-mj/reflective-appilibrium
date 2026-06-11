@@ -47,10 +47,12 @@ export {};
  * - `conflicts` — source and target are incompatible (orange dashed arrow)
  * - `undermines` — source weakens target without flat contradiction (amber dashed arrow)
  * - `depends`   — source presupposes target (grey arrow)
- * - `jointly_entails`  — source (premise) jointly entails target (conclusion) as part of a detected argument (green arrow)
- * - `jointly_precludes` — source (premise) jointly precludes target (conclusion), i.e. entails its negation (rose arrow)
+ * - `entails`          — single premise entails conclusion (green arrow)
+ * - `precludes`        — single premise entails negation of conclusion (rose arrow)
+ * - `jointly_entails`  — multiple premises jointly entail conclusion (green arrow)
+ * - `jointly_precludes` — multiple premises jointly preclude conclusion, i.e. entail its negation (rose arrow)
  *
- * @typedef {'supports'|'conflicts'|'undermines'|'depends'|'jointly_entails'|'jointly_precludes'} RelationType
+ * @typedef {'supports'|'conflicts'|'undermines'|'depends'|'entails'|'precludes'|'jointly_entails'|'jointly_precludes'} RelationType
  */
 
 // ─── Domain objects ───────────────────────────────────────────────────────────

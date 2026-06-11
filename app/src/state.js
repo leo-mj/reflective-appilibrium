@@ -116,7 +116,10 @@ export function makeQuestionnaireState(spec) {
     if (!arg.every((n) => lookup[Math.abs(n)] != null)) continue;
     const conclusionIdx = arg.at(-1);
     const conclusion = lookup[Math.abs(conclusionIdx)];
-    const relationType = conclusionIdx < 0 ? "jointly_precludes" : "jointly_entails";
+    const premiseCount = arg.length - 1;
+    const relationType = premiseCount === 1
+      ? (conclusionIdx < 0 ? "precludes" : "entails")
+      : (conclusionIdx < 0 ? "jointly_precludes" : "jointly_entails");
     const argumentId = `questionnaire-arg-${i}`;
     for (const n of arg.slice(0, -1)) {
       relations.push({

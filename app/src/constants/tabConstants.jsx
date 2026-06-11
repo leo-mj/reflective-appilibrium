@@ -18,10 +18,11 @@ export const ASSIST_TABS = [
   "questionnaire",
   "elicitJudgments",
   "suggestPrinciples",
-  "suggestRelations",
   "detectArguments",
-  "simulateRethon",
+  "suggestRelations",
 ];
+
+export const SIMULATE_TABS = ["simulateRethon"];
 
 export const TAB_ICONS = {
   questionnaire: <JudgmentIcon />,
@@ -44,8 +45,8 @@ export const TAB_LABELS = {
   clusters: "Clusters",
   elicitJudgments: "Judgments",
   suggestPrinciples: "Principles",
-  suggestRelations: "Relations",
   detectArguments: "Arguments",
+  suggestRelations: "Relations",
   simulateRethon: "Simulate",
 };
 

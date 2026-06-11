@@ -18,12 +18,16 @@ import {
   GraphCanvas,
   OffscreenIndicators,
 } from "./graphs_shared/GraphElements.jsx";
+import { parallelEdgeOffsets, groupJointArguments } from "../utils/graphHelpers.js";
 import {
   renderEdge,
+  renderJointArgument,
   renderNode,
   historyEdgeVisuals,
   historyNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
+
+const ENTAILS_TYPES = new Set(["entails", "precludes", "jointly_entails", "jointly_precludes"]);
 import { PlaybackControls } from "./history/HistoryPlaybackControls.jsx";
 import { LogOverlay } from "./history/LogOverlay.jsx";
 
@@ -299,7 +303,7 @@ function RoundScoresChart({ roundScores, snappedRound }) {
  * @param {boolean}     props.isWide
  * @returns {React.ReactElement}
  */
-export function HistoryTab({ state, positions, onRoundChange, isWide }) {
+export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEntailsRels }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
@@ -352,6 +356,11 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
       behavior: "smooth",
     });
   }, [snappedRound]);
+
+  const elementById = useMemo(
+    () => new Map(state.elements.map((e) => [e.id, e])),
+    [state.elements],
+  );
 
   const { withdrawn } = elementsAtRound(state.elements, snappedRound);
   const wIds = new Set(withdrawn.map((e) => e.id));
@@ -467,14 +476,34 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
           </>
         }
       >
-        {state.relations.map((r) =>
-          renderEdge(
-            r,
-            positions,
-            state.elements,
-            historyEdgeVisuals(r, wIds, snappedRound),
-          ),
-        )}
+        {(() => {
+          const visRels = hideNonEntailsRels
+            ? state.relations.filter((r) => ENTAILS_TYPES.has(r.type))
+            : state.relations;
+          const { solo, jointGroups } = groupJointArguments(visRels);
+          const offsets = parallelEdgeOffsets(solo);
+          return (
+            <>
+              {solo.map((r) =>
+                renderEdge(
+                  r,
+                  positions,
+                  state.elements,
+                  historyEdgeVisuals(r, wIds, snappedRound),
+                  offsets.get(r) ?? 0,
+                ),
+              )}
+              {jointGroups.map((rels) =>
+                renderJointArgument(
+                  rels,
+                  positions,
+                  elementById,
+                  historyEdgeVisuals(rels[0], wIds, snappedRound),
+                ),
+              )}
+            </>
+          );
+        })()}
         {state.elements.map((el) =>
           renderNode(
             el,

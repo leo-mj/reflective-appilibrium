@@ -5,7 +5,7 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
@@ -13,8 +13,14 @@ import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import {
   hitRadius,
+  nodeRadius,
+  arrowGeometry,
   getNeighbours,
   distToSegment,
+  distToQuadBezier,
+  parallelEdgeOffsets,
+  groupJointArguments,
+  computeJunction,
 } from "../utils/graphHelpers.js";
 import { elementsAtRound } from "../utils/stateUtils.js";
 import {
@@ -23,6 +29,7 @@ import {
 } from "./graphs_shared/GraphElements.jsx";
 import {
   renderEdge,
+  renderJointArgument,
   renderNode,
   graphEdgeVisuals,
   graphNodeVisuals,
@@ -232,7 +239,7 @@ function GraphModals({
                 {
                   from: premise,
                   to: conclusion,
-                  type: "jointly_entails",
+                  type: premises.length === 1 ? "entails" : "jointly_entails",
                   argumentId,
                   explanation,
                 },
@@ -259,6 +266,9 @@ function useGraphClick({
   panUp,
   visibleEls,
   visRels,
+  jointGroups,
+  elementById,
+  edgeOffsets,
   positions,
   pan,
   zoom,
@@ -333,14 +343,66 @@ function useGraphClick({
       }
     }
 
-    // Edge hit-test (threshold 8 px).
+    // Edge hit-test (threshold 8 px) — uses the same bezier geometry as rendering.
     for (const r of visRels) {
-      const sp = positions[r.from],
-        tp = positions[r.to];
+      const sp = positions[r.from], tp = positions[r.to];
       if (!sp || !tp) continue;
-      if (distToSegment(sx, sy, sp.x, sp.y, tp.x, tp.y) < 8) {
+      const srcEl = elementById.get(r.from);
+      const tgtEl = elementById.get(r.to);
+      const { x1, y1, tipX, tipY, perpX, perpY } = arrowGeometry(
+        sp, tp,
+        nodeRadius(srcEl?.type, srcEl?.confidence),
+        nodeRadius(tgtEl?.type, tgtEl?.confidence),
+      );
+      const offset = edgeOffsets.get(r) ?? 0;
+      const cx = (x1 + tipX) / 2 + perpX * offset;
+      const cy = (y1 + tipY) / 2 + perpY * offset;
+      if (distToQuadBezier(sx, sy, x1, y1, cx, cy, tipX, tipY) < 8) {
         onSelect(() => null);
         onSelectRel((prev) => (prev === r ? null : r));
+        return;
+      }
+    }
+
+    // Joint argument hit-test: premise lines, junction dot, conclusion arrow.
+    for (const rels of jointGroups) {
+      const conclusionEl = elementById.get(rels[0].to);
+      const conclusionPos = positions[rels[0].to];
+      if (!conclusionPos || !conclusionEl) continue;
+      const premises = rels
+        .map((r) => ({ r, el: elementById.get(r.from), pos: positions[r.from] }))
+        .filter((d) => d.el && d.pos);
+      if (!premises.length) continue;
+      const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
+      const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
+      const tr = nodeRadius(conclusionEl.type, conclusionEl.confidence);
+      const { jx, jy } = computeJunction(centX, centY, conclusionPos, tr);
+      // Junction circle
+      if (Math.hypot(sx - jx, sy - jy) < 10) {
+        onSelect(() => null);
+        onSelectRel((prev) => (prev === rels[0] ? null : rels[0]));
+        return;
+      }
+      // Premise lines
+      for (const { r, el, pos } of premises) {
+        const sr = nodeRadius(el.type, el.confidence);
+        const dx = jx - pos.x, dy = jy - pos.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const x1 = pos.x + (dx / dist) * sr, y1 = pos.y + (dy / dist) * sr;
+        if (distToSegment(sx, sy, x1, y1, jx, jy) < 8) {
+          onSelect(() => null);
+          onSelectRel((prev) => (prev === r ? null : r));
+          return;
+        }
+      }
+      // Conclusion arrow
+      const adx = conclusionPos.x - jx, ady = conclusionPos.y - jy;
+      const adist = Math.hypot(adx, ady) || 1;
+      const tipX = conclusionPos.x - (adx / adist) * tr;
+      const tipY = conclusionPos.y - (ady / adist) * tr;
+      if (distToSegment(sx, sy, jx, jy, tipX, tipY) < 8) {
+        onSelect(() => null);
+        onSelectRel((prev) => (prev === rels[0] ? null : rels[0]));
         return;
       }
     }
@@ -473,6 +535,13 @@ export function Graph({
     return false;
   };
 
+  const elementById = useMemo(
+    () => new Map(state.elements.map((e) => [e.id, e])),
+    [state.elements],
+  );
+  const { solo: soloRels, jointGroups } = groupJointArguments(visRels);
+  const edgeOffsets = parallelEdgeOffsets(soloRels);
+
   // ── Pan + click ───────────────────────────────────────────────────────────
 
   const {
@@ -496,6 +565,9 @@ export function Graph({
     panUp,
     visibleEls,
     visRels,
+    jointGroups,
+    elementById,
+    edgeOffsets,
     positions,
     pan,
     zoom,
@@ -573,12 +645,21 @@ export function Graph({
         }
       >
         {/* ── Edges ── */}
-        {visRels.map((r) =>
+        {soloRels.map((r) =>
           renderEdge(
             r,
             positions,
             state.elements,
             graphEdgeVisuals(r, wIds, dimEdge, selectedArgRelSet),
+            edgeOffsets.get(r) ?? 0,
+          ),
+        )}
+        {jointGroups.map((rels) =>
+          renderJointArgument(
+            rels,
+            positions,
+            elementById,
+            graphEdgeVisuals(rels[0], wIds, dimEdge, selectedArgRelSet),
           ),
         )}
 

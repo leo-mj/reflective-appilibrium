@@ -608,7 +608,7 @@ export function SimulateRethonTab({
 
   const atLeastOneArgument =
     state.relations.filter(
-      (r) => r.type === "jointly_entails" || r.type === "jointly_precludes",
+      (r) => r.type === "entails" || r.type === "precludes" || r.type === "jointly_entails" || r.type === "jointly_precludes",
     ).length > 0;
 
   const equilibrium = useMemo(

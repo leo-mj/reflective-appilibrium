@@ -9,10 +9,6 @@ const _DUMMY_ARGUMENTS = [
   // 22:P (well-being capacity grounds justice — bridge for T1→P5)
   // 23:J (people in 2100 causally affected — bridge for P5→J2)
   [13, 21, 1],
-  [13, 3],
-  [13, 4],
-  [14, 8],
-  [14, 5],
   [15, 10],
   [17, 23, 2],
   [17, 12],
@@ -25,7 +21,6 @@ const _DUMMY_ARGUMENTS = [
   [13, 17, 10],
   [14, 15, 5],
   // Negation arguments:
-  [5, -10],      // J5 → ¬J10 (permissible discounting entails rejection of strict equal counting)
   [16, -1],      // P4 → ¬J1 (if only current beings matter, radioactive waste is not wrong)
   [14, -6],      // P2 → ¬J6 (probabilistic obligation entails rejection of "no obligations to non-existent")
   [18, 7, -10],  // P6 + J7 → ¬J10 (if proximity modulates and parents > strangers, strict equal counting fails)
@@ -81,7 +76,11 @@ function addNewPremisesToLookup(lookup, addedPremises, elements, round, model) {
 export function buildExistingArgFingerprints(relations) {
   const groups = {};
   for (const r of relations) {
-    if ((r.type !== "jointly_entails" && r.type !== "jointly_precludes") || !r.argumentId) continue;
+    if (
+      (r.type !== "entails" && r.type !== "precludes" &&
+       r.type !== "jointly_entails" && r.type !== "jointly_precludes") ||
+      !r.argumentId
+    ) continue;
     if (!groups[r.argumentId]) groups[r.argumentId] = { froms: [], to: r.to };
     groups[r.argumentId].froms.push(r.from);
   }

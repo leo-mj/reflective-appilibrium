@@ -6,7 +6,7 @@
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 
-export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
+export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRels }) {
   const items = [
     { label: "Judgment", shape: "judgment-gradient", key: "J" },
     { label: "Principle", shape: "roundrect", color: "#7c3aed", key: "P" },
@@ -15,15 +15,14 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
     { label: "Rejected", shape: "circle", color: "#fb7185", key: "rejected" },
   ];
   const lines = [
-    { label: "Supports", color: C.supports, dash: "", key: "supports" },
-    { label: "Conflicts", color: C.conflicts, dash: "8,4", key: "conflicts" },
-    {
-      label: "Undermines",
-      color: C.undermines,
-      dash: "4,4",
-      key: "undermines",
-    },
-    { label: "(Jointly) Entails", color: C.jointly_entails, dash: "", key: "jointly_entails" },
+    ...(!hideNonEntailsRels ? [
+      { label: "Supports", color: C.supports, dash: "", key: "supports" },
+      { label: "Conflicts", color: C.conflicts, dash: "8,4", key: "conflicts" },
+      { label: "Undermines", color: C.undermines, dash: "4,4", key: "undermines" },
+    ] : []),
+    { label: "Entails", color: C.entails, dash: "", key: "entails" },
+    { label: "Jointly Entails", color: C.jointly_entails, dash: "", key: "jointly_entails" },
+    { label: "Precludes", color: C.precludes, dash: "", key: "precludes" },
     { label: "Jointly Precludes", color: C.jointly_precludes, dash: "", key: "jointly_precludes" },
   ];
 
@@ -118,16 +117,26 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
           delay={100}
         >
           <div onClick={() => toggle(l.key)} style={itemStyle(l.key)}>
-            <svg width={20} height={10}>
+            <svg width={24} height={10}>
               <line
                 x1={0}
                 y1={5}
-                x2={20}
+                x2={17}
                 y2={5}
                 stroke={l.color}
-                strokeWidth={2}
+                strokeWidth={l.key === "entails" || l.key === "precludes" ? 3 : 2}
                 strokeDasharray={l.dash}
               />
+              {l.key === "entails" || l.key === "precludes" ? (
+                <polygon
+                  points="24,5 17,2 17,8"
+                  fill="none"
+                  stroke={l.color}
+                  strokeWidth={1.5}
+                />
+              ) : (
+                <polygon points="24,5 17,2 17,8" fill={l.color} />
+              )}
             </svg>
             {l.label}
           </div>

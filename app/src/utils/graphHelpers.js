@@ -114,7 +114,119 @@ export function getNeighbours(selectedId, visRels) {
   return ids;
 }
 
+// ─── Joint argument geometry ─────────────────────────────────────────────────
+
+/**
+ * Computes the junction point for a joint argument visualization.
+ * The junction sits on the conclusion→centroid axis at half the distance,
+ * but no closer than (conclusionRadius + 18) px so the arrowhead always fits.
+ *
+ * @param {number}   centX @param {number} centY - Premise centroid.
+ * @param {Position} conclusionPos               - Conclusion node centre.
+ * @param {number}   tr                          - Conclusion node radius.
+ * @returns {{ jx: number, jy: number }}
+ */
+export function computeJunction(centX, centY, conclusionPos, tr) {
+  const dist = Math.hypot(centX - conclusionPos.x, centY - conclusionPos.y) || 1;
+  const ux = (centX - conclusionPos.x) / dist;
+  const uy = (centY - conclusionPos.y) / dist;
+  const jDist = Math.max(tr + 18, dist / 2);
+  return { jx: conclusionPos.x + ux * jDist, jy: conclusionPos.y + uy * jDist };
+}
+
+// ─── Joint argument grouping ──────────────────────────────────────────────────
+
+/**
+ * Splits a relation array into solo relations and multi-premise joint argument groups.
+ *
+ * `jointly_entails` / `jointly_precludes` relations that share an `argumentId`
+ * are grouped together.  Groups with only one surviving member (e.g. after
+ * visibility filtering) fall back to solo so they still render as a normal edge.
+ *
+ * @param {RERelation[]} relations
+ * @returns {{ solo: RERelation[], jointGroups: RERelation[][] }}
+ */
+export function groupJointArguments(relations) {
+  const groups = new Map();
+  const solo = [];
+  for (const r of relations) {
+    if (
+      (r.type === "jointly_entails" || r.type === "jointly_precludes") &&
+      r.argumentId
+    ) {
+      if (!groups.has(r.argumentId)) groups.set(r.argumentId, []);
+      groups.get(r.argumentId).push(r);
+    } else {
+      solo.push(r);
+    }
+  }
+  const jointGroups = [];
+  for (const group of groups.values()) {
+    if (group.length > 1) jointGroups.push(group);
+    else solo.push(...group);
+  }
+  return { solo, jointGroups };
+}
+
+// ─── Parallel edge offsets ────────────────────────────────────────────────────
+
+const PARALLEL_SPACING = 22;
+
+/**
+ * Returns a Map from each relation to a perpendicular pixel offset so that
+ * multiple edges between the same pair of nodes don't overlap.
+ *
+ * Offsets are symmetric around zero (e.g. -4.5, +4.5 for two edges).
+ * For edges in the reverse canonical direction the raw offset is negated so
+ * that all edges shift consistently relative to the canonical A→B axis.
+ *
+ * @param {RERelation[]} relations
+ * @returns {Map<RERelation, number>}
+ */
+export function parallelEdgeOffsets(relations) {
+  const groups = new Map();
+  for (const r of relations) {
+    const key = r.from < r.to ? `${r.from}↔${r.to}` : `${r.to}↔${r.from}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const offsets = new Map();
+  for (const group of groups.values()) {
+    const n = group.length;
+    group.forEach((r, i) => {
+      const raw = (i - (n - 1) / 2) * PARALLEL_SPACING;
+      const canonicalFrom = r.from < r.to ? r.from : r.to;
+      offsets.set(r, r.from === canonicalFrom ? raw : -raw);
+    });
+  }
+  return offsets;
+}
+
 // ─── Hit-testing ──────────────────────────────────────────────────────────────
+
+/**
+ * Minimum distance from point (px, py) to a quadratic bezier curve,
+ * approximated by sampling `samples` evenly-spaced points along the curve.
+ *
+ * @param {number} px @param {number} py  Test point.
+ * @param {number} x0 @param {number} y0  Curve start.
+ * @param {number} cx @param {number} cy  Control point.
+ * @param {number} x1 @param {number} y1  Curve end.
+ * @param {number} [samples=16]
+ * @returns {number}
+ */
+export function distToQuadBezier(px, py, x0, y0, cx, cy, x1, y1, samples = 16) {
+  let min = Infinity;
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const mt = 1 - t;
+    const bx = mt * mt * x0 + 2 * mt * t * cx + t * t * x1;
+    const by = mt * mt * y0 + 2 * mt * t * cy + t * t * y1;
+    const d = Math.hypot(px - bx, py - by);
+    if (d < min) min = d;
+  }
+  return min;
+}
 
 /**
  * Returns the shortest distance from point `(px, py)` to the line segment

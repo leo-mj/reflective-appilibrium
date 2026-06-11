@@ -28,7 +28,7 @@ const SaveIcon = () => (
   </svg>
 );
 import { ModalShell } from "./user_edits/ModalShell.jsx";
-import { ASSIST_TABS } from "../constants/tabConstants.jsx";
+import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 import { AppHeaderNarrow } from "./app_header/AppHeaderNarrow.jsx";
 import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
 import { C } from "../constants/colors.js";
@@ -148,11 +148,20 @@ export function AppHeader({
     "clusters",
     "matrix",
   ];
-  const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
-  const visibleSubTabs = (metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS)
+  const metaTab = ASSIST_TABS.includes(tab)
+    ? "assist"
+    : SIMULATE_TABS.includes(tab)
+      ? "simulate"
+      : "analyze";
+  const visibleSubTabs = (
+    metaTab === "assist"
+      ? ASSIST_TABS
+      : metaTab === "simulate"
+        ? SIMULATE_TABS
+        : ANALYZE_TABS
+  )
     .filter((t) => !hideNonEntailsRels || t !== "suggestRelations")
     .filter((t) => model === "questionnaire" || t !== "questionnaire")
-    .filter((t) => BACKEND_ENABLED || t !== "simulateRethon")
     .filter((t) => LLM_ENABLED || t !== "matrix");
 
   const importModals = (
@@ -260,6 +269,7 @@ export function AppHeader({
         active={stepperActive}
         onClose={() => setStepperActive(false)}
         onSetTab={setTab}
+        hideNonEntailsRels={hideNonEntailsRels}
       />
       <AppHeaderWide
         {...shared}

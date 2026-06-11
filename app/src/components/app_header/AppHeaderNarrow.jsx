@@ -12,6 +12,7 @@ import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import {
   ASSIST_TABS,
+  SIMULATE_TABS,
   TAB_ICONS,
   TAB_LABELS,
 } from "../../constants/tabConstants.jsx";
@@ -377,6 +378,32 @@ export function AppHeaderNarrow({
                 {TAB_LABELS[t]}
               </button>
             ))}
+
+            {BACKEND_ENABLED && (
+              <>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: C.dim,
+                    fontWeight: "bold",
+                    padding: "4px 4px 2px",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Simulate
+                </div>
+                {SIMULATE_TABS.map((t) => (
+                  <button
+                    key={t}
+                    onClick={close(() => setTab(t))}
+                    style={menuBtn(tab === t)}
+                  >
+                    {TAB_ICONS[t]}
+                    {TAB_LABELS[t]}
+                  </button>
+                ))}
+              </>
+            )}
             {workflowPhase ? (
               <button
                 onClick={close(onStopWorkflow)}
