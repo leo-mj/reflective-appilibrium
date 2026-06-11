@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef } from "react";
-import { nextElementId, makeDiff, makeLogEntry } from "../utils/stateUtils.js";
+import { nextElementId, makeDiff, makeLogEntry, ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 import { importStateFromFile } from "../utils/importMarkdown.js";
 
 /**
@@ -149,12 +149,12 @@ export function useREActions(initialState) {
 
   const handleWithdrawRelRequest = (rel) => {
     const newRound = state.round + 1;
-    const isArgRel = (rel.type === "entails" || rel.type === "precludes" || rel.type === "jointly_entails" || rel.type === "jointly_precludes") && rel.argumentId;
+    const isArgRel = ARGUMENT_RELATION_TYPES.has(rel.type) && rel.argumentId;
     mutate((prev) => ({
       ...prev,
       round: newRound,
       relations: prev.relations.map((r) => {
-        const inGroup = isArgRel && r.argumentId === rel.argumentId && (r.type === "entails" || r.type === "precludes" || r.type === "jointly_entails" || r.type === "jointly_precludes");
+        const inGroup = isArgRel && r.argumentId === rel.argumentId && (ARGUMENT_RELATION_TYPES.has(r.type));
         return r === rel || inGroup
           ? { ...r, status: "withdrawn", withdrawnRound: newRound }
           : r;
@@ -181,7 +181,7 @@ export function useREActions(initialState) {
     mutate((prev) => ({
       ...prev,
       relations: prev.relations.filter(
-        (r) => !(r.argumentId === argumentId && (r.type === "entails" || r.type === "precludes" || r.type === "jointly_entails" || r.type === "jointly_precludes")),
+        (r) => !(r.argumentId === argumentId && (ARGUMENT_RELATION_TYPES.has(r.type))),
       ),
     }));
     if (selectedRel?.argumentId === argumentId) setSelectedRel(null);

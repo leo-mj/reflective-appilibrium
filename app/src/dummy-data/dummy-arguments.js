@@ -1,4 +1,5 @@
 // Dummy argument detection for the DetectArgumentsTab.
+import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 // Topic: obligations to future generations (matches dummy-state.js).
 // Mirrors the Python _dummy_detect_arguments logic from backend/routers/arguments.py.
 
@@ -76,11 +77,7 @@ function addNewPremisesToLookup(lookup, addedPremises, elements, round, model) {
 export function buildExistingArgFingerprints(relations) {
   const groups = {};
   for (const r of relations) {
-    if (
-      (r.type !== "entails" && r.type !== "precludes" &&
-       r.type !== "jointly_entails" && r.type !== "jointly_precludes") ||
-      !r.argumentId
-    ) continue;
+    if (!ARGUMENT_RELATION_TYPES.has(r.type) || !r.argumentId) continue;
     if (!groups[r.argumentId]) groups[r.argumentId] = { froms: [], to: r.to };
     groups[r.argumentId].froms.push(r.from);
   }

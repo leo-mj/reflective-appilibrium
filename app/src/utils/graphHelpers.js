@@ -127,6 +127,8 @@ export function getNeighbours(selectedId, visRels) {
  * @returns {{ jx: number, jy: number }}
  */
 export function computeJunction(centX, centY, conclusionPos, tr) {
+  // dist || 1: if centroid exactly coincides with conclusion (all premises overlap it),
+  // ux=0/uy=1 places the junction directly below — arbitrary but avoids NaN.
   const dist = Math.hypot(centX - conclusionPos.x, centY - conclusionPos.y) || 1;
   const ux = (centX - conclusionPos.x) / dist;
   const uy = (centY - conclusionPos.y) / dist;

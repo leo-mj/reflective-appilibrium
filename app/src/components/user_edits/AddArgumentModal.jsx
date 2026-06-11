@@ -79,7 +79,7 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
         <label style={LABEL_STYLE}>Premises</label>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {premises.map((p, i) => (
-            <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div key={p} style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <select
                 value={p}
                 onChange={(e) => setPremise(i, e.target.value)}

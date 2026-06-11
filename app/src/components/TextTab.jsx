@@ -5,6 +5,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { scoreChanges } from "../utils/simulateRethonClient.js";
+import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 import { C } from "../constants/colors.js";
 import { useTextTabData } from "../hooks/useTextTabData.js";
 import { useActiveSection } from "../hooks/useActiveSection.js";
@@ -106,7 +107,7 @@ export function TextTab({
         `rels:${
           state.relations.filter(
             (r) =>
-              r.type === "entails" || r.type === "precludes" || r.type === "jointly_entails" || r.type === "jointly_precludes",
+              ARGUMENT_RELATION_TYPES.has(r.type),
           ).length
         }`,
       ]

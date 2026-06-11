@@ -5,7 +5,7 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo } from "react";
 
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
@@ -22,7 +22,7 @@ import {
   groupJointArguments,
   computeJunction,
 } from "../utils/graphHelpers.js";
-import { elementsAtRound } from "../utils/stateUtils.js";
+import { elementsAtRound, argumentRelationType } from "../utils/stateUtils.js";
 import {
   GraphCanvas,
   OffscreenIndicators,
@@ -234,9 +234,7 @@ function GraphModals({
           initialConclusion={addingArgPrefill?.conclusion}
           onSave={({ premises, conclusion, negated, explanation }) => {
             const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
-            const type = premises.length === 1
-              ? (negated ? "precludes" : "entails")
-              : (negated ? "jointly_precludes" : "jointly_entails");
+            const type = argumentRelationType(premises.length, negated);
             premises.forEach((premise, i) => {
               onAddRelation(
                 { from: premise, to: conclusion, type, argumentId, explanation },
@@ -311,7 +309,7 @@ function useGraphClick({
       for (const el of visibleEls) {
         const pos = positions[el.id];
         if (!pos) continue;
-        if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitRadius(el.type) ** 2) {
+        if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitRadius(el.type, el.confidence) ** 2) {
           setTooltip((prev) =>
             prev?.el?.id === el.id
               ? null
@@ -329,7 +327,7 @@ function useGraphClick({
     for (const el of visibleEls) {
       const pos = positions[el.id];
       if (!pos) continue;
-      if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitRadius(el.type) ** 2) {
+      if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitRadius(el.type, el.confidence) ** 2) {
         if (e.ctrlKey || e.metaKey) {
           onCtrlNodeClick(el.id);
         } else {
@@ -354,7 +352,10 @@ function useGraphClick({
       const offset = edgeOffsets.get(r) ?? 0;
       const cx = (x1 + tipX) / 2 + perpX * offset;
       const cy = (y1 + tipY) / 2 + perpY * offset;
-      if (distToQuadBezier(sx, sy, x1, y1, cx, cy, tipX, tipY) < 8) {
+      const tdx = tipX - cx, tdy = tipY - cy;
+      const tlen = Math.hypot(tdx, tdy) || 1;
+      const bx = tipX - (tdx / tlen) * 10, by = tipY - (tdy / tlen) * 10;
+      if (distToQuadBezier(sx, sy, x1, y1, cx, cy, bx, by) < 8) {
         onSelect(() => null);
         onSelectRel((prev) => (prev === r ? null : r));
         return;
@@ -646,18 +647,20 @@ export function Graph({
           renderEdge(
             r,
             positions,
-            state.elements,
+            elementById,
             graphEdgeVisuals(r, wIds, dimEdge, selectedArgRelSet),
             edgeOffsets.get(r) ?? 0,
           ),
         )}
         {jointGroups.map((rels) =>
-          renderJointArgument(
-            rels,
-            positions,
-            elementById,
-            graphEdgeVisuals(rels[0], wIds, dimEdge, selectedArgRelSet),
-          ),
+          <React.Fragment key={rels[0].argumentId}>
+            {renderJointArgument(
+              rels,
+              positions,
+              elementById,
+              graphEdgeVisuals(rels[0], wIds, dimEdge, selectedArgRelSet),
+            )}
+          </React.Fragment>
         )}
 
         {/* ── Nodes ── */}

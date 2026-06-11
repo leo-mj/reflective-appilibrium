@@ -42,17 +42,17 @@ export function makeTooltipHandlers(isDragging, setTooltip, element) {
  * Resolves positions and element objects for both endpoints of a relation.
  * Returns `null` when either position is missing (element not yet placed).
  *
- * @param {RERelation}  relation
- * @param {PositionMap} positions
- * @param {REElement[]} elements
+ * @param {RERelation}            relation
+ * @param {PositionMap}           positions
+ * @param {Map<string,REElement>} elementById
  * @returns {{ sourcePos: Object, targetPos: Object, sourceEl: REElement, targetEl: REElement } | null}
  */
-export function resolveEdge(relation, positions, elements) {
+export function resolveEdge(relation, positions, elementById) {
   const sourcePos = positions[relation.from];
   const targetPos = positions[relation.to];
   if (!sourcePos || !targetPos) return null;
-  const sourceEl = elements.find((el) => el.id === relation.from);
-  const targetEl = elements.find((el) => el.id === relation.to);
+  const sourceEl = elementById.get(relation.from);
+  const targetEl = elementById.get(relation.to);
   return { sourcePos, targetPos, sourceEl, targetEl };
 }
 
@@ -224,7 +224,7 @@ export function renderJointArgument(rels, positions, elementById, visuals) {
   const aperpX = -auy, aperpY = aux;
 
   return (
-    <g key={rels[0].argumentId} opacity={opacity} style={{ transition }}>
+    <g opacity={opacity} style={{ transition }}>
       {premises.map(({ r, el, pos }) => {
         const sr = nodeRadius(el.type, el.confidence);
         const dx = jx - pos.x, dy = jy - pos.y;
@@ -254,12 +254,12 @@ export function renderJointArgument(rels, positions, elementById, visuals) {
  *
  * @param {RERelation}  relation
  * @param {PositionMap} positions
- * @param {REElement[]} elements
+ * @param {Map<string,REElement>} elementById
  * @param {Object}      visuals   - Output of `historyEdgeVisuals` or `graphEdgeVisuals`.
  * @returns {React.ReactElement|null}
  */
-export function renderEdge(relation, positions, elements, visuals, parallelOffset = 0) {
-  const resolved = resolveEdge(relation, positions, elements);
+export function renderEdge(relation, positions, elementById, visuals, parallelOffset = 0) {
+  const resolved = resolveEdge(relation, positions, elementById);
   if (!resolved) return null;
   const { sourcePos, targetPos, sourceEl, targetEl } = resolved;
   return (

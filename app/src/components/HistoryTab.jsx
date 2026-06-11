@@ -5,7 +5,7 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { scaleLinear, line as d3Line, curveMonotoneX } from "d3";
 import { C } from "../constants/colors.js";
 import { scorePerRound } from "../utils/simulateRethonClient.js";
@@ -13,7 +13,7 @@ import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import { usePlayback } from "../hooks/usePlayback.js";
-import { elementsAtRound } from "../utils/stateUtils.js";
+import { elementsAtRound, ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 import {
   GraphCanvas,
   OffscreenIndicators,
@@ -27,7 +27,6 @@ import {
   historyNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
 
-const ENTAILS_TYPES = new Set(["entails", "precludes", "jointly_entails", "jointly_precludes"]);
 import { PlaybackControls } from "./history/HistoryPlaybackControls.jsx";
 import { LogOverlay } from "./history/LogOverlay.jsx";
 
@@ -478,7 +477,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
       >
         {(() => {
           const visRels = hideNonEntailsRels
-            ? state.relations.filter((r) => ENTAILS_TYPES.has(r.type))
+            ? state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type))
             : state.relations;
           const { solo, jointGroups } = groupJointArguments(visRels);
           const offsets = parallelEdgeOffsets(solo);
@@ -488,19 +487,21 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
                 renderEdge(
                   r,
                   positions,
-                  state.elements,
+                  elementById,
                   historyEdgeVisuals(r, wIds, snappedRound),
                   offsets.get(r) ?? 0,
                 ),
               )}
-              {jointGroups.map((rels) =>
-                renderJointArgument(
-                  rels,
-                  positions,
-                  elementById,
-                  historyEdgeVisuals(rels[0], wIds, snappedRound),
-                ),
-              )}
+              {jointGroups.map((rels) => (
+                <React.Fragment key={rels[0].argumentId}>
+                  {renderJointArgument(
+                    rels,
+                    positions,
+                    elementById,
+                    historyEdgeVisuals(rels[0], wIds, snappedRound),
+                  )}
+                </React.Fragment>
+              ))}
             </>
           );
         })()}

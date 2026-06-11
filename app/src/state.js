@@ -18,6 +18,7 @@
 /** @import { REState } from './types.js' */
 
 import _dummyState from "./dummy-data/dummy-state.js"; // dev fixture — not used in production builds
+import { argumentRelationType } from "./utils/stateUtils.js";
 
 // ============================================================
 // REPLACE THIS OBJECT WITH CURRENT STATE DATA WHEN GENERATING
@@ -117,9 +118,7 @@ export function makeQuestionnaireState(spec) {
     const conclusionIdx = arg.at(-1);
     const conclusion = lookup[Math.abs(conclusionIdx)];
     const premiseCount = arg.length - 1;
-    const relationType = premiseCount === 1
-      ? (conclusionIdx < 0 ? "precludes" : "entails")
-      : (conclusionIdx < 0 ? "jointly_precludes" : "jointly_entails");
+    const relationType = argumentRelationType(premiseCount, conclusionIdx < 0);
     const argumentId = `questionnaire-arg-${i}`;
     for (const n of arg.slice(0, -1)) {
       relations.push({

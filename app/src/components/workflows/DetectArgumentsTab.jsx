@@ -10,7 +10,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { detectArguments } from "../../utils/argumentsClient.js";
-import { nextElementId } from "../../utils/stateUtils.js";
+import { nextElementId, argumentRelationType } from "../../utils/stateUtils.js";
 import {
   AcceptButton,
   RejectButton,
@@ -370,9 +370,7 @@ export function DetectArgumentsTab({
     const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
     if (premises.length > 0) {
       const conclusionId = resolveId(conclusion);
-      const relationType = premises.length === 1
-        ? (conclusion.negated ? "precludes" : "entails")
-        : (conclusion.negated ? "jointly_precludes" : "jointly_entails");
+      const relationType = argumentRelationType(premises.length, conclusion.negated);
       for (const premise of premises) {
         onAddRelation?.(
           {

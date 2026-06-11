@@ -7,6 +7,7 @@
 
 import { BACKEND_ENABLED } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
+import { ARGUMENT_RELATION_TYPES } from "./stateUtils.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -32,7 +33,7 @@ export async function simulateRethonStep(state, local, evolution = null, weights
     body: JSON.stringify({
       elements: state.elements,
       relations: state.relations.filter(
-        (r) => r.type === "entails" || r.type === "precludes" || r.type === "jointly_entails" || r.type === "jointly_precludes",
+        (r) => ARGUMENT_RELATION_TYPES.has(r.type),
       ),
       round: `${state.round}`,
       local,
@@ -153,7 +154,7 @@ export async function scoreChanges(state, local = true, weights = null) {
       body: JSON.stringify({
         elements: state.elements,
         relations: state.relations.filter(
-          (r) => r.type === "entails" || r.type === "precludes" || r.type === "jointly_entails" || r.type === "jointly_precludes",
+          (r) => ARGUMENT_RELATION_TYPES.has(r.type),
         ),
         local,
         weights,
@@ -173,7 +174,7 @@ export async function simulateRethon(state, local, evolution = null, weights = n
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       elements: state.elements,
-      relations: state.relations.filter((r) => r.type === "entails" || r.type === "precludes" || r.type === "jointly_entails" || r.type === "jointly_precludes"),
+      relations: state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type)),
       round: `${state.round}`,
       local,
       evolution,

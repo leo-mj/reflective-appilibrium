@@ -15,6 +15,7 @@ import {
   simulateRethonStep,
 } from "../../utils/simulateRethonClient.js";
 import { ErrorBanner } from "../SuggestionActions.jsx";
+import { ARGUMENT_RELATION_TYPES } from "../../utils/stateUtils.js";
 
 const ACCENT = C.principle.high;
 
@@ -608,7 +609,7 @@ export function SimulateRethonTab({
 
   const atLeastOneArgument =
     state.relations.filter(
-      (r) => r.type === "entails" || r.type === "precludes" || r.type === "jointly_entails" || r.type === "jointly_precludes",
+      (r) => ARGUMENT_RELATION_TYPES.has(r.type),
     ).length > 0;
 
   const equilibrium = useMemo(

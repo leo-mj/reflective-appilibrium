@@ -154,7 +154,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [scrollToRelationsKey, setScrollToRelationsKey] = useState(0);
   const scrollToRelations = () => {
     if (isWide) {
-      if (isAssistTab) setAssistSidePanel("text");
+      if (usesSidePanel) setAssistSidePanel("text");
       else setShowText(true);
     } else setTab("text");
     setScrollToRelationsKey((k) => k + 1);
