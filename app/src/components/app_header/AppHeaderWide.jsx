@@ -154,8 +154,8 @@ export function AppHeaderWide({
             flexShrink: 0,
           }}
         >
-          {/* Assist side-panel toggle (only in assist mode) */}
-          {metaTab === "assist" && (
+          {/* Side-panel toggle (assist and simulate modes) */}
+          {(metaTab === "assist" || metaTab === "simulate") && (
             <div
               style={{
                 display: "flex",

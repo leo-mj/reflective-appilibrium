@@ -102,9 +102,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const isWide = dims.w > 768 && dims.h > 500;
   const isAssistTab = ASSIST_TABS.includes(tab);
   const isSimulateTab = SIMULATE_TABS.includes(tab);
+  const usesSidePanel = isAssistTab || isSimulateTab;
   const hasSidePanel =
     isWide &&
-    (isAssistTab
+    (usesSidePanel
       ? assistSidePanel !== "none" && assistSidePanel !== "focus"
       : showText);
   // graphW must match the actual rendered width of the graph SVG so the force
@@ -112,7 +113,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   // Focus mode keeps the same graphW as graph mode so switching between the two
   // doesn't restart the simulation and scramble node positions.
   const graphW =
-    isAssistTab && (assistSidePanel === "graph" || assistSidePanel === "focus")
+    usesSidePanel && (assistSidePanel === "graph" || assistSidePanel === "focus")
       ? (dims.w - 44) / 2
       : hasSidePanel
         ? (dims.w - 32) / 2 - 12
@@ -177,7 +178,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
   // Props shared by both the assist-side and analyze-mode TextPanel instances.
   const showingTextPanel = isWide
-    ? isAssistTab
+    ? usesSidePanel
       ? assistSidePanel === "text"
       : showText
     : tab === "text";
@@ -312,7 +313,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           gap: 12,
         }}
       >
-        {isWide && isAssistTab && assistSidePanel === "graph" && (
+        {isWide && usesSidePanel && assistSidePanel === "graph" && (
           <div
             style={{
               width: "50%",

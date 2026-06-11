@@ -61,7 +61,9 @@ RelationType = Literal[
     "conflicts",
     "undermines",
     "depends",
+    "entails",
     "jointly_entails",
+    "precludes",
     "jointly_precludes",
 ]
 

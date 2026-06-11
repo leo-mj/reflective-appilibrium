@@ -229,7 +229,7 @@ describe("importStateFromFile — schema validation", () => {
         {
           from: "J1",
           to: "P1",
-          type: "entails",
+          type: "causes",
           explanation: "",
           addedRound: 1,
         },
