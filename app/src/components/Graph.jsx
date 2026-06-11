@@ -232,17 +232,14 @@ function GraphModals({
           currentRound={round}
           initialPremises={addingArgPrefill?.premises}
           initialConclusion={addingArgPrefill?.conclusion}
-          onSave={({ premises, conclusion, explanation }) => {
+          onSave={({ premises, conclusion, negated, explanation }) => {
             const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+            const type = premises.length === 1
+              ? (negated ? "precludes" : "entails")
+              : (negated ? "jointly_precludes" : "jointly_entails");
             premises.forEach((premise, i) => {
               onAddRelation(
-                {
-                  from: premise,
-                  to: conclusion,
-                  type: premises.length === 1 ? "entails" : "jointly_entails",
-                  argumentId,
-                  explanation,
-                },
+                { from: premise, to: conclusion, type, argumentId, explanation },
                 { select: false, pinRecent: i === premises.length - 1 },
               );
             });

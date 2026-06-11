@@ -1,5 +1,5 @@
 /**
- * @fileoverview Modal dialog for manually adding a jointly_entails argument.
+ * @fileoverview Modal dialog for manually adding an entails/precludes argument.
  * @module components/AddArgumentModal
  */
 
@@ -27,7 +27,7 @@ const ghostBtn = {
  * @param {Object}      props
  * @param {import('../../types.js').REElement[]} props.elements - Active elements to choose from.
  * @param {number}      props.currentRound
- * @param {function({ premises: string[], conclusion: string, explanation: string }): void} props.onSave
+ * @param {function({ premises: string[], conclusion: string, negated: boolean, explanation: string }): void} props.onSave
  * @param {function(): void} props.onCancel
  * @param {string[]}    [props.initialPremises]
  * @param {string}      [props.initialConclusion]
@@ -45,6 +45,7 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
       : (ids[1] ?? ids[0] ?? "")
   );
   const [explanation, setExplanation] = useState("");
+  const [negated, setNegated] = useState(false);
 
   const setPremise = (i, id) =>
     setPremises((prev) => prev.map((p, j) => (j === i ? id : p)));
@@ -70,12 +71,12 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
       title="Add argument"
       subtitle={`Will be added in Round ${currentRound + 1}`}
       onCancel={onCancel}
-      onSave={() => onSave({ premises, conclusion, explanation })}
+      onSave={() => onSave({ premises, conclusion, negated, explanation })}
       saveDisabled={!isValid}
       saveLabel="Add argument"
     >
       <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Premises (jointly entail the conclusion)</label>
+        <label style={LABEL_STYLE}>Premises</label>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {premises.map((p, i) => (
             <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -118,6 +119,32 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
       </div>
 
       <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Relation to conclusion</label>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[
+            { value: false, label: "Entails", color: C.entails },
+            { value: true,  label: "Precludes", color: C.precludes },
+          ].map(({ value, label, color }) => (
+            <button
+              key={label}
+              onClick={() => setNegated(value)}
+              style={{
+                ...ghostBtn,
+                flex: 1,
+                padding: "5px 0",
+                border: `1px solid ${negated === value ? color : C.border}`,
+                color: negated === value ? color : C.dim,
+                background: negated === value ? color + "18" : "transparent",
+                fontWeight: negated === value ? "bold" : "normal",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Conclusion</label>
         <select
           value={conclusion}
@@ -138,7 +165,9 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
           style={{ ...INPUT_STYLE, height: 72, resize: "vertical" }}
-          placeholder="Why do these premises jointly entail the conclusion?"
+          placeholder={negated
+            ? "Why do these premises preclude the conclusion?"
+            : "Why do these premises entail the conclusion?"}
         />
       </div>
     </ModalShell>
