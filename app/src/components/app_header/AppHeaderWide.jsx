@@ -57,8 +57,7 @@ export function AppHeaderWide({
   workflowLoops,
   onStartWorkflow,
   onStopWorkflow,
-  tutorialMode,
-  onToggleTutorial,
+  onStartStepper,
   showTabNav,
   setShowTabNav,
   allExpanded,
@@ -205,13 +204,12 @@ export function AppHeaderWide({
 
           {inlineDivider}
 
-          <Tooltip text="Toggle tutorial mode — shows explanations for each button.">
+          <Tooltip text="Start the step-by-step tour.">
             <button
-              onClick={onToggleTutorial}
+              onClick={onStartStepper}
               style={{
-                ...btn(tutorialMode),
-                color: tutorialMode ? C.supports : C.dim,
-                borderColor: tutorialMode ? C.supports : undefined,
+                ...btn(false),
+                color: C.dim,
                 fontWeight: "bold",
                 fontSize: 13,
               }}
@@ -563,6 +561,7 @@ export function AppHeaderWide({
               </button>
             ) : (
               <button
+                data-tutorial="btn-workflow"
                 onClick={onStartWorkflow}
                 style={{ ...btn(false), color: C.supports }}
               >

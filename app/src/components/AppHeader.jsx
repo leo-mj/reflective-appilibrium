@@ -5,6 +5,7 @@
 
 import { useState, useRef } from "react";
 import { TutorialOverlay } from "./TutorialOverlay.jsx";
+import { TutorialStepper } from "./TutorialStepper.jsx";
 
 const SaveIcon = () => (
   <svg
@@ -31,7 +32,7 @@ import { ASSIST_TABS } from "../constants/tabConstants.jsx";
 import { AppHeaderNarrow } from "./app_header/AppHeaderNarrow.jsx";
 import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
 import { C } from "../constants/colors.js";
-import { BACKEND_ENABLED } from "../config.js";
+import { BACKEND_ENABLED, LLM_ENABLED } from "../config.js";
 
 /**
  * @param {Object}   props
@@ -95,7 +96,14 @@ export function AppHeader({
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [tutorialMode, setTutorialMode] = useState(false);
+  const [tutorialMode] = useState(false);
+  const [stepperActive, setStepperActive] = useState(() => {
+    if (sessionStorage.getItem("startTour") === "1") {
+      sessionStorage.removeItem("startTour");
+      return true;
+    }
+    return false;
+  });
   const [importConfirmPending, setImportConfirmPending] = useState(null);
   const [importError, setImportError] = useState(null);
   const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "error"
@@ -144,7 +152,8 @@ export function AppHeader({
   const visibleSubTabs = (metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS)
     .filter((t) => !hideNonEntailsRels || t !== "suggestRelations")
     .filter((t) => model === "questionnaire" || t !== "questionnaire")
-    .filter((t) => BACKEND_ENABLED || t !== "simulateRethon");
+    .filter((t) => BACKEND_ENABLED || t !== "simulateRethon")
+    .filter((t) => LLM_ENABLED || t !== "matrix");
 
   const importModals = (
     <>
@@ -247,6 +256,11 @@ export function AppHeader({
       {hiddenInput}
       {importModals}
       <TutorialOverlay active={tutorialMode} />
+      <TutorialStepper
+        active={stepperActive}
+        onClose={() => setStepperActive(false)}
+        onSetTab={setTab}
+      />
       <AppHeaderWide
         {...shared}
         showText={showText}
@@ -254,8 +268,7 @@ export function AppHeader({
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         visibleSubTabs={visibleSubTabs}
-        tutorialMode={tutorialMode}
-        onToggleTutorial={() => setTutorialMode((v) => !v)}
+        onStartStepper={() => setStepperActive(true)}
       />
     </>
   );

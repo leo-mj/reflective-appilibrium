@@ -39,6 +39,7 @@ const DESC_STYLE = {
   color: C.dim,
   lineHeight: 1.7,
   flex: 1,
+  textAlign: "left",
 };
 
 const BTN_STYLE = {
@@ -81,12 +82,11 @@ function NewProcessCard({ onStart }) {
 
   return (
     <div style={{ ...CARD_STYLE, minWidth: 300 }}>
-      <div style={TITLE_STYLE}>Start your own RE process</div>
+      <div style={TITLE_STYLE}>Start your own process</div>
       <div style={DESC_STYLE}>
-        Begin a new wide reflective equilibrium process from scratch. Enter a
-        topic and start adding your moral judgments and principles.
+        Begin a new reflective equilibrium process from scratch. <br />
+        Enter a topic and start adding your moral judgments and principles.
       </div>
-      <label style={{ fontSize: 11, color: C.dim }}>Topic</label>
       <input
         style={INPUT_STYLE}
         placeholder="e.g. obligations to future generations"
@@ -117,21 +117,38 @@ function NewProcessCard({ onStart }) {
  * @param {Object}   props
  * @param {Function} props.onLoad - Called when the user confirms.
  */
-function SampleProcessCard({ onLoad }) {
+function SampleProcessCard({ onLoad, onTour }) {
   return (
     <div style={{ ...CARD_STYLE, minWidth: 300 }}>
-      <div style={TITLE_STYLE}>Explore the sample RE process</div>
+      <div style={TITLE_STYLE}>Explore the demo</div>
       <div style={DESC_STYLE}>
         Browse a pre-built reflective equilibrium process on obligations to
-        future generations. Explore the graph, review the element history, and
-        see how judgments, principles, and theories fit together.
+        future generations. <br /> Explore the graph, review the element
+        history, and see how judgments, principles, and theories fit together.
       </div>
-      <button
-        style={{ ...BTN_STYLE, background: C.principle.high, color: "#fff" }}
-        onClick={onLoad}
-      >
-        Load sample
-      </button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          style={{
+            ...BTN_STYLE,
+            background: C.principle.high,
+            color: "#fff",
+          }}
+          onClick={onTour}
+        >
+          Tutorial
+        </button>
+        <button
+          style={{
+            ...BTN_STYLE,
+            background: "transparent",
+            border: `1px solid ${C.supports}`,
+            color: C.supports,
+          }}
+          onClick={onLoad}
+        >
+          Skip tutorial
+        </button>
+      </div>
     </div>
   );
 }
@@ -152,7 +169,7 @@ function renderDescription(description) {
       <a key={i} href={part.href} target="_blank" style={{ color: C.dim }}>
         {part.link}
       </a>
-    )
+    ),
   );
 }
 
@@ -437,8 +454,8 @@ export function HomePage({
         <div
           style={{ fontSize: 13, color: C.dim, maxWidth: 480, lineHeight: 1.7 }}
         >
-          A structured tool for conducting wide reflective equilibrium in ethics
-          — iteratively building coherent moral positions by working between
+          A structured tool for conducting reflective equilibrium in ethics —
+          iteratively building coherent moral positions by working between
           judgments, principles, and background theories.
         </div>
       </div>
@@ -453,8 +470,14 @@ export function HomePage({
           flexWrap: "wrap",
         }}
       >
+        <SampleProcessCard
+          onLoad={onLoadSample}
+          onTour={() => {
+            sessionStorage.setItem("startTour", "1");
+            onLoadSample();
+          }}
+        />
         <NewProcessCard onStart={onStartFresh} />
-        <SampleProcessCard onLoad={onLoadSample} />
         {QUESTIONNAIRE_SPECS.map((spec) => (
           <QuestionnaireCard
             key={spec.name}
