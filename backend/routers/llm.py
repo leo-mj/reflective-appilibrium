@@ -36,6 +36,8 @@ class CompletionRequest(BaseModel):
 
 
 class TokenUsage(BaseModel):
+    """Token consumption reported by the LLM provider for a single completion."""
+
     input_tokens: int
     output_tokens: int
 

@@ -2,8 +2,9 @@
  * @fileoverview Coherent-cluster detection for the RE state.
  *
  * A **coherent cluster** is a maximal set of active elements that:
- *   (a) are mutually connected via support paths, AND
- *   (b) contain no conflict or undermines edges between any pair of members.
+ *   (a) are mutually connected via support paths (supports / entails / jointly_entails), AND
+ *   (b) contain no conflict-like edges (conflicts / undermines / precludes / jointly_precludes)
+ *       between any pair of members.
  *
  * Algorithm: Bron-Kerbosch (exact) for < 50 active elements;
  *            BFS fallback for ≥ 50 (fast, may miss some clusters).
@@ -243,7 +244,9 @@ export function findCoherentClusters(state, hideNonEntailsRels = false) {
     : findClusters_BFS(state, hideNonEntailsRels);
 }
 
+/** All relation types treated as conflict-like for cluster analysis. */
 const CONFLICT_TYPES = new Set(["conflicts", "undermines", "precludes", "jointly_precludes"]);
+/** All relation types treated as support-like for cluster analysis. */
 const SUPPORT_TYPES = new Set(["supports", "entails", "jointly_entails"]);
 
 /**

@@ -1,3 +1,19 @@
+"""
+Simulate rethon router — /api/simulate_rethon
+
+Runs formal reflective equilibrium computations via the theodias / rethon
+Python packages and exposes the results to the frontend.  Five endpoints:
+
+- ``/simulate``         — run a full RE process to fixed point (or resume from a
+                          saved evolution).
+- ``/step``             — advance one step at a time (stateless; pass the previous
+                          evolution to resume).
+- ``/score_per_round``  — compute the equilibrium Z-score at each workflow round.
+- ``/quick_score``      — compute account and systematicity analytically without a
+                          full simulation.
+- ``/score_changes``    — batch withdrawal-delta analysis for all active elements.
+"""
+
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Literal, Optional, Union
 from collections import defaultdict
@@ -22,6 +38,8 @@ _REProcess = Union[
 
 
 class ModelWeights(BaseModel):
+    """Rethon objective-function weights (account, systematicity, faithfulness) that must sum to 1.0."""
+
     account: float = Field(default=0.35, ge=0, le=1)
     systematicity: float = Field(default=0.55, ge=0, le=1)
     faithfulness: float = Field(default=0.1, ge=0, le=1)
@@ -57,6 +75,14 @@ class ZScores(BaseModel):
 
 
 class SimulatedRethonState(BaseModel):
+    """Full translated evolution produced by a simulate or step endpoint.
+
+    ``evolution``, ``step_types``, and ``scores`` are parallel lists: index ``i``
+    holds the position, its label (``"commitments"`` or ``"theory"``), and its
+    Z-score (``None`` for step 0 which has no theory yet).  ``alternatives`` are
+    the alternative positions considered at each step.
+    """
+
     finished: bool
     evolution: List[List[REElement]]
     # Parallel to evolution: "commitments" for even indices (C₀, C₁, …),
@@ -162,6 +188,7 @@ def _build_numerical_arguments(
 
 
 def _add_negated_to_lookup(lookup: Dict) -> Dict:
+    """Extend the lookup with negated copies of every element (negative key → ``negated=True``)."""
     return {
         **lookup,
         **{-k: e.model_copy(update={"negated": True}) for k, e in lookup.items()},
@@ -175,6 +202,13 @@ def _get_rethon_final_state(
     local: bool = True,
     weights: Optional[ModelWeights] = None,
 ) -> _REProcess:
+    """Build a BDD dialectical structure, set initial commitments from the lookup, and run the full RE process to a fixed point.
+
+    Uses ``StandardLocalReflectiveEquilibrium`` when ``local=True`` (considers
+    only positions close to the current one) or
+    ``StandardGlobalReflectiveEquilibrium`` otherwise (considers all positions;
+    slow for sentence pools larger than ~10 elements).
+    """
     logger.info("Beginning rethon simulation.")
     # Binary decision diagram - necessary for n_unnegated_sentence_pool > 10
     bdd_ds = BDDDialecticalStructure.from_arguments(
@@ -381,6 +415,12 @@ def _translate_re_state(
     lookup: Dict[int, REElement],
     scores: Optional[List[Optional[ZScores]]] = None,
 ) -> SimulatedRethonState:
+    """Translate a numerical rethon REState into a frontend-typed SimulatedRethonState.
+
+    Each position in the evolution (a set of signed sentence indices) is mapped
+    to a list of REElements via ``translate_from_lookup``.  The negated lookup
+    (negative keys) must be passed so negated elements translate correctly.
+    """
     logger.info("Translating rethon RE state.")
     re_state_dict = numerical_re_state.as_dict()
     evolution = re_state_dict["evolution"]
@@ -437,6 +477,15 @@ async def simulate_rethon(
     request: SimulateRethonRequest,
     sentence_pool_minimum: int = 3,
 ) -> SimulatedRethonResponse:
+    """Run the RE process to a fixed point and return the translated evolution with Z-scores.
+
+    If ``request.evolution`` is supplied the process is resumed from that
+    checkpoint (the saved evolution is reconstructed and the simulation continues
+    from where it left off).  Otherwise the simulation starts fresh from the
+    element statuses in the request.
+
+    Raises 422 if the sentence pool is too small or no argument relations are present.
+    """
     built_arguments, lookup_w_negated, n = _validate_and_build(
         request.elements, request.relations, sentence_pool_minimum
     )
@@ -497,6 +546,14 @@ async def simulate_rethon_step(
     request: SimulateRethonStepRequest,
     sentence_pool_minimum: int = 3,
 ) -> SimulatedRethonResponse:
+    """Advance the RE process by exactly one step and return the updated evolution.
+
+    On the first call omit ``request.evolution`` (or pass an empty list) — the
+    simulation starts from the element statuses.  On each subsequent call pass
+    the ``translated_re_state.evolution`` from the previous response to resume.
+    All fields except ``evolution`` must be identical across calls for a given
+    stepping session.  Returns 400 if the process has already reached a fixed point.
+    """
     built_arguments, lookup_w_negated, n = _validate_and_build(
         request.elements, request.relations, sentence_pool_minimum
     )

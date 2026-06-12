@@ -1,3 +1,15 @@
+"""
+Arguments router — /api/arguments
+
+Maps active RE elements into a propositional sentence lookup (integer → REElement),
+asks the LLM to enumerate all strictly logically valid arguments that can be formed
+over that pool, deduplicates against arguments already in the state, and returns
+both the numeric argument lists and their element-translated forms.
+
+Negative indices in argument lists represent negations: ``-n`` means ¬sentence n.
+The final member of each inner list is the conclusion; all preceding members are premises.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Tuple, Set, Annotated
 from ..services.llm import LLMService
@@ -13,12 +25,16 @@ router = APIRouter(prefix="/api/arguments", tags=["arguments"])
 
 
 class DetectArgumentsRequest(BaseModel):
+    """Payload for ``POST /api/arguments/detect``."""
+
     elements: List[REElement]
     relations: List[RERelation] = []
     round: str
 
 
 class LLMArgumentsResponse(BaseModel):
+    """Raw argument data returned by the LLM, before deduplication and translation."""
+
     detected_arguments: List[List[int]]
     added_premises: List[Dict]
     input_tokens: int
@@ -26,6 +42,14 @@ class LLMArgumentsResponse(BaseModel):
 
 
 class DetectArgumentsResponse(BaseModel):
+    """Detected arguments in numeric and translated form, plus the element lookup.
+
+    ``num_arguments`` uses integer indices (negative = negated); ``translated_arguments``
+    is the parallel list with each index replaced by its REElement.  ``lookup`` maps
+    every integer index (positive and negative) to an REElement so callers can perform
+    further translations without re-requesting.
+    """
+
     num_arguments: List[List[int]]
     translated_arguments: List[List[REElement]] = []
     lookup: Dict
@@ -36,6 +60,11 @@ class DetectArgumentsResponse(BaseModel):
 def translate_from_lookup(
     nums: List[int], lookup: Dict[int, REElement]
 ) -> List[REElement]:
+    """Translate a numeric argument list into REElements using the lookup.
+
+    Positive indices map directly; negative indices produce a negated copy of
+    the corresponding positive-index element (``negated=True``).
+    """
     result = []
     for num in nums:
         if num in lookup:
@@ -46,12 +75,23 @@ def translate_from_lookup(
 
 
 def _arg_fingerprint(arg: List[int]) -> Tuple:
+    """Canonical key for an argument: (sorted premises, conclusion).
+
+    Used to detect duplicates — two arguments are identical regardless of the
+    order in which their premises are listed.
+    """
     return (tuple(sorted(arg[:-1])), arg[-1])
 
 
 def _existing_arg_fingerprints(
     relations: List[RERelation], reverse_lookup: Dict[str, int]
 ) -> Set[Tuple]:
+    """Return fingerprints of all jointly_entails/jointly_precludes argument groups already in the state.
+
+    Groups are reconstructed from relations that share an ``argument_id``.
+    Only complete groups (all premise IDs present in ``reverse_lookup``) are
+    included.  ``jointly_precludes`` conclusions use a negative index.
+    """
     groups: Dict[str, Dict] = {}
     for r in relations:
         if r.type not in ("jointly_entails", "jointly_precludes") or not r.argument_id:
@@ -80,6 +120,7 @@ def _filter_existing_arguments(
     relations: List[RERelation],
     lookup: Dict[int, REElement],
 ) -> List[List[int]]:
+    """Remove arguments from ``num_arguments`` whose fingerprint already exists in the state."""
     reverse_lookup = {e.id: n for n, e in lookup.items()}
     existing = _existing_arg_fingerprints(relations, reverse_lookup)
     filtered = [arg for arg in num_arguments if _arg_fingerprint(arg) not in existing]
@@ -92,6 +133,11 @@ def _filter_existing_arguments(
 def _format_existing_args_for_prompt(
     relations: List[RERelation], reverse_lookup: Dict[str, int]
 ) -> str:
+    """Format already-accepted argument groups as a human-readable string for the LLM prompt.
+
+    The output is injected into the prompt so the LLM does not re-suggest
+    arguments already present in the state.
+    """
     groups: Dict[str, Dict] = {}
     for r in relations:
         if r.type not in ("jointly_entails", "jointly_precludes") or not r.argument_id:
@@ -118,6 +164,12 @@ def _format_existing_args_for_prompt(
 def _build_prompt(
     lookup: Dict[int, REElement], relations: List[RERelation] = []
 ) -> str:
+    """Build the LLM prompt requesting all strictly logically valid arguments over the sentence pool.
+
+    Injects existing arguments (from ``relations``) so the model is told not to
+    reproduce them.  The response format is JSON with ``"arguments"`` and
+    ``"added_premises"`` keys.
+    """
     element_lines = "\n".join(f"  {n}: {e.text}" for n, e in lookup.items())
 
     reverse_lookup = {e.id: n for n, e in lookup.items()}
@@ -175,6 +227,12 @@ def _add_new_premises_to_lookup(
     round: str,
     model: str,
 ) -> Dict:
+    """Add LLM-supplied suppressed premises to the lookup, assigning fresh element IDs.
+
+    New elements are assigned IDs of the form ``J<n>``, ``P<n>``, or ``T<n>``
+    based on their type, counting up from the existing maximum for that type.
+    Returns the extended lookup (original is not mutated).
+    """
     if not added_premises:
         logger.info("No new premises to add to lookup.")
         return lookup
@@ -213,6 +271,7 @@ def _add_new_premises_to_lookup(
 def _translate_arguments(
     detected_arguments: List[List[int]], lookup: Dict[int, REElement]
 ) -> List[List[REElement]]:
+    """Translate a list of numeric argument lists to lists of REElements via the lookup."""
     logger.info("Translating arguments.")
     result = [translate_from_lookup(arg, lookup) for arg in detected_arguments]
     logger.info("Completed translating arguments.")
@@ -277,6 +336,12 @@ _DUMMY_ARGUMENTS: List[List[int]] = [
 def _dummy_detect_arguments(
     n_unnegated_sentence_pool: int, elements: List[REElement], round: str
 ) -> DetectArgumentsResponse:
+    """Return a hard-coded argument set for the dummy 'obligations to future generations' RE state.
+
+    Filters ``_DUMMY_ARGUMENTS`` to those whose indices fall within the current
+    sentence pool size, then adds the three suppressed-premise elements (indices
+    21–23) to the lookup.
+    """
     initial_lookup = {index + 1: e for index, e in enumerate(elements)}
     added_premises = [
         {
@@ -319,6 +384,7 @@ def _dummy_detect_arguments(
 async def _get_arguments_from_llm(
     lookup: Dict[int, REElement], llm: LLMService, relations: List[RERelation] = []
 ) -> LLMArgumentsResponse:
+    """Send the element lookup to the LLM and parse the JSON argument response."""
     prompt = _build_prompt(lookup, relations)
     result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
@@ -341,6 +407,15 @@ async def detect_arguments(
     use_dummy: bool = False,
     sentence_pool_minimum: int = 3,
 ) -> DetectArgumentsResponse:
+    """Detect logically valid arguments over the current element set.
+
+    Builds a sentence-index lookup from the request elements, queries the LLM
+    (or the dummy fixture when ``use_dummy=true``), filters out arguments already
+    present in the state, adds any LLM-supplied suppressed premises to the lookup,
+    and returns the deduplicated numeric arguments alongside their translated forms.
+
+    Raises 422 if the sentence pool is smaller than ``sentence_pool_minimum``.
+    """
     n_unnegated_sentence_pool = len(request.elements)
     if n_unnegated_sentence_pool < sentence_pool_minimum:
         raise HTTPException(

@@ -121,9 +121,10 @@ export function getNeighbours(selectedId, visRels) {
  * The junction sits on the conclusion→centroid axis at half the distance,
  * but no closer than (conclusionRadius + 18) px so the arrowhead always fits.
  *
- * @param {number}   centX @param {number} centY - Premise centroid.
- * @param {Position} conclusionPos               - Conclusion node centre.
- * @param {number}   tr                          - Conclusion node radius.
+ * @param {number}   centX        - Premise centroid x.
+ * @param {number}   centY        - Premise centroid y.
+ * @param {Position} conclusionPos - Conclusion node centre.
+ * @param {number}   tr           - Conclusion node radius.
  * @returns {{ jx: number, jy: number }}
  */
 export function computeJunction(centX, centY, conclusionPos, tr) {
@@ -210,11 +211,15 @@ export function parallelEdgeOffsets(relations) {
  * Minimum distance from point (px, py) to a quadratic bezier curve,
  * approximated by sampling `samples` evenly-spaced points along the curve.
  *
- * @param {number} px @param {number} py  Test point.
- * @param {number} x0 @param {number} y0  Curve start.
- * @param {number} cx @param {number} cy  Control point.
- * @param {number} x1 @param {number} y1  Curve end.
- * @param {number} [samples=16]
+ * @param {number} px - Test point x.
+ * @param {number} py - Test point y.
+ * @param {number} x0 - Curve start x.
+ * @param {number} y0 - Curve start y.
+ * @param {number} cx - Control point x.
+ * @param {number} cy - Control point y.
+ * @param {number} x1 - Curve end x.
+ * @param {number} y1 - Curve end y.
+ * @param {number} [samples=16] - Number of points sampled along the curve.
  * @returns {number}
  */
 export function distToQuadBezier(px, py, x0, y0, cx, cy, x1, y1, samples = 16) {
