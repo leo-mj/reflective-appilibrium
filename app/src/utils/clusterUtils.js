@@ -29,20 +29,31 @@ export const clusterColor = (i) => CLUSTER_COLORS[i % CLUSTER_COLORS.length];
  * Builds the adjacency structures needed by both algorithms.
  *
  * @param {REState} state
+ * @param {boolean} hideNonEntailsRels - When true, only entails/precludes relations
+ *   are used for support/conflict; supports/conflicts/undermines are ignored.
  * @returns {{ activeElements, supportAdj: Map<string,Set<string>>,
  *             conflictSet: Set<string>, compatAdj: Map<string,Set<string>> }}
  */
-function buildGraphs(state) {
-  const activeElements = state.elements.filter((e) => e.status !== "withdrawn" && e.status !== "possible");
+function buildGraphs(state, hideNonEntailsRels) {
+  const activeElements = state.elements.filter(
+    (e) => e.status !== "withdrawn" && e.status !== "possible",
+  );
   const activeIds = new Set(activeElements.map((e) => e.id));
+
+  const supportRels = ["entails", "jointly_entails"];
+  const conflictRels = ["precludes", "jointly_precludes"];
+  if (!hideNonEntailsRels) {
+    supportRels.push("supports");
+    conflictRels.push("conflicts", "undermines");
+  }
 
   const supportEdges = state.relations.filter(
     (r) =>
-      r.type === "supports" && activeIds.has(r.from) && activeIds.has(r.to),
+      supportRels.includes(r.type) && activeIds.has(r.from) && activeIds.has(r.to),
   );
   const conflictEdges = state.relations.filter(
     (r) =>
-      (r.type === "conflicts" || r.type === "undermines") &&
+      conflictRels.includes(r.type) &&
       activeIds.has(r.from) &&
       activeIds.has(r.to),
   );
@@ -109,9 +120,9 @@ function bronKerbosch(R, P, X, compatAdj, results) {
   }
 }
 
-function findClusters_BronKerbosch(state) {
+function findClusters_BronKerbosch(state, hideNonEntailsRels) {
   const { activeElements, supportAdj, conflictSet, compatAdj } =
-    buildGraphs(state);
+    buildGraphs(state, hideNonEntailsRels);
 
   // Step 1: all maximal cliques in the compatibility graph.
   const cliques = [];
@@ -175,8 +186,8 @@ function findClusters_BronKerbosch(state) {
 
 // ─── BFS fallback (≥ 50 elements) ────────────────────────────────────────────
 
-function findClusters_BFS(state) {
-  const { activeElements, supportAdj, conflictSet } = buildGraphs(state);
+function findClusters_BFS(state, hideNonEntailsRels) {
+  const { activeElements, supportAdj, conflictSet } = buildGraphs(state, hideNonEntailsRels);
 
   const allClusters = [];
   for (const seed of activeElements) {
@@ -219,19 +230,25 @@ function findClusters_BFS(state) {
  * Finds all maximal coherent clusters in the current RE state.
  *
  * @param {REState} state
+ * @param {boolean} [hideNonEntailsRels=false] - When true, only entails/precludes
+ *   relations count as support/conflict (computational RE mode).
  * @returns {{ members: Set<string>, size: number }[]} Sorted by size descending.
  */
-export function findCoherentClusters(state) {
+export function findCoherentClusters(state, hideNonEntailsRels = false) {
   const activeCount = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.status !== "possible",
   ).length;
   return activeCount < 50
-    ? findClusters_BronKerbosch(state)
-    : findClusters_BFS(state);
+    ? findClusters_BronKerbosch(state, hideNonEntailsRels)
+    : findClusters_BFS(state, hideNonEntailsRels);
 }
 
+const CONFLICT_TYPES = new Set(["conflicts", "undermines", "precludes", "jointly_precludes"]);
+const SUPPORT_TYPES = new Set(["supports", "entails", "jointly_entails"]);
+
 /**
- * Finds conflict/undermines edges that cross cluster boundaries.
+ * Finds conflict-like edges that cross cluster boundaries.
+ * Includes conflicts, undermines, precludes, and jointly_precludes.
  *
  * @param {{ members: Set<string> }[]} clusters
  * @param {REState} state
@@ -244,7 +261,7 @@ export function findCrossClusterTensions(clusters, state) {
       const { members: C1 } = clusters[i];
       const { members: C2 } = clusters[j];
       for (const r of state.relations) {
-        if (r.type !== "conflicts" && r.type !== "undermines") continue;
+        if (!CONFLICT_TYPES.has(r.type)) continue;
         if (
           (C1.has(r.from) && C2.has(r.to)) ||
           (C2.has(r.from) && C1.has(r.to))
@@ -259,6 +276,8 @@ export function findCrossClusterTensions(clusters, state) {
 /**
  * Finds pairs of clusters that are close to being mergeable:
  * connected by at least one support bridge and separated by ≤ 2 conflicts.
+ * Support bridges include supports, entails, and jointly_entails.
+ * Conflicts include conflicts, undermines, precludes, and jointly_precludes.
  *
  * @param {{ members: Set<string> }[]} clusters
  * @param {REState} state
@@ -277,14 +296,14 @@ export function findMergeCandidates(clusters, state) {
 
       const bridges = state.relations.filter(
         (r) =>
-          r.type === "supports" &&
+          SUPPORT_TYPES.has(r.type) &&
           ((C1.has(r.from) && C2.has(r.to)) ||
             (C2.has(r.from) && C1.has(r.to))),
       );
 
       const conflicts = state.relations.filter(
         (r) =>
-          (r.type === "conflicts" || r.type === "undermines") &&
+          CONFLICT_TYPES.has(r.type) &&
           ((C1.has(r.from) && C2.has(r.to)) ||
             (C2.has(r.from) && C1.has(r.to))),
       );
@@ -294,7 +313,7 @@ export function findMergeCandidates(clusters, state) {
       const mergedSet = new Set([...C1, ...C2]);
       const remainingConflicts = state.relations.filter(
         (r) =>
-          (r.type === "conflicts" || r.type === "undermines") &&
+          CONFLICT_TYPES.has(r.type) &&
           mergedSet.has(r.from) &&
           mergedSet.has(r.to) &&
           !conflicts.includes(r),

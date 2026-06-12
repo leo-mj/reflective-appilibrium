@@ -163,7 +163,7 @@ const suggestionsDisabled = !LLM_ENABLED && !isSample;
           />
         )}
         {tab === "clusters" && (
-          <ClusterTab state={state} positions={positions} />
+          <ClusterTab state={state} positions={positions} hideNonEntailsRels={hideNonEntailsRels} />
         )}
         {tab === "matrix" && (
           <Suspense fallback={null}>
