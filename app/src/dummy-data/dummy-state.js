@@ -450,38 +450,38 @@ export default {
     },
 
     // Arguments (entails for single-premise; jointly_entails for multi-premise)
-    // arg-dummy-1: T1 + T2 → P2
-    {
-      from: "T1", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1",
-      explanation: "T1 grounds moral patienthood in well-being capacity; T2 establishes that future people as a class are metaphysically determinate; together they entail probabilistic obligation (P2).",
-      addedRound: 7,
-    },
-    {
-      from: "T2", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1",
-      explanation: "T1 grounds moral patienthood in well-being capacity; T2 establishes that future people as a class are metaphysically determinate; together they entail probabilistic obligation (P2).",
-      addedRound: 7,
-    },
-    // arg-dummy-2: P1 + P5 → J10
-    {
-      from: "P1", to: "J10", type: "jointly_entails", argumentId: "arg-dummy-2",
-      explanation: "The sufficientarian duty (P1) requires not leaving future generations worse off; the Rawlsian extension (P5) demands equal consideration of all affected parties; together they entail equal temporal counting of future interests (J10).",
-      addedRound: 7,
-    },
-    {
-      from: "P5", to: "J10", type: "jointly_entails", argumentId: "arg-dummy-2",
-      explanation: "The sufficientarian duty (P1) requires not leaving future generations worse off; the Rawlsian extension (P5) demands equal consideration of all affected parties; together they entail equal temporal counting of future interests (J10).",
-      addedRound: 7,
-    },
-    // arg-dummy-3: P2 + P3 → J5
+    // arg-dummy-3: P2 + P3 → J5  (detected round 4: P3 arrives round 4)
     {
       from: "P2", to: "J5", type: "jointly_entails", argumentId: "arg-dummy-3",
       explanation: "Probabilistic obligation (P2) allows uncertain future existence to ground present duties; the diminution principle (P3) says only existence-uncertainty (not temporal distance) may reduce obligation strength; together they permit the slight welfare discounting asserted by J5.",
-      addedRound: 8,
+      addedRound: 4,
     },
     {
       from: "P3", to: "J5", type: "jointly_entails", argumentId: "arg-dummy-3",
       explanation: "Probabilistic obligation (P2) allows uncertain future existence to ground present duties; the diminution principle (P3) says only existence-uncertainty (not temporal distance) may reduce obligation strength; together they permit the slight welfare discounting asserted by J5.",
-      addedRound: 8,
+      addedRound: 4,
+    },
+    // arg-dummy-2: P1 + P5 → J10  (detected round 5: P5 and J10 arrive round 5)
+    {
+      from: "P1", to: "J10", type: "jointly_entails", argumentId: "arg-dummy-2",
+      explanation: "The sufficientarian duty (P1) requires not leaving future generations worse off; the Rawlsian extension (P5) demands equal consideration of all affected parties; together they entail equal temporal counting of future interests (J10).",
+      addedRound: 5,
+    },
+    {
+      from: "P5", to: "J10", type: "jointly_entails", argumentId: "arg-dummy-2",
+      explanation: "The sufficientarian duty (P1) requires not leaving future generations worse off; the Rawlsian extension (P5) demands equal consideration of all affected parties; together they entail equal temporal counting of future interests (J10).",
+      addedRound: 5,
+    },
+    // arg-dummy-1: T1 + T2 → P2  (detected round 6: T2 arrives round 6)
+    {
+      from: "T1", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1",
+      explanation: "T1 grounds moral patienthood in well-being capacity; T2 establishes that future people as a class are metaphysically determinate; together they entail probabilistic obligation (P2).",
+      addedRound: 6,
+    },
+    {
+      from: "T2", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1",
+      explanation: "T1 grounds moral patienthood in well-being capacity; T2 establishes that future people as a class are metaphysically determinate; together they entail probabilistic obligation (P2).",
+      addedRound: 6,
     },
     // arg-dummy-4: P1 → J3
     {

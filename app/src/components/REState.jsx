@@ -205,6 +205,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     showTabNav,
     expandAllKey,
     allExpanded,
+    showZScores: tab === "history",
   };
 
   const graphPanelCommonProps = {

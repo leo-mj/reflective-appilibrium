@@ -4,8 +4,10 @@
  */
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { scoreChanges } from "../utils/simulateRethonClient.js";
+import { scoreChanges, scorePerRound } from "../utils/simulateRethonClient.js";
+import { RoundScoresChart } from "./graphs_shared/RoundScoresChart.jsx";
 import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
+import { BACKEND_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { useTextTabData } from "../hooks/useTextTabData.js";
 import { useActiveSection } from "../hooks/useActiveSection.js";
@@ -32,7 +34,7 @@ const DEFAULT_COLLAPSED_SECTIONS = {
   theories: true,
   relations: true,
   coherence: true,
-  clusters: false,
+  clusters: true,
   log: true,
 };
 
@@ -73,6 +75,7 @@ export function TextTab({
   allExpanded,
   hideNonEntailsRels,
   weights,
+  showZScores = false,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   const scrollRef = useRef(null);
@@ -101,14 +104,14 @@ export function TextTab({
           .filter(
             (e) =>
               (e.status === "active" || e.status === "revised") &&
-              (e.type === "judgment" || e.type === "principle" || e.type === "theory"),
+              (e.type === "judgment" ||
+                e.type === "principle" ||
+                e.type === "theory"),
           )
           .map((e) => `${e.id}:${e.status}`),
         `rels:${
-          state.relations.filter(
-            (r) =>
-              ARGUMENT_RELATION_TYPES.has(r.type),
-          ).length
+          state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type))
+            .length
         }`,
       ]
         .sort()
@@ -125,7 +128,10 @@ export function TextTab({
           result.withdrawal_deltas.map((d) => [
             d.element_id,
             d.delta_account != null
-              ? { delta_account: d.delta_account, delta_systematicity: d.delta_systematicity }
+              ? {
+                  delta_account: d.delta_account,
+                  delta_systematicity: d.delta_systematicity,
+                }
               : null,
           ]),
         ),
@@ -135,6 +141,20 @@ export function TextTab({
       cancelled = true;
     };
   }, [withdrawalKey, weights]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [roundScores, setRoundScores] = useState(null);
+  useEffect(() => {
+    if (!BACKEND_ENABLED) return;
+    let cancelled = false;
+    scorePerRound(state)
+      .then((data) => {
+        if (!cancelled) setRoundScores(data.round_scores);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = (key) =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -281,65 +301,66 @@ export function TextTab({
           />
         )}
 
-        <div
-          ref={scrollRef}
-          style={{
-            overflowY: "auto",
-            flex: 1,
-            padding: "0 4px 24px",
-            background: C.bg,
-            color: C.text,
-          }}
-        >
-          {highlightedIds && (
-            <HighlightedSection
-              selectedRel={selectedRel}
-              selected={selected}
-              selectedEl={selectedEl}
-              neighbourEls={neighbourEls}
-              hlRels={hlRels}
-              restEls={restEls}
-              restRels={restRels}
-            />
-          )}
-
-          {!highlightedIds && (pinnedEl || pinnedRel) && (
-            <>
-              <SectionHeader title="Just added" />
-              {pinnedEl && <ElementCard e={pinnedEl} />}
-              {pinnedRel &&
-                (pinnedArgRels ? (
-                  <ArgumentCard rels={pinnedArgRels} />
-                ) : (
-                  <RelationCard
-                    key={`${pinnedRel.from}-${pinnedRel.to}-${pinnedRel.type}-${pinnedRel.addedRound ?? 1}`}
-                    r={pinnedRel}
-                  />
-                ))}
-              <div
-                style={{
-                  borderTop: `1px solid ${C.border}`,
-                  margin: "4px 0 8px",
-                }}
+        <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+          <div
+            ref={scrollRef}
+            style={{
+              overflowY: "auto",
+              height: "100%",
+              padding: "0 4px 24px",
+              background: C.bg,
+              color: C.text,
+            }}
+          >
+            {highlightedIds && (
+              <HighlightedSection
+                selectedRel={selectedRel}
+                selected={selected}
+                selectedEl={selectedEl}
+                neighbourEls={neighbourEls}
+                hlRels={hlRels}
+                restEls={restEls}
+                restRels={restRels}
               />
-            </>
-          )}
+            )}
 
-          {!highlightedIds && (
-            <SectionListing
-              refJudgments={refJudgments}
-              refPrinciples={refPrinciples}
-              refTheories={refTheories}
-              refRelations={refRelations}
-              displayEls={displayEls}
-              displayRels={displayRels}
-              isCollapsed={isCollapsed}
-              toggle={toggle}
-              showRelations={!hideNonEntailsRels}
-            />
-          )}
+            {!highlightedIds && (pinnedEl || pinnedRel) && (
+              <>
+                <SectionHeader title="Just added" />
+                {pinnedEl && <ElementCard e={pinnedEl} />}
+                {pinnedRel &&
+                  (pinnedArgRels ? (
+                    <ArgumentCard rels={pinnedArgRels} />
+                  ) : (
+                    <RelationCard
+                      key={`${pinnedRel.from}-${pinnedRel.to}-${pinnedRel.type}-${pinnedRel.addedRound ?? 1}`}
+                      r={pinnedRel}
+                    />
+                  ))}
+                <div
+                  style={{
+                    borderTop: `1px solid ${C.border}`,
+                    margin: "4px 0 8px",
+                  }}
+                />
+              </>
+            )}
 
-          {/* {hasCoherence && (
+            {!highlightedIds && (
+              <SectionListing
+                refJudgments={refJudgments}
+                refPrinciples={refPrinciples}
+                refTheories={refTheories}
+                refRelations={refRelations}
+                displayEls={displayEls}
+                displayRels={displayRels}
+                isCollapsed={isCollapsed}
+                toggle={toggle}
+                showRelations={!hideNonEntailsRels}
+              />
+            )}
+
+            {/* {hasCoherence && (
             <CoherenceSection
               state={state}
               sectionRef={refCoherence}
@@ -348,45 +369,46 @@ export function TextTab({
             />
           )} */}
 
-          <ClusterSection
-            state={state}
-            clusters={clusters}
-            clusterSectionRef={clusterSectionRef}
-            collapsed={isCollapsed("clusters")}
-            onToggle={() => toggle("clusters")}
-          />
-
-          {state.log.length > 0 && (
-            <LogSection
-              log={state.log}
-              sectionRef={refLog}
-              isCollapsed={isCollapsed("log")}
-              onToggle={() => toggle("log")}
-              search={search}
+            <ClusterSection
+              state={state}
+              clusters={clusters}
+              clusterSectionRef={clusterSectionRef}
+              collapsed={isCollapsed("clusters")}
+              onToggle={() => toggle("clusters")}
             />
-          )}
-        </div>
 
-        <button
-          onClick={() =>
-            scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
-          }
-          style={{
-            zIndex: 99,
-            position: "absolute",
-            bottom: 10,
-            left: 10,
-            background: C.panel,
-            border: `1px solid ${C.border}`,
-            borderRadius: 6,
-            color: C.dim,
-            cursor: "pointer",
-            fontSize: 16,
-            padding: "3px 8px",
-          }}
-        >
-          ↑ Top
-        </button>
+            {state.log.length > 0 && (
+              <LogSection
+                log={state.log}
+                sectionRef={refLog}
+                isCollapsed={isCollapsed("log")}
+                onToggle={() => toggle("log")}
+                search={search}
+              />
+            )}
+          </div>
+
+          <button
+            onClick={() =>
+              scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+            }
+            style={{
+              zIndex: 99,
+              position: "absolute",
+              bottom: 10,
+              left: 10,
+              background: C.panel,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              color: C.dim,
+              cursor: "pointer",
+              fontSize: 16,
+              padding: "3px 8px",
+            }}
+          >
+            ↑ Top
+          </button>
+        </div>
 
         {!isWide && (
           <MobileAddButton
@@ -395,6 +417,21 @@ export function TextTab({
             elements={state.elements}
             round={state.round}
           />
+        )}
+
+        {showZScores && roundScores && (
+          <div
+            style={{
+              borderTop: `1px solid ${C.border}`,
+              padding: "6px 4px 2px",
+              flexShrink: 0,
+            }}
+          >
+            <RoundScoresChart
+              roundScores={roundScores}
+              snappedRound={state.round}
+            />
+          </div>
         )}
       </div>
     </Ctx.Provider>
