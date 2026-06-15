@@ -19,7 +19,7 @@ import {
   ModifyTextarea,
   ErrorBanner,
 } from "../SuggestionActions.jsx";
-import { AddArgumentPanel } from "../user_edits/TextTabAddPanel.jsx";
+import { AddArgumentPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 
 const ACCENT = C.judgment.high;

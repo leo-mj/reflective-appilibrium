@@ -8,8 +8,21 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { FIELD_STYLE, LABEL_STYLE } from "../../constants/modalConstants.js";
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Primitives ───────────────────────────────────────────────────────────────
+
+/** Label + input wrapper shared across all modal form fields. */
+export function FormField({ label, children }) {
+  return (
+    <div style={FIELD_STYLE}>
+      <label style={LABEL_STYLE}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+// ─── Shell ────────────────────────────────────────────────────────────────────
 
 /**
  * Centred modal overlay with a standard two-button footer.

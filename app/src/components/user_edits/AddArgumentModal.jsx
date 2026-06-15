@@ -5,12 +5,8 @@
 
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
-import {
-  INPUT_STYLE,
-  LABEL_STYLE,
-  FIELD_STYLE,
-} from "../../constants/modalConstants.js";
-import { ModalShell } from "./ModalShell.jsx";
+import { INPUT_STYLE } from "../../constants/modalConstants.js";
+import { ModalShell, FormField } from "./ModalShell.jsx";
 import { sortElementIds } from "../../utils/stateUtils.js";
 
 const ghostBtn = {
@@ -75,8 +71,7 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
       saveDisabled={!isValid}
       saveLabel="Add argument"
     >
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Premises</label>
+      <FormField label="Premises">
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {premises.map((p, i) => (
             <div key={p} style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -116,10 +111,9 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
             </div>
           )}
         </div>
-      </div>
+      </FormField>
 
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Relation to conclusion</label>
+      <FormField label="Relation to conclusion">
         <div style={{ display: "flex", gap: 6 }}>
           {[
             { value: false, label: "Entails", color: C.entails },
@@ -142,10 +136,9 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
             </button>
           ))}
         </div>
-      </div>
+      </FormField>
 
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Conclusion</label>
+      <FormField label="Conclusion">
         <select
           value={conclusion}
           onChange={(e) => setConclusion(e.target.value)}
@@ -157,10 +150,9 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
             </option>
           ))}
         </select>
-      </div>
+      </FormField>
 
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Explanation (optional)</label>
+      <FormField label="Explanation (optional)">
         <textarea
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
@@ -169,7 +161,7 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
             ? "Why do these premises preclude the conclusion?"
             : "Why do these premises entail the conclusion?"}
         />
-      </div>
+      </FormField>
     </ModalShell>
   );
 }

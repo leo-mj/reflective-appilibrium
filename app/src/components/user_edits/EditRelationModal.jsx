@@ -6,12 +6,8 @@
 /** @import { RERelation } from '../../types.js' */
 
 import { useState } from "react";
-import {
-  INPUT_STYLE,
-  LABEL_STYLE,
-  FIELD_STYLE,
-} from "../../constants/modalConstants.js";
-import { ModalShell } from "./ModalShell.jsx";
+import { INPUT_STYLE } from "../../constants/modalConstants.js";
+import { ModalShell, FormField } from "./ModalShell.jsx";
 
 /**
  * @typedef {Object} EditRelationFormData
@@ -51,8 +47,7 @@ export function EditRelationModal({
       onCancel={onCancel}
       onSave={() => onSave(form)}
     >
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Relation type</label>
+      <FormField label="Relation type">
         <select
           value={form.type}
           onChange={(e) => set("type", e.target.value)}
@@ -67,16 +62,15 @@ export function EditRelationModal({
           <option value="jointly_entails">Jointly Entails</option>
           <option value="jointly_precludes">Jointly Precludes</option>
         </select>
-      </div>
+      </FormField>
 
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Explanation</label>
+      <FormField label="Explanation">
         <textarea
           value={form.explanation}
           onChange={(e) => set("explanation", e.target.value)}
           style={{ ...INPUT_STYLE, height: 110, resize: "vertical" }}
         />
-      </div>
+      </FormField>
     </ModalShell>
   );
 }

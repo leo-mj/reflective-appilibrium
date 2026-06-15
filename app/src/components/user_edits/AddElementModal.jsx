@@ -4,12 +4,8 @@
  */
 
 import { useState } from "react";
-import {
-  INPUT_STYLE,
-  LABEL_STYLE,
-  FIELD_STYLE,
-} from "../../constants/modalConstants.js";
-import { ModalShell } from "./ModalShell.jsx";
+import { INPUT_STYLE } from "../../constants/modalConstants.js";
+import { ModalShell, FormField } from "./ModalShell.jsx";
 import { ConfidenceInput } from "./ConfidenceInput.jsx";
 
 /**
@@ -33,8 +29,7 @@ export function AddElementForm({ form, setForm }) {
     setForm((prev) => ({ ...prev, [field]: value }));
   return (
     <>
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Type</label>
+      <FormField label="Type">
         <select
           value={form.type}
           onChange={(e) => set("type", e.target.value)}
@@ -44,28 +39,26 @@ export function AddElementForm({ form, setForm }) {
           <option value="principle">Principle</option>
           <option value="theory">Background Theory</option>
         </select>
-      </div>
+      </FormField>
       <ConfidenceInput
         value={form.confidence}
         onChange={(v) => set("confidence", v)}
       />
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Origin</label>
+      <FormField label="Origin">
         <input
           type="text"
           value={form.origin}
           onChange={(e) => set("origin", e.target.value)}
           style={INPUT_STYLE}
         />
-      </div>
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Text</label>
+      </FormField>
+      <FormField label="Text">
         <textarea
           value={form.text}
           onChange={(e) => set("text", e.target.value)}
           style={{ ...INPUT_STYLE, height: 90, resize: "vertical" }}
         />
-      </div>
+      </FormField>
     </>
   );
 }

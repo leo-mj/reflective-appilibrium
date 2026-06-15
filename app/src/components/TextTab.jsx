@@ -17,9 +17,8 @@ import {
   ElementCard,
   RelationCard,
   SectionHeader,
-  HighlightedSection,
-  SectionListing,
 } from "./text_panel/TextTabCards.jsx";
+import { HighlightedSection, SectionListing } from "./text_panel/TextTabSections.jsx";
 import { ClusterSection } from "./text_panel/TextTabClusterSection.jsx";
 import { NavBar } from "./text_panel/TextTabNavBar.jsx";
 import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";

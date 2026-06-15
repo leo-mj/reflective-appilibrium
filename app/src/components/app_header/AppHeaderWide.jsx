@@ -13,24 +13,12 @@ import {
   TAB_LABELS,
   TAB_TOOLTIPS,
 } from "../../constants/tabConstants.jsx";
-import { btn, metaTabBtn } from "./appHeaderStyles.js";
+import { btn, metaTabBtn, menuIconStyle, menuDividerStyle, inlineDividerStyle } from "./appHeaderStyles.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
-
-const inlineDivider = (
-  <div
-    style={{
-      width: 1,
-      height: 20,
-      background: C.border,
-      alignSelf: "center",
-      margin: "0 4px",
-    }}
-  />
-);
 
 /** Two-row desktop header: title row + tab bar. Props mirror AppHeader. */
 export function AppHeaderWide({
@@ -94,16 +82,6 @@ export function AppHeaderWide({
     borderRadius: 4,
     border: "none",
   };
-  const icon = {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 20,
-    flexShrink: 0,
-  };
-  const menuDivider = (
-    <div style={{ height: 1, background: C.border, margin: "2px 0" }} />
-  );
   const close = (fn) => () => {
     fn();
     setMenuOpen(false);
@@ -187,7 +165,7 @@ export function AppHeaderWide({
                   {label}
                 </button>
               ))}
-              {inlineDivider}
+              <div style={inlineDividerStyle} />
             </div>
           )}
 
@@ -202,7 +180,7 @@ export function AppHeaderWide({
             </button>
           </Tooltip>
 
-          {inlineDivider}
+          <div style={inlineDividerStyle} />
 
           <Tooltip text="Start the step-by-step tour.">
             <button
@@ -218,7 +196,7 @@ export function AppHeaderWide({
             </button>
           </Tooltip>
 
-          {inlineDivider}
+          <div style={inlineDividerStyle} />
 
           {/* Burger menu */}
           <div style={{ position: "relative" }}>
@@ -261,18 +239,18 @@ export function AppHeaderWide({
                       onClick={close(onHome)}
                       style={menuItem}
                     >
-                      <span style={icon}>←</span>Home
+                      <span style={menuIconStyle}>←</span>Home
                     </button>
                   </Tooltip>
 
-                  {menuDivider}
+                  <div style={menuDividerStyle} />
 
                   {metaTab !== "assist" && (
                     <button
                       onClick={close(() => setShowText((s) => !s))}
                       style={menuItem}
                     >
-                      <span style={icon}>≡</span>
+                      <span style={menuIconStyle}>≡</span>
                       {showText ? "Hide text" : "Show text"}
                     </button>
                   )}
@@ -281,7 +259,7 @@ export function AppHeaderWide({
                     onClick={close(() => setShowTabNav((s) => !s))}
                     style={menuItem}
                   >
-                    <span style={icon}>
+                    <span style={menuIconStyle}>
                       <svg
                         width="12"
                         height="12"
@@ -301,7 +279,7 @@ export function AppHeaderWide({
                   </button>
 
                   <button onClick={close(onExpandAll)} style={menuItem}>
-                    <span style={icon}>⇅</span>
+                    <span style={menuIconStyle}>⇅</span>
                     {allExpanded ? "Minimize toggles" : "Expand toggles"}
                   </button>
 
@@ -309,7 +287,7 @@ export function AppHeaderWide({
                     onClick={close(() => setHideNonEntailsRels((s) => !s))}
                     style={{ ...menuItem, textAlign: "left " }}
                   >
-                    <span style={icon}>→</span>
+                    <span style={menuIconStyle}>→</span>
                     {hideNonEntailsRels
                       ? "Show all relations"
                       : "Arguments only"}
@@ -317,7 +295,7 @@ export function AppHeaderWide({
 
                   {BACKEND_ENABLED && (
                     <>
-                      {menuDivider}
+                      <div style={menuDividerStyle} />
 
                       <button
                         onClick={() => setWeightsOpen((o) => !o)}
@@ -326,7 +304,7 @@ export function AppHeaderWide({
                           color: weightsChanged ? C.principle.high : undefined,
                         }}
                       >
-                        <span style={icon}>⚖</span>
+                        <span style={menuIconStyle}>⚖</span>
                         Model weights{weightsChanged ? " *" : ""}
                         <span
                           style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}
@@ -363,7 +341,7 @@ export function AppHeaderWide({
                     </>
                   )}
 
-                  {menuDivider}
+                  <div style={menuDividerStyle} />
 
                   <button
                     onClick={() => {
@@ -372,11 +350,11 @@ export function AppHeaderWide({
                     }}
                     style={menuItem}
                   >
-                    <span style={icon}>Aa</span>Select Font
+                    <span style={menuIconStyle}>Aa</span>Select Font
                   </button>
 
                   <button onClick={close(toggleTheme)} style={menuItem}>
-                    <span style={icon}>
+                    <span style={menuIconStyle}>
                       {isDark ? (
                         <svg
                           width="12"
@@ -418,7 +396,7 @@ export function AppHeaderWide({
                     {isDark ? "Light mode" : "Dark mode"}
                   </button>
 
-                  {menuDivider}
+                  <div style={menuDividerStyle} />
 
                   <Tooltip text="Import a previously exported JSON file to restore an RE state.">
                     <button
@@ -428,7 +406,7 @@ export function AppHeaderWide({
                       }}
                       style={menuItem}
                     >
-                      <span style={icon}>↑</span>Import
+                      <span style={menuIconStyle}>↑</span>Import
                     </button>
                   </Tooltip>
                   <Tooltip text="Export the current RE state as a JSON file you can re-import later.">
@@ -436,7 +414,7 @@ export function AppHeaderWide({
                       onClick={close(onDownload)}
                       style={{ ...menuItem, color: C.theory.high }}
                     >
-                      <span style={icon}>↓</span>Export
+                      <span style={menuIconStyle}>↓</span>Export
                     </button>
                   </Tooltip>
                   {BACKEND_ENABLED && (
@@ -451,11 +429,11 @@ export function AppHeaderWide({
                             : {}),
                         }}
                       >
-                        <span style={icon}>{saveLabel}</span>Save
+                        <span style={menuIconStyle}>{saveLabel}</span>Save
                       </button>
                     </Tooltip>
                   )}
-                  {menuDivider}
+                  <div style={menuDividerStyle} />
 
                   {BYOK_ENABLED && (
                     <Tooltip text="Configure your LLM provider, model name, and API key.">
@@ -467,7 +445,7 @@ export function AppHeaderWide({
                         }}
                         style={menuItem}
                       >
-                        <span style={icon}>⚙</span>
+                        <span style={menuIconStyle}>⚙</span>
                         {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
                       </button>
                     </Tooltip>
@@ -530,13 +508,7 @@ export function AppHeaderWide({
           </Tooltip>
         )}
         <div
-          style={{
-            width: 1,
-            height: 20,
-            background: C.border,
-            alignSelf: "center",
-            margin: "0 4px",
-          }}
+          style={inlineDividerStyle}
         />
         {visibleSubTabs.map((t) => (
           <Tooltip key={t} text={TAB_TOOLTIPS[t]}>

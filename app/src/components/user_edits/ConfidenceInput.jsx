@@ -5,7 +5,8 @@
  */
 
 import { C } from "../../constants/colors.js";
-import { LABEL_STYLE, FIELD_STYLE, INPUT_STYLE } from "../../constants/modalConstants.js";
+import { INPUT_STYLE } from "../../constants/modalConstants.js";
+import { FormField } from "./ModalShell.jsx";
 
 const PRESETS = [
   { label: "Low", value: 0.33 },
@@ -25,8 +26,7 @@ export function ConfidenceInput({ value, onChange }) {
   };
 
   return (
-    <div style={FIELD_STYLE}>
-      <label style={LABEL_STYLE}>Confidence</label>
+    <FormField label="Confidence">
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         {PRESETS.map((p) => {
           const active = Math.abs(value - p.value) < 0.01;
@@ -60,6 +60,6 @@ export function ConfidenceInput({ value, onChange }) {
           style={{ ...INPUT_STYLE, width: 70 }}
         />
       </div>
-    </div>
+    </FormField>
   );
 }

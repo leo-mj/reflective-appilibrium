@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from ..dependencies import get_llm_service
 from ..models.re_state import REElement
 from ..services.llm import LLMService
+from ..services.prompts import build_matrix_prompt
 
 router = APIRouter(prefix="/api/matrix", tags=["matrix"])
 logger = logging.getLogger(__name__)
@@ -50,43 +51,6 @@ class MatrixResponse(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-# ── Prompt ────────────────────────────────────────────────────────────────────
-
-
-def _build_prompt(topic: str, elements: list[REElement]) -> str:
-    """Build the LLM prompt for relatedness matrix computation.
-
-    The prompt instructs the model to produce a symmetric matrix with
-    diagonal 1.0 entries and a ``pairDescriptions`` dict keyed by
-    ``"A→B"`` in JavaScript sort order (to match the frontend).
-    """
-    element_list = "\n".join(f"{e.id} [{e.type}]: {e.text}" for e in elements)
-    ids = [e.id for e in elements]
-    example_ids = ids[:3] if len(ids) >= 3 else ids
-
-    return f"""\
-You are assisting a reflective equilibrium (RE) analysis in ethics.
-Topic: "{topic}"
-
-Elements (judgments and principles):
-{element_list}
-
-Task: compute a symmetric relatedness matrix.
-- Score each ordered pair (including diagonal) from 0.0 (completely unrelated) to 1.0 (identical or directly equivalent).
-- Diagonal entries must be 1.0.
-- For each off-diagonal unordered pair, provide a one-sentence description. \
-Use the key "A→B" where A and B are sorted by JavaScript string sort order \
-(e.g. ["J12","J10","J1","J3"].sort() → ["J1","J10","J12","J3"]).
-- Write a 2–3 sentence overview of the overall element landscape.
-
-Respond with valid JSON only, in exactly this format:
-{{
-  "overview": "...",
-  "matrix": {{ {", ".join(f'"{i}": {{...}}' for i in example_ids)} }},
-  "pairDescriptions": {{ "{example_ids[0]}→{example_ids[1]}": "Brief description." }}
-}}"""
-
-
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 
 
@@ -104,7 +68,7 @@ async def analyze(
     logger.info(
         f"Requesting relatedness matrix from model '{llm.model}' for {len(active)} elements."
     )
-    prompt = _build_prompt(request.topic, active)
+    prompt = build_matrix_prompt(request.topic, active)
     result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,

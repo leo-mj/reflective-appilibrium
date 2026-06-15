@@ -16,7 +16,7 @@ import {
   TAB_ICONS,
   TAB_LABELS,
 } from "../../constants/tabConstants.jsx";
-import { btn } from "./appHeaderStyles.js";
+import { btn, menuIconStyle, menuDividerStyle } from "./appHeaderStyles.js";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
 
@@ -76,16 +76,6 @@ export function AppHeaderNarrow({
     justifyContent: "flex-start",
     gap: 8,
   });
-  const icon = {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 20,
-    flexShrink: 0,
-  };
-  const divider = (
-    <div style={{ height: 1, background: C.border, margin: "2px 0" }} />
-  );
   const close = (fn) => () => {
     fn();
     setMenuOpen(false);
@@ -144,17 +134,17 @@ export function AppHeaderNarrow({
           }}
         >
           <button onClick={close(onHome)} style={menuBtn()}>
-            <span style={icon}>←</span>Home
+            <span style={menuIconStyle}>←</span>Home
           </button>
 
-          {divider}
+          <div style={menuDividerStyle} />
 
           {metaTab !== "assist" && (
             <button
               onClick={close(() => setShowText((s) => !s))}
               style={menuBtn()}
             >
-              <span style={icon}>≡</span>
+              <span style={menuIconStyle}>≡</span>
               {showText ? "Hide text" : "Show text"}
             </button>
           )}
@@ -163,7 +153,7 @@ export function AppHeaderNarrow({
             onClick={close(() => setShowTabNav((s) => !s))}
             style={menuBtn()}
           >
-            <span style={icon}>
+            <span style={menuIconStyle}>
               <svg
                 width="12"
                 height="12"
@@ -183,7 +173,7 @@ export function AppHeaderNarrow({
           </button>
 
           <button onClick={close(onExpandAll)} style={menuBtn()}>
-            <span style={icon}>⇅</span>
+            <span style={menuIconStyle}>⇅</span>
             {allExpanded ? "Minimize all toggles" : "Expand all toggles"}
           </button>
 
@@ -191,11 +181,11 @@ export function AppHeaderNarrow({
             onClick={close(() => setHideNonEntailsRels((s) => !s))}
             style={menuBtn()}
           >
-            <span style={icon}>→</span>
+            <span style={menuIconStyle}>→</span>
             {hideNonEntailsRels ? "All relations" : "Arguments only"}
           </button>
 
-          {divider}
+          <div style={menuDividerStyle} />
 
           <button
             onClick={() => setWeightsOpen((o) => !o)}
@@ -204,7 +194,7 @@ export function AppHeaderNarrow({
               color: weightsChanged ? C.principle.high : undefined,
             }}
           >
-            <span style={icon}>⚖</span>
+            <span style={menuIconStyle}>⚖</span>
             Model weights{weightsChanged ? " *" : ""}
             <span style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}>
               {weightsOpen ? "▲" : "▼"}
@@ -237,7 +227,7 @@ export function AppHeaderNarrow({
             </div>
           )}
 
-          {divider}
+          <div style={menuDividerStyle} />
 
           <button
             onClick={() => {
@@ -246,7 +236,7 @@ export function AppHeaderNarrow({
             }}
             style={menuBtn()}
           >
-            <span style={icon}>Aa</span>Select Font
+            <span style={menuIconStyle}>Aa</span>Select Font
           </button>
 
           <button
@@ -256,7 +246,7 @@ export function AppHeaderNarrow({
             }}
             style={menuBtn()}
           >
-            <span style={icon}>
+            <span style={menuIconStyle}>
               {isDark ? (
                 <svg
                   width="12"
@@ -298,7 +288,7 @@ export function AppHeaderNarrow({
             {isDark ? "Light mode" : "Dark mode"}
           </button>
 
-          {divider}
+          <div style={menuDividerStyle} />
 
           <button
             onClick={() => {
@@ -307,18 +297,18 @@ export function AppHeaderNarrow({
             }}
             style={menuBtn()}
           >
-            <span style={icon}>↑</span>Import
+            <span style={menuIconStyle}>↑</span>Import
           </button>
           <button
             onClick={close(onDownload)}
             style={{ ...menuBtn(), color: C.theory.high }}
           >
-            <span style={icon}>↓</span>Export
+            <span style={menuIconStyle}>↓</span>Export
           </button>
 
           {BYOK_ENABLED && (
             <>
-              {divider}
+              <div style={menuDividerStyle} />
               <button
                 onClick={() => {
                   setMenuOpen(false);
@@ -326,14 +316,14 @@ export function AppHeaderNarrow({
                 }}
                 style={menuBtn()}
               >
-                <span style={icon}>⚙</span>
+                <span style={menuIconStyle}>⚙</span>
                 {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
               </button>
             </>
           )}
 
           <>
-            {divider}
+            <div style={menuDividerStyle} />
 
             <div
               style={{
@@ -429,7 +419,7 @@ export function AppHeaderNarrow({
             )}
           </>
 
-          {divider}
+          <div style={menuDividerStyle} />
 
           <button
             onClick={close(onUndo)}
