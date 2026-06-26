@@ -418,7 +418,7 @@ export function AppHeaderWide({
                     </button>
                   </Tooltip>
                   {BACKEND_ENABLED && (
-                    <Tooltip text="Save session to the backend server (localhost:8000). Reload it from the home screen.">
+                    <Tooltip text="Save session to the backend server. Reload it from the home screen.">
                       <button
                         onClick={close(onSave)}
                         disabled={saveBusy}
