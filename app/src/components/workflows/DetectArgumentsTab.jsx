@@ -279,6 +279,7 @@ export function DetectArgumentsTab({
   workflowPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
+  hideNonEntailsRels,
 }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -370,7 +371,10 @@ export function DetectArgumentsTab({
     const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
     if (premises.length > 0) {
       const conclusionId = resolveId(conclusion);
-      const relationType = argumentRelationType(premises.length, conclusion.negated);
+      const relationType = argumentRelationType(
+        premises.length,
+        conclusion.negated,
+      );
       for (const premise of premises) {
         onAddRelation?.(
           {
@@ -475,6 +479,7 @@ export function DetectArgumentsTab({
                   nextPhaseIsEnabled={nextPhaseIsEnabled}
                   workflowPhase={workflowPhase}
                   advanceWorkflow={onAdvanceWorkflow}
+                  hideNonEntailsRels={hideNonEntailsRels}
                 />
               </>
             )}

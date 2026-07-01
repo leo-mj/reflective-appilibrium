@@ -142,18 +142,16 @@ export function TextTab({
   }, [withdrawalKey, weights]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [roundScores, setRoundScores] = useState(null);
-  useEffect(() => {
-    if (!BACKEND_ENABLED) return;
-    let cancelled = false;
+  const [roundScoresLoading, setRoundScoresLoading] = useState(false);
+
+  const loadRoundScores = () => {
+    if (!BACKEND_ENABLED || roundScoresLoading) return;
+    setRoundScoresLoading(true);
     scorePerRound(state)
-      .then((data) => {
-        if (!cancelled) setRoundScores(data.round_scores);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      .then((data) => setRoundScores(data.round_scores))
+      .catch(() => {})
+      .finally(() => setRoundScoresLoading(false));
+  };
 
   const toggle = (key) =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -418,7 +416,7 @@ export function TextTab({
           />
         )}
 
-        {showZScores && roundScores && (
+        {showZScores && (
           <div
             style={{
               borderTop: `1px solid ${C.border}`,
@@ -426,10 +424,29 @@ export function TextTab({
               flexShrink: 0,
             }}
           >
-            <RoundScoresChart
-              roundScores={roundScores}
-              snappedRound={state.round}
-            />
+            {roundScores ? (
+              <RoundScoresChart
+                roundScores={roundScores}
+                snappedRound={state.round}
+              />
+            ) : (
+              <button
+                onClick={loadRoundScores}
+                disabled={roundScoresLoading}
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  color: roundScoresLoading ? C.dim : C.text,
+                  borderRadius: 6,
+                  padding: "4px 10px",
+                  fontSize: 11,
+                  cursor: roundScoresLoading ? "not-allowed" : "pointer",
+                  width: "100%",
+                }}
+              >
+                {roundScoresLoading ? "Calculating…" : "Calculate Z-scores per round"}
+              </button>
+            )}
           </div>
         )}
       </div>

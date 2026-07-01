@@ -13,7 +13,14 @@ import { quickScore } from "../../utils/simulateRethonClient.js";
  * pre-computed baseline.  Renders nothing while loading or when scoring is
  * unavailable.
  */
-export function ScoreDeltaBadge({ state, text, type, confidence, baseline, weights }) {
+export function ScoreDeltaBadge({
+  state,
+  text,
+  type,
+  confidence,
+  baseline,
+  weights,
+}) {
   const [delta, setDelta] = useState(null);
 
   useEffect(() => {
@@ -35,27 +42,44 @@ export function ScoreDeltaBadge({ state, text, type, confidence, baseline, weigh
       text,
       addedRound: state.round,
     };
-    quickScore([...state.elements, tempElement], state.relations, weights).then((scores) => {
-      if (!cancelled && scores != null) {
-        setDelta({
-          account: scores.account - baseline.account,
-          systematicity: scores.systematicity - baseline.systematicity,
-        });
-      }
-    });
-    return () => { cancelled = true; };
+    quickScore([...state.elements, tempElement], state.relations, weights).then(
+      (scores) => {
+        if (!cancelled && scores != null) {
+          setDelta({
+            account: scores.account - baseline.account,
+            systematicity: scores.systematicity - baseline.systematicity,
+          });
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [text, baseline, weights]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (delta == null) return null;
 
   const fmtDelta = (v) => `${v > 0 ? "+" : ""}${v.toFixed(3)}`;
-  const color = (v) => (v > 0.001 ? C.supports : v < -0.001 ? C.conflicts : C.dim);
+  const color = (v) =>
+    v > 0.001 ? C.supports : v < -0.001 ? C.conflicts : C.dim;
   return (
     <span style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-      <span style={{ fontSize: 10, fontWeight: "bold", color: color(delta.account) }}>
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: "bold",
+          color: color(delta.account),
+        }}
+      >
         A {fmtDelta(delta.account)}
       </span>
-      <span style={{ fontSize: 10, fontWeight: "bold", color: color(delta.systematicity) }}>
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: "bold",
+          color: color(delta.systematicity),
+        }}
+      >
         S {fmtDelta(delta.systematicity)}
       </span>
     </span>
@@ -81,11 +105,13 @@ export function ProgressWorkflowBtn({
   nextPhaseIsEnabled,
   workflowPhase,
   advanceWorkflow,
-  nextPhaseLabel,
+  hideNonEntailsRels = true,
 }) {
   if (!workflowPhase) return null;
-  const label =
-    nextPhaseLabel ?? WORKFLOW_PHASE_LABELS[WORKFLOW_NEXT_PHASE[workflowPhase]];
+  let label = WORKFLOW_PHASE_LABELS[WORKFLOW_NEXT_PHASE[workflowPhase]];
+  if (workflowPhase === "detectArguments" && hideNonEntailsRels) {
+    label = "Workflow Step: Elicit Judgments";
+  }
   const tooltipText =
     !nextPhaseIsEnabled && workflowPhase === "elicitJudgments"
       ? "Add at least 3 judgments to continue"

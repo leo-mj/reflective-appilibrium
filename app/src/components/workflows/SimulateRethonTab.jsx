@@ -6,7 +6,7 @@
 
 /** @import { REState } from '../../types.js' */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import {
@@ -74,6 +74,9 @@ export function SimulateRethonTab({
   const [error, setError] = useState(null);
   const [evolutionOpen, setEvolutionOpen] = useState(false);
   const [decision, setDecision] = useState(null); // "accepted" | "rejected" | null
+  const [neighbourhoodDepth, setNeighbourhoodDepth] = useState(1);
+
+  useEffect(() => () => onSetEquilibriumPreview?.(null), [onSetEquilibriumPreview]);
 
   const activeCount = state.elements.filter((e) =>
     ["active", "revised"].includes(e.status),
@@ -98,7 +101,7 @@ export function SimulateRethonTab({
     setStepPending(false);
     onSetEquilibriumPreview?.(null);
     try {
-      const data = await simulateRethon(state, true, startingEvolution, weights);
+      const data = await simulateRethon(state, true, startingEvolution, weights, neighbourhoodDepth);
       setResult(data);
       setResultMode("simulate");
       const eq = deriveEquilibrium(data);
@@ -120,7 +123,7 @@ export function SimulateRethonTab({
       onSetEquilibriumPreview?.(null);
     }
     try {
-      const data = await simulateRethonStep(state, true, confirmedEvolution, weights);
+      const data = await simulateRethonStep(state, true, confirmedEvolution, weights, neighbourhoodDepth);
       setResult(data);
       setResultMode("step");
       setStepPending(true);
@@ -211,7 +214,18 @@ export function SimulateRethonTab({
             )}
           </div>
 
-          <div style={{ display: "flex", gap: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ fontSize: 11, color: C.dim, display: "flex", alignItems: "center", gap: 4 }}>
+              Depth
+              <select
+                value={neighbourhoodDepth}
+                onChange={(e) => setNeighbourhoodDepth(Number(e.target.value))}
+                disabled={loadingMode !== null}
+                style={{ fontSize: 11, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 4, color: C.text, padding: "2px 4px" }}
+              >
+                {[1, 2, 3, 4].map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </label>
             {/* Simulate button */}
             <button
               onClick={simulate}

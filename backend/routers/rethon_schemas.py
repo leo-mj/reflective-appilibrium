@@ -32,6 +32,7 @@ class SimulateRethonRequest(BaseModel):
     local: bool = True
     evolution: Optional[List[List[REElement]]] = None
     weights: Optional[ModelWeights] = None
+    neighbourhood_depth: int = Field(default=1, ge=1, le=4)
 
 
 class ZScores(BaseModel):
@@ -159,3 +160,4 @@ class SimulateRethonStepRequest(BaseModel):
     local: bool = True
     evolution: Optional[List[List[REElement]]] = None
     weights: Optional[ModelWeights] = None
+    neighbourhood_depth: int = Field(default=1, ge=1, le=4)

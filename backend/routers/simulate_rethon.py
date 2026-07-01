@@ -16,6 +16,7 @@ Python packages and exposes the results to the frontend.  Five endpoints:
 
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict
+import asyncio
 import logging
 
 from theodias import StandardPosition
@@ -33,6 +34,7 @@ from .rethon_schemas import (
     QuickScoreResponse,
 )
 from ..services.rethon_simulation import (
+    REProcess,
     validate_and_build,
     get_rethon_final_state,
     build_re,
@@ -67,7 +69,8 @@ async def simulate_rethon(
     built_arguments, lookup_w_negated, n = validate_and_build(
         request.elements, request.relations, sentence_pool_minimum
     )
-    try:
+
+    def _run() -> REProcess:
         if request.evolution:
             id_to_index: Dict[str, int] = {
                 el.id: i + 1 for i, el in enumerate(request.elements)
@@ -80,6 +83,7 @@ async def simulate_rethon(
                 init_coms,
                 request.local,
                 request.weights,
+                request.neighbourhood_depth,
             )
             re.set_state(reconstructed)
             re.re_process()
@@ -90,7 +94,12 @@ async def simulate_rethon(
                 lookup=built_arguments.lookup,
                 local=request.local,
                 weights=request.weights,
+                neighbourhood_depth=request.neighbourhood_depth,
             )
+        return re
+
+    try:
+        re = await asyncio.to_thread(_run)
     except Exception as e:
         logger.error("Simulation failed: %s", e, exc_info=True)
         raise
@@ -117,7 +126,8 @@ async def simulate_rethon_step(
     built_arguments, lookup_w_negated, n = validate_and_build(
         request.elements, request.relations, sentence_pool_minimum
     )
-    try:
+
+    def _run() -> REProcess:
         id_to_index: Dict[str, int] = {
             el.id: i + 1 for i, el in enumerate(request.elements)
         }
@@ -143,6 +153,7 @@ async def simulate_rethon_step(
             init_coms=init_coms,
             local=request.local,
             weights=request.weights,
+            neighbourhood_depth=request.neighbourhood_depth,
         )
         if request.evolution:
             re.set_state(reconstructed)
@@ -152,6 +163,10 @@ async def simulate_rethon_step(
                 detail="The RE process has already reached a fixed point.",
             )
         re.next_step()
+        return re
+
+    try:
+        re = await asyncio.to_thread(_run)
     except HTTPException:
         raise
     except Exception as e:
@@ -174,33 +189,35 @@ async def score_per_round(
     running the rethon simulation.  Rounds where the simulation fails (e.g. not
     enough elements or no arguments yet) are returned with ``scores=None``.
     """
-    results: List[RoundScores] = []
-    for r in range(1, request.round + 1):
-        # Elements present at round r: added by r AND not yet withdrawn at r
-        elements_at_r = [
-            el
-            for el in request.elements
-            if (el.added_round or 1) <= r
-            and not (el.withdrawn_round and el.withdrawn_round <= r)
-        ]
-        el_ids = {el.id for el in elements_at_r}
-        # Relations present at round r: added by r, both endpoints still exist
-        relations_at_r = [
-            rel
-            for rel in request.relations
-            if (rel.added_round or 1) <= r
-            and rel.from_id in el_ids
-            and rel.to_id in el_ids
-        ]
-        results.append(
-            RoundScores(
-                round=r,
-                scores=get_final_score(
-                    elements_at_r, relations_at_r, request.local, request.weights
-                ),
+
+    def _run() -> List[RoundScores]:
+        results: List[RoundScores] = []
+        for r in range(1, request.round + 1):
+            elements_at_r = [
+                el
+                for el in request.elements
+                if (el.added_round or 1) <= r
+                and not (el.withdrawn_round and el.withdrawn_round <= r)
+            ]
+            el_ids = {el.id for el in elements_at_r}
+            relations_at_r = [
+                rel
+                for rel in request.relations
+                if (rel.added_round or 1) <= r
+                and rel.from_id in el_ids
+                and rel.to_id in el_ids
+            ]
+            results.append(
+                RoundScores(
+                    round=r,
+                    scores=get_final_score(
+                        elements_at_r, relations_at_r, request.local, request.weights
+                    ),
+                )
             )
-        )
-    return ScorePerRoundResponse(round_scores=results)
+        return results
+
+    return ScorePerRoundResponse(round_scores=await asyncio.to_thread(_run))
 
 
 @router.post("/score_changes", response_model=ScoreChangesResponse)
@@ -212,8 +229,12 @@ async def score_changes(request: ScoreChangesRequest) -> ScoreChangesResponse:
     computed directly from ``re_obj.achievement(C, T, C₀)`` — no full RE
     simulation is run.
     """
-    return compute_score_changes(
-        request.elements, request.relations, request.local, request.weights
+    return await asyncio.to_thread(
+        compute_score_changes,
+        request.elements,
+        request.relations,
+        request.local,
+        request.weights,
     )
 
 
@@ -228,4 +249,9 @@ async def quick_score(request: QuickScoreRequest) -> QuickScoreResponse:
     Returns ``account=null, systematicity=null`` when there are fewer than 3
     elements, no argument relations, or no active principle/theory elements.
     """
-    return compute_quick_score(request.elements, request.relations, request.weights)
+    return await asyncio.to_thread(
+        compute_quick_score,
+        request.elements,
+        request.relations,
+        request.weights,
+    )

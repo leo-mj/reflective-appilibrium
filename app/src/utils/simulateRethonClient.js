@@ -25,7 +25,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @param {Array[]|null} evolution  - translated_re_state.evolution from the previous response
  * @returns {Promise<{translated_arguments: Array, translated_re_state: Object}>}
  */
-export async function simulateRethonStep(state, local, evolution = null, weights = null) {
+export async function simulateRethonStep(state, local, evolution = null, weights = null, neighbourhoodDepth = 1) {
   const url = `${BACKEND_URL}/api/simulate_rethon/step`;
   const res = await fetch(url, {
     method: "POST",
@@ -39,6 +39,7 @@ export async function simulateRethonStep(state, local, evolution = null, weights
       local,
       evolution,
       weights,
+      neighbourhood_depth: neighbourhoodDepth,
     }),
   });
   if (!res.ok) {
@@ -167,7 +168,7 @@ export async function scoreChanges(state, local = true, weights = null) {
   }
 }
 
-export async function simulateRethon(state, local, evolution = null, weights = null) {
+export async function simulateRethon(state, local, evolution = null, weights = null, neighbourhoodDepth = 1) {
   const url = `${BACKEND_URL}/api/simulate_rethon/simulate`;
   const res = await fetch(url, {
     method: "POST",
@@ -179,6 +180,7 @@ export async function simulateRethon(state, local, evolution = null, weights = n
       local,
       evolution,
       weights,
+      neighbourhood_depth: neighbourhoodDepth,
     }),
   });
   if (!res.ok) {

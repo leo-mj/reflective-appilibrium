@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from typing import List, Dict, Optional, Union
 from collections import defaultdict
 import logging
+import time
 
 from theodias import Position, StandardPosition, BDDDialecticalStructure
 from rethon import (
@@ -72,6 +73,7 @@ def get_rethon_final_state(
     lookup: Dict[int, REElement],
     local: bool = True,
     weights: Optional[ModelWeights] = None,
+    neighbourhood_depth: Optional[int] = 1,
 ) -> REProcess:
     """Build a BDD dialectical structure, set initial commitments from the lookup, and run the full RE process to a fixed point.
 
@@ -81,6 +83,7 @@ def get_rethon_final_state(
     slow for sentence pools larger than ~10 elements).
     """
     logger.info("Beginning rethon simulation.")
+    start = time.time()
     # Binary decision diagram - necessary for n_unnegated_sentence_pool > 10
     bdd_ds = BDDDialecticalStructure.from_arguments(
         arguments=numerical_arguments,
@@ -107,8 +110,10 @@ def get_rethon_final_state(
         )
     if weights is not None:
         re.set_model_parameters({"weights": weights.model_dump()})
+    re.set_model_parameters(neighbourhood_depth=neighbourhood_depth)
     re.re_process()
-    logger.info("Completed rethon simulation.")
+    end = time.time()
+    logger.info(f"Completed rethon simulation in {end - start:.2f} seconds'")
     return re
 
 
@@ -118,6 +123,7 @@ def build_re(
     init_coms: Position,
     local: bool = True,
     weights: Optional[ModelWeights] = None,
+    neighbourhood_depth: Optional[int] = 1,
 ) -> REProcess:
     """Build and initialise a rethon RE object without running any steps."""
     bdd_ds = BDDDialecticalStructure.from_arguments(
@@ -134,6 +140,8 @@ def build_re(
         )
     if weights is not None:
         re.set_model_parameters({"weights": weights.model_dump()})
+
+    re.set_model_parameters(neighbourhood_depth=neighbourhood_depth)
     return re
 
 

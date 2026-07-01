@@ -10,7 +10,7 @@ import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { Legend } from "./graphs_shared/Legend.jsx";
-import { ASSIST_TABS } from "../constants/tabConstants.jsx";
+import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 
 const CoherenceMatrixTab = lazy(() =>
   import("./CoherenceMatrixTab.jsx").then((m) => ({
@@ -88,13 +88,9 @@ export function GraphPanel({
   weights,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
-const suggestionsDisabled = !LLM_ENABLED && !isSample;
+  const suggestionsDisabled = !LLM_ENABLED && !isSample;
   const autoFetch = !!workflowPhase;
-  const workflowNextPhase =
-    hideNonEntailsRels && workflowPhase === "suggestPrinciples"
-      ? "Workflow Step: Detect Arguments"
-      : undefined;
-  const isAssistPanel = ASSIST_TABS.includes(tab);
+  const isAssistPanel = ASSIST_TABS.includes(tab) || SIMULATE_TABS.includes(tab);
   return (
     <div
       style={{
@@ -112,28 +108,31 @@ const suggestionsDisabled = !LLM_ENABLED && !isSample;
           hideNonEntailsRels={hideNonEntailsRels}
         />
       )}
-      {APP_ENV === "dev" && isAssistPanel && isSample && state.model !== "questionnaire" && (
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 11,
-            color: C.dim,
-            padding: "4px 0 2px",
-            userSelect: "none",
-            cursor: "pointer",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={useDummyAssist}
-            onChange={(e) => setUseDummyAssist(e.target.checked)}
-            style={{ accentColor: C.supports, cursor: "pointer" }}
-          />
-          Use dummy suggestions
-        </label>
-      )}
+      {APP_ENV === "dev" &&
+        isAssistPanel &&
+        isSample &&
+        state.model !== "questionnaire" && (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11,
+              color: C.dim,
+              padding: "4px 0 2px",
+              userSelect: "none",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={useDummyAssist}
+              onChange={(e) => setUseDummyAssist(e.target.checked)}
+              style={{ accentColor: C.supports, cursor: "pointer" }}
+            />
+            Use dummy suggestions
+          </label>
+        )}
       <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
         {tab === "graph" && (
           <Graph
@@ -163,7 +162,11 @@ const suggestionsDisabled = !LLM_ENABLED && !isSample;
           />
         )}
         {tab === "clusters" && (
-          <ClusterTab state={state} positions={positions} hideNonEntailsRels={hideNonEntailsRels} />
+          <ClusterTab
+            state={state}
+            positions={positions}
+            hideNonEntailsRels={hideNonEntailsRels}
+          />
         )}
         {tab === "matrix" && (
           <Suspense fallback={null}>
@@ -199,7 +202,7 @@ const suggestionsDisabled = !LLM_ENABLED && !isSample;
               workflowPhase={workflowPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-              workflowNextPhase={workflowNextPhase}
+
               useDummy={useDummyAssist}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
@@ -244,6 +247,7 @@ const suggestionsDisabled = !LLM_ENABLED && !isSample;
               workflowPhase={workflowPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
+              hideNonEntailsRels={hideNonEntailsRels}
             />
           </Suspense>
         )}
