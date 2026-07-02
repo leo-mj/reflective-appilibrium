@@ -82,7 +82,7 @@ class LLMService:
             self._anthropic = AsyncAnthropic(api_key=config.api_key)
         else:
             self._openai = AsyncOpenAI(
-                api_key=config.api_key,
+                api_key=config.api_key or "placeholder",
                 base_url=config.base_url,
             )
 
