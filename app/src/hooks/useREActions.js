@@ -1,11 +1,14 @@
 /**
  * @fileoverview Mutation hook for all RE state changes.
+ * Composes useElementActions and useRelationActions; owns undo, selection,
+ * file import, and questionnaire logic.
  * @module hooks/useREActions
  */
 
 import { useState, useRef } from "react";
-import { nextElementId, makeDiff, makeLogEntry } from "../utils/stateUtils.js";
 import { importStateFromFile } from "../utils/importMarkdown.js";
+import { useElementActions } from "./useElementActions.js";
+import { useRelationActions } from "./useRelationActions.js";
 
 /**
  * Owns the mutable RE state and all mutation handlers.
@@ -28,11 +31,8 @@ export function useREActions(initialState) {
     setUndoCount((n) => n + 1);
   };
 
-  const [editingEl, setEditingEl] = useState(null);
-  const [editingRel, setEditingRel] = useState(null);
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
-  const [withdrawingId, setWithdrawingId] = useState(null);
   const [recentlyAdded, setRecentlyAdded] = useState(null);
   const [recentlyAddedRel, setRecentlyAddedRel] = useState(null);
 
@@ -49,220 +49,6 @@ export function useREActions(initialState) {
     setRecentlyAddedRel(null);
   };
 
-  const handleEditRequest = (elementId) => {
-    setSelected(elementId);
-    setEditingEl(state.elements.find((e) => e.id === elementId) ?? null);
-  };
-
-  const handleEditSave = (formData) => {
-    const newRound = state.round + 1;
-    const oldEl = editingEl;
-    // eslint-disable-next-line no-unused-vars
-    const { withdrawnRound, reason, ...oldElBase } = oldEl;
-    const newEl = {
-      ...oldElBase,
-      ...formData,
-      status: "revised",
-      previousText: oldEl.text,
-      revisedRound: newRound,
-    };
-    const diffs = makeDiff(
-      ["type", "confidence", "status", "origin", "text"],
-      oldEl,
-      formData,
-    );
-    mutate((prev) => ({
-      ...prev,
-      round: newRound,
-      elements: prev.elements.map((e) => (e.id === oldEl.id ? newEl : e)),
-      log: [
-        ...prev.log,
-        makeLogEntry(
-          newRound,
-          `${oldEl.id} was edited by the user.`,
-          "Changes applied",
-          diffs.length ? diffs.join("; ") : "No fields changed",
-        ),
-      ],
-    }));
-    setEditingEl(null);
-  };
-
-  const handleRelEditSave = (formData) => {
-    const newRound = state.round + 1;
-    const diffs = makeDiff(["type", "explanation"], editingRel, formData);
-    mutate((prev) => ({
-      ...prev,
-      round: newRound,
-      relations: prev.relations.map((r) =>
-        r === editingRel
-          ? { ...editingRel, ...formData, status: "revised", revisedRound: newRound }
-          : r,
-      ),
-      log: [
-        ...prev.log,
-        makeLogEntry(
-          newRound,
-          `Relation ${editingRel.from} → ${editingRel.to} was edited by the user.`,
-          "Changes applied",
-          diffs.length ? diffs.join("; ") : "No fields changed",
-        ),
-      ],
-    }));
-    setEditingRel(null);
-  };
-
-  const handleWithdrawRequest = (elementId) => {
-    setWithdrawingId(elementId);
-  };
-
-  const handleWithdrawConfirm = (elementId, reason) => {
-    const newRound = state.round + 1;
-    mutate((prev) => ({
-      ...prev,
-      round: newRound,
-      elements: prev.elements.map((e) =>
-        e.id === elementId
-          ? {
-              ...e,
-              status: "withdrawn",
-              withdrawnRound: newRound,
-              reason: reason ?? "",
-              previousText: undefined,
-              revisedRound: undefined,
-            }
-          : e,
-      ),
-      log: [
-        ...prev.log,
-        makeLogEntry(
-          newRound,
-          `${elementId} was withdrawn by the user.`,
-          "Withdrawn",
-          `${elementId}: status → withdrawn`,
-        ),
-      ],
-    }));
-    setWithdrawingId(null);
-    if (selected === elementId) setSelected(null);
-  };
-
-  const handleWithdrawRelRequest = (rel) => {
-    const newRound = state.round + 1;
-    mutate((prev) => ({
-      ...prev,
-      round: newRound,
-      relations: prev.relations.map((r) =>
-        r === rel ? { ...r, status: "withdrawn", withdrawnRound: newRound } : r,
-      ),
-      log: [
-        ...prev.log,
-        makeLogEntry(
-          newRound,
-          `Relation ${rel.from} → ${rel.to} was withdrawn by the user.`,
-          "Withdrawn",
-          `${rel.from} → ${rel.to}: status → withdrawn`,
-        ),
-      ],
-    }));
-    if (selectedRel === rel) setSelectedRel(null);
-  };
-
-  const handleAddElement = (formData) => {
-    const newRound = state.round + 1;
-    const newId = nextElementId(state.elements, formData.type);
-    mutate((prev) => ({
-      ...prev,
-      round: newRound,
-      elements: [
-        ...prev.elements,
-        { id: newId, status: "active", addedRound: newRound, ...formData },
-      ],
-      log: [
-        ...prev.log,
-        makeLogEntry(newRound, `${newId} was added by the user.`, "Added", `${newId} added`),
-      ],
-    }));
-    setSelected(null);
-    setSelectedRel(null);
-    setRecentlyAdded(newId);
-    setRecentlyAddedRel(null);
-  };
-
-  const handleAddRelation = (formData, { select = true } = {}) => {
-    const newRound = state.round + 1;
-    const newRel = { ...formData, addedRound: newRound };
-    mutate((prev) => ({
-      ...prev,
-      round: newRound,
-      relations: [...prev.relations, newRel],
-      log: [
-        ...prev.log,
-        makeLogEntry(
-          newRound,
-          `Relation ${formData.from} → ${formData.to} was added by the user.`,
-          "Added",
-          `${formData.from} → ${formData.to} (${formData.type}) added`,
-        ),
-      ],
-    }));
-    if (select) {
-      setSelected(null);
-      setSelectedRel(null);
-      setRecentlyAddedRel(newRel);
-      setRecentlyAdded(null);
-    }
-  };
-
-  const handleRejectElements = (formDatas) => {
-    mutate((prev) => {
-      let running = prev.elements;
-      const newEls = formDatas.map((fd) => {
-        const id = nextElementId(running, fd.type);
-        const el = { id, status: "rejected", addedRound: prev.round, rejectedRound: prev.round, ...fd };
-        running = [...running, el];
-        return el;
-      });
-      return {
-        ...prev,
-        elements: [...prev.elements, ...newEls],
-        log: [
-          ...prev.log,
-          makeLogEntry(
-            prev.round,
-            `${formDatas.length} suggestion${formDatas.length !== 1 ? "s" : ""} rejected.`,
-            "Rejected",
-            formDatas.map((fd) => fd.text).join("; "),
-          ),
-        ],
-      };
-    });
-  };
-
-  const handleRejectRelations = (formDatas) => {
-    mutate((prev) => ({
-      ...prev,
-      relations: [
-        ...prev.relations,
-        ...formDatas.map((fd) => ({
-          ...fd,
-          status: "rejected",
-          addedRound: prev.round,
-          rejectedRound: prev.round,
-        })),
-      ],
-      log: [
-        ...prev.log,
-        makeLogEntry(
-          prev.round,
-          `${formDatas.length} relation suggestion${formDatas.length !== 1 ? "s" : ""} rejected.`,
-          "Rejected",
-          formDatas.map((fd) => `${fd.from} → ${fd.to} (${fd.type})`).join("; "),
-        ),
-      ],
-    }));
-  };
-
   const handleUndo = () => {
     const prev = undoStack.current[0];
     if (!prev) return;
@@ -274,6 +60,26 @@ export function useREActions(initialState) {
   };
   const canUndo = undoCount > 0;
 
+  const elementActions = useElementActions({
+    state,
+    mutate,
+    selected,
+    setSelected,
+    setSelectedRel,
+    setRecentlyAdded,
+    setRecentlyAddedRel,
+  });
+
+  const relationActions = useRelationActions({
+    state,
+    mutate,
+    selectedRel,
+    setSelected,
+    setSelectedRel,
+    setRecentlyAddedRel,
+    setRecentlyAdded,
+  });
+
   const handleImportFile = async (file) => {
     const newState = await importStateFromFile(file);
     undoStack.current = [];
@@ -281,6 +87,61 @@ export function useREActions(initialState) {
     setState(newState);
     setSelected(null);
     setSelectedRel(null);
+  };
+
+  /**
+   * Records the user's answer to a questionnaire and propagates conclusion
+   * activations throughout the arguments behind the questionnaire (must be pre-set).
+   *
+   * 1. Activates `selectedId` and resets unchosen `siblingIds` to `"possible"`.
+   * 2. Rebuilds a questionnaireIndex → element lookup over the updated element list.
+   * 3. Checks every argument in the questionnaire whose conclusion is a
+   *    pure-conclusion element: if all premises
+   *    are now `"active"`, the conclusion is activated; otherwise it stays/becomes
+   *    `"possible"`.
+   *
+   * @param {string}   selectedId  - Element id of the chosen answer.
+   * @param {string[]} siblingIds  - Element ids of the unchosen answers for the same question.
+   */
+  const handleQuestionnaireSelectAnswer = (selectedId, siblingIds) => {
+    mutate((prev) => {
+      const allArgs = [
+        ...prev.questionnaireSpec.participantArguments,
+        ...prev.questionnaireSpec.furtherArguments,
+      ];
+      const premiseIndices = new Set(allArgs.flatMap((arg) => arg.slice(0, -1).map(Math.abs)));
+      const conclusionIndices = new Set(
+        allArgs.map((arg) => Math.abs(arg.at(-1))).filter((i) => !premiseIndices.has(i))
+      );
+
+      const updated = prev.elements.map((el) => {
+        if (el.id === selectedId) return { ...el, status: "active" };
+        if (siblingIds.includes(el.id)) return { ...el, status: "possible" };
+        return el;
+      });
+
+      const lookup = {};
+      for (const el of updated) if (el.questionnaireIndex != null) lookup[el.questionnaireIndex] = el;
+
+      const shouldBeActive = new Set();
+      for (const arg of allArgs) {
+        if (!arg.every((n) => lookup[Math.abs(n)] != null)) continue;
+        const conclusionIdx = Math.abs(arg.at(-1));
+        if (!conclusionIndices.has(conclusionIdx)) continue;
+        if (arg.slice(0, -1).every((n) => lookup[Math.abs(n)]?.status === "active")) {
+          shouldBeActive.add(conclusionIdx);
+        }
+      }
+
+      return {
+        ...prev,
+        elements: updated.map((el) => {
+          if (!conclusionIndices.has(el.questionnaireIndex)) return el;
+          const active = shouldBeActive.has(el.questionnaireIndex);
+          return { ...el, status: active ? "active" : "possible" };
+        }),
+      };
+    });
   };
 
   return {
@@ -291,24 +152,11 @@ export function useREActions(initialState) {
     recentlyAddedRel,
     handleSelectNode,
     handleSelectRel,
-    editingEl,
-    setEditingEl,
-    handleEditRequest,
-    handleEditSave,
-    editingRel,
-    setEditingRel,
-    handleRelEditSave,
-    handleWithdrawRequest,
-    handleWithdrawConfirm,
-    withdrawingId,
-    setWithdrawingId,
-    handleWithdrawRelRequest,
-    handleAddElement,
-    handleAddRelation,
-    handleRejectElements,
-    handleRejectRelations,
-    handleImportFile,
     handleUndo,
     canUndo,
+    ...elementActions,
+    ...relationActions,
+    handleImportFile,
+    handleQuestionnaireSelectAnswer,
   };
 }

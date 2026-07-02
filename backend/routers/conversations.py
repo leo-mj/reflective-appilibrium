@@ -9,7 +9,6 @@ is injected once into the system prompt and not repeated in the history.
 Sessions are held in-memory and expire after SESSION_TTL minutes.
 """
 
-import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
@@ -20,6 +19,7 @@ from pydantic import BaseModel, Field
 from ..dependencies import get_llm_service
 from ..models.re_state import REState
 from ..services.llm import LLMService
+from ..services.prompts import build_conversation_system
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
@@ -51,39 +51,6 @@ def _get_session(session_id: str) -> _Session:
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found or expired")
     return session
-
-
-# ── Prompt builder ────────────────────────────────────────────────────────────
-
-
-def _build_system(state: REState, suggestion: dict) -> str:
-    active = [e for e in state.elements if e.status not in ("withdrawn", "rejected")]
-    active_rels = [r for r in state.relations if r.status not in ("withdrawn", "rejected")]
-
-    elements_text = "\n".join(
-        f"  [{e.id}] ({e.type}, {e.confidence}) {e.text}" for e in active
-    ) or "  (none)"
-
-    relations_text = "\n".join(
-        f"  {r.from_id} --{r.type}--> {r.to_id}: {r.explanation}" for r in active_rels
-    ) or "  (none)"
-
-    log_text = "\n".join(
-        f"  Round {e.round}: {e.findings}" for e in state.log[-5:] if e.findings
-    ) or "  (none)"
-
-    suggestion_block = "```json\n" + json.dumps(suggestion, indent=2) + "\n```"
-
-    return (
-        "You are assisting a user conducting wide reflective equilibrium (RE) in ethics.\n"
-        "Help them think through the suggestion below in the context of their RE position. "
-        "Reference elements by ID (J1, P2, etc.) where relevant. Do not impose moral views.\n\n"
-        f"## RE state — topic: {state.topic or '(unspecified)'}, round {state.round}\n\n"
-        f"### Elements\n{elements_text}\n\n"
-        f"### Relations\n{relations_text}\n\n"
-        f"### Recent log\n{log_text}\n\n"
-        f"## Suggestion under discussion\n{suggestion_block}"
-    )
 
 
 # ── Request / response models ──────────────────────────────────────────────────
@@ -122,7 +89,7 @@ async def start_conversation(
     """Start a new conversation about a suggestion. Returns a session_id for follow-up messages."""
     _purge_expired()
     session_id = str(uuid.uuid4())
-    system = _build_system(request.state, request.suggestion)
+    system = build_conversation_system(request.state, request.suggestion)
     session = _Session(system)
     _sessions[session_id] = session
 

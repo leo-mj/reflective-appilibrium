@@ -59,7 +59,10 @@ def get_llm_service(
     if not x_api_key:
         client_host = request.client.host if request.client else "127.0.0.1"
         if client_host not in _LOOPBACK:
-            raise HTTPException(status_code=403, detail="Server-side API keys are only accessible from localhost")
+            raise HTTPException(
+                status_code=403,
+                detail="Server-side API keys are only accessible from localhost",
+            )
     api_key = x_api_key or settings.llm_api_keys.get(x_base_url)
     if not api_key:
         raise HTTPException(status_code=400, detail="No API key configured")

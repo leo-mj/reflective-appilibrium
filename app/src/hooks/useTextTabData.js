@@ -35,9 +35,10 @@ export function useTextTabData({
   search,
 }) {
   const isElVisible = (el) => {
+    if (el.status === "possible") return false;
     if (el.status === "withdrawn") return !hiddenLegendKeys?.has("withdrawn");
     if (el.status === "rejected") return !hiddenLegendKeys?.has("rejected");
-    if (el.type === "judgment") return !hiddenLegendKeys?.has(`J-${el.confidence}`);
+    if (el.type === "judgment") return !hiddenLegendKeys?.has("J");
     if (el.type === "principle") return !hiddenLegendKeys?.has("P");
     if (el.type === "theory") return !hiddenLegendKeys?.has("T");
     return true;
@@ -77,10 +78,18 @@ export function useTextTabData({
     ? visRels.filter((r) => matchesSearchRel(r, search))
     : visRels;
 
+  // All relations belonging to the same argument as selectedRel (or just [selectedRel]).
+  const selectedArgRels = selectedRel?.argumentId
+    ? visRels.filter((r) => r.argumentId === selectedRel.argumentId)
+    : selectedRel
+      ? [selectedRel]
+      : [];
+  const selectedArgRelSet = new Set(selectedArgRels);
+
   let highlightedIds = null;
   if (selected) highlightedIds = getNeighbours(selected, visRels);
-  else if (selectedRel)
-    highlightedIds = new Set([selectedRel.from, selectedRel.to]);
+  else if (selectedArgRels.length > 0)
+    highlightedIds = new Set(selectedArgRels.flatMap((r) => [r.from, r.to]));
 
   const selectedEl = selected
     ? (visibleEls.find((e) => e.id === selected) ?? null)
@@ -95,10 +104,11 @@ export function useTextTabData({
   let hlRels = [];
   if (selected)
     hlRels = visRels.filter((r) => r.from === selected || r.to === selected);
-  else if (selectedRel) hlRels = [selectedRel];
+  else if (selectedArgRels.length > 0) hlRels = selectedArgRels;
 
   let restRels = visRels;
-  if (selectedRel) restRels = visRels.filter((r) => r !== selectedRel);
+  if (selectedArgRels.length > 0)
+    restRels = visRels.filter((r) => !selectedArgRelSet.has(r));
   else if (selected)
     restRels = visRels.filter(
       (r) => r.from !== selected && r.to !== selected,
@@ -116,6 +126,9 @@ export function useTextTabData({
     : null;
   const pinnedRel = recentlyAddedRel && visRels.includes(recentlyAddedRel)
     ? recentlyAddedRel
+    : null;
+  const pinnedArgRels = pinnedRel?.argumentId
+    ? visRels.filter((r) => r.argumentId === pinnedRel.argumentId)
     : null;
 
   return {
@@ -136,5 +149,6 @@ export function useTextTabData({
     clusterCount,
     pinnedEl,
     pinnedRel,
+    pinnedArgRels,
   };
 }

@@ -21,6 +21,7 @@ import {
   graphNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
 import { findCoherentClusters, clusterColor } from "../utils/clusterUtils.js";
+import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 
 // ─── ClusterGraph ─────────────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ import { useAutoFit } from "../hooks/useAutoFit.js";
  * Mini pannable graph showing only the elements of one cluster,
  * centred in whatever space the parent gives it.
  */
-function ClusterGraph({ cluster, color, state, positions }) {
+function ClusterGraph({ cluster, color, state, positions, hideNonEntailsRels }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
@@ -67,8 +68,15 @@ function ClusterGraph({ cluster, color, state, positions }) {
     refitKey: memberKey,
   });
 
+  const elementById = useMemo(
+    () => new Map(state.elements.map((e) => [e.id, e])),
+    [state.elements],
+  );
   const visRels = state.relations.filter(
-    (r) => members.has(r.from) && members.has(r.to),
+    (r) =>
+      members.has(r.from) &&
+      members.has(r.to) &&
+      (!hideNonEntailsRels || ARGUMENT_RELATION_TYPES.has(r.type)),
   );
   const wIds = new Set(
     state.elements.filter((e) => e.status === "withdrawn").map((e) => e.id),
@@ -104,7 +112,7 @@ function ClusterGraph({ cluster, color, state, positions }) {
         renderEdge(
           r,
           positions,
-          state.elements,
+          elementById,
           graphEdgeVisuals(r, wIds, () => false, null),
         ),
       )}
@@ -131,8 +139,11 @@ function ClusterGraph({ cluster, color, state, positions }) {
  * @param {REState}     props.state
  * @param {PositionMap} props.positions
  */
-export function ClusterTab({ state, positions }) {
-  const clusters = useMemo(() => findCoherentClusters(state), [state]);
+export function ClusterTab({ state, positions, hideNonEntailsRels = false }) {
+  const clusters = useMemo(
+    () => findCoherentClusters(state, hideNonEntailsRels),
+    [state, hideNonEntailsRels],
+  );
 
   if (!clusters.length) {
     return (
@@ -192,6 +203,7 @@ export function ClusterTab({ state, positions }) {
               color={clusterColor(i)}
               state={state}
               positions={positions}
+              hideNonEntailsRels={hideNonEntailsRels}
             />
           </div>
         </div>

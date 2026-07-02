@@ -6,20 +6,24 @@
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 
-export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
+export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRels }) {
   const items = [
-    { label: "Judgment (high)", shape: "circle", color: "#2563eb", key: "J-high" },
-    { label: "Judgment (mod)", shape: "circle", color: "#60a5fa", key: "J-moderate" },
-    { label: "Judgment (low)", shape: "circle", color: "#93c5fd", key: "J-low" },
+    { label: "Judgment", shape: "judgment-gradient", key: "J" },
     { label: "Principle", shape: "roundrect", color: "#7c3aed", key: "P" },
     { label: "Theory", shape: "diamond", color: "#d97706", key: "T" },
     { label: "Withdrawn", shape: "circle", color: "#64748b", key: "withdrawn" },
     { label: "Rejected", shape: "circle", color: "#fb7185", key: "rejected" },
   ];
   const lines = [
-    { label: "Supports", color: C.supports, dash: "", key: "supports" },
-    { label: "Conflicts", color: C.conflicts, dash: "8,4", key: "conflicts" },
-    { label: "Undermines", color: C.undermines, dash: "4,4", key: "undermines" },
+    ...(!hideNonEntailsRels ? [
+      { label: "Supports", color: C.supports, dash: "", key: "supports" },
+      { label: "Conflicts", color: C.conflicts, dash: "8,4", key: "conflicts" },
+      { label: "Undermines", color: C.undermines, dash: "4,4", key: "undermines" },
+    ] : []),
+    { label: "Entails", color: C.entails, dash: "", key: "entails" },
+    { label: "Jointly Entails", color: C.jointly_entails, dash: "", key: "jointly_entails" },
+    { label: "Precludes", color: C.precludes, dash: "", key: "precludes" },
+    { label: "Jointly Precludes", color: C.jointly_precludes, dash: "", key: "jointly_precludes" },
   ];
 
   const hidden = (key) => hiddenLegendKeys?.has(key) ?? false;
@@ -54,10 +58,25 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
       {items.map((it) => (
         <Tooltip
           key={it.key}
-          text={hidden(it.key) ? `Show ${it.label.toLowerCase()}` : `Hide ${it.label.toLowerCase()}`}
+          text={
+            hidden(it.key)
+              ? `Show ${it.label.toLowerCase()}`
+              : `Hide ${it.label.toLowerCase()}`
+          }
           delay={100}
         >
           <div onClick={() => toggle(it.key)} style={itemStyle(it.key)}>
+            {it.shape === "judgment-gradient" && (
+              <div
+                style={{
+                  width: 22,
+                  height: 10,
+                  borderRadius: 5,
+                  background: "linear-gradient(to right, #93c5fd, #2563eb)",
+                  border: "1px solid #2563eb",
+                }}
+              />
+            )}
             {it.shape === "circle" && (
               <div
                 style={{
@@ -90,20 +109,34 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys }) {
       {lines.map((l) => (
         <Tooltip
           key={l.key}
-          text={hidden(l.key) ? `Show ${l.label.toLowerCase()}` : `Hide ${l.label.toLowerCase()}`}
+          text={
+            hidden(l.key)
+              ? `Show ${l.label.toLowerCase()}`
+              : `Hide ${l.label.toLowerCase()}`
+          }
           delay={100}
         >
           <div onClick={() => toggle(l.key)} style={itemStyle(l.key)}>
-            <svg width={20} height={10}>
+            <svg width={24} height={10}>
               <line
                 x1={0}
                 y1={5}
-                x2={20}
+                x2={17}
                 y2={5}
                 stroke={l.color}
-                strokeWidth={2}
+                strokeWidth={l.key === "entails" || l.key === "precludes" ? 3 : 2}
                 strokeDasharray={l.dash}
               />
+              {l.key === "entails" || l.key === "precludes" ? (
+                <polygon
+                  points="24,5 17,2 17,8"
+                  fill="none"
+                  stroke={l.color}
+                  strokeWidth={1.5}
+                />
+              ) : (
+                <polygon points="24,5 17,2 17,8" fill={l.color} />
+              )}
             </svg>
             {l.label}
           </div>

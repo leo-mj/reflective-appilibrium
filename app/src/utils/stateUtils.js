@@ -137,3 +137,30 @@ export function sortElementIds(id1, id2) {
   const [elNumber1, elNumber2] = [id1.slice(1), id2.slice(1)];
   return Number(elNumber1) - Number(elNumber2);
 }
+
+/**
+ * Set of relation types that represent logical arguments (entailment or preclusion).
+ * Used to filter argument relations from the full relation list.
+ *
+ * @type {Set<string>}
+ */
+export const ARGUMENT_RELATION_TYPES = new Set([
+  "entails",
+  "precludes",
+  "jointly_entails",
+  "jointly_precludes",
+]);
+
+/**
+ * Returns the relation type for an argument based on premise count and
+ * whether the conclusion is negated.
+ *
+ * @param {number}  premiseCount
+ * @param {boolean} negated
+ * @returns {'entails'|'precludes'|'jointly_entails'|'jointly_precludes'}
+ */
+export function argumentRelationType(premiseCount, negated) {
+  return premiseCount === 1
+    ? (negated ? "precludes" : "entails")
+    : (negated ? "jointly_precludes" : "jointly_entails");
+}

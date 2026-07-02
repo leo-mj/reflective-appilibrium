@@ -31,7 +31,9 @@ class Settings(BaseSettings):
     @classmethod
     def no_wildcard(cls, v: str) -> str:
         if any(o.strip() == "*" for o in v.split(",")):
-            raise ValueError("Wildcard '*' is not permitted in CORS_ORIGINS; list specific origins explicitly.")
+            raise ValueError(
+                "Wildcard '*' is not permitted in CORS_ORIGINS; list specific origins explicitly."
+            )
         return v
 
     @property

@@ -17,7 +17,7 @@ function makeEl(overrides = {}) {
     id: "J1",
     type: "judgment",
     status: "active",
-    confidence: "high",
+    confidence: 1.0,
     origin: "user",
     text: "Original text",
     addedRound: 1,
@@ -58,7 +58,7 @@ describe("handleAddElement", () => {
       result.current.handleAddElement({
         type: "judgment",
         text: "New judgment",
-        confidence: "moderate",
+        confidence: 0.67,
         origin: "user",
       });
     });
@@ -73,7 +73,7 @@ describe("handleAddElement", () => {
   it("increments state.round", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     expect(result.current.state.round).toBe(2);
   });
@@ -81,7 +81,7 @@ describe("handleAddElement", () => {
   it("appends a log entry with decision 'Added'", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     expect(result.current.state.log).toHaveLength(1);
     expect(result.current.state.log[0].decision).toBe("Added");
@@ -96,7 +96,7 @@ describe("handleAddElement", () => {
     });
     expect(result.current.recentlyAddedRel).not.toBeNull();
     act(() => {
-      result.current.handleAddElement({ type: "principle", text: "P", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "principle", text: "P", confidence: 1.0, origin: "user" });
     });
     expect(result.current.recentlyAdded).toBe("P1");
     expect(result.current.recentlyAddedRel).toBeNull();
@@ -107,7 +107,7 @@ describe("handleAddElement", () => {
     act(() => result.current.handleSelectNode("J1"));
     expect(result.current.selected).toBe("J1");
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     expect(result.current.selected).toBeNull();
   });
@@ -118,7 +118,7 @@ describe("handleAddElement", () => {
     act(() => result.current.handleSelectRel(rel));
     expect(result.current.selectedRel).toBe(rel);
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     expect(result.current.selectedRel).toBeNull();
   });
@@ -126,11 +126,11 @@ describe("handleAddElement", () => {
   it("generates IDs independently per type", () => {
     const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
     act(() => {
-      result.current.handleAddElement({ type: "principle", text: "P", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "principle", text: "P", confidence: 1.0, origin: "user" });
     });
     expect(result.current.state.elements[0].id).toBe("P1");
     act(() => {
-      result.current.handleAddElement({ type: "theory", text: "T", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "theory", text: "T", confidence: 1.0, origin: "user" });
     });
     expect(result.current.state.elements[1].id).toBe("T1");
   });
@@ -175,7 +175,7 @@ describe("handleAddRelation", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     // Populate recentlyAdded via an element add, then add a relation and assert it's cleared
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     expect(result.current.recentlyAdded).toBe("J2");
     act(() => {
@@ -210,7 +210,7 @@ describe("handleEditSave", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleEditRequest("J1"));
     act(() => {
-      result.current.handleEditSave({ text: "Updated text", confidence: "high", type: "judgment", origin: "user" });
+      result.current.handleEditSave({ text: "Updated text", confidence: 1.0, type: "judgment", origin: "user" });
     });
     const el = result.current.state.elements[0];
     expect(el.text).toBe("Updated text");
@@ -221,7 +221,7 @@ describe("handleEditSave", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleEditRequest("J1"));
     act(() => {
-      result.current.handleEditSave({ text: "New text", confidence: "high", type: "judgment", origin: "user" });
+      result.current.handleEditSave({ text: "New text", confidence: 1.0, type: "judgment", origin: "user" });
     });
     const el = result.current.state.elements[0];
     expect(el.previousText).toBe("Original text");
@@ -233,7 +233,7 @@ describe("handleEditSave", () => {
     const { result } = renderHook(() => useREActions(baseState({ elements: [elWithWithdrawn] })));
     act(() => result.current.handleEditRequest("J1"));
     act(() => {
-      result.current.handleEditSave({ text: "New text", confidence: "high", type: "judgment", origin: "user" });
+      result.current.handleEditSave({ text: "New text", confidence: 1.0, type: "judgment", origin: "user" });
     });
     const el = result.current.state.elements[0];
     expect(el.withdrawnRound).toBeUndefined();
@@ -244,7 +244,7 @@ describe("handleEditSave", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleEditRequest("J1"));
     act(() => {
-      result.current.handleEditSave({ text: "x", confidence: "high", type: "judgment", origin: "user" });
+      result.current.handleEditSave({ text: "x", confidence: 1.0, type: "judgment", origin: "user" });
     });
     expect(result.current.state.round).toBe(2);
   });
@@ -253,7 +253,7 @@ describe("handleEditSave", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleEditRequest("J1"));
     act(() => {
-      result.current.handleEditSave({ text: "New text", confidence: "low", type: "judgment", origin: "user" });
+      result.current.handleEditSave({ text: "New text", confidence: 0.33, type: "judgment", origin: "user" });
     });
     const { changes } = result.current.state.log[0];
     expect(changes).toContain("text:");
@@ -266,7 +266,7 @@ describe("handleEditSave", () => {
     act(() => {
       result.current.handleEditSave({
         text: "Original text",
-        confidence: "high",
+        confidence: 1.0,
         type: "judgment",
         origin: "user",
         status: "active",
@@ -280,7 +280,7 @@ describe("handleEditSave", () => {
     act(() => result.current.handleEditRequest("J1"));
     expect(result.current.editingEl).not.toBeNull();
     act(() => {
-      result.current.handleEditSave({ text: "x", confidence: "high", type: "judgment", origin: "user" });
+      result.current.handleEditSave({ text: "x", confidence: 1.0, type: "judgment", origin: "user" });
     });
     expect(result.current.editingEl).toBeNull();
   });
@@ -435,7 +435,7 @@ describe("handleRejectElements", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
       result.current.handleRejectElements([
-        { type: "judgment", text: "Rejected J", confidence: "low", origin: "assistant" },
+        { type: "judgment", text: "Rejected J", confidence: 0.33, origin: "assistant" },
       ]);
     });
     const el = result.current.state.elements[1];
@@ -447,7 +447,7 @@ describe("handleRejectElements", () => {
   it("does not increment state.round", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
-      result.current.handleRejectElements([{ type: "judgment", text: "x", confidence: "low", origin: "assistant" }]);
+      result.current.handleRejectElements([{ type: "judgment", text: "x", confidence: 0.33, origin: "assistant" }]);
     });
     expect(result.current.state.round).toBe(1);
   });
@@ -456,8 +456,8 @@ describe("handleRejectElements", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
       result.current.handleRejectElements([
-        { type: "judgment", text: "A", confidence: "low", origin: "assistant" },
-        { type: "judgment", text: "B", confidence: "low", origin: "assistant" },
+        { type: "judgment", text: "A", confidence: 0.33, origin: "assistant" },
+        { type: "judgment", text: "B", confidence: 0.33, origin: "assistant" },
       ]);
     });
     const els = result.current.state.elements;
@@ -470,8 +470,8 @@ describe("handleRejectElements", () => {
     const { result } = renderHook(() => useREActions(state));
     act(() => {
       result.current.handleRejectElements([
-        { type: "judgment", text: "x", confidence: "low", origin: "assistant" },
-        { type: "principle", text: "y", confidence: "low", origin: "assistant" },
+        { type: "judgment", text: "x", confidence: 0.33, origin: "assistant" },
+        { type: "principle", text: "y", confidence: 0.33, origin: "assistant" },
       ]);
     });
     const els = result.current.state.elements;
@@ -482,7 +482,7 @@ describe("handleRejectElements", () => {
   it("uses singular in log for one rejection", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
-      result.current.handleRejectElements([{ type: "judgment", text: "a", confidence: "low", origin: "assistant" }]);
+      result.current.handleRejectElements([{ type: "judgment", text: "a", confidence: 0.33, origin: "assistant" }]);
     });
     expect(result.current.state.log[0].findings).toContain("1 suggestion rejected");
   });
@@ -491,8 +491,8 @@ describe("handleRejectElements", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
       result.current.handleRejectElements([
-        { type: "judgment", text: "a", confidence: "low", origin: "assistant" },
-        { type: "judgment", text: "b", confidence: "low", origin: "assistant" },
+        { type: "judgment", text: "a", confidence: 0.33, origin: "assistant" },
+        { type: "judgment", text: "b", confidence: 0.33, origin: "assistant" },
       ]);
     });
     expect(result.current.state.log[0].findings).toContain("2 suggestions rejected");
@@ -548,7 +548,7 @@ describe("handleUndo / canUndo", () => {
   it("canUndo is true after a mutation", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     expect(result.current.canUndo).toBe(true);
   });
@@ -556,7 +556,7 @@ describe("handleUndo / canUndo", () => {
   it("reverts state to before the last mutation", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     expect(result.current.state.elements).toHaveLength(2);
     act(() => result.current.handleUndo());
@@ -567,10 +567,10 @@ describe("handleUndo / canUndo", () => {
   it("supports multiple sequential undos", () => {
     const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "A", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "A", confidence: 1.0, origin: "user" });
     });
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "B", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "B", confidence: 1.0, origin: "user" });
     });
     expect(result.current.state.elements).toHaveLength(2);
     act(() => result.current.handleUndo());
@@ -582,7 +582,7 @@ describe("handleUndo / canUndo", () => {
   it("canUndo is false after undoing all mutations", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     act(() => result.current.handleUndo());
     expect(result.current.canUndo).toBe(false);
@@ -597,7 +597,7 @@ describe("handleUndo / canUndo", () => {
   it("clears selected when the selected element no longer exists after undo", () => {
     const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     act(() => result.current.handleSelectNode("J1"));
     expect(result.current.selected).toBe("J1");
@@ -610,7 +610,7 @@ describe("handleUndo / canUndo", () => {
     // 21 mutations: the state before mutation 1 (0 elements) will be dropped
     act(() => {
       for (let i = 0; i < 21; i++) {
-        result.current.handleAddElement({ type: "judgment", text: `x${i}`, confidence: "high", origin: "user" });
+        result.current.handleAddElement({ type: "judgment", text: `x${i}`, confidence: 1.0, origin: "user" });
       }
     });
     expect(result.current.state.elements).toHaveLength(21);
@@ -631,7 +631,7 @@ describe("handleSelectNode", () => {
   it("sets selected and clears recentlyAdded", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     expect(result.current.recentlyAdded).toBe("J2");
     act(() => result.current.handleSelectNode("J1"));
@@ -673,7 +673,7 @@ describe("handleSelectRel", () => {
   it("clears recentlyAdded", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     expect(result.current.recentlyAdded).toBe("J2");
     const rel = result.current.state.relations[0];
@@ -721,7 +721,7 @@ describe("handleImportFile", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     // Populate undo stack, node selection, and relation selection
     act(() => {
-      result.current.handleAddElement({ type: "judgment", text: "x", confidence: "high", origin: "user" });
+      result.current.handleAddElement({ type: "judgment", text: "x", confidence: 1.0, origin: "user" });
     });
     act(() => result.current.handleSelectNode("J1"));
     expect(result.current.selected).toBe("J1");

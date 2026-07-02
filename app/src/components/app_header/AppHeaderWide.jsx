@@ -13,23 +13,12 @@ import {
   TAB_LABELS,
   TAB_TOOLTIPS,
 } from "../../constants/tabConstants.jsx";
-import { btn, metaTabBtn } from "./appHeaderStyles.js";
+import { btn, metaTabBtn, menuIconStyle, menuDividerStyle, inlineDividerStyle } from "./appHeaderStyles.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
-
-const inlineDivider = (
-  <div
-    style={{
-      width: 1,
-      height: 20,
-      background: C.border,
-      alignSelf: "center",
-      margin: "0 4px",
-    }}
-  />
-);
+import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
 
 /** Two-row desktop header: title row + tab bar. Props mirror AppHeader. */
 export function AppHeaderWide({
@@ -56,16 +45,22 @@ export function AppHeaderWide({
   workflowLoops,
   onStartWorkflow,
   onStopWorkflow,
-  tutorialMode,
-  onToggleTutorial,
+  onStartStepper,
   showTabNav,
   setShowTabNav,
   allExpanded,
   onExpandAll,
+  hideNonEntailsRels,
+  setHideNonEntailsRels,
+  weights,
+  weightsChanged,
+  onWeightsChange,
+  onResetWeights,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
+  const [weightsOpen, setWeightsOpen] = useState(false);
   const { isDark, toggle: toggleTheme } = useTheme();
 
   const llmSaved = (() => {
@@ -87,16 +82,6 @@ export function AppHeaderWide({
     borderRadius: 4,
     border: "none",
   };
-  const icon = {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 20,
-    flexShrink: 0,
-  };
-  const menuDivider = (
-    <div style={{ height: 1, background: C.border, margin: "2px 0" }} />
-  );
   const close = (fn) => () => {
     fn();
     setMenuOpen(false);
@@ -147,8 +132,8 @@ export function AppHeaderWide({
             flexShrink: 0,
           }}
         >
-          {/* Assist side-panel toggle (only in assist mode) */}
-          {metaTab === "assist" && (
+          {/* Side-panel toggle (assist and simulate modes) */}
+          {(metaTab === "assist" || metaTab === "simulate") && (
             <div
               style={{
                 display: "flex",
@@ -180,7 +165,7 @@ export function AppHeaderWide({
                   {label}
                 </button>
               ))}
-              {inlineDivider}
+              <div style={inlineDividerStyle} />
             </div>
           )}
 
@@ -195,15 +180,14 @@ export function AppHeaderWide({
             </button>
           </Tooltip>
 
-          {inlineDivider}
+          <div style={inlineDividerStyle} />
 
-          <Tooltip text="Toggle tutorial mode — shows explanations for each button.">
+          <Tooltip text="Start the step-by-step tour.">
             <button
-              onClick={onToggleTutorial}
+              onClick={onStartStepper}
               style={{
-                ...btn(tutorialMode),
-                color: tutorialMode ? C.supports : C.dim,
-                borderColor: tutorialMode ? C.supports : undefined,
+                ...btn(false),
+                color: C.dim,
                 fontWeight: "bold",
                 fontSize: 13,
               }}
@@ -212,12 +196,13 @@ export function AppHeaderWide({
             </button>
           </Tooltip>
 
-          {inlineDivider}
+          <div style={inlineDividerStyle} />
 
           {/* Burger menu */}
           <div style={{ position: "relative" }}>
             <Tooltip text="Settings — theme, font, import, export, and LLM configuration.">
               <button
+                data-tutorial="btn-menu"
                 onClick={() => setMenuOpen((o) => !o)}
                 style={{ ...btn(menuOpen), border: `1px solid ${C.text}` }}
               >
@@ -244,7 +229,7 @@ export function AppHeaderWide({
                     display: "flex",
                     flexDirection: "column",
                     gap: 2,
-                    minWidth: 180,
+                    minWidth: weightsOpen ? 248 : 180,
                     boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
                   }}
                 >
@@ -254,18 +239,18 @@ export function AppHeaderWide({
                       onClick={close(onHome)}
                       style={menuItem}
                     >
-                      <span style={icon}>←</span>Home
+                      <span style={menuIconStyle}>←</span>Home
                     </button>
                   </Tooltip>
 
-                  {menuDivider}
+                  <div style={menuDividerStyle} />
 
                   {metaTab !== "assist" && (
                     <button
                       onClick={close(() => setShowText((s) => !s))}
                       style={menuItem}
                     >
-                      <span style={icon}>≡</span>
+                      <span style={menuIconStyle}>≡</span>
                       {showText ? "Hide text" : "Show text"}
                     </button>
                   )}
@@ -274,7 +259,7 @@ export function AppHeaderWide({
                     onClick={close(() => setShowTabNav((s) => !s))}
                     style={menuItem}
                   >
-                    <span style={icon}>
+                    <span style={menuIconStyle}>
                       <svg
                         width="12"
                         height="12"
@@ -294,13 +279,69 @@ export function AppHeaderWide({
                   </button>
 
                   <button onClick={close(onExpandAll)} style={menuItem}>
-                    <span style={icon}>⇅</span>
-                    {allExpanded
-                      ? "Minimize all toggles"
-                      : "Expand all toggles"}
+                    <span style={menuIconStyle}>⇅</span>
+                    {allExpanded ? "Minimize toggles" : "Expand toggles"}
                   </button>
 
-                  {menuDivider}
+                  <button
+                    onClick={close(() => setHideNonEntailsRels((s) => !s))}
+                    style={{ ...menuItem, textAlign: "left " }}
+                  >
+                    <span style={menuIconStyle}>→</span>
+                    {hideNonEntailsRels
+                      ? "Show all relations"
+                      : "Arguments only"}
+                  </button>
+
+                  {BACKEND_ENABLED && (
+                    <>
+                      <div style={menuDividerStyle} />
+
+                      <button
+                        onClick={() => setWeightsOpen((o) => !o)}
+                        style={{
+                          ...menuItem,
+                          color: weightsChanged ? C.principle.high : undefined,
+                        }}
+                      >
+                        <span style={menuIconStyle}>⚖</span>
+                        Model weights{weightsChanged ? " *" : ""}
+                        <span
+                          style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}
+                        >
+                          {weightsOpen ? "▲" : "▼"}
+                        </span>
+                      </button>
+                      {weightsOpen && (
+                        <div style={{ padding: "4px 8px 8px 8px" }}>
+                          <WeightTriangle
+                            weights={weights}
+                            onChange={onWeightsChange}
+                            weightsChanged={weightsChanged}
+                          />
+                          {weightsChanged && (
+                            <button
+                              onClick={onResetWeights}
+                              style={{
+                                marginTop: 4,
+                                background: "transparent",
+                                border: `1px solid ${C.border}`,
+                                color: C.dim,
+                                borderRadius: 4,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div style={menuDividerStyle} />
 
                   <button
                     onClick={() => {
@@ -309,11 +350,11 @@ export function AppHeaderWide({
                     }}
                     style={menuItem}
                   >
-                    <span style={icon}>Aa</span>Select Font
+                    <span style={menuIconStyle}>Aa</span>Select Font
                   </button>
 
                   <button onClick={close(toggleTheme)} style={menuItem}>
-                    <span style={icon}>
+                    <span style={menuIconStyle}>
                       {isDark ? (
                         <svg
                           width="12"
@@ -355,7 +396,7 @@ export function AppHeaderWide({
                     {isDark ? "Light mode" : "Dark mode"}
                   </button>
 
-                  {menuDivider}
+                  <div style={menuDividerStyle} />
 
                   <Tooltip text="Import a previously exported JSON file to restore an RE state.">
                     <button
@@ -365,7 +406,7 @@ export function AppHeaderWide({
                       }}
                       style={menuItem}
                     >
-                      <span style={icon}>↑</span>Import
+                      <span style={menuIconStyle}>↑</span>Import
                     </button>
                   </Tooltip>
                   <Tooltip text="Export the current RE state as a JSON file you can re-import later.">
@@ -373,11 +414,11 @@ export function AppHeaderWide({
                       onClick={close(onDownload)}
                       style={{ ...menuItem, color: C.theory.high }}
                     >
-                      <span style={icon}>↓</span>Export
+                      <span style={menuIconStyle}>↓</span>Export
                     </button>
                   </Tooltip>
                   {BACKEND_ENABLED && (
-                    <Tooltip text="Save session to the backend server (localhost:8000). Reload it from the home screen.">
+                    <Tooltip text="Save session to the backend server. Reload it from the home screen.">
                       <button
                         onClick={close(onSave)}
                         disabled={saveBusy}
@@ -388,11 +429,11 @@ export function AppHeaderWide({
                             : {}),
                         }}
                       >
-                        <span style={icon}>{saveLabel}</span>Save
+                        <span style={menuIconStyle}>{saveLabel}</span>Save
                       </button>
                     </Tooltip>
                   )}
-                  {menuDivider}
+                  <div style={menuDividerStyle} />
 
                   {BYOK_ENABLED && (
                     <Tooltip text="Configure your LLM provider, model name, and API key.">
@@ -404,7 +445,7 @@ export function AppHeaderWide({
                         }}
                         style={menuItem}
                       >
-                        <span style={icon}>⚙</span>
+                        <span style={menuIconStyle}>⚙</span>
                         {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
                       </button>
                     </Tooltip>
@@ -454,14 +495,20 @@ export function AppHeaderWide({
             Analyze
           </button>
         </Tooltip>
+        {BACKEND_ENABLED && (
+          <Tooltip text="Run the formal rethon RE simulation on your active elements.">
+            <button
+              style={metaTabBtn(metaTab === "simulate")}
+              onClick={() => {
+                if (metaTab !== "simulate") setTab("simulateRethon");
+              }}
+            >
+              Simulate
+            </button>
+          </Tooltip>
+        )}
         <div
-          style={{
-            width: 1,
-            height: 20,
-            background: C.border,
-            alignSelf: "center",
-            margin: "0 4px",
-          }}
+          style={inlineDividerStyle}
         />
         {visibleSubTabs.map((t) => (
           <Tooltip key={t} text={TAB_TOOLTIPS[t]}>
@@ -503,6 +550,7 @@ export function AppHeaderWide({
               </button>
             ) : (
               <button
+                data-tutorial="btn-workflow"
                 onClick={onStartWorkflow}
                 style={{ ...btn(false), color: C.supports }}
               >

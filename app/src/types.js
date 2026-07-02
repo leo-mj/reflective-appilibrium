@@ -27,15 +27,17 @@ export {};
  * - `revised`   — text was changed in a later round; `previousText` and `revisedRound` are set
  * - `withdrawn` — removed from the equilibrium; `reason` and `withdrawnRound` are set
  * - `rejected`  — a declined LLM suggestion; `rejectedRound` is set
+ * - `possible`  — pre-loaded but not yet affirmed by the user; invisible in graph and text tab
  *
- * @typedef {'active'|'revised'|'withdrawn'|'rejected'} ElementStatus
+ * @typedef {'active'|'revised'|'withdrawn'|'rejected'|'possible'} ElementStatus
  */
 
 /**
- * How strongly the user holds an element.
- * Maps directly to node opacity in the graph via {@link module:constants/colors.confOp}.
+ * How strongly the user holds an element, as a float in [0, 1].
+ * Maps to node opacity and size in the graph via {@link module:constants/colors.confOp}
+ * and {@link module:utils/graphHelpers.nodeRadius}.
  *
- * @typedef {'high'|'moderate'|'low'} ConfidenceLevel
+ * @typedef {number} ConfidenceLevel
  */
 
 /**
@@ -45,8 +47,12 @@ export {};
  * - `conflicts` — source and target are incompatible (orange dashed arrow)
  * - `undermines` — source weakens target without flat contradiction (amber dashed arrow)
  * - `depends`   — source presupposes target (grey arrow)
+ * - `entails`          — single premise entails conclusion (green arrow)
+ * - `precludes`        — single premise entails negation of conclusion (rose arrow)
+ * - `jointly_entails`  — multiple premises jointly entail conclusion (green arrow)
+ * - `jointly_precludes` — multiple premises jointly preclude conclusion, i.e. entail its negation (rose arrow)
  *
- * @typedef {'supports'|'conflicts'|'undermines'|'depends'} RelationType
+ * @typedef {'supports'|'conflicts'|'undermines'|'depends'|'entails'|'precludes'|'jointly_entails'|'jointly_precludes'} RelationType
  */
 
 // ─── Domain objects ───────────────────────────────────────────────────────────
@@ -58,7 +64,7 @@ export {};
  * @property {string}          id            - Unique identifier, e.g. `"J1"`, `"P3"`, `"T2"`.
  * @property {ElementType}     type          - Element category.
  * @property {ElementStatus}   status        - Current lifecycle status.
- * @property {ConfidenceLevel} confidence    - How strongly the user holds this element.
+ * @property {ConfidenceLevel} confidence    - How strongly the user holds this element (0–1).
  * @property {string}          origin        - Who introduced it, e.g. `"user"` or
  *                                            `"assistant-suggested → user-adopted"`.
  * @property {string}          text          - The moral claim or principle statement.
@@ -68,6 +74,7 @@ export {};
  * @property {string}          [reason]        - Explanation for withdrawal (withdrawn only).
  * @property {number}          [withdrawnRound] - Round in which element was withdrawn (withdrawn only).
  * @property {number}          [rejectedRound]  - Round in which element was rejected (rejected only).
+ * @property {boolean}         [negated]        - True when this element appears as a negated sentence in a rethon position (simulation only; defaults to false).
  */
 
 /**
@@ -79,6 +86,7 @@ export {};
  * @property {RelationType}  type           - The kind of relation.
  * @property {string}        explanation    - Human-readable justification of why this relation holds.
  * @property {number}        addedRound     - Round number in which this relation was first recorded.
+ * @property {string}        [argumentId]    - Set on `entails` relations only; all premises of the same detected argument share this ID.
  * @property {ElementStatus} [status]        - Lifecycle status; absence or `"active"` means currently in play.
  * @property {number}        [revisedRound]  - Round in which this relation was last revised.
  * @property {number}        [withdrawnRound] - Round in which this relation was withdrawn.

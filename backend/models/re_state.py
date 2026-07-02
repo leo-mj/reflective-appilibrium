@@ -8,15 +8,15 @@ these models; the import security logic mirrors importMarkdown.js.
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
 # ── Element ────────────────────────────────────────────────────────────────────
 
 ElementType = Literal["judgment", "principle", "theory"]
-Status = Literal["active", "revised", "withdrawn", "rejected"]
-Confidence = Literal["high", "moderate", "low"]
+Status = Literal["active", "revised", "withdrawn", "rejected", "possible"]
+Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class REElement(BaseModel):
@@ -35,6 +35,7 @@ class REElement(BaseModel):
     origin: str = Field(max_length=200, default="")
     text: str = Field(max_length=10_000)
     added_round: int = Field(alias="addedRound", ge=1)
+    negated: Optional[bool] = False
 
     # Revised fields
     previous_text: Optional[str] = Field(None, alias="previousText", max_length=10_000)
@@ -47,12 +48,24 @@ class REElement(BaseModel):
     # Rejected fields
     rejected_round: Optional[int] = Field(None, alias="rejectedRound", ge=1)
 
+    # Questionnaire fields
+    questionnaire_index: Optional[int] = Field(None, alias="questionnaireIndex", ge=0)
+
     model_config = {"populate_by_name": True}
 
 
 # ── Relation ───────────────────────────────────────────────────────────────────
 
-RelationType = Literal["supports", "conflicts", "undermines", "depends"]
+RelationType = Literal[
+    "supports",
+    "conflicts",
+    "undermines",
+    "depends",
+    "entails",
+    "jointly_entails",
+    "precludes",
+    "jointly_precludes",
+]
 
 
 class RERelation(BaseModel):
@@ -61,6 +74,10 @@ class RERelation(BaseModel):
     ``from_id`` / ``to_id`` use the JSON aliases ``from`` / ``to`` to match
     the frontend schema.  A single ordered pair can have multiple relations
     (e.g. one ``supports`` and one ``undermines`` entry recorded separately).
+
+    ``argument_id`` is set only for ``(jointly) entails`` relations: all premises of the
+    same detected argument share the same ``argument_id`` so the graph can
+    visually group them.
     """
 
     from_id: str = Field(alias="from", pattern=r"^[JPT]\d+$")
@@ -68,6 +85,7 @@ class RERelation(BaseModel):
     type: RelationType
     explanation: str = Field(max_length=2_000, default="")
     added_round: int = Field(alias="addedRound", ge=1)
+    argument_id: Optional[str] = Field(None, alias="argumentId", max_length=200)
 
     status: Optional[Status] = None
     revised_round: Optional[int] = Field(None, alias="revisedRound", ge=1)
@@ -78,6 +96,7 @@ class RERelation(BaseModel):
 
 
 # ── Log ────────────────────────────────────────────────────────────────────────
+
 
 class RELogEntry(BaseModel):
     """Structured record of what happened in a single RE round.
@@ -96,6 +115,7 @@ class RELogEntry(BaseModel):
 
 # ── Coherence ──────────────────────────────────────────────────────────────────
 
+
 class RECoherence(BaseModel):
     """Snapshot of the coherence analysis at the end of a review round.
 
@@ -113,6 +133,7 @@ class RECoherence(BaseModel):
 
 # ── State ──────────────────────────────────────────────────────────────────────
 
+
 class REState(BaseModel):
     """Complete serialisable state of a wide reflective equilibrium process.
 
@@ -125,7 +146,9 @@ class REState(BaseModel):
     topic: str = Field(max_length=500, default="")
     phase: int = Field(default=2, ge=1)
     round: int = Field(ge=1)
+    model: Optional[Literal["questionnaire"]] = None
     elements: list[REElement] = Field(default_factory=list, max_length=1_000)
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
     coherence: RECoherence = Field(default_factory=RECoherence)
     log: list[RELogEntry] = Field(default_factory=list, max_length=1_000)
+    questionnaire_spec: Optional[Any] = Field(None, alias="questionnaireSpec")

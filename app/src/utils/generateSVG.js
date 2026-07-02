@@ -72,8 +72,8 @@ function nodeSVG(el, positions, ox, oy) {
   const pos = positions[el.id];
   if (!pos) return "";
   const { fill, stroke } = getColors(el);
-  const op = confOp[el.confidence] ?? 1;
-  const r = nodeRadius(el.type);
+  const op = confOp(el.confidence ?? 1);
+  const r = nodeRadius(el.type, el.confidence);
   const cx = f(pos.x - ox);
   const cy = f(pos.y - oy);
 

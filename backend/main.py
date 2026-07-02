@@ -13,7 +13,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import conversations, judgments, llm, matrix, principles, relations, sessions
+from .routers import (
+    conversations,
+    judgments,
+    llm,
+    matrix,
+    principles,
+    relations,
+    sessions,
+    simulate_rethon,
+    arguments,
+)
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +52,7 @@ app.add_middleware(
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 
+app.include_router(arguments.router)
 app.include_router(conversations.router)
 app.include_router(judgments.router)
 app.include_router(llm.router)
@@ -49,10 +60,11 @@ app.include_router(matrix.router)
 app.include_router(principles.router)
 app.include_router(relations.router)
 app.include_router(sessions.router)
-# Future: app.include_router(coherence.router)
+app.include_router(simulate_rethon.router)
 
 
 # ── Health ─────────────────────────────────────────────────────────────────────
+
 
 @app.get("/api/health", tags=["meta"])
 async def health() -> dict:

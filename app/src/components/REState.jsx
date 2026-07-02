@@ -5,7 +5,7 @@ import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
 import { stateAtRound } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
-import { ASSIST_TABS } from "../constants/tabConstants.jsx";
+import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
 import { saveSession } from "../utils/sessionsClient.js";
 import {
@@ -18,19 +18,36 @@ import { GraphPanel } from "./GraphPanel.jsx";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
-  const [tab, setTab] = useState("elicitJudgments");
-  const [hiddenLegendKeys, setHiddenLegendKeys] = useState(
-    new Set(["withdrawn", "rejected"]),
+  const [tab, setTab] = useState(
+    initialState.model === "questionnaire"
+      ? "questionnaire"
+      : "elicitJudgments",
   );
+  const [hiddenLegendKeys, setHiddenLegendKeys] = useState(new Set());
   const [showText, setShowText] = useState(true);
   const [showTabNav, setShowTabNav] = useState(false);
   const [expandAllKey, setExpandAllKey] = useState(0);
   const [allExpanded, setAllExpanded] = useState(false);
-  const [assistSidePanel, setAssistSidePanel] = useState("text");
+  const [assistSidePanel, setAssistSidePanel] = useState("graph");
   const [historyRound, setHistoryRound] = useState(0);
   const [workflowPhase, setWorkflowPhase] = useState(null);
   const [addBarCtrlTo, setAddBarCtrlTo] = useState(null);
   const [workflowLoops, setWorkflowLoops] = useState(0);
+  const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
+  const [equilibriumPreviewWithdrawnIds, setEquilibriumPreviewWithdrawnIds] =
+    useState(null);
+  const DEFAULT_WEIGHTS = {
+    account: 0.35,
+    systematicity: 0.55,
+    faithfulness: 0.1,
+  };
+  const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
+  const weightsChanged =
+    weights.account !== DEFAULT_WEIGHTS.account ||
+    weights.systematicity !== DEFAULT_WEIGHTS.systematicity ||
+    weights.faithfulness !== DEFAULT_WEIGHTS.faithfulness;
+  // Pass null when weights are default so backend uses its own defaults.
+  const effectiveWeights = weightsChanged ? weights : null;
 
   const {
     state,
@@ -52,10 +69,13 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     withdrawingId,
     setWithdrawingId,
     handleWithdrawRelRequest,
+    handleDeleteRelationsByArgId,
     handleAddElement,
     handleAddRelation,
+    handleQuestionnaireSelectAnswer,
     handleRejectElements,
     handleRejectRelations,
+    handleApplyRethonEquilibrium,
     handleImportFile,
     handleUndo,
     canUndo,
@@ -81,9 +101,11 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const dims = useWindowSize();
   const isWide = dims.w > 768 && dims.h > 500;
   const isAssistTab = ASSIST_TABS.includes(tab);
+  const isSimulateTab = SIMULATE_TABS.includes(tab);
+  const usesSidePanel = isAssistTab || isSimulateTab;
   const hasSidePanel =
     isWide &&
-    (isAssistTab
+    (usesSidePanel
       ? assistSidePanel !== "none" && assistSidePanel !== "focus"
       : showText);
   // graphW must match the actual rendered width of the graph SVG so the force
@@ -91,7 +113,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   // Focus mode keeps the same graphW as graph mode so switching between the two
   // doesn't restart the simulation and scramble node positions.
   const graphW =
-    isAssistTab && (assistSidePanel === "graph" || assistSidePanel === "focus")
+    usesSidePanel && (assistSidePanel === "graph" || assistSidePanel === "focus")
       ? (dims.w - 44) / 2
       : hasSidePanel
         ? (dims.w - 32) / 2 - 12
@@ -113,8 +135,15 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     setWorkflowPhase(null);
     setWorkflowLoops(0);
   };
+  const NON_ENTAILS_TYPES = ["supports", "conflicts", "undermines", "depends"];
+  const effectiveHiddenKeys = hideNonEntailsRels
+    ? new Set([...hiddenLegendKeys, ...NON_ENTAILS_TYPES])
+    : hiddenLegendKeys;
+
   const advanceWorkflow = () => {
-    const next = WORKFLOW_NEXT_PHASE[workflowPhase];
+    let next = WORKFLOW_NEXT_PHASE[workflowPhase];
+    if (hideNonEntailsRels && next === "suggestRelations")
+      next = WORKFLOW_NEXT_PHASE["suggestRelations"];
     if (next === "elicitJudgments") setWorkflowLoops((n) => n + 1);
     setWorkflowPhase(next);
     setTab(next);
@@ -125,7 +154,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [scrollToRelationsKey, setScrollToRelationsKey] = useState(0);
   const scrollToRelations = () => {
     if (isWide) {
-      if (isAssistTab) setAssistSidePanel("text");
+      if (usesSidePanel) setAssistSidePanel("text");
       else setShowText(true);
     } else setTab("text");
     setScrollToRelationsKey((k) => k + 1);
@@ -149,7 +178,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
   // Props shared by both the assist-side and analyze-mode TextPanel instances.
   const showingTextPanel = isWide
-    ? isAssistTab
+    ? usesSidePanel
       ? assistSidePanel === "text"
       : showText
     : tab === "text";
@@ -158,7 +187,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     clusterSectionRef,
     scrollToRelationsKey,
     state: textState,
-    hiddenLegendKeys,
+    hiddenLegendKeys: effectiveHiddenKeys,
+    hideNonEntailsRels,
+    weights: effectiveWeights,
     selected,
     onSelect: handleSelectNode,
     selectedRel,
@@ -174,12 +205,13 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     showTabNav,
     expandAllKey,
     allExpanded,
+    showZScores: tab === "history",
   };
 
   const graphPanelCommonProps = {
     state,
     positions,
-    hiddenLegendKeys,
+    hiddenLegendKeys: effectiveHiddenKeys,
     setHiddenLegendKeys,
     selected,
     onSelect: handleSelectNode,
@@ -187,15 +219,23 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onSelectRel: handleSelectRel,
     onAddElement: handleAddElement,
     onAddRelation: handleAddRelation,
+    onDeleteRelationsByArgId: handleDeleteRelationsByArgId,
+    onQuestionnaireSelectAnswer: handleQuestionnaireSelectAnswer,
     recentlyAdded,
     onScrollToRelations: scrollToRelations,
     onRejectElements: handleRejectElements,
     onRejectRelations: handleRejectRelations,
+    onApplyRethonEquilibrium: handleApplyRethonEquilibrium,
+    weights: effectiveWeights,
+    equilibriumPreviewWithdrawnIds:
+      tab === "simulateRethon" ? equilibriumPreviewWithdrawnIds : null,
+    onSetEquilibriumPreview: setEquilibriumPreviewWithdrawnIds,
     onRoundChange: setHistoryRound,
     isWide,
     onCtrlSecondSelect: setAddBarCtrlTo,
     ready,
     isSample,
+    hideNonEntailsRels,
   };
 
   return (
@@ -224,13 +264,14 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           }}
         >
           {isSample
-            ? "No LLM API connection — pre-set examples shown in the Assist Tabs and the Matrix Tab"
-            : "No LLM API connection — AI-assistance is disabled"}
+            ? "No LLM API connection — pre-set examples shown in the Assist Tabs"
+            : "No LLM API connection — AI-assistance is disabled, but you can still manually use the app"}
         </div>
       )}
       <AppHeader
         round={state.round}
         topic={state.topic}
+        model={state.model}
         tab={tab}
         setTab={handleSetTab}
         showText={showText}
@@ -256,6 +297,12 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           setAllExpanded((v) => !v);
           setExpandAllKey((k) => k + 1);
         }}
+        hideNonEntailsRels={hideNonEntailsRels}
+        setHideNonEntailsRels={setHideNonEntailsRels}
+        weights={weights}
+        weightsChanged={weightsChanged}
+        onWeightsChange={setWeights}
+        onResetWeights={() => setWeights(DEFAULT_WEIGHTS)}
       />
 
       <div
@@ -267,7 +314,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           gap: 12,
         }}
       >
-        {isWide && isAssistTab && assistSidePanel === "graph" && (
+        {isWide && usesSidePanel && assistSidePanel === "graph" && (
           <div
             style={{
               width: "50%",
@@ -301,10 +348,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         )}
       </div>
 
-      {isWide && !isAssistTab && (
+      {isWide && !isAssistTab && !isSimulateTab && (
         <AddBar
-          elements={state.elements.filter(
-            (e) => e.status !== "withdrawn" && e.status !== "rejected",
+          elements={state.elements.filter((e) =>
+            ["active", "revised"].includes(e.status),
           )}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}

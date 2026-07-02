@@ -6,17 +6,14 @@
 /** @import { REElement } from '../../types.js' */
 
 import { useState } from "react";
-import {
-  INPUT_STYLE,
-  LABEL_STYLE,
-  FIELD_STYLE,
-} from "../../constants/modalConstants.js";
-import { ModalShell } from "./ModalShell.jsx";
+import { INPUT_STYLE } from "../../constants/modalConstants.js";
+import { ModalShell, FormField } from "./ModalShell.jsx";
+import { ConfidenceInput } from "./ConfidenceInput.jsx";
 
 /**
  * @typedef {Object} EditFormData
  * @property {'judgment'|'principle'|'theory'} type
- * @property {'high'|'moderate'|'low'}         confidence
+ * @property {number} confidence
  * @property {string} origin
  * @property {string} text
  */
@@ -50,8 +47,7 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
       onCancel={onCancel}
       onSave={() => onSave(form)}
     >
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Type</label>
+      <FormField label="Type">
         <select
           value={form.type}
           onChange={(e) => set("type", e.target.value)}
@@ -61,39 +57,29 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
           <option value="principle">Principle</option>
           <option value="theory">Background Theory</option>
         </select>
-      </div>
+      </FormField>
 
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Confidence</label>
-        <select
-          value={form.confidence}
-          onChange={(e) => set("confidence", e.target.value)}
-          style={INPUT_STYLE}
-        >
-          <option value="high">High</option>
-          <option value="moderate">Moderate</option>
-          <option value="low">Low</option>
-        </select>
-      </div>
+      <ConfidenceInput
+        value={form.confidence}
+        onChange={(v) => set("confidence", v)}
+      />
 
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Origin</label>
+      <FormField label="Origin">
         <input
           type="text"
           value={form.origin}
           onChange={(e) => set("origin", e.target.value)}
           style={INPUT_STYLE}
         />
-      </div>
+      </FormField>
 
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Text</label>
+      <FormField label="Text">
         <textarea
           value={form.text}
           onChange={(e) => set("text", e.target.value)}
           style={{ ...INPUT_STYLE, height: 110, resize: "vertical" }}
         />
-      </div>
+      </FormField>
     </ModalShell>
   );
 }

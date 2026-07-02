@@ -10,9 +10,10 @@
 
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
+import { quickScore } from "../../utils/simulateRethonClient.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
-import { AddElementPanel } from "../user_edits/TextTabAddPanel.jsx";
+import { AddElementPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import {
   AcceptButton,
   RejectButton,
@@ -22,7 +23,7 @@ import {
   ModifyTextarea,
   ErrorBanner,
 } from "../SuggestionActions.jsx";
-import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
+import { ProgressWorkflowBtn, ScoreDeltaBadge } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ function Toolbar({
  * inline before a decision is made.
  *
  * @param {Object}   props
- * @param {{question: string, judgments: Array<{text: string, confidence: string}>}} props.suggestion
+ * @param {{question: string, judgments: Array<{text: string, confidence: number}>}} props.suggestion
  * @param {{judgment: Object, draft: string}|null} props.editing
  *   The judgment currently being edited and its draft text, or null.
  * @param {Function} props.onAcceptJudgment   Called with the judgment object.
@@ -128,6 +129,8 @@ function SuggestionCard({
   suggestion,
   editing,
   state,
+  baseline,
+  weights,
   onAcceptJudgment,
   onRejectJudgment,
   onModify,
@@ -197,7 +200,7 @@ function SuggestionCard({
                   display: "inline-block",
                 }}
               >
-                {j.confidence}
+                {typeof j.confidence === "number" ? j.confidence.toFixed(2) : j.confidence}
               </span>
               {isEditing ? (
                 <ModifyTextarea
@@ -213,6 +216,7 @@ function SuggestionCard({
               <div
                 style={{
                   display: "flex",
+                  alignItems: "center",
                   gap: 4,
                   flexShrink: 0,
                   alignSelf: "flex-start",
@@ -221,6 +225,14 @@ function SuggestionCard({
                   transition: "opacity 0.12s",
                 }}
               >
+                <ScoreDeltaBadge
+                  state={state}
+                  text={isEditing ? editing.draft : j.text}
+                  type="judgment"
+                  confidence={j.confidence}
+                  baseline={baseline}
+                  weights={weights}
+                />
                 <AcceptButton
                   onClick={() => onAcceptJudgment(j)}
                   accentColor={C.judgment.high}
@@ -282,6 +294,7 @@ export function JudgmentElicitTab({
   nextPhaseIsEnabled,
   useDummy = false,
   suggestionsDisabled = false,
+  weights = null,
 }) {
   /** @type {[Array<{question: string, judgments: Array<{text: string, confidence: string}>}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -290,6 +303,17 @@ export function JudgmentElicitTab({
   const [model, setModel] = useState(null);
   /** @type {[{suggestion: Object, judgment: Object, draft: string}|null, Function]} */
   const [editing, setEditing] = useState(null);
+
+  // Baseline account + systematicity for the current state — used by
+  // ScoreDeltaBadge to compute per-suggestion acceptance deltas.
+  const [baseline, setBaseline] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    quickScore(state.elements, state.relations, weights).then((scores) => {
+      if (!cancelled) setBaseline(scores ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [state.elements, state.relations, weights]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const elicit = async () => {
     setLoading(true);
@@ -321,6 +345,7 @@ export function JudgmentElicitTab({
       text: resolvedText(judgment),
       confidence: judgment.confidence,
       origin: "llm",
+      ...(judgment.index != null && { questionnaireIndex: judgment.index }),
     });
     setEditing(null);
     setSuggestions((prev) => removeJudgment(prev, suggestion, judgment));
@@ -372,6 +397,8 @@ export function JudgmentElicitTab({
             suggestion={s}
             editing={editing?.suggestion === s ? editing : null}
             state={state}
+            baseline={baseline}
+            weights={weights}
             onAcceptJudgment={(j) => accept(s, j)}
             onRejectJudgment={(j) => reject(s, j)}
             onModify={(j) =>

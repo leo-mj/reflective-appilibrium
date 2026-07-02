@@ -9,9 +9,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
+import { quickScore } from "../../utils/simulateRethonClient.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { fetchPrincipleSuggestions } from "../../utils/principlesClient.js";
-import { AddElementPanel } from "../user_edits/TextTabAddPanel.jsx";
+import { AddElementPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import {
   AcceptButton,
   RejectButton,
@@ -25,10 +26,8 @@ import {
   nextPhaseEnabled,
   WORKFLOW_NEXT_PHASE,
 } from "../../utils/workflowUtils.js";
-import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
+import { ProgressWorkflowBtn, ScoreDeltaBadge } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 /**
  * @param {Object}           props
@@ -119,7 +118,7 @@ function Toolbar({
  * before accepting.
  *
  * @param {Object}   props
- * @param {{text: string, confidence: string, covers: string[], explanation: string}} props.suggestion
+ * @param {{text: string, confidence: number, covers: string[], explanation: string}} props.suggestion
  * @param {string|null} props.draft  Current draft text when editing, null otherwise.
  * @param {Function} props.onAccept
  * @param {Function} props.onReject
@@ -131,6 +130,8 @@ function SuggestionCard({
   suggestion,
   draft,
   state,
+  baseline,
+  weights,
   onAccept,
   onReject,
   onModify,
@@ -176,7 +177,15 @@ function SuggestionCard({
             {suggestion.text}
           </div>
         )}
-        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <ScoreDeltaBadge
+            state={state}
+            text={draft ?? suggestion.text}
+            type="principle"
+            confidence={suggestion.confidence}
+            baseline={baseline}
+            weights={weights}
+          />
           <AcceptButton onClick={onAccept} accentColor={C.principle.high} />
           <RejectButton onClick={onReject} />
           {isEditing ? (
@@ -209,7 +218,7 @@ function SuggestionCard({
             padding: "3px 6px",
           }}
         >
-          {suggestion.confidence}
+          {typeof suggestion.confidence === "number" ? suggestion.confidence.toFixed(2) : suggestion.confidence}
         </span>
         {suggestion.covers.length > 0 && (
           <span style={{ fontSize: 10, color: C.dim }}>
@@ -242,6 +251,7 @@ export function PrincipleSuggestTab({
   onAdvanceWorkflow,
   useDummy = false,
   suggestionsDisabled = false,
+  weights = null,
 }) {
   /** @type {[Array<{text: string, confidence: string, covers: string[], explanation: string}>|null, Function]} */
   const [suggestions, setSuggestions] = useState(null);
@@ -250,6 +260,16 @@ export function PrincipleSuggestTab({
   const [model, setModel] = useState(null);
   /** @type {[{suggestion: Object, draft: string}|null, Function]} */
   const [editing, setEditing] = useState(null);
+
+  // Baseline account + systematicity for the current state.
+  const [baseline, setBaseline] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    quickScore(state.elements, state.relations, weights).then((scores) => {
+      if (!cancelled) setBaseline(scores ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [state.elements, state.relations, weights]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const judgments = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.type === "judgment",
@@ -345,6 +365,8 @@ export function PrincipleSuggestTab({
             suggestion={s}
             draft={editing?.suggestion === s ? editing.draft : null}
             state={state}
+            baseline={baseline}
+            weights={weights}
             onAccept={() => accept(s)}
             onReject={() => reject(s)}
             onModify={() => setEditing({ suggestion: s, draft: s.text })}

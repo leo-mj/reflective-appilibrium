@@ -22,6 +22,27 @@ export const btn = (active) => ({
   color: active ? C.text : C.dim,
 });
 
+/** Shared icon span style used in both header menu layouts. */
+export const menuIconStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 20,
+  flexShrink: 0,
+};
+
+/** Horizontal rule between menu sections. Render as <div style={menuDividerStyle} />. */
+export const menuDividerStyle = { height: 1, background: C.border, margin: "2px 0" };
+
+/** Vertical divider between inline toolbar buttons. Render as <div style={inlineDividerStyle} />. */
+export const inlineDividerStyle = {
+  width: 1,
+  height: 20,
+  background: C.border,
+  alignSelf: "center",
+  margin: "0 4px",
+};
+
 /** Connected-tab style for Analyze / Assist meta-tab buttons (wide layout). */
 export const metaTabBtn = (active) => ({
   display: "flex",

@@ -68,7 +68,6 @@ export function accumulateUsage(data) {
  * @returns {Promise<{ text: string, model: string, usage: { input_tokens: number, output_tokens: number } }>}
  */
 export async function callBackendLLM(prompt, temperature = 0.3) {
-  console.log(`Fetching response from LLM`);
   const res = await fetch(`${BACKEND_URL}/api/llm/complete`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },

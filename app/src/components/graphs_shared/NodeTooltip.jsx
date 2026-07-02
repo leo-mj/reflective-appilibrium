@@ -88,7 +88,7 @@ export function NodeTooltip({ tooltip }) {
         </div>
       )}
       <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
-        Confidence: {el.confidence} · Origin: {el.origin}
+        Confidence: {typeof el.confidence === "number" ? el.confidence.toFixed(2) : el.confidence} · Origin: {el.origin}
         {el.addedRound && ` · Added: Round ${el.addedRound}`}
       </div>
     </div>,

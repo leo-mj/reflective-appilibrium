@@ -24,6 +24,9 @@ Thumbs.db
 
 sessions/*
 
+# Questionnaire data files
+app/src/questionnaires/*
+
 # Logs
 *.log
 npm-debug.log*

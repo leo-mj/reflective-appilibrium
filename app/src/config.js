@@ -1,26 +1,25 @@
 /**
  * @fileoverview Build-time feature flags.
  *
- * Two environments are supported:
- *   DEV  (vite dev)   — LLM + backend enabled; dummy data available via toggle
- *   PROD (vite build) — LLM + backend disabled; dummy data always on
- *
- * Exception: BYOK builds are PROD builds where the user supplies their own API
- * key.  Set VITE_BYOK_ENABLED=true in .env.byok to re-enable LLM + backend.
+ * Three environments, set via VITE_APP_ENV:
+ *   dev     (vite dev)                  — backend + LLM + BYOK enabled; dummy data toggleable
+ *   demo    (vite build)                — all disabled; dummy data always on; publicly hosted
+ *   backend (vite build --mode backend) — backend + LLM + BYOK enabled; publicly hosted
  *
  * @module config
  */
 
-/** @type {"dev" | "prod"} */
+/** @type {"dev" | "demo" | "backend"} */
 export const APP_ENV = import.meta.env.VITE_APP_ENV;
 
-export const BYOK_ENABLED = import.meta.env.VITE_BYOK_ENABLED === "true";
+/** True in dev and backend modes; false in demo. */
+export const BACKEND_ENABLED = APP_ENV === "dev" || APP_ENV === "backend";
 
-/** LLM features available in dev or when the user brings their own key. */
-export const LLM_ENABLED = APP_ENV === "dev" || BYOK_ENABLED;
+/** LLM features follow backend availability. */
+export const LLM_ENABLED = BACKEND_ENABLED;
 
-/** FastAPI backend available under the same conditions as LLM. */
-export const BACKEND_ENABLED = APP_ENV === "dev" || BYOK_ENABLED;
+/** LLM settings modal (provider, model, API key) follows backend availability. */
+export const BYOK_ENABLED = BACKEND_ENABLED;
 
 export const DEFAULT_PROVIDER = import.meta.env.VITE_DEFAULT_PROVIDER ?? "";
 export const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL ?? "";

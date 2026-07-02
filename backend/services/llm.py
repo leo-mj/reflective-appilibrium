@@ -82,7 +82,7 @@ class LLMService:
             self._anthropic = AsyncAnthropic(api_key=config.api_key)
         else:
             self._openai = AsyncOpenAI(
-                api_key=config.api_key,
+                api_key=config.api_key or "placeholder",
                 base_url=config.base_url,
             )
 
@@ -109,10 +109,14 @@ class LLMService:
     ) -> CompletionResult:
         """Send chat messages and return the reply with token usage."""
         if self._anthropic is not None:
-            text, inp, out = await self._complete_anthropic(self._anthropic, messages, temperature, json_mode)
+            text, inp, out = await self._complete_anthropic(
+                self._anthropic, messages, temperature, json_mode
+            )
         else:
             assert self._openai is not None
-            text, inp, out = await self._complete_openai(self._openai, messages, temperature, json_mode)
+            text, inp, out = await self._complete_openai(
+                self._openai, messages, temperature, json_mode
+            )
         return CompletionResult(
             text=_extract_json(text) if json_mode else text,
             input_tokens=inp,

@@ -50,43 +50,59 @@ export function GraphEdge({
   strokeWidth = 2,
   transition,
   hitArea = false,
+  parallelOffset = 0,
 }) {
   const color = isRejected
     ? C.rejected
     : isWithdrawn
       ? C.withdrawn
       : C[relation.type];
-  const { x1, y1, x2, y2, tipX, tipY, perpX, perpY } = arrowGeometry(
+  const { x1, y1, tipX, tipY, perpX, perpY } = arrowGeometry(
     sourcePos,
     targetPos,
-    nodeRadius(sourceEl?.type),
-    nodeRadius(targetEl?.type),
+    nodeRadius(sourceEl?.type, sourceEl?.confidence),
+    nodeRadius(targetEl?.type, targetEl?.confidence),
   );
+
+  // Quadratic bezier: control point at midpoint displaced perpendicularly.
+  // For parallelOffset=0 this degenerates to a straight line.
+  const cx = (x1 + tipX) / 2 + perpX * parallelOffset;
+  const cy = (y1 + tipY) / 2 + perpY * parallelOffset;
+
+  // Arrowhead direction: tangent of the bezier at the tip = (tip - ctrl) normalised.
+  const tdx = tipX - cx, tdy = tipY - cy;
+  const tlen = Math.hypot(tdx, tdy) || 1;
+  const tux = tdx / tlen, tuy = tdy / tlen;
+  const tperpX = -tuy, tperpY = tux;
+  const bx = tipX - tux * 10, by = tipY - tuy * 10; // arrowhead base
+
+  const pathD = `M ${x1} ${y1} Q ${cx} ${cy} ${bx} ${by}`;
+  const isHollow = relation.type === "entails" || relation.type === "precludes";
   return (
     <g opacity={opacity} style={{ transition }}>
       {hitArea && (
-        <line
-          x1={x1}
-          y1={y1}
-          x2={x2}
-          y2={y2}
-          stroke="transparent"
-          strokeWidth={16}
+        <path d={pathD} stroke="transparent" strokeWidth={16} fill="none" />
+      )}
+      <path
+        d={pathD}
+        stroke={color}
+        strokeWidth={isHollow ? strokeWidth + 1 : strokeWidth}
+        strokeDasharray={edgeDashArray(relation.type)}
+        fill="none"
+      />
+      {isHollow ? (
+        <polygon
+          points={`${tipX},${tipY} ${bx + tperpX * 5},${by + tperpY * 5} ${bx - tperpX * 5},${by - tperpY * 5}`}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.5}
+        />
+      ) : (
+        <polygon
+          points={`${tipX},${tipY} ${bx + tperpX * 5},${by + tperpY * 5} ${bx - tperpX * 5},${by - tperpY * 5}`}
+          fill={color}
         />
       )}
-      <line
-        x1={x1}
-        y1={y1}
-        x2={x2}
-        y2={y2}
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeDasharray={edgeDashArray(relation.type)}
-      />
-      <polygon
-        points={`${tipX},${tipY} ${x2 + perpX * 5},${y2 + perpY * 5} ${x2 - perpX * 5},${y2 - perpY * 5}`}
-        fill={color}
-      />
     </g>
   );
 }
@@ -170,7 +186,7 @@ export function GraphNode({
         ? { ...element, status: "withdrawn" }
         : element,
   );
-  const radius = nodeRadius(element.type);
+  const radius = nodeRadius(element.type, element.confidence);
   return (
     <g
       transform={`translate(${position.x},${position.y})`}
@@ -183,7 +199,7 @@ export function GraphNode({
       <text
         textAnchor="middle"
         dy="0.35em"
-        fill={isWithdrawn || isRejected ? "#666" : "#fff"}
+        fill={"#fff"}
         fontSize={element.type === "principle" ? 13 : 11}
         fontWeight="bold"
         style={{
@@ -346,7 +362,7 @@ export function OffscreenIndicators({
   els.forEach((el) => {
     const pos = positions[el.id];
     if (!pos) return;
-    const r = nodeRadius(el.type) * zoom;
+    const r = nodeRadius(el.type, el.confidence) * zoom;
     const sx = pos.x * zoom + pan.x;
     const sy = pos.y * zoom + pan.y;
     if (sx - r < 0) hidden.left = true;

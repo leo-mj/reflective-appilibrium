@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:byok": "vite build --mode byok",
     "build:local": "vite build --mode local",
+    "build:backend": "vite build --mode backend",
     "lint": "eslint .",
     "format": "prettier --write .",
     "preview": "vite preview",

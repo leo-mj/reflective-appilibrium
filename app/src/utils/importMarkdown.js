@@ -18,13 +18,17 @@
 
 const MAX_FILE_SIZE = 500_000; // 500 KB
 const ELEMENT_TYPES = new Set(["judgment", "principle", "theory"]);
-const STATUSES = new Set(["active", "revised", "withdrawn"]);
-const CONFIDENCES = new Set(["high", "moderate", "low"]);
+const STATUSES = new Set(["active", "revised", "withdrawn", "rejected", "possible"]);
+const LEGACY_CONFIDENCE = { high: 1.0, moderate: 0.67, low: 0.33 };
 const RELATION_TYPES = new Set([
   "supports",
   "conflicts",
   "undermines",
   "depends",
+  "entails",
+  "precludes",
+  "jointly_entails",
+  "jointly_precludes",
 ]);
 
 // ─── Field validators ─────────────────────────────────────────────────────────
@@ -49,6 +53,118 @@ function arr(v, field, max = 1_000) {
   return v;
 }
 
+function bool(v, field) {
+  if (typeof v !== "boolean")
+    throw new Error(`"${field}" must be a boolean, got ${typeof v}`);
+  return v;
+}
+
+// ─── Questionnaire spec validator ─────────────────────────────────────────────
+
+function validateQuestionnaireJudgment(j, ctx) {
+  let confidence;
+  if (typeof j.confidence === "string") {
+    if (!(j.confidence in LEGACY_CONFIDENCE))
+      throw new Error(`${ctx}.confidence "${j.confidence}" is not valid`);
+    confidence = LEGACY_CONFIDENCE[j.confidence];
+  } else {
+    confidence = num(j.confidence, `${ctx}.confidence`);
+    if (confidence < 0 || confidence > 1)
+      throw new Error(`${ctx}.confidence must be in [0, 1], got ${confidence}`);
+  }
+  return {
+    index: num(j.index, `${ctx}.index`),
+    id: str(j.id, `${ctx}.id`, 10),
+    confidence,
+    answer: str(j.answer, `${ctx}.answer`, 200),
+    text: str(j.text, `${ctx}.text`, 10_000),
+  };
+}
+
+function validateQuestionnaireSuggestion(s, i) {
+  const ctx = `questionnaireSpec.suggestions[${i}]`;
+  return {
+    question: str(s.question, `${ctx}.question`, 1_000),
+    judgments: arr(s.judgments, `${ctx}.judgments`, 20).map((j, ji) =>
+      validateQuestionnaireJudgment(j, `${ctx}.judgments[${ji}]`),
+    ),
+  };
+}
+
+function validateArgArrays(raw, field) {
+  return arr(raw ?? [], field, 100).map((inner, i) =>
+    arr(inner, `${field}[${i}]`, 50).map((n, ni) =>
+      num(n, `${field}[${i}][${ni}]`),
+    ),
+  );
+}
+
+function validateQuestionnaireSpec(spec) {
+  if (typeof spec !== "object" || spec === null || Array.isArray(spec))
+    throw new Error("questionnaireSpec must be a JSON object");
+
+  const cardRaw = spec.card ?? {};
+  let cardDescription;
+  if (typeof cardRaw.description === "string") {
+    cardDescription = str(
+      cardRaw.description,
+      "questionnaireSpec.card.description",
+      5_000,
+    );
+  } else if (Array.isArray(cardRaw.description)) {
+    cardDescription = arr(
+      cardRaw.description,
+      "questionnaireSpec.card.description",
+      50,
+    ).map((item, i) => {
+      if (typeof item === "string")
+        return str(
+          item,
+          `questionnaireSpec.card.description[${i}]`,
+          2_000,
+        );
+      if (typeof item === "object" && item !== null && !Array.isArray(item))
+        return {
+          link: str(item.link ?? "", `questionnaireSpec.card.description[${i}].link`, 200),
+          href: str(item.href ?? "", `questionnaireSpec.card.description[${i}].href`, 500),
+        };
+      throw new Error(
+        `questionnaireSpec.card.description[${i}] must be a string or link object`,
+      );
+    });
+  } else {
+    cardDescription = "";
+  }
+
+  return {
+    id: str(spec.id ?? "", "questionnaireSpec.id", 100),
+    name: str(spec.name ?? "", "questionnaireSpec.name", 500),
+    model: str(spec.model ?? "", "questionnaireSpec.model", 100),
+    card: {
+      title: str(cardRaw.title ?? "", "questionnaireSpec.card.title", 500),
+      description: cardDescription,
+      buttonLabel: str(
+        cardRaw.buttonLabel ?? "",
+        "questionnaireSpec.card.buttonLabel",
+        200,
+      ),
+    },
+    suggestions: arr(
+      spec.suggestions ?? [],
+      "questionnaireSpec.suggestions",
+      100,
+    ).map(validateQuestionnaireSuggestion),
+    participantArguments: validateArgArrays(
+      spec.participantArguments,
+      "questionnaireSpec.participantArguments",
+    ),
+    furtherArguments: validateArgArrays(
+      spec.furtherArguments,
+      "questionnaireSpec.furtherArguments",
+    ),
+  };
+}
+
 // ─── Object validators (whitelist only known fields) ──────────────────────────
 
 function validateElement(e, i) {
@@ -65,9 +181,16 @@ function validateElement(e, i) {
   if (!STATUSES.has(status))
     throw new Error(`${ctx}.status "${status}" is not valid`);
 
-  const confidence = str(e.confidence, `${ctx}.confidence`, 20);
-  if (!CONFIDENCES.has(confidence))
-    throw new Error(`${ctx}.confidence "${confidence}" is not valid`);
+  let confidence;
+  if (typeof e.confidence === "string") {
+    if (!(e.confidence in LEGACY_CONFIDENCE))
+      throw new Error(`${ctx}.confidence "${e.confidence}" is not valid`);
+    confidence = LEGACY_CONFIDENCE[e.confidence];
+  } else {
+    confidence = num(e.confidence, `${ctx}.confidence`);
+    if (confidence < 0 || confidence > 1)
+      throw new Error(`${ctx}.confidence must be in [0, 1], got ${confidence}`);
+  }
 
   const result = {
     id,
@@ -87,6 +210,12 @@ function validateElement(e, i) {
     result.reason = str(e.reason, `${ctx}.reason`, 2_000);
   if (e.withdrawnRound !== undefined)
     result.withdrawnRound = num(e.withdrawnRound, `${ctx}.withdrawnRound`);
+  if (e.rejectedRound !== undefined)
+    result.rejectedRound = num(e.rejectedRound, `${ctx}.rejectedRound`);
+  if (e.negated !== undefined)
+    result.negated = bool(e.negated, `${ctx}.negated`);
+  if (e.questionnaireIndex !== undefined)
+    result.questionnaireIndex = num(e.questionnaireIndex, `${ctx}.questionnaireIndex`);
 
   return result;
 }
@@ -114,6 +243,10 @@ function validateRelation(r, i) {
     result.revisedRound = num(r.revisedRound, `${ctx}.revisedRound`);
   if (r.withdrawnRound !== undefined)
     result.withdrawnRound = num(r.withdrawnRound, `${ctx}.withdrawnRound`);
+  if (r.rejectedRound !== undefined)
+    result.rejectedRound = num(r.rejectedRound, `${ctx}.rejectedRound`);
+  if (r.argumentId !== undefined)
+    result.argumentId = str(r.argumentId, `${ctx}.argumentId`, 200);
 
   return result;
 }
@@ -141,7 +274,7 @@ function validateState(raw) {
     throw new Error("State must be a JSON object");
 
   const coherenceRaw = raw.coherence ?? {};
-  return {
+  const result = {
     topic: str(raw.topic ?? "", "topic", 500),
     phase: typeof raw.phase === "number" ? num(raw.phase, "phase") : 2,
     round: num(raw.round, "round"),
@@ -160,6 +293,16 @@ function validateState(raw) {
     },
     log: arr(raw.log ?? [], "log", 1_000).map(validateLogEntry),
   };
+
+  if (raw.model !== undefined) {
+    if (raw.model !== "questionnaire")
+      throw new Error(`"model" must be "questionnaire" if present, got "${raw.model}"`);
+    result.model = "questionnaire";
+  }
+  if (raw.questionnaireSpec !== undefined)
+    result.questionnaireSpec = validateQuestionnaireSpec(raw.questionnaireSpec);
+
+  return result;
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────

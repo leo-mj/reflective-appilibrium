@@ -7,20 +7,22 @@ export function nextPhaseEnabled(workflowPhase, state) {
     state.elements.filter(
       (e) =>
         e.type === "judgment" &&
-        e.status !== "withdrawn" &&
-        e.status !== "rejected",
+        ["active", "revised"].includes(e.status),
+
     ).length >= 3
   );
 }
 
 export const WORKFLOW_PHASE_LABELS = {
-  elicitJudgments: "Step 1 · Elicit Judgments",
-  suggestPrinciples: "Step 2 · Suggest Principles",
-  suggestRelations: "Step 3 · Suggest Relations",
+  elicitJudgments: "Workflow Step: Elicit Judgments",
+  suggestPrinciples: "Workflow Step: Suggest Principles",
+  detectArguments: "Workflow Step: Detect Arguments",
+  suggestRelations: "Workflow Step: Suggest Relations",
 };
 
 export const WORKFLOW_NEXT_PHASE = {
   elicitJudgments: "suggestPrinciples",
-  suggestPrinciples: "suggestRelations",
+  suggestPrinciples: "detectArguments",
+  detectArguments: "suggestRelations",
   suggestRelations: "elicitJudgments",
 };

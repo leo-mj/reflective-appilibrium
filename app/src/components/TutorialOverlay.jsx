@@ -60,6 +60,14 @@ const ANNOTATIONS = {
     text: "AI suggests missing relations between existing elements.",
     row: 0,
   },
+  "tab-detectArguments": {
+    text: "AI detects logically valid arguments formed of existing elements.",
+    row: 2,
+  },
+  "tab-simulateRethon": {
+    text: "Run the formal rethon RE simulation to find the equilibrium position.",
+    row: 1,
+  },
   // ── Right-side controls ────────────────────────────────────────────────────
   "toggle-withdrawn": {
     text: "Show or hide withdrawn elements in the graph and text panel.",

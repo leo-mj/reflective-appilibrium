@@ -10,7 +10,7 @@ import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { Legend } from "./graphs_shared/Legend.jsx";
-import { ASSIST_TABS } from "../constants/tabConstants.jsx";
+import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 
 const CoherenceMatrixTab = lazy(() =>
   import("./CoherenceMatrixTab.jsx").then((m) => ({
@@ -18,9 +18,9 @@ const CoherenceMatrixTab = lazy(() =>
   })),
 );
 
-const RelationSuggestTab = lazy(() =>
-  import("./workflows/RelationSuggestTab.jsx").then((m) => ({
-    default: m.RelationSuggestTab,
+const JudgmentElicitTab = lazy(() =>
+  import("./workflows/JudgmentElicitTab.jsx").then((m) => ({
+    default: m.JudgmentElicitTab,
   })),
 );
 
@@ -30,9 +30,28 @@ const PrincipleSuggestTab = lazy(() =>
   })),
 );
 
-const JudgmentElicitTab = lazy(() =>
-  import("./workflows/JudgmentElicitTab.jsx").then((m) => ({
-    default: m.JudgmentElicitTab,
+const RelationSuggestTab = lazy(() =>
+  import("./workflows/RelationSuggestTab.jsx").then((m) => ({
+    default: m.RelationSuggestTab,
+  })),
+);
+
+// Replace RelationsSuggestTab with DetectArgumentsTab?
+const DetectArgumentsTab = lazy(() =>
+  import("./workflows/DetectArgumentsTab.jsx").then((m) => ({
+    default: m.DetectArgumentsTab,
+  })),
+);
+
+const SimulateRethonTab = lazy(() =>
+  import("./workflows/SimulateRethonTab.jsx").then((m) => ({
+    default: m.SimulateRethonTab,
+  })),
+);
+
+const QuestionnaireTab = lazy(() =>
+  import("./workflows/QuestionnaireTab.jsx").then((m) => ({
+    default: m.QuestionnaireTab,
   })),
 );
 
@@ -48,24 +67,30 @@ export function GraphPanel({
   onSelectRel,
   onAddElement,
   onAddRelation,
+  onDeleteRelationsByArgId,
+  onQuestionnaireSelectAnswer,
   onScrollToRelations,
   onRejectElements,
   onRejectRelations,
+  onApplyRethonEquilibrium,
+  equilibriumPreviewWithdrawnIds,
+  onSetEquilibriumPreview,
   onRoundChange,
   isWide,
   workflowPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
+  hideNonEntailsRels,
   onCtrlSecondSelect,
   ready,
   isSample,
   recentlyAdded,
+  weights,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
-
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
   const autoFetch = !!workflowPhase;
-  const isAssistPanel = ASSIST_TABS.includes(tab);
+  const isAssistPanel = ASSIST_TABS.includes(tab) || SIMULATE_TABS.includes(tab);
   return (
     <div
       style={{
@@ -80,30 +105,34 @@ export function GraphPanel({
         <Legend
           hiddenLegendKeys={hiddenLegendKeys}
           setHiddenLegendKeys={setHiddenLegendKeys}
+          hideNonEntailsRels={hideNonEntailsRels}
         />
       )}
-      {APP_ENV === "dev" && isAssistPanel && isSample && (
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 11,
-            color: C.dim,
-            padding: "4px 0 2px",
-            userSelect: "none",
-            cursor: "pointer",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={useDummyAssist}
-            onChange={(e) => setUseDummyAssist(e.target.checked)}
-            style={{ accentColor: C.supports, cursor: "pointer" }}
-          />
-          Use dummy suggestions
-        </label>
-      )}
+      {APP_ENV === "dev" &&
+        isAssistPanel &&
+        isSample &&
+        state.model !== "questionnaire" && (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11,
+              color: C.dim,
+              padding: "4px 0 2px",
+              userSelect: "none",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={useDummyAssist}
+              onChange={(e) => setUseDummyAssist(e.target.checked)}
+              style={{ accentColor: C.supports, cursor: "pointer" }}
+            />
+            Use dummy suggestions
+          </label>
+        )}
       <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
         {tab === "graph" && (
           <Graph
@@ -119,6 +148,8 @@ export function GraphPanel({
             onCtrlSecondSelect={onCtrlSecondSelect}
             ready={ready}
             recentlyAdded={recentlyAdded}
+            hideNonEntailsRels={hideNonEntailsRels}
+            equilibriumPreviewWithdrawnIds={equilibriumPreviewWithdrawnIds}
           />
         )}
         {tab === "history" && (
@@ -127,10 +158,15 @@ export function GraphPanel({
             positions={positions}
             onRoundChange={onRoundChange}
             isWide={isWide}
+            hideNonEntailsRels={hideNonEntailsRels}
           />
         )}
         {tab === "clusters" && (
-          <ClusterTab state={state} positions={positions} />
+          <ClusterTab
+            state={state}
+            positions={positions}
+            hideNonEntailsRels={hideNonEntailsRels}
+          />
         )}
         {tab === "matrix" && (
           <Suspense fallback={null}>
@@ -166,8 +202,10 @@ export function GraphPanel({
               workflowPhase={workflowPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
+
               useDummy={useDummyAssist}
               suggestionsDisabled={suggestionsDisabled}
+              weights={weights}
             />
           </Suspense>
         )}
@@ -183,6 +221,41 @@ export function GraphPanel({
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
               suggestionsDisabled={suggestionsDisabled}
+              weights={weights}
+            />
+          </Suspense>
+        )}
+        {tab === "simulateRethon" && (
+          <Suspense fallback={null}>
+            <SimulateRethonTab
+              state={state}
+              onApplyRethonEquilibrium={onApplyRethonEquilibrium}
+              onSetEquilibriumPreview={onSetEquilibriumPreview}
+              weights={weights}
+            />
+          </Suspense>
+        )}
+        {tab === "detectArguments" && (
+          <Suspense fallback={null}>
+            <DetectArgumentsTab
+              state={state}
+              useDummy={useDummyAssist}
+              onAddElement={onAddElement}
+              onAddRelation={onAddRelation}
+              onDeleteRelationsByArgId={onDeleteRelationsByArgId}
+              autoFetch={autoFetch}
+              workflowPhase={workflowPhase}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
+              hideNonEntailsRels={hideNonEntailsRels}
+            />
+          </Suspense>
+        )}
+        {tab === "questionnaire" && (
+          <Suspense fallback={null}>
+            <QuestionnaireTab
+              state={state}
+              onSelectAnswer={onQuestionnaireSelectAnswer}
             />
           </Suspense>
         )}

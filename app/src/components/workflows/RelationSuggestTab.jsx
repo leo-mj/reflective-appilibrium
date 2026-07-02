@@ -11,7 +11,7 @@ import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { fetchRelationSuggestions } from "../../utils/relationsClient.js";
-import { AddRelationPanel } from "../user_edits/TextTabAddPanel.jsx";
+import { AddRelationPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import {
   AcceptButton,
   RejectButton,

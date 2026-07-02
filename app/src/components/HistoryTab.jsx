@@ -5,23 +5,26 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import { usePlayback } from "../hooks/usePlayback.js";
-import { elementsAtRound } from "../utils/stateUtils.js";
+import { elementsAtRound, ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 import {
   GraphCanvas,
   OffscreenIndicators,
 } from "./graphs_shared/GraphElements.jsx";
+import { parallelEdgeOffsets, groupJointArguments } from "../utils/graphHelpers.js";
 import {
   renderEdge,
+  renderJointArgument,
   renderNode,
   historyEdgeVisuals,
   historyNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
+
 import { PlaybackControls } from "./history/HistoryPlaybackControls.jsx";
 import { LogOverlay } from "./history/LogOverlay.jsx";
 
@@ -36,7 +39,7 @@ import { LogOverlay } from "./history/LogOverlay.jsx";
  * @param {boolean}     props.isWide
  * @returns {React.ReactElement}
  */
-export function HistoryTab({ state, positions, onRoundChange, isWide }) {
+export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEntailsRels }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
@@ -70,6 +73,11 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
     });
   }, [snappedRound]);
 
+  const elementById = useMemo(
+    () => new Map(state.elements.map((e) => [e.id, e])),
+    [state.elements],
+  );
+
   const { withdrawn } = elementsAtRound(state.elements, snappedRound);
   const wIds = new Set(withdrawn.map((e) => e.id));
   const newIds = new Set(
@@ -84,6 +92,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <PlaybackControls playback={playback} maxRound={state.round} />
+
       <GraphCanvas
         containerRef={containerRef}
         dims={dims}
@@ -120,14 +129,36 @@ export function HistoryTab({ state, positions, onRoundChange, isWide }) {
           </>
         }
       >
-        {state.relations.map((r) =>
-          renderEdge(
-            r,
-            positions,
-            state.elements,
-            historyEdgeVisuals(r, wIds, snappedRound),
-          ),
-        )}
+        {(() => {
+          const visRels = hideNonEntailsRels
+            ? state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type))
+            : state.relations;
+          const { solo, jointGroups } = groupJointArguments(visRels);
+          const offsets = parallelEdgeOffsets(solo);
+          return (
+            <>
+              {solo.map((r) =>
+                renderEdge(
+                  r,
+                  positions,
+                  elementById,
+                  historyEdgeVisuals(r, wIds, snappedRound),
+                  offsets.get(r) ?? 0,
+                ),
+              )}
+              {jointGroups.map((rels) => (
+                <React.Fragment key={rels[0].argumentId}>
+                  {renderJointArgument(
+                    rels,
+                    positions,
+                    elementById,
+                    historyEdgeVisuals(rels[0], wIds, snappedRound),
+                  )}
+                </React.Fragment>
+              ))}
+            </>
+          );
+        })()}
         {state.elements.map((el) =>
           renderNode(
             el,

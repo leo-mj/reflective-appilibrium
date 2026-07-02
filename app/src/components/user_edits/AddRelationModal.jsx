@@ -7,12 +7,8 @@
 
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
-import {
-  INPUT_STYLE,
-  LABEL_STYLE,
-  FIELD_STYLE,
-} from "../../constants/modalConstants.js";
-import { ModalShell } from "./ModalShell.jsx";
+import { INPUT_STYLE } from "../../constants/modalConstants.js";
+import { ModalShell, FormField } from "./ModalShell.jsx";
 import { sortElementIds } from "../../utils/stateUtils.js";
 
 /**
@@ -39,8 +35,7 @@ export function AddRelationForm({ form, setForm, elements }) {
   const selfLoop = form.from === form.to;
   return (
     <>
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>From</label>
+      <FormField label="From">
         <select
           value={form.from}
           onChange={(e) => set("from", e.target.value)}
@@ -52,9 +47,8 @@ export function AddRelationForm({ form, setForm, elements }) {
             </option>
           ))}
         </select>
-      </div>
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>To</label>
+      </FormField>
+      <FormField label="To">
         <select
           value={form.to}
           onChange={(e) => set("to", e.target.value)}
@@ -71,9 +65,8 @@ export function AddRelationForm({ form, setForm, elements }) {
             From and To must be different.
           </div>
         )}
-      </div>
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Relation type</label>
+      </FormField>
+      <FormField label="Relation type">
         <select
           value={form.type}
           onChange={(e) => set("type", e.target.value)}
@@ -84,15 +77,14 @@ export function AddRelationForm({ form, setForm, elements }) {
           <option value="undermines">Undermines</option>
           <option value="depends">Depends</option>
         </select>
-      </div>
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Explanation</label>
+      </FormField>
+      <FormField label="Explanation">
         <textarea
           value={form.explanation}
           onChange={(e) => set("explanation", e.target.value)}
           style={{ ...INPUT_STYLE, height: 80, resize: "vertical" }}
         />
-      </div>
+      </FormField>
     </>
   );
 }

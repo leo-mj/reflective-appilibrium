@@ -8,7 +8,7 @@
 // fetch is replaced with a vi.stubGlobal spy so we can assert whether the
 // network path was taken without making real HTTP requests.
 import { vi, describe, it, expect, afterEach } from "vitest";
-import dummyJudgments from "../dummy-judgments.js";
+import dummyJudgments from "../dummy-data/dummy-judgments.js";
 
 afterEach(() => {
   vi.resetModules();

@@ -312,6 +312,18 @@ export function EditIcon({ size = "1em" }) {
   );
 }
 
+export function SimulateIcon({ size = "2em" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 512 512" style={{ display: "block" }}>
+      <g stroke="currentColor" strokeWidth="28" strokeLinecap="round" strokeLinejoin="round" fill="none">
+        <path d="M360 150 A140 140 0 1 0 390 320" />
+        <polyline points="365,288 390,320 358,338" />
+      </g>
+      <circle cx="256" cy="256" r="36" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function ChatIcon({ size = "1em" }) {
   return (
     <svg

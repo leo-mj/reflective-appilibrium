@@ -17,7 +17,8 @@
 
 /** @import { REState } from './types.js' */
 
-import _dummyState from "./dummy-state.js"; // dev fixture — not used in production builds
+import _dummyState from "./dummy-data/dummy-state.js"; // dev fixture — not used in production builds
+import { argumentRelationType } from "./utils/stateUtils.js";
 
 // ============================================================
 // REPLACE THIS OBJECT WITH CURRENT STATE DATA WHEN GENERATING
@@ -35,9 +36,9 @@ const _inlineState = {
   phase: 0,
   round: 0,
   elements: [
-    // { id: "J1", type: "judgment", status: "active", confidence: "high", origin: "user", text: "...", addedRound: 1 },
-    // { id: "P1", type: "principle", status: "active", confidence: "moderate", origin: "user", text: "...", addedRound: 1 },
-    // { id: "T1", type: "theory", status: "active", confidence: "high", origin: "assistant-suggested → user-adopted", text: "...", addedRound: 5 },
+    // { id: "J1", type: "judgment", status: "active", confidence: 1.0, origin: "user", text: "...", addedRound: 1 },
+    // { id: "P1", type: "principle", status: "active", confidence: 0.67, origin: "user", text: "...", addedRound: 1 },
+    // { id: "T1", type: "theory", status: "active", confidence: 1.0, origin: "assistant-suggested → user-adopted", text: "...", addedRound: 5 },
     // For revised elements, add: previousText: "...", revisedRound: N
     // For withdrawn elements, add: reason: "...", withdrawnRound: N
   ],
@@ -75,4 +76,61 @@ export const SAMPLE_STATE = _dummyState;
  */
 export function makeEmptyState(topic) {
   return { ..._inlineState, topic, phase: 1, round: 1 };
+}
+
+/**
+ * Factory that returns a pre-populated questionnaire RE state from a spec.
+ *
+ * All judgment elements are created with `status: "possible"` so they are
+ * invisible until the user selects them via the Questionnaire tab.  All
+ * argument relations are pre-computed from the spec and stored in `relations`,
+ * so the full argument graph is present without a separate detect-arguments step.
+ *
+ * When the user answers a question, `handleQuestionnaireSelectAnswer` activates
+ * the chosen element and keeps unchosen siblings as `"possible"`. Pure-conclusion
+ * elements are automatically activated whenever every premise of at least one
+ * argument leading to them is active.
+ *
+ * @returns {REState}
+ */
+export function makeQuestionnaireState(spec) {
+  const elements = spec.suggestions.flatMap(({ judgments }) =>
+    judgments.map(({ id, index, confidence, text }) => ({
+      id,
+      type: "judgment",
+      status: "possible",
+      confidence,
+      origin: spec.id,
+      text,
+      addedRound: 1,
+      questionnaireIndex: index,
+    }))
+  );
+
+  const lookup = {};
+  for (const el of elements) lookup[el.questionnaireIndex] = el;
+
+  const relations = [];
+  const allArgs = [...spec.participantArguments, ...spec.furtherArguments];
+  for (let i = 0; i < allArgs.length; i++) {
+    const arg = allArgs[i];
+    if (!arg.every((n) => lookup[Math.abs(n)] != null)) continue;
+    const conclusionIdx = arg.at(-1);
+    const conclusion = lookup[Math.abs(conclusionIdx)];
+    const premiseCount = arg.length - 1;
+    const relationType = argumentRelationType(premiseCount, conclusionIdx < 0);
+    const argumentId = `questionnaire-arg-${i}`;
+    for (const n of arg.slice(0, -1)) {
+      relations.push({
+        from: lookup[Math.abs(n)].id,
+        to: conclusion.id,
+        type: relationType,
+        argumentId,
+        explanation: "",
+        addedRound: 1,
+      });
+    }
+  }
+
+  return { ..._inlineState, topic: spec.name, phase: 1, round: 1, model: "questionnaire", questionnaireSpec: spec, elements, relations };
 }

@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { C } from "../constants/colors.js";
 import { fetchRelatednessMatrix } from "../utils/matrixClient.js";
+import { ErrorBanner } from "./SuggestionActions.jsx";
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ function getAnalysisElements(state) {
   return state.elements.filter(
     (e) =>
       e.status !== "withdrawn" &&
+      e.status !== "possible" &&
       (e.type === "judgment" || e.type === "principle"),
   );
 }
@@ -121,29 +123,6 @@ function Toolbar({
   );
 }
 
-/**
- * Red error banner.
- *
- * @param {Object} props
- * @param {string} props.message
- */
-function ErrorBanner({ message }) {
-  return (
-    <div
-      style={{
-        background: "#7c1d1d44",
-        border: "1px solid #dc2626",
-        borderRadius: 6,
-        padding: "10px 14px",
-        fontSize: 12,
-        color: "#fca5a5",
-        marginBottom: 14,
-      }}
-    >
-      {message}
-    </div>
-  );
-}
 
 /**
  * Overview paragraph rendered above the heatmap.

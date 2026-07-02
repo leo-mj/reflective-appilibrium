@@ -1,7 +1,8 @@
 /**
  * @fileoverview Bottom bar for adding elements and relations.
  * Spans the full width at ~20vh, always visible.
- * Also exports AddElementPanel and AddRelationPanel for use inside assist tabs.
+ * Workflow-tab panels (AddElementPanel, AddArgumentPanel, AddRelationPanel)
+ * live in WorkflowAddPanels.jsx.
  * @module components/TextTabAddPanel
  */
 
@@ -11,35 +12,13 @@ import { useState, useEffect } from "react";
 
 import { C } from "../../constants/colors.js";
 import { sortElementIds } from "../../utils/stateUtils.js";
+import { SELECT_STYLE, makeRelationDefaults } from "./addPanelShared.js";
 
 const ELEMENT_DEFAULTS = {
   type: "judgment",
-  confidence: "moderate",
+  confidence: 0.67,
   origin: "user",
   text: "",
-};
-
-/**
- * @param {REElement[]} elements
- * @returns {{ from: string, to: string, type: string, explanation: string }}
- */
-function makeRelationDefaults(elements) {
-  const ids = elements.map((e) => e.id).sort(sortElementIds);
-  return {
-    from: ids[0] ?? "",
-    to: ids[1] ?? "",
-    type: "supports",
-    explanation: "",
-  };
-}
-
-const SELECT_STYLE = {
-  background: C.bg,
-  border: `1px solid ${C.border}`,
-  borderRadius: 4,
-  color: C.text,
-  padding: "3px 6px",
-  fontSize: 14,
 };
 
 /**
@@ -196,15 +175,45 @@ export function AddBar({
                 <option value="principle">Principle</option>
                 <option value="theory">Theory</option>
               </select>
-              <select
+              {[
+                { l: "L", v: 0.33 },
+                { l: "M", v: 0.67 },
+                { l: "H", v: 1.0 },
+              ].map(({ l, v }) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setEl("confidence", v)}
+                  style={{
+                    ...SELECT_STYLE,
+                    padding: "3px 7px",
+                    background:
+                      Math.abs(elementForm.confidence - v) < 0.01
+                        ? C.border
+                        : "transparent",
+                    fontWeight:
+                      Math.abs(elementForm.confidence - v) < 0.01
+                        ? "bold"
+                        : "normal",
+                    cursor: "pointer",
+                  }}
+                >
+                  {l}
+                </button>
+              ))}
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
                 value={elementForm.confidence}
-                onChange={(e) => setEl("confidence", e.target.value)}
-                style={SELECT_STYLE}
-              >
-                <option value="high">High</option>
-                <option value="moderate">Moderate</option>
-                <option value="low">Low</option>
-              </select>
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!Number.isNaN(v))
+                    setEl("confidence", Math.max(0, Math.min(1, v)));
+                }}
+                style={{ ...SELECT_STYLE, width: 55 }}
+              />
               <input
                 value={elementForm.origin}
                 onChange={(e) => setEl("origin", e.target.value)}
@@ -302,222 +311,3 @@ export function AddBar({
   );
 }
 
-const PANEL_STYLE = {
-  flexShrink: 0,
-  borderTop: `1px solid ${C.border}`,
-  background: C.panel,
-  display: "flex",
-  flexDirection: "column",
-  padding: "8px 16px",
-  minHeight: "14vh",
-};
-
-/**
- * Minimal add-element panel for use inside an assist tab.
- * The element type is fixed.
- *
- * @param {Object}   props
- * @param {"judgment"|"principle"} props.elementType
- * @param {function} props.onAddElement
- */
-export function AddElementPanel({ elementType, onAddElement }) {
-  const [form, setForm] = useState({
-    confidence: "moderate",
-    origin: "user",
-    text: "",
-  });
-  const set = (field, value) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
-  const canSubmit = form.text.trim().length > 0;
-  const handleSubmit = () => {
-    onAddElement({ type: elementType, ...form });
-    setForm({ confidence: "moderate", origin: "user", text: "" });
-  };
-  return (
-    <div style={PANEL_STYLE}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          flexShrink: 0,
-          flexWrap: "wrap",
-        }}
-      >
-        <button
-          disabled={!canSubmit}
-          onClick={handleSubmit}
-          style={{
-            padding: "3px 14px",
-            borderRadius: 4,
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: canSubmit ? "pointer" : "default",
-            border: "none",
-            background: C.supports,
-            color: "#fff",
-            opacity: canSubmit ? 1 : 0.4,
-          }}
-        >
-          Add {elementType}
-        </button>
-        <select
-          value={form.confidence}
-          onChange={(e) => set("confidence", e.target.value)}
-          style={SELECT_STYLE}
-        >
-          <option value="high">High</option>
-          <option value="moderate">Moderate</option>
-          <option value="low">Low</option>
-        </select>
-        <input
-          value={form.origin}
-          onChange={(e) => set("origin", e.target.value)}
-          placeholder="Origin"
-          style={{ ...SELECT_STYLE, width: 90 }}
-        />
-      </div>
-      <textarea
-        value={form.text}
-        onChange={(e) => set("text", e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && e.ctrlKey && canSubmit) {
-            e.preventDefault();
-            handleSubmit();
-          }
-        }}
-        placeholder="Enter statement…"
-        style={{
-          flex: 1,
-          marginTop: 8,
-          resize: "none",
-          width: "100%",
-          boxSizing: "border-box",
-          background: C.bg,
-          border: `1px solid ${C.border}`,
-          borderRadius: 4,
-          color: C.text,
-          padding: "6px 10px",
-          fontSize: 14,
-          outline: "none",
-        }}
-      />
-    </div>
-  );
-}
-
-/**
- * Minimal add-relation panel for use inside the RelationSuggestTab.
- *
- * @param {Object}      props
- * @param {REElement[]} props.elements - Active (non-withdrawn) elements.
- * @param {function}    props.onAddRelation
- */
-export function AddRelationPanel({ elements, onAddRelation }) {
-  const [form, setForm] = useState(() => makeRelationDefaults(elements));
-  const set = (field, value) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
-  const ids = elements.map((e) => e.id).sort(sortElementIds);
-  const canSubmit = form.from && form.to && form.from !== form.to;
-  const handleSubmit = () => {
-    onAddRelation(form);
-    setForm(makeRelationDefaults(elements));
-  };
-  return (
-    <div style={PANEL_STYLE}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          flexShrink: 0,
-          flexWrap: "wrap",
-        }}
-      >
-        <button
-          disabled={!canSubmit}
-          onClick={handleSubmit}
-          style={{
-            padding: "3px 14px",
-            borderRadius: 4,
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: canSubmit ? "pointer" : "default",
-            border: "none",
-            background: C.supports,
-            color: "#fff",
-            opacity: canSubmit ? 1 : 0.4,
-          }}
-        >
-          Add relation
-        </button>
-        <select
-          value={form.from}
-          onChange={(e) => set("from", e.target.value)}
-          style={SELECT_STYLE}
-        >
-          {ids.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
-        </select>
-        <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
-          →
-        </span>
-        <select
-          value={form.type}
-          onChange={(e) => set("type", e.target.value)}
-          style={{ ...SELECT_STYLE, color: C[form.type] }}
-        >
-          <option value="supports">supports</option>
-          <option value="conflicts">conflicts</option>
-          <option value="undermines">undermines</option>
-          <option value="depends">depends</option>
-        </select>
-        <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
-          →
-        </span>
-        <select
-          value={form.to}
-          onChange={(e) => set("to", e.target.value)}
-          style={SELECT_STYLE}
-        >
-          {ids.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
-        </select>
-        {form.from === form.to && ids.length >= 2 && (
-          <span style={{ fontSize: 10, color: C.conflicts }}>From ≠ To</span>
-        )}
-      </div>
-      <textarea
-        value={form.explanation}
-        onChange={(e) => set("explanation", e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && e.ctrlKey && canSubmit) {
-            e.preventDefault();
-            handleSubmit();
-          }
-        }}
-        placeholder="Explanation (optional)…"
-        style={{
-          flex: 1,
-          marginTop: 8,
-          resize: "none",
-          width: "100%",
-          boxSizing: "border-box",
-          background: C.bg,
-          border: `1px solid ${C.border}`,
-          borderRadius: 4,
-          color: C.text,
-          padding: "6px 10px",
-          fontSize: 14,
-          outline: "none",
-        }}
-      />
-    </div>
-  );
-}

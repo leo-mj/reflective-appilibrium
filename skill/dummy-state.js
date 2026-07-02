@@ -166,6 +166,17 @@ export default {
 
     // Depends
     { from: "P5", to: "T1", type: "depends", explanation: "The Rawlsian extension presupposes that future people qualify as moral patients.", addedRound: 5 },
+
+    // Arguments (jointly_entails)
+    // arg-dummy-1: T1 + T2 → P2
+    { from: "T1", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1", explanation: "T1 grounds moral patienthood in well-being capacity; T2 establishes that future people as a class are metaphysically determinate; together they entail probabilistic obligation (P2).", addedRound: 7 },
+    { from: "T2", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1", explanation: "T1 grounds moral patienthood in well-being capacity; T2 establishes that future people as a class are metaphysically determinate; together they entail probabilistic obligation (P2).", addedRound: 7 },
+    // arg-dummy-2: P1 + P5 → J10
+    { from: "P1", to: "J10", type: "jointly_entails", argumentId: "arg-dummy-2", explanation: "The sufficientarian duty (P1) requires not leaving future generations worse off; the Rawlsian extension (P5) demands equal consideration of all affected parties; together they entail equal temporal counting of future interests (J10).", addedRound: 7 },
+    { from: "P5", to: "J10", type: "jointly_entails", argumentId: "arg-dummy-2", explanation: "The sufficientarian duty (P1) requires not leaving future generations worse off; the Rawlsian extension (P5) demands equal consideration of all affected parties; together they entail equal temporal counting of future interests (J10).", addedRound: 7 },
+    // arg-dummy-3: P2 + P3 → J5
+    { from: "P2", to: "J5", type: "jointly_entails", argumentId: "arg-dummy-3", explanation: "Probabilistic obligation (P2) allows uncertain future existence to ground present duties; the diminution principle (P3) says only existence-uncertainty (not temporal distance) may reduce obligation strength; together they permit the slight welfare discounting asserted by J5.", addedRound: 8 },
+    { from: "P3", to: "J5", type: "jointly_entails", argumentId: "arg-dummy-3", explanation: "Probabilistic obligation (P2) allows uncertain future existence to ground present duties; the diminution principle (P3) says only existence-uncertainty (not temporal distance) may reduce obligation strength; together they permit the slight welfare discounting asserted by J5.", addedRound: 8 },
   ],
   coherence: {
     tensions: [

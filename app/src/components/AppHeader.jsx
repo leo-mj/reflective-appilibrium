@@ -5,6 +5,7 @@
 
 import { useState, useRef } from "react";
 import { TutorialOverlay } from "./TutorialOverlay.jsx";
+import { TutorialStepper } from "./TutorialStepper.jsx";
 
 const SaveIcon = () => (
   <svg
@@ -27,10 +28,11 @@ const SaveIcon = () => (
   </svg>
 );
 import { ModalShell } from "./user_edits/ModalShell.jsx";
-import { ASSIST_TABS } from "../constants/tabConstants.jsx";
+import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 import { AppHeaderNarrow } from "./app_header/AppHeaderNarrow.jsx";
 import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
 import { C } from "../constants/colors.js";
+import { BACKEND_ENABLED, LLM_ENABLED } from "../config.js";
 
 /**
  * @param {Object}   props
@@ -62,6 +64,7 @@ import { C } from "../constants/colors.js";
 export function AppHeader({
   round,
   topic,
+  model,
   tab,
   setTab,
   showText,
@@ -84,10 +87,23 @@ export function AppHeader({
   setShowTabNav,
   allExpanded,
   onExpandAll,
+  hideNonEntailsRels,
+  setHideNonEntailsRels,
+  weights,
+  weightsChanged,
+  onWeightsChange,
+  onResetWeights,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [tutorialMode, setTutorialMode] = useState(false);
+  const [tutorialMode] = useState(false);
+  const [stepperActive, setStepperActive] = useState(() => {
+    if (sessionStorage.getItem("startTour") === "1") {
+      sessionStorage.removeItem("startTour");
+      return true;
+    }
+    return false;
+  });
   const [importConfirmPending, setImportConfirmPending] = useState(null);
   const [importError, setImportError] = useState(null);
   const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "error"
@@ -132,8 +148,21 @@ export function AppHeader({
     "clusters",
     "matrix",
   ];
-  const metaTab = ASSIST_TABS.includes(tab) ? "assist" : "analyze";
-  const visibleSubTabs = metaTab === "assist" ? ASSIST_TABS : ANALYZE_TABS;
+  const metaTab = ASSIST_TABS.includes(tab)
+    ? "assist"
+    : SIMULATE_TABS.includes(tab)
+      ? "simulate"
+      : "analyze";
+  const visibleSubTabs = (
+    metaTab === "assist"
+      ? ASSIST_TABS
+      : metaTab === "simulate"
+        ? SIMULATE_TABS
+        : ANALYZE_TABS
+  )
+    .filter((t) => !hideNonEntailsRels || t !== "suggestRelations")
+    .filter((t) => model === "questionnaire" || t !== "questionnaire")
+    .filter((t) => LLM_ENABLED || t !== "matrix");
 
   const importModals = (
     <>
@@ -208,6 +237,12 @@ export function AppHeader({
     onStopWorkflow,
     metaTab,
     ANALYZE_TABS,
+    hideNonEntailsRels,
+    setHideNonEntailsRels,
+    weights,
+    weightsChanged,
+    onWeightsChange,
+    onResetWeights,
   };
 
   if (!isWide) {
@@ -230,6 +265,12 @@ export function AppHeader({
       {hiddenInput}
       {importModals}
       <TutorialOverlay active={tutorialMode} />
+      <TutorialStepper
+        active={stepperActive}
+        onClose={() => setStepperActive(false)}
+        onSetTab={setTab}
+        hideNonEntailsRels={hideNonEntailsRels}
+      />
       <AppHeaderWide
         {...shared}
         showText={showText}
@@ -237,8 +278,7 @@ export function AppHeader({
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         visibleSubTabs={visibleSubTabs}
-        tutorialMode={tutorialMode}
-        onToggleTutorial={() => setTutorialMode((v) => !v)}
+        onStartStepper={() => setStepperActive(true)}
       />
     </>
   );
