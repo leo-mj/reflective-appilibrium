@@ -9,12 +9,12 @@ It is part of a research project exploring in how far LLMs can assist in RE proc
 The project currently runs as a Claude Skill inside Claude Projects. See `skill/` for the prompt and knowledge files.
 
 **Phase 2 — Standalone Web App (working)**
-A React SPA backed by a FastAPI server. Features: session save/load, multi-provider LLM support (OpenAI, Mistral, Anthropic, local Ollama), bring-your-own-key (BYOK) access from the browser, light/dark mode, tutorial overlays, and a structured RE workflow with judgment elicitation, principle suggestions, and relation checking.
+A React SPA backed by a FastAPI server. Features: session save/load, multi-provider LLM support (OpenAI, Mistral, Anthropic, local Ollama), bring-your-own-key (BYOK) access from the browser, light/dark mode, tutorial overlays, and a structured RE workflow with judgment elicitation, principle suggestions, argument detection, and relation checking.
 
-The React SPA also works by itself. However, only the Analyze tabs are usable while the Assist tabs' LLM features are only demoed via sample data.
+The React SPA also works by itself in demo mode. LLM-dependent features fall back to pre-set dummy data.
 
-**Phase 3 - Integration of rethon (computational RE)**
-Integrating the computational model of RE from [rethon](https://re-models.github.io/rethon/). Uses an LLM to detect arguments among the existing elements and suggest additional premises.
+**Phase 3 — Integration of rethon (computational RE, in progress)**
+Integrating the computational model of RE from [rethon](https://re-models.github.io/rethon/). Uses an LLM to detect arguments among the existing elements and suggest additional premises. A Simulate tab runs the full rethon RE process, stepping through commitment/theory evolution and visualising equilibrium scores.
 
 See:
 
@@ -38,9 +38,11 @@ npm install
 npm run dev
 ```
 
-## Backend Setup (Phase 2)
+See `app/README.md` for full build target and environment variable documentation.
 
-The FastAPI backend exposes LLM endpoints and session persistence. It must be running for AI features in the frontend to work.
+## Backend Setup (Phase 2 + 3)
+
+The FastAPI backend exposes LLM endpoints, session persistence, and the rethon RE simulation. It must be running for AI features and the Simulate tab to work.
 
 ### Prerequisites
 
@@ -109,6 +111,13 @@ uvicorn backend.main:app --reload
 ```
 
 The API is then available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+
+### 5. Run backend tests
+
+```bash
+cd backend
+python -m pytest
+```
 
 ---
 
