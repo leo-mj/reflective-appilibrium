@@ -8,6 +8,7 @@
 import { useContext } from "react";
 import { C } from "../../constants/colors.js";
 import { CARD_STYLE, META_LABEL_STYLE, CONTENT_FONT_SIZE } from "../../constants/textTabStyles.js";
+import { relationTypeLabel } from "../../utils/stateUtils.js";
 import { Ctx } from "./TextTabContext.js";
 import {
   MetaChip,
@@ -189,7 +190,6 @@ export function ArgumentCard({ rels, dim }) {
             </span>
             <Badge id={r.to} />
             <StatusLabel status={r.status} />
-            {r.origin && <MetaChip>Origin: {r.origin}</MetaChip>}
           </div>
           <div onClick={(e) => e.stopPropagation()}>
             <ActionButtons
@@ -268,6 +268,11 @@ export function ArgumentCard({ rels, dim }) {
           <Highlight text={rels[0].explanation} query={search} />
         </div>
       )}
+      {rels[0].origin && (
+        <div style={{ marginTop: 6 }}>
+          <MetaChip>Origin: {rels[0].origin}</MetaChip>
+        </div>
+      )}
     </div>
   );
 }
@@ -317,7 +322,7 @@ export function RelationCard({ r, dim }) {
         >
           <Badge id={r.from} />
           <span style={{ color: C[r.type], fontSize: 11, fontWeight: "bold" }}>
-            → {r.type} →
+            → {relationTypeLabel(r.type)} →
           </span>
           <Badge id={r.to} />
           <StatusLabel status={r.status} />

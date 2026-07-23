@@ -75,7 +75,7 @@ export function AddRelationForm({ form, setForm, elements }) {
           <option value="supports">Supports</option>
           <option value="conflicts">Conflicts</option>
           <option value="undermines">Undermines</option>
-          <option value="depends">Depends</option>
+          <option value="depends">Depends on</option>
         </select>
       </FormField>
       <FormField label="Explanation">

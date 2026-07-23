@@ -137,6 +137,7 @@ export function SectionListing({
   refJudgments,
   refPrinciples,
   refTheories,
+  refArguments,
   refRelations,
   displayEls,
   displayRels,
@@ -154,6 +155,11 @@ export function SectionListing({
       ? (a.addedRound ?? 1) - (b.addedRound ?? 1)
       : sortElementIds(a.from, b.from),
   );
+  const relGroups = groupRelationsByArgument(sortedRels);
+  const argGroups = relGroups.filter((g) => g.argId);
+  const plainRelGroups = relGroups.filter((g) => !g.argId);
+  const relKey = (group) =>
+    `${group.rels[0].from}-${group.rels[0].to}-${group.rels[0].type}-${group.rels[0].addedRound ?? 1}`;
   return (
     <>
       <div ref={refJudgments}>
@@ -202,46 +208,53 @@ export function SectionListing({
         )}
       </div>
       {showRelations ? (
-        <div ref={refRelations}>
-          <SectionHeader
-            title={`Relations (${displayRels.length})`}
-            collapsed={isCollapsed("relations")}
-            onToggle={() => toggle("relations")}
-          />
-          {!isCollapsed("relations") && (
-            <>
-              <SortToggle value={relSort} onChange={setRelSort} />
-              {groupRelationsByArgument(sortedRels).map((group) =>
-                group.argId ? (
+        <>
+          <div ref={refArguments}>
+            <SectionHeader
+              title={`Arguments (${argGroups.length})`}
+              collapsed={isCollapsed("arguments")}
+              onToggle={() => toggle("arguments")}
+            />
+            {!isCollapsed("arguments") && (
+              <>
+                <SortToggle value={relSort} onChange={setRelSort} />
+                {argGroups.map((group) => (
                   <ArgumentCard key={group.argId} rels={group.rels} />
-                ) : (
-                  <RelationCard
-                    key={`${group.rels[0].from}-${group.rels[0].to}-${group.rels[0].type}-${group.rels[0].addedRound ?? 1}`}
-                    r={group.rels[0]}
-                  />
-                ),
-              )}
-            </>
-          )}
-        </div>
+                ))}
+              </>
+            )}
+          </div>
+          <div ref={refRelations}>
+            <SectionHeader
+              title={`Relations (${plainRelGroups.length})`}
+              collapsed={isCollapsed("relations")}
+              onToggle={() => toggle("relations")}
+            />
+            {!isCollapsed("relations") && (
+              <>
+                <SortToggle value={relSort} onChange={setRelSort} />
+                {plainRelGroups.map((group) => (
+                  <RelationCard key={relKey(group)} r={group.rels[0]} />
+                ))}
+              </>
+            )}
+          </div>
+        </>
       ) : (
         <div ref={refRelations}>
           <SectionHeader
-            title={`Arguments (${groupRelationsByArgument(sortedRels).length})`}
+            title={`Arguments (${relGroups.length})`}
             collapsed={isCollapsed("relations")}
             onToggle={() => toggle("relations")}
           />
           {!isCollapsed("relations") && (
             <>
               <SortToggle value={relSort} onChange={setRelSort} />
-              {groupRelationsByArgument(sortedRels).map((group) =>
+              {relGroups.map((group) =>
                 group.argId ? (
                   <ArgumentCard key={group.argId} rels={group.rels} />
                 ) : (
-                  <RelationCard
-                    key={`${group.rels[0].from}-${group.rels[0].to}-${group.rels[0].type}-${group.rels[0].addedRound ?? 1}`}
-                    r={group.rels[0]}
-                  />
+                  <RelationCard key={relKey(group)} r={group.rels[0]} />
                 ),
               )}
             </>

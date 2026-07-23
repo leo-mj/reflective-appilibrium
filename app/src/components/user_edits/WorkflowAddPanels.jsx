@@ -412,7 +412,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
           <option value="supports">supports</option>
           <option value="conflicts">conflicts</option>
           <option value="undermines">undermines</option>
-          <option value="depends">depends</option>
+          <option value="depends">depends on</option>
         </select>
         <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
           →

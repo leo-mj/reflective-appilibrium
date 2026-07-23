@@ -14,7 +14,7 @@ import { fetchRelationSuggestions } from "../../utils/relationsClient.js";
 import { AddRelationPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
-import { llmOrigin } from "../../utils/stateUtils.js";
+import { llmOrigin, relationTypeLabel } from "../../utils/stateUtils.js";
 import {
   AcceptButton,
   RejectButton,
@@ -190,7 +190,7 @@ function SuggestionCard({
             padding: "1px 6px",
           }}
         >
-          {suggestion.type}
+          {relationTypeLabel(suggestion.type)}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
           <AcceptButton onClick={onAccept} accentColor={C.supports} />

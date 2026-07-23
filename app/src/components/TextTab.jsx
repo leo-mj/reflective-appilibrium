@@ -31,6 +31,7 @@ const DEFAULT_COLLAPSED_SECTIONS = {
   judgments: true,
   principles: true,
   theories: true,
+  arguments: true,
   relations: true,
   coherence: true,
   clusters: true,
@@ -42,6 +43,7 @@ const NAV_SECTIONS = [
   { key: "judgments", label: "J" },
   { key: "principles", label: "P" },
   { key: "theories", label: "T" },
+  { key: "arguments", label: "Arguments" },
   { key: "relations", label: "Relations" },
   // { key: "coherence", label: "Coherence" },
   { key: "clusters", label: "Clusters" },
@@ -81,6 +83,7 @@ export function TextTab({
   const refJudgments = useRef(null);
   const refPrinciples = useRef(null);
   const refTheories = useRef(null);
+  const refArguments = useRef(null);
   const refRelations = useRef(null);
   const refCoherence = useRef(null);
   const refLog = useRef(null);
@@ -204,6 +207,7 @@ export function TextTab({
     judgments: refJudgments,
     principles: refPrinciples,
     theories: refTheories,
+    arguments: refArguments,
     relations: refRelations,
     coherence: refCoherence,
     clusters: clusterSectionRef,
@@ -233,6 +237,15 @@ export function TextTab({
   ]);
 
   // ── Nav bar items ─────────────────────────────────────────────────────────
+  // Split relations into argument groups (entails/precludes with a shared
+  // argumentId) and plain relations, so each gets its own section + count.
+  const argIds = new Set();
+  let plainRelCount = 0;
+  for (const r of displayRels) {
+    if (ARGUMENT_RELATION_TYPES.has(r.type) && r.argumentId) argIds.add(r.argumentId);
+    else plainRelCount++;
+  }
+  const argumentCount = argIds.size;
   const sectionMeta = {
     judgments: {
       count: displayEls.filter((e) => e.type === "judgment").length,
@@ -246,9 +259,18 @@ export function TextTab({
       count: displayEls.filter((e) => e.type === "theory").length,
       show: !highlightedIds,
     },
+    // In "hide non-entails" mode the single relations section is relabeled
+    // "Arguments"; the dedicated arguments nav entry only appears when all
+    // relations are shown.
+    arguments: {
+      count: argumentCount,
+      show: !highlightedIds && !hideNonEntailsRels && argumentCount > 0,
+    },
     relations: {
-      count: displayRels.length,
-      show: !highlightedIds && (!hideNonEntailsRels || displayRels.length > 0),
+      count: hideNonEntailsRels ? argumentCount + plainRelCount : plainRelCount,
+      show:
+        !highlightedIds &&
+        (hideNonEntailsRels ? displayRels.length > 0 : plainRelCount > 0),
     },
     coherence: { count: null, show: !highlightedIds && hasCoherence },
     clusters: { count: clusterCount || null, show: clusterCount > 0 },
@@ -348,6 +370,7 @@ export function TextTab({
                 refJudgments={refJudgments}
                 refPrinciples={refPrinciples}
                 refTheories={refTheories}
+                refArguments={refArguments}
                 refRelations={refRelations}
                 displayEls={displayEls}
                 displayRels={displayRels}

@@ -19,6 +19,7 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRe
       { label: "Supports", color: C.supports, dash: "", key: "supports" },
       { label: "Conflicts", color: C.conflicts, dash: "8,4", key: "conflicts" },
       { label: "Undermines", color: C.undermines, dash: "4,4", key: "undermines" },
+      { label: "Depends on", color: C.depends, dash: "", key: "depends" },
     ] : []),
     { label: "Entails", color: C.entails, dash: "", key: "entails" },
     { label: "Jointly Entails", color: C.jointly_entails, dash: "", key: "jointly_entails" },
