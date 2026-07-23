@@ -11,7 +11,7 @@ The project currently runs as a Claude Skill inside Claude Projects. See `skill/
 **Phase 2 — Standalone Web App (working)**
 A React SPA backed by a FastAPI server. Features: session save/load, multi-provider LLM support (OpenAI, Mistral, Anthropic, local Ollama), bring-your-own-key (BYOK) access from the browser, light/dark mode, tutorial overlays, and a structured RE workflow with judgment elicitation, principle suggestions, argument detection, and relation checking.
 
-The React SPA also works by itself in demo mode. LLM-dependent features fall back to pre-set dummy data.
+The React SPA also works by itself in demo mode. LLM-dependent features fall back to pre-set sample data.
 
 **Phase 3 — Integration of rethon (computational RE, in progress)**
 Integrating the computational model of RE from [rethon](https://re-models.github.io/rethon/). Uses an LLM to detect arguments among the existing elements and suggest additional premises. A Simulate tab runs the full rethon RE process, stepping through commitment/theory evolution and visualising equilibrium scores.

@@ -15,11 +15,11 @@ For AI features, the FastAPI backend must also be running (see the root README).
 
 Three environments, controlled by `VITE_APP_ENV`:
 
-| Command | Mode / env file | `VITE_APP_ENV` | Backend / LLM | Intended use |
-|---|---|---|---|---|
-| `npm run dev` | `.env` | `dev` | enabled | Local development |
-| `npm run build` | `.env.production` | `demo` | disabled | Public static deploy |
-| `npm run build:backend` | `.env.backend` | `backend` | enabled | Public deploy with backend |
+| Command                 | Mode / env file   | `VITE_APP_ENV` | Backend / LLM | Intended use               |
+| ----------------------- | ----------------- | -------------- | ------------- | -------------------------- |
+| `npm run dev`           | `.env`            | `dev`          | enabled       | Local development          |
+| `npm run build`         | `.env.production` | `demo`         | disabled      | Public static deploy       |
+| `npm run build:backend` | `.env.backend`    | `backend`      | enabled       | Public deploy with backend |
 
 ### Public demo build (no LLM)
 
@@ -27,7 +27,7 @@ Three environments, controlled by `VITE_APP_ENV`:
 npm run build
 ```
 
-Produces a static site with all tabs present. LLM-dependent features (Assist workflow tabs, coherence matrix, RE simulation) fall back to pre-set dummy data and show a "No LLM API connection" banner. Deploy the `dist/` folder to any static host.
+Produces a static site with all tabs present. LLM-dependent features (Assist workflow tabs, coherence matrix, RE simulation) fall back to pre-set sample data and show a "No LLM API connection" banner. Deploy the `dist/` folder to any static host.
 
 ### Backend build (deployed backend)
 
@@ -46,11 +46,11 @@ VITE_BACKEND_URL=https://<your-deployed-backend>
 
 All LLM features are controlled by a single variable:
 
-| `VITE_APP_ENV` | Backend | LLM | BYOK | Dummy data |
-|---|---|---|---|---|
-| `dev` | ✓ | ✓ | ✓ | toggleable |
-| `backend` | ✓ | ✓ | ✓ | off |
-| `demo` | ✗ | ✗ | ✗ | always on |
+| `VITE_APP_ENV` | Backend | LLM | BYOK | Sample data |
+| -------------- | ------- | --- | ---- | ----------- |
+| `dev`          | ✓       | ✓   | ✓    | toggleable  |
+| `backend`      | ✓       | ✓   | ✓    | off         |
+| `demo`         | ✗       | ✗   | ✗    | always on   |
 
 `BACKEND_ENABLED` (and therefore `LLM_ENABLED`) is `true` when `VITE_APP_ENV` is `dev` or `backend`.
 

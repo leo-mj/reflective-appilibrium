@@ -1,4 +1,4 @@
-// Dummy RE state for visualization development
+// Sample RE state for visualization development
 // Topic: obligations to future generations
 // 8 rounds, 12 judgments, 6 principles, 2 theories, mix of statuses
 
@@ -82,7 +82,7 @@ export default {
       type: "judgment",
       status: "active",
       confidence: 0.67,
-      origin: "assistant-suggested → user-adopted",
+      origin: "gpt-5.4-mini",
       text: "A society that could prevent its own extinction at modest cost but chooses not to acts wrongly.",
       addedRound: 4,
     },
@@ -109,7 +109,7 @@ export default {
       type: "judgment",
       status: "withdrawn",
       confidence: 0.33,
-      origin: "assistant-suggested",
+      origin: "gpt-5.4-mini",
       text: "Obligations to future generations are entirely reducible to obligations to currently existing people.",
       reason: "User rejected: found it too restrictive given J1 and J2.",
       addedRound: 3,
@@ -140,7 +140,7 @@ export default {
       type: "principle",
       status: "active",
       confidence: 0.67,
-      origin: "assistant-suggested → user-adopted",
+      origin: "gpt-5.4-mini",
       text: "Moral obligations can exist toward beings whose existence is probable, even if not certain (probabilistic obligation).",
       addedRound: 3,
     },
@@ -161,7 +161,7 @@ export default {
       type: "principle",
       status: "withdrawn",
       confidence: 0.33,
-      origin: "assistant-suggested",
+      origin: "gpt-5.4-mini",
       text: "Only beings who currently exist can be the subjects of moral obligations.",
       reason:
         "Conflicted with J1, J2, J8 and the user's overall trajectory. Replaced by P2.",
@@ -173,7 +173,7 @@ export default {
       type: "principle",
       status: "active",
       confidence: 0.67,
-      origin: "assistant-suggested → user-adopted",
+      origin: "gpt-5.4-mini",
       text: "Obligations of justice are owed to all who will be affected by our decisions, regardless of when they come to exist (Rawlsian extension).",
       addedRound: 5,
     },
@@ -182,7 +182,7 @@ export default {
       type: "principle",
       status: "active",
       confidence: 0.33,
-      origin: "assistant-suggested → user-adopted",
+      origin: "gpt-5.4-mini",
       text: "Proximity (temporal, social, relational) modulates the strength but not the existence of moral obligations.",
       addedRound: 6,
     },
@@ -193,7 +193,7 @@ export default {
       type: "theory",
       status: "active",
       confidence: 0.67,
-      origin: "assistant-suggested → user-adopted",
+      origin: "gpt-5.4-mini",
       text: "Personal identity is not required for moral patienthood — what matters is the capacity for well-being, which future people will have.",
       addedRound: 5,
     },
@@ -216,6 +216,7 @@ export default {
       explanation:
         "Poisoning groundwater violates the sufficientarian threshold.",
       addedRound: 2,
+      origin: "user",
     },
     {
       from: "P1",
@@ -224,6 +225,7 @@ export default {
       explanation:
         "Climate policy must ensure future generations aren't worse off.",
       addedRound: 2,
+      origin: "user",
     },
     {
       from: "P1",
@@ -231,6 +233,7 @@ export default {
       type: "supports",
       explanation: "Resource depletion leaves the next generation worse off.",
       addedRound: 2,
+      origin: "user",
     },
     {
       from: "P1",
@@ -239,6 +242,7 @@ export default {
       explanation:
         "Sufficientarianism requires a liveable environment, not identical living standards.",
       addedRound: 5,
+      origin: "user",
     },
 
     // P2 supports
@@ -249,6 +253,7 @@ export default {
       explanation:
         "Probabilistic obligation allows discounting by existence uncertainty.",
       addedRound: 3,
+      origin: "user",
     },
     {
       from: "P2",
@@ -257,6 +262,7 @@ export default {
       explanation:
         "Probable future people ground the obligation to prevent extinction.",
       addedRound: 4,
+      origin: "user",
     },
     {
       from: "P2",
@@ -265,6 +271,7 @@ export default {
       explanation:
         "Even under non-identity, probabilistic obligations persist.",
       addedRound: 4,
+      origin: "user",
     },
 
     // P3 supports
@@ -275,6 +282,7 @@ export default {
       explanation:
         "Uncertainty-based discounting is permitted; temporal discounting is not.",
       addedRound: 5,
+      origin: "user",
     },
     {
       from: "P3",
@@ -283,6 +291,7 @@ export default {
       explanation:
         "No temporal discounting aligns with equal counting of future interests.",
       addedRound: 5,
+      origin: "user",
     },
 
     // P5 supports
@@ -292,6 +301,7 @@ export default {
       type: "supports",
       explanation: "People in 2100 are affected by current climate policy.",
       addedRound: 5,
+      origin: "user",
     },
     {
       from: "P5",
@@ -300,6 +310,7 @@ export default {
       explanation:
         "If future people are owed justice, institutions should represent them.",
       addedRound: 6,
+      origin: "user",
     },
     {
       from: "P5",
@@ -307,6 +318,7 @@ export default {
       type: "supports",
       explanation: "Rawlsian extension implies equal moral consideration.",
       addedRound: 5,
+      origin: "user",
     },
 
     // P6 supports and tensions
@@ -317,6 +329,7 @@ export default {
       explanation:
         "Parental proximity strengthens (but doesn't create) the obligation.",
       addedRound: 6,
+      origin: "user",
     },
     {
       from: "P6",
@@ -325,6 +338,7 @@ export default {
       explanation:
         "If proximity modulates strength, strict equality across time is weakened.",
       addedRound: 6,
+      origin: "user",
     },
 
     // Conflicts
@@ -335,6 +349,7 @@ export default {
       explanation:
         "If only current beings matter, future groundwater poisoning isn't wrong.",
       addedRound: 2,
+      origin: "user",
     },
     {
       from: "P4",
@@ -343,6 +358,7 @@ export default {
       explanation:
         "No obligation to account for people in 2100 if they can't hold rights now.",
       addedRound: 2,
+      origin: "user",
     },
     {
       from: "P4",
@@ -351,6 +367,7 @@ export default {
       explanation:
         "P4 denies obligations to non-existent beings; P2 affirms them.",
       addedRound: 3,
+      origin: "user",
     },
     {
       from: "J6",
@@ -359,6 +376,7 @@ export default {
       explanation:
         "J6 denies obligations to the non-existent; P2 grounds them.",
       addedRound: 3,
+      origin: "user",
     },
 
     // Undermines
@@ -369,6 +387,7 @@ export default {
       explanation:
         "If some discounting is permissible, strict equal counting is weakened.",
       addedRound: 5,
+      origin: "user",
     },
     {
       from: "J9",
@@ -377,6 +396,7 @@ export default {
       explanation:
         "Non-identity complicates the Rawlsian extension to future people.",
       addedRound: 5,
+      origin: "user",
     },
 
     // Theory relations
@@ -387,6 +407,7 @@ export default {
       explanation:
         "If identity isn't needed for moral patienthood, probable future beings qualify.",
       addedRound: 5,
+      origin: "user",
     },
     {
       from: "T1",
@@ -395,6 +416,7 @@ export default {
       explanation:
         "Grounds the Rawlsian extension: future people will have well-being capacities.",
       addedRound: 5,
+      origin: "user",
     },
     {
       from: "T2",
@@ -403,6 +425,7 @@ export default {
       explanation:
         "Explains why non-identity reduces but doesn't eliminate obligations.",
       addedRound: 6,
+      origin: "user",
     },
     {
       from: "T2",
@@ -411,6 +434,7 @@ export default {
       explanation:
         "Future people as a class are determinate enough for probabilistic obligation.",
       addedRound: 6,
+      origin: "user",
     },
     {
       from: "T2",
@@ -419,6 +443,7 @@ export default {
       explanation:
         "Class-level determinacy reinforces the claim that identity isn't needed.",
       addedRound: 6,
+      origin: "user",
     },
 
     // J-J supports
@@ -429,6 +454,7 @@ export default {
       explanation:
         "Both express concern for long-term consequences on future people.",
       addedRound: 1,
+      origin: "user",
     },
     {
       from: "J8",
@@ -437,6 +463,7 @@ export default {
       explanation:
         "If extinction prevention is obligatory, so is preventing severe environmental harm.",
       addedRound: 4,
+      origin: "user",
     },
 
     // Depends
@@ -447,6 +474,7 @@ export default {
       explanation:
         "The Rawlsian extension presupposes that future people qualify as moral patients.",
       addedRound: 5,
+      origin: "user",
     },
 
     // Arguments (entails for single-premise; jointly_entails for multi-premise)
@@ -455,63 +483,74 @@ export default {
       from: "P2", to: "J5", type: "jointly_entails", argumentId: "arg-dummy-3",
       explanation: "Probabilistic obligation (P2) allows uncertain future existence to ground present duties; the diminution principle (P3) says only existence-uncertainty (not temporal distance) may reduce obligation strength; together they permit the slight welfare discounting asserted by J5.",
       addedRound: 4,
+      origin: "gpt-5.4-mini",
     },
     {
       from: "P3", to: "J5", type: "jointly_entails", argumentId: "arg-dummy-3",
       explanation: "Probabilistic obligation (P2) allows uncertain future existence to ground present duties; the diminution principle (P3) says only existence-uncertainty (not temporal distance) may reduce obligation strength; together they permit the slight welfare discounting asserted by J5.",
       addedRound: 4,
+      origin: "gpt-5.4-mini",
     },
     // arg-dummy-2: P1 + P5 → J10  (detected round 5: P5 and J10 arrive round 5)
     {
       from: "P1", to: "J10", type: "jointly_entails", argumentId: "arg-dummy-2",
       explanation: "The sufficientarian duty (P1) requires not leaving future generations worse off; the Rawlsian extension (P5) demands equal consideration of all affected parties; together they entail equal temporal counting of future interests (J10).",
       addedRound: 5,
+      origin: "gpt-5.4-mini",
     },
     {
       from: "P5", to: "J10", type: "jointly_entails", argumentId: "arg-dummy-2",
       explanation: "The sufficientarian duty (P1) requires not leaving future generations worse off; the Rawlsian extension (P5) demands equal consideration of all affected parties; together they entail equal temporal counting of future interests (J10).",
       addedRound: 5,
+      origin: "gpt-5.4-mini",
     },
     // arg-dummy-1: T1 + T2 → P2  (detected round 6: T2 arrives round 6)
     {
       from: "T1", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1",
       explanation: "T1 grounds moral patienthood in well-being capacity; T2 establishes that future people as a class are metaphysically determinate; together they entail probabilistic obligation (P2).",
       addedRound: 6,
+      origin: "gpt-5.4-mini",
     },
     {
       from: "T2", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1",
       explanation: "T1 grounds moral patienthood in well-being capacity; T2 establishes that future people as a class are metaphysically determinate; together they entail probabilistic obligation (P2).",
       addedRound: 6,
+      origin: "gpt-5.4-mini",
     },
     // arg-dummy-4: P1 → J3
     {
       from: "P1", to: "J3", type: "entails", argumentId: "arg-dummy-4",
       explanation: "The sufficientarian threshold directly entails that depleting all natural resources for short-term economic gain is wrong, since it leaves future generations worse off.",
       addedRound: 2,
+      origin: "gpt-5.4-mini",
     },
     // arg-dummy-5: P1 → J4
     {
       from: "P1", to: "J4", type: "entails", argumentId: "arg-dummy-5",
       explanation: "The sufficientarian duty requires leaving the next generation no worse off, which entails owing a liveable environment but not necessarily the same standard of living.",
       addedRound: 2,
+      origin: "gpt-5.4-mini",
     },
     // arg-dummy-6: P2 → J5
     {
       from: "P2", to: "J5", type: "entails", argumentId: "arg-dummy-6",
       explanation: "If obligations can attach to probable future people, then existence uncertainty (but not mere temporal distance) is a legitimate basis for slight welfare discounting.",
       addedRound: 3,
+      origin: "gpt-5.4-mini",
     },
     // arg-dummy-7: P2 → J8
     {
       from: "P2", to: "J8", type: "entails", argumentId: "arg-dummy-7",
       explanation: "Probabilistic obligation to future people who will probably exist grounds the duty not to allow their extinction when prevention is available at modest cost.",
       addedRound: 4,
+      origin: "gpt-5.4-mini",
     },
     // arg-dummy-8: J5 → ¬J10
     {
       from: "J5", to: "J10", type: "precludes", argumentId: "arg-dummy-8",
       explanation: "If permissible discounting by existence uncertainty is accepted (J5), then the strict equal temporal counting of future interests (J10) cannot hold without qualification.",
       addedRound: 5,
+      origin: "gpt-5.4-mini",
     },
   ],
   coherence: {

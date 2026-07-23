@@ -1,12 +1,12 @@
-// Dummy principle suggestions for the PrincipleSuggestTab.
+// Sample principle suggestions for the PrincipleSuggestTab.
 // Topic: obligations to future generations (matches dummy-state.js).
-// Used automatically in PROD, or in DEV when the "Use dummy suggestions" toggle is on.
+// Used automatically in PROD, or in DEV when the "Use sample data" toggle is on.
 
 const dummyPrinciples = {
-  model: "dummy",
+  model: "sample data model",
   suggestions: [
     {
-      text: "(This is a dummy suggestion.) Each generation must leave future generations no worse off in terms of basic capabilities and resources than it found them.",
+      text: "Each generation must leave future generations no worse off in terms of basic capabilities and resources than it found them.",
       confidence: 1.0,
       covers: ["J1", "J2", "J3"],
       explanation:

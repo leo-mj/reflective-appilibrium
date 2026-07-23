@@ -10,7 +10,12 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { detectArguments } from "../../utils/argumentsClient.js";
-import { nextElementId, argumentRelationType } from "../../utils/stateUtils.js";
+import {
+  nextElementId,
+  argumentRelationType,
+  withUserEdit,
+  llmOrigin,
+} from "../../utils/stateUtils.js";
 import {
   AcceptButton,
   RejectButton,
@@ -18,8 +23,11 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
+  AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { AddArgumentPanel } from "../user_edits/WorkflowAddPanels.jsx";
+import { Tooltip } from "../Tooltip.jsx";
+import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 
 const ACCENT = C.judgment.high;
@@ -350,14 +358,16 @@ export function DetectArgumentsTab({
     for (const el of arg) {
       if (addedIds.has(el.id) && !(el.id in newSubmittedIds)) {
         const newId = nextElementId(runningElements, el.type);
+        const editedText = drafts?.[el.id];
+        const wasEdited = editedText != null && editedText !== el.text;
         runningElements = [...runningElements, { ...el, id: newId }];
         newSubmittedIds[el.id] = newId;
         onAddElement?.({
           id: newId,
           type: el.type,
-          text: drafts?.[el.id] ?? el.text,
+          text: editedText ?? el.text,
           confidence: el.confidence,
-          origin: el.origin,
+          origin: wasEdited ? withUserEdit(el.origin) : el.origin,
         });
       }
     }
@@ -383,6 +393,7 @@ export function DetectArgumentsTab({
             type: relationType,
             argumentId,
             explanation: "",
+            origin: llmOrigin(false, result.model),
           },
           { select: false, pinRecent: true },
         );
@@ -445,26 +456,28 @@ export function DetectArgumentsTab({
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <button
-              onClick={detect}
-              disabled={disabled}
-              style={{
-                background: "transparent",
-                border: `1px solid ${disabled ? C.border : ACCENT}`,
-                color: disabled ? C.dim : ACCENT,
-                borderRadius: 6,
-                padding: "5px 12px",
-                fontSize: 12,
-                fontWeight: "bold",
-                cursor: disabled ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
-              {loading ? <SpinnerIcon /> : <span>↺</span>}
-              {loading ? "Detecting…" : result ? "Re-detect" : "Detect"}
-            </button>
+            <Tooltip text={sendsToLlmText()}>
+              <button
+                onClick={detect}
+                disabled={disabled}
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${disabled ? C.border : ACCENT}`,
+                  color: disabled ? C.dim : ACCENT,
+                  borderRadius: 6,
+                  padding: "5px 12px",
+                  fontSize: 12,
+                  fontWeight: "bold",
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                {loading ? <SpinnerIcon /> : <span>↺</span>}
+                {loading ? "Detecting…" : result ? "Re-detect" : "Detect"}
+              </button>
+            </Tooltip>
             {workflowPhase && (
               <>
                 <div
@@ -493,6 +506,9 @@ export function DetectArgumentsTab({
         )}
 
         {error && <ErrorBanner message={error} />}
+        {result && result.translated_arguments.length > 0 && (
+          <AiDisclosureBanner model={result.model} />
+        )}
 
         {result && (
           <>

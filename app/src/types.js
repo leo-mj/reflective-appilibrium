@@ -65,8 +65,13 @@ export {};
  * @property {ElementType}     type          - Element category.
  * @property {ElementStatus}   status        - Current lifecycle status.
  * @property {ConfidenceLevel} confidence    - How strongly the user holds this element (0–1).
- * @property {string}          origin        - Who introduced it, e.g. `"user"` or
- *                                            `"assistant-suggested → user-adopted"`.
+ * @property {string}          origin        - Who introduced it: `"user"` (manually added);
+ *                                            the specific model name, e.g. `"gpt-4o"` (accepted
+ *                                            from an LLM suggestion unedited, model known), or
+ *                                            `"LLM"` if the model wasn't known; or that value
+ *                                            plus `"+user"`, e.g. `"gpt-4o+user"` (an LLM
+ *                                            suggestion the user edited before accepting, or
+ *                                            later revised). See {@link module:utils/stateUtils.llmOrigin}.
  * @property {string}          text          - The moral claim or principle statement.
  * @property {number}          addedRound    - Round number in which this element first appeared.
  * @property {string}          [previousText]  - Original wording before revision (revised only).
@@ -86,6 +91,9 @@ export {};
  * @property {RelationType}  type           - The kind of relation.
  * @property {string}        explanation    - Human-readable justification of why this relation holds.
  * @property {number}        addedRound     - Round number in which this relation was first recorded.
+ * @property {string}        [origin]       - Who introduced it — see {@link REElement.origin} for the
+ *                                           value convention. Absent on relations added before this
+ *                                           field existed.
  * @property {string}        [argumentId]    - Set on `entails` relations only; all premises of the same detected argument share this ID.
  * @property {ElementStatus} [status]        - Lifecycle status; absence or `"active"` means currently in play.
  * @property {number}        [revisedRound]  - Round in which this relation was last revised.

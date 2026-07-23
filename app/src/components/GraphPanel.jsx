@@ -90,7 +90,8 @@ export function GraphPanel({
   const [useDummyAssist, setUseDummyAssist] = useState(false);
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
   const autoFetch = !!workflowPhase;
-  const isAssistPanel = ASSIST_TABS.includes(tab) || SIMULATE_TABS.includes(tab);
+  const isAssistPanel =
+    ASSIST_TABS.includes(tab) || SIMULATE_TABS.includes(tab);
   return (
     <div
       style={{
@@ -130,7 +131,7 @@ export function GraphPanel({
               onChange={(e) => setUseDummyAssist(e.target.checked)}
               style={{ accentColor: C.supports, cursor: "pointer" }}
             />
-            Use dummy suggestions
+            Use sample data
           </label>
         )}
       <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
@@ -202,7 +203,6 @@ export function GraphPanel({
               workflowPhase={workflowPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-
               useDummy={useDummyAssist}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}

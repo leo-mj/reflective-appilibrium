@@ -86,6 +86,7 @@ class RERelation(BaseModel):
     explanation: str = Field(max_length=2_000, default="")
     added_round: int = Field(alias="addedRound", ge=1)
     argument_id: Optional[str] = Field(None, alias="argumentId", max_length=200)
+    origin: Optional[str] = Field(None, max_length=200)
 
     status: Optional[Status] = None
     revised_round: Optional[int] = Field(None, alias="revisedRound", ge=1)

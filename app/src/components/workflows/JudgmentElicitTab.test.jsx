@@ -12,7 +12,7 @@ import { render, act } from "@testing-library/react";
 vi.mock("../../utils/judgmentsClient.js", () => ({
   fetchJudgmentElicitations: vi.fn().mockResolvedValue({
     suggestions: [],
-    model: "dummy",
+    model: "sample data model",
   }),
 }));
 
@@ -20,7 +20,14 @@ import { JudgmentElicitTab } from "./JudgmentElicitTab.jsx";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
 
 const baseProps = {
-  state: { elements: [], topic: "", round: 1, relations: [], coherence: {}, log: [] },
+  state: {
+    elements: [],
+    topic: "",
+    round: 1,
+    relations: [],
+    coherence: {},
+    log: [],
+  },
   onAddElement: () => {},
   onRejectElements: () => {},
   workflowPhase: null,

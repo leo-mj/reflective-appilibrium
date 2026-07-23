@@ -164,3 +164,35 @@ export function argumentRelationType(premiseCount, negated) {
     ? (negated ? "precludes" : "entails")
     : (negated ? "jointly_precludes" : "jointly_entails");
 }
+
+// ─── Origin helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Marks an element's `origin` as also user-edited, unless it already says so.
+ * Used when an LLM suggestion is modified before acceptance, or when a
+ * previously LLM-authored element is later revised by the user.
+ *
+ * @param {string} origin - The element's current origin, e.g. `"LLM"` or a model name.
+ * @returns {string} e.g. `"LLM+user"`; unchanged if already user-attributed.
+ */
+export function withUserEdit(origin) {
+  if (!origin || origin.includes("user")) return origin;
+  return `${origin} & user`;
+}
+
+/** Fallback origin for an LLM suggestion when the specific model is unknown. */
+export const LLM_ORIGIN = "LLM";
+
+/**
+ * Origin for an accepted LLM suggestion: the specific model name when known
+ * (e.g. `"gpt-4o"`), else the generic `"LLM"` fallback — plus `"+user"` if
+ * the user edited the suggestion's text before accepting it.
+ *
+ * @param {boolean} wasEdited
+ * @param {string} [model] - The model that produced the suggestion, if known.
+ * @returns {string}
+ */
+export function llmOrigin(wasEdited, model) {
+  const base = model || LLM_ORIGIN;
+  return wasEdited ? withUserEdit(base) : base;
+}

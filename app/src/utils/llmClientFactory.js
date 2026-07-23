@@ -1,7 +1,7 @@
 /**
  * @fileoverview Factory for LLM backend client functions.
  * All clients POST to a backend endpoint, accumulate token usage, and
- * fall back to dummy data when LLM_ENABLED is false or useDummy is true.
+ * fall back to sample data when LLM_ENABLED is false or useDummy is true.
  * @module utils/llmClientFactory
  */
 

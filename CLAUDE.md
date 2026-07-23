@@ -37,7 +37,7 @@ Directional; a pair can have multiple. Full matrix in `skill/re-relations-refere
     furtherArguments: Array,
   },
   elements: [{ id, type, status, confidence, origin, text, addedRound, ?previousText, ?revisedRound, ?reason, ?withdrawnRound, ?questionnaireIndex }],
-  relations: [{ from, to, type, explanation, addedRound }],
+  relations: [{ from, to, type, explanation, addedRound, ?origin }],
   coherence: { tensions: [], orphans: [], clusters: [] },
   log: [{ round, findings, options, decision, changes }]
 }

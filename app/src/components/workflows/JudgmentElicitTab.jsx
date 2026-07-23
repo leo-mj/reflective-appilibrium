@@ -14,6 +14,9 @@ import { quickScore } from "../../utils/simulateRethonClient.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
 import { AddElementPanel } from "../user_edits/WorkflowAddPanels.jsx";
+import { Tooltip } from "../Tooltip.jsx";
+import { sendsToLlmText } from "../../utils/openaiClient.js";
+import { llmOrigin } from "../../utils/stateUtils.js";
 import {
   AcceptButton,
   RejectButton,
@@ -22,6 +25,7 @@ import {
   ChatButton,
   ModifyTextarea,
   ErrorBanner,
+  AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { ProgressWorkflowBtn, ScoreDeltaBadge } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
@@ -68,26 +72,28 @@ function Toolbar({
         {model && <span style={{ color: C.dim }}> · {model}</span>}
       </div>
       <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <button
-          onClick={onElicit}
-          disabled={buttonDisabled}
-          style={{
-            background: "transparent",
-            border: `1px solid ${buttonDisabled ? C.border : C.judgment.high}`,
-            color: buttonDisabled ? C.dim : C.judgment.high,
-            borderRadius: 6,
-            padding: "5px 12px",
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: buttonDisabled ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-          }}
-        >
-          {loading ? <SpinnerIcon /> : <span>↺</span>}
-          {loading ? "Thinking…" : hasResult ? "Re-elicit" : "Elicit"}
-        </button>
+        <Tooltip text={sendsToLlmText()}>
+          <button
+            onClick={onElicit}
+            disabled={buttonDisabled}
+            style={{
+              background: "transparent",
+              border: `1px solid ${buttonDisabled ? C.border : C.judgment.high}`,
+              color: buttonDisabled ? C.dim : C.judgment.high,
+              borderRadius: 6,
+              padding: "5px 12px",
+              fontSize: 12,
+              fontWeight: "bold",
+              cursor: buttonDisabled ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            }}
+          >
+            {loading ? <SpinnerIcon /> : <span>↺</span>}
+            {loading ? "Thinking…" : hasResult ? "Re-elicit" : "Elicit"}
+          </button>
+        </Tooltip>
         {workflowPhase && (
           <>
             <div
@@ -200,7 +206,9 @@ function SuggestionCard({
                   display: "inline-block",
                 }}
               >
-                {typeof j.confidence === "number" ? j.confidence.toFixed(2) : j.confidence}
+                {typeof j.confidence === "number"
+                  ? j.confidence.toFixed(2)
+                  : j.confidence}
               </span>
               {isEditing ? (
                 <ModifyTextarea
@@ -312,7 +320,9 @@ export function JudgmentElicitTab({
     quickScore(state.elements, state.relations, weights).then((scores) => {
       if (!cancelled) setBaseline(scores ?? null);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [state.elements, state.relations, weights]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const elicit = async () => {
@@ -340,11 +350,13 @@ export function JudgmentElicitTab({
     editing?.judgment === judgment ? editing.draft : judgment.text;
 
   const accept = (suggestion, judgment) => {
+    const wasEdited =
+      editing?.judgment === judgment && editing.draft !== judgment.text;
     onAddElement({
       type: "judgment",
       text: resolvedText(judgment),
       confidence: judgment.confidence,
-      origin: "llm",
+      origin: llmOrigin(wasEdited, model),
       ...(judgment.index != null && { questionnaireIndex: judgment.index }),
     });
     setEditing(null);
@@ -384,6 +396,9 @@ export function JudgmentElicitTab({
           suggestionsDisabled={suggestionsDisabled}
         />
         {error && <ErrorBanner message={error} />}
+        {suggestions !== null && suggestions.length > 0 && (
+          <AiDisclosureBanner model={model} />
+        )}
 
         {suggestions !== null && suggestions.length === 0 && (
           <div style={{ fontSize: 12, color: C.dim }}>

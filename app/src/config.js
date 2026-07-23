@@ -2,8 +2,8 @@
  * @fileoverview Build-time feature flags.
  *
  * Three environments, set via VITE_APP_ENV:
- *   dev     (vite dev)                  — backend + LLM + BYOK enabled; dummy data toggleable
- *   demo    (vite build)                — all disabled; dummy data always on; publicly hosted
+ *   dev     (vite dev)                  — backend + LLM + BYOK enabled; sample data toggleable
+ *   demo    (vite build)                — all disabled; sample data always on; publicly hosted
  *   backend (vite build --mode backend) — backend + LLM + BYOK enabled; publicly hosted
  *
  * @module config

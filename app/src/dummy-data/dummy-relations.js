@@ -1,16 +1,16 @@
-// Dummy relation suggestions for the RelationSuggestTab.
+// Sample relation suggestions for the RelationSuggestTab.
 // Topic: obligations to future generations (matches dummy-state.js).
-// Used automatically in PROD, or in DEV when the "Use dummy suggestions" toggle is on.
+// Used automatically in PROD, or in DEV when the "Use sample data" toggle is on.
 
 const dummyRelations = {
-  model: "dummy",
+  model: "sample data model",
   suggestions: [
     {
       from: "J1",
       to: "P1",
       type: "supports",
       explanation:
-        "(This is a dummy suggestion.) The radioactive waste case is a paradigm instance of leaving the next generation worse off, directly evidencing the sufficientarian threshold principle.",
+        "The radioactive waste case is a paradigm instance of leaving the next generation worse off, directly evidencing the sufficientarian threshold principle.",
     },
     {
       from: "J8",

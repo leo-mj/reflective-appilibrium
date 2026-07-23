@@ -1,13 +1,13 @@
-// Dummy judgment elicitation suggestions for the JudgmentElicitTab.
+// Sample judgment elicitation suggestions for the JudgmentElicitTab.
 // Topic: obligations to future generations (matches dummy-state.js).
-// Used automatically in PROD, or in DEV when the "Use dummy suggestions" toggle is on.
+// Used automatically in PROD, or in DEV when the "Use sample data" toggle is on.
 
 const dummyJudgments = {
-  model: "dummy",
+  model: "sample data model",
   suggestions: [
     {
       question:
-        "(This is a dummy suggestion.) A company buries toxic waste that will only become dangerous in 300 years. No one alive today will be harmed. Is the company acting wrongly?",
+        "A company buries toxic waste that will only become dangerous in 300 years. No one alive today will be harmed. Is the company acting wrongly?",
       judgments: [
         {
           text: "Knowingly creating serious hazards for future people is morally wrong, even when no currently living person will be affected.",

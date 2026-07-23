@@ -10,7 +10,9 @@
 import { useState } from "react";
 import { C } from "../constants/colors.js";
 import { fetchRelatednessMatrix } from "../utils/matrixClient.js";
-import { ErrorBanner } from "./SuggestionActions.jsx";
+import { ErrorBanner, AiDisclosureBanner } from "./SuggestionActions.jsx";
+import { Tooltip } from "./Tooltip.jsx";
+import { sendsToLlmText } from "../utils/openaiClient.js";
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 
@@ -102,23 +104,25 @@ function Toolbar({
         </span>{" "}
         elements (judgments + principles){model ? `, scored by ${model}` : ""}.
       </div>
-      <button
-        onClick={onAnalyze}
-        disabled={disabled}
-        style={{
-          background: loading ? C.border : C.supports,
-          border: "none",
-          color: "#fff",
-          borderRadius: 6,
-          padding: "6px 14px",
-          fontSize: 12,
-          fontWeight: "bold",
-          cursor: disabled ? "not-allowed" : "pointer",
-          flexShrink: 0,
-        }}
-      >
-        {loading ? "Analyzing…" : hasResult ? "Re-analyze" : "Analyze"}
-      </button>
+      <Tooltip text={sendsToLlmText("your elements")}>
+        <button
+          onClick={onAnalyze}
+          disabled={disabled}
+          style={{
+            background: loading ? C.border : C.supports,
+            border: "none",
+            color: "#fff",
+            borderRadius: 6,
+            padding: "6px 14px",
+            fontSize: 12,
+            fontWeight: "bold",
+            cursor: disabled ? "not-allowed" : "pointer",
+            flexShrink: 0,
+          }}
+        >
+          {loading ? "Analyzing…" : hasResult ? "Re-analyze" : "Analyze"}
+        </button>
+      </Tooltip>
     </div>
   );
 }
@@ -352,6 +356,12 @@ export function CoherenceMatrixTab({ state, suggestionsDisabled = false }) {
       />
 
       {error && <ErrorBanner message={error} />}
+      {result && (
+        <AiDisclosureBanner
+          model={result._model}
+          note="Review carefully — scores and descriptions can be wrong."
+        />
+      )}
 
       {elements.length < 2 && (
         <div style={{ fontSize: 12, color: C.dim }}>

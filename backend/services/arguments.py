@@ -217,7 +217,7 @@ def translate_arguments(
     return result
 
 
-# Dummy arguments keyed to the dummy RE state (obligations to future generations).
+# Sample arguments keyed to the sample RE state (obligations to future generations).
 # Full element order (all 20, including withdrawn):
 # 1:J1  2:J2  3:J3  4:J4  5:J5  6:J6(w)  7:J7  8:J8  9:J9  10:J10  11:J11(w)  12:J12
 # 13:P1  14:P2  15:P3  16:P4(w)  17:P5  18:P6  19:T1  20:T2
@@ -275,7 +275,7 @@ DUMMY_ARGUMENTS: List[List[int]] = [
 def dummy_detect_arguments(
     n_unnegated_sentence_pool: int, elements: List[REElement], round: str
 ) -> DetectArgumentsResponse:
-    """Return a hard-coded argument set for the dummy 'obligations to future generations' RE state.
+    """Return a hard-coded argument set for the sample 'obligations to future generations' RE state.
 
     Filters ``DUMMY_ARGUMENTS`` to those whose indices fall within the current
     sentence pool size, then adds the three suppressed-premise elements (indices
@@ -308,7 +308,7 @@ def dummy_detect_arguments(
         lookup=initial_lookup,
         elements=elements,
         round=round,
-        model="dummy",
+        model="sample data model",
     )
     translated = translate_arguments(
         detected_arguments=num_arguments, lookup=lookup_w_premises

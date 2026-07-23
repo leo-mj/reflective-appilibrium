@@ -1,4 +1,4 @@
-// Dummy argument detection for the DetectArgumentsTab.
+// Sample argument detection for the DetectArgumentsTab.
 import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 // Topic: obligations to future generations (matches dummy-state.js).
 // Mirrors the Python _dummy_detect_arguments logic from backend/routers/arguments.py.
@@ -99,7 +99,7 @@ export function argFingerprint(arg, lookup) {
 }
 
 /**
- * Returns a dummy DetectArgumentsResponse for the given elements, round, and existing relations.
+ * Returns a sample DetectArgumentsResponse for the given elements, round, and existing relations.
  * Arguments already present as jointly_entails groups in the state are excluded.
  *
  * @param {Array} elements
@@ -110,7 +110,7 @@ export function argFingerprint(arg, lookup) {
 export function getDummyArguments(elements, round, relations = []) {
   const initialLookup = Object.fromEntries(elements.map((e, i) => [i + 1, e]));
   const poolSize = elements.length + _ADDED_PREMISES.length;
-  const lookup = addNewPremisesToLookup(initialLookup, _ADDED_PREMISES, elements, round, "dummy");
+  const lookup = addNewPremisesToLookup(initialLookup, _ADDED_PREMISES, elements, round, "sample data");
   const existingFingerprints = buildExistingArgFingerprints(relations);
   const numArguments = _DUMMY_ARGUMENTS.filter(
     (arg) =>
@@ -128,7 +128,7 @@ export function getDummyArguments(elements, round, relations = []) {
     num_arguments: numArguments,
     translated_arguments: translatedArguments,
     lookup,
-    model: "dummy",
+    model: "sample data model",
     input_tokens: 0,
     output_tokens: 0,
   };

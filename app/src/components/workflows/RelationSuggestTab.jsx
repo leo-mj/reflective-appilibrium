@@ -12,6 +12,9 @@ import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { fetchRelationSuggestions } from "../../utils/relationsClient.js";
 import { AddRelationPanel } from "../user_edits/WorkflowAddPanels.jsx";
+import { Tooltip } from "../Tooltip.jsx";
+import { sendsToLlmText } from "../../utils/openaiClient.js";
+import { llmOrigin } from "../../utils/stateUtils.js";
 import {
   AcceptButton,
   RejectButton,
@@ -20,6 +23,7 @@ import {
   ChatButton,
   ModifyTextarea,
   ErrorBanner,
+  AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import {
   nextPhaseEnabled,
@@ -81,26 +85,28 @@ function Toolbar({
         {model && <span style={{ color: C.dim }}> · {model}</span>}
       </div>
       <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <button
-          onClick={onSuggest}
-          disabled={suggestDisabled}
-          style={{
-            background: "transparent",
-            border: `1px solid ${suggestDisabled ? C.border : C.supports}`,
-            color: suggestDisabled ? C.dim : C.supports,
-            borderRadius: 6,
-            padding: "5px 12px",
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: suggestDisabled ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-          }}
-        >
-          {loading ? <SpinnerIcon /> : <span>↺</span>}
-          {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
-        </button>
+        <Tooltip text={sendsToLlmText()}>
+          <button
+            onClick={onSuggest}
+            disabled={suggestDisabled}
+            style={{
+              background: "transparent",
+              border: `1px solid ${suggestDisabled ? C.border : C.supports}`,
+              color: suggestDisabled ? C.dim : C.supports,
+              borderRadius: 6,
+              padding: "5px 12px",
+              fontSize: 12,
+              fontWeight: "bold",
+              cursor: suggestDisabled ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            }}
+          >
+            {loading ? <SpinnerIcon /> : <span>↺</span>}
+            {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
+          </button>
+        </Tooltip>
         {workflowPhase && (
           <>
             <div
@@ -275,12 +281,16 @@ export function RelationSuggestTab({
     editing?.suggestion === suggestion ? editing.draft : suggestion.explanation;
 
   const accept = (suggestion) => {
+    const wasEdited =
+      editing?.suggestion === suggestion &&
+      editing.draft !== suggestion.explanation;
     onAddRelation(
       {
         from: suggestion.from,
         to: suggestion.to,
         type: suggestion.type,
         explanation: resolvedExplanation(suggestion),
+        origin: llmOrigin(wasEdited, model),
       },
       { select: false },
     );
@@ -320,6 +330,9 @@ export function RelationSuggestTab({
         />
 
         {error && <ErrorBanner message={error} />}
+        {suggestions !== null && suggestions.length > 0 && (
+          <AiDisclosureBanner model={model} />
+        )}
 
         {activeElements.length < 2 && (
           <div style={{ fontSize: 12, color: C.dim }}>

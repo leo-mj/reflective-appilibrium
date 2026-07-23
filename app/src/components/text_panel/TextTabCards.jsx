@@ -64,8 +64,11 @@ export function ElementCard({ e, dim }) {
           }}
         >
           <Badge id={e.id} />
-          <MetaChip>{typeof e.confidence === "number" ? e.confidence.toFixed(2) : e.confidence}</MetaChip>
+          <MetaChip>
+            Confidence: {typeof e.confidence === "number" ? e.confidence.toFixed(2) : e.confidence}
+          </MetaChip>
           <StatusLabel status={e.status} />
+          {e.origin && <MetaChip>Origin: {e.origin}</MetaChip>}
           {pCovers[e.id]?.length > 0 && (
             <MetaChip>covers: {pCovers[e.id].join(", ")}</MetaChip>
           )}
@@ -186,6 +189,7 @@ export function ArgumentCard({ rels, dim }) {
             </span>
             <Badge id={r.to} />
             <StatusLabel status={r.status} />
+            {r.origin && <MetaChip>Origin: {r.origin}</MetaChip>}
           </div>
           <div onClick={(e) => e.stopPropagation()}>
             <ActionButtons
@@ -317,6 +321,7 @@ export function RelationCard({ r, dim }) {
           </span>
           <Badge id={r.to} />
           <StatusLabel status={r.status} />
+          {r.origin && <MetaChip>Origin: {r.origin}</MetaChip>}
         </div>
         <div onClick={(e) => e.stopPropagation()}>
           <ActionButtons

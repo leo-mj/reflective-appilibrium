@@ -39,7 +39,7 @@ async def detect_arguments(
     """Detect logically valid arguments over the current element set.
 
     Builds a sentence-index lookup from the request elements, queries the LLM
-    (or the dummy fixture when ``use_dummy=true``), filters out arguments already
+    (or the sample fixture when ``use_dummy=true``), filters out arguments already
     present in the state, adds any LLM-supplied suppressed premises to the lookup,
     and returns the deduplicated numeric arguments alongside their translated forms.
 
@@ -53,7 +53,7 @@ async def detect_arguments(
         )
     try:
         if use_dummy:
-            logger.info("Returning dummy arguments")
+            logger.info("Returning sample arguments")
             return dummy_detect_arguments(
                 n_unnegated_sentence_pool=n_unnegated_sentence_pool,
                 elements=request.elements,
