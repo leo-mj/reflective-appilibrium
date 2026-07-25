@@ -22,7 +22,8 @@ def build_matrix_prompt(topic: str, elements: list[REElement]) -> str:
 
     The prompt instructs the model to produce a symmetric matrix with
     diagonal 1.0 entries and a ``pairDescriptions`` dict keyed by
-    ``"A→B"`` in JavaScript sort order (to match the frontend).
+    ``"A→B"`` with one entry per unordered pair (the frontend looks up
+    both directions, so key order does not matter).
     """
     element_list = "\n".join(f"{e.id} [{e.type}]: {e.text}" for e in elements)
     ids = [e.id for e in elements]
@@ -38,9 +39,8 @@ Elements (judgments and principles):
 Task: compute a symmetric relatedness matrix.
 - Score each ordered pair (including diagonal) from 0.0 (completely unrelated) to 1.0 (identical or directly equivalent).
 - Diagonal entries must be 1.0.
-- For each off-diagonal unordered pair, provide a one-sentence description. \
-Use the key "A→B" where A and B are sorted by JavaScript string sort order \
-(e.g. ["J12","J10","J1","J3"].sort() → ["J1","J10","J12","J3"]).
+- For each unordered pair of distinct elements, provide a one-sentence description \
+under the key "A→B". Exactly one entry per pair; either direction is fine.
 - Write a 2–3 sentence overview of the overall element landscape.
 
 Respond with valid JSON only, in exactly this format:
@@ -58,20 +58,29 @@ def build_relations_prompt(
 ) -> str:
     """Build the LLM prompt for relation suggestion.
 
-    Already-recorded directed pairs are extracted from ``existing_relations``
-    and injected into the prompt as a skip list.  The model is instructed to
-    check both directions for every element pair and to err on the side of
-    inclusion — the user can reject spurious suggestions in the UI.
+    Already-recorded (from, to, type) combinations are extracted from
+    ``existing_relations`` and injected into the prompt as a skip list.  Only
+    the exact combination is skipped — a pair can bear multiple relations, so
+    a different relation type on an already-related pair remains suggestible.
+    The model is instructed to check both directions for every element pair
+    and to err on the side of inclusion — the user can reject spurious
+    suggestions in the UI.
     """
     element_lines = "\n".join(f"{e.id} [{e.type}]: {e.text}" for e in elements)
 
-    skip_pairs: set[tuple[str, str]] = set()
+    skip_triples: set[tuple[str, str, str]] = set()
     for r in existing_relations:
-        skip_pairs.add((r.from_id, r.to_id))
+        skip_triples.add((r.from_id, r.to_id, r.type))
 
-    if skip_pairs:
-        skip_lines = "\n".join(f"  {a} → {b}" for a, b in sorted(skip_pairs))
-        skip_section = f"\nAlready recorded (do not re-suggest these directed pairs):\n{skip_lines}\n"
+    if skip_triples:
+        skip_lines = "\n".join(
+            f"  {a} --{t}--> {b}" for a, b, t in sorted(skip_triples)
+        )
+        skip_section = (
+            "\nAlready recorded (do not re-suggest these exact combinations; "
+            "a different relation type between the same pair may still be "
+            f"suggested):\n{skip_lines}\n"
+        )
     else:
         skip_section = ""
 
@@ -201,7 +210,7 @@ Existing judgments and principles to systematise:
 {judgment_lines}
 {principle_lines}
 
-Task: propose at least 2 and up to {(len(judgments) + len(existing_principles))/3} \
+Task: propose at least 2 and up to {max(2, (len(judgments) + len(existing_principles)) // 3)} \
 NEW principles that would systematise as many of the judgments
 and/or principles above as possible. Each principle should:
 - Be a general moral rule or norm (not a particular verdict).

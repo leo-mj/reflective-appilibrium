@@ -1,9 +1,9 @@
 """Pydantic request/response models and translation utility for the arguments router."""
 
-from typing import List, Dict
+from typing import List, Dict, Literal, Optional
 from pydantic import BaseModel
 
-from ..models.re_state import REElement, RERelation
+from ..models.re_state import ElementType, REElement, RERelation
 
 
 class DetectArgumentsRequest(BaseModel):
@@ -12,13 +12,41 @@ class DetectArgumentsRequest(BaseModel):
     elements: List[REElement]
     relations: List[RERelation] = []
     round: str
+    topic: str = ""
+
+
+class AddedPremise(BaseModel):
+    """A suppressed premise supplied by the LLM to make an argument formally valid.
+
+    ``form`` is the premise's logical content as a propositional formula over
+    the *other* sentences' indices (e.g. ``"(3 & 4) -> 7"``; never its own
+    index); the validity checker uses it to verify the reconstructed
+    argument.  ``role`` distinguishes:
+
+    - ``"premise"`` — substantive normative or empirical content; surfaced to
+      the user and, on acceptance, added to the element pool.
+    - ``"postulate"`` — a meaning postulate (Carnap 1952): true solely in
+      virtue of the meanings of the sentences involved.  Verified like any
+      premise but kept out of the pool; its text is folded into the created
+      relation's explanation instead.
+
+    ``role`` defaults to ``"premise"`` — the safe direction, since a
+    misclassified premise hides a contestable commitment while a
+    misclassified postulate merely adds clutter.
+    """
+
+    index: int
+    type: ElementType
+    text: str
+    form: Optional[str] = None
+    role: Literal["premise", "postulate"] = "premise"
 
 
 class LLMArgumentsResponse(BaseModel):
-    """Raw argument data returned by the LLM, before deduplication and translation."""
+    """Raw argument data returned by the LLM, before verification, deduplication, and translation."""
 
     detected_arguments: List[List[int]]
-    added_premises: List[Dict]
+    added_premises: List[AddedPremise]
     input_tokens: int
     output_tokens: int
 
@@ -29,12 +57,17 @@ class DetectArgumentsResponse(BaseModel):
     ``num_arguments`` uses integer indices (negative = negated); ``translated_arguments``
     is the parallel list with each index replaced by its REElement.  ``lookup`` maps
     every integer index (positive and negative) to an REElement so callers can perform
-    further translations without re-requesting.
+    further translations without re-requesting.  ``argument_postulates`` is parallel to
+    ``num_arguments``: the meaning-postulate texts each argument relies on (usually
+    empty).  ``rejected_count`` is the number of LLM proposals that failed formal
+    verification and were dropped.
     """
 
     num_arguments: List[List[int]]
     translated_arguments: List[List[REElement]] = []
     lookup: Dict
+    argument_postulates: List[List[str]] = []
+    rejected_count: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
 

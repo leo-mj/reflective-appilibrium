@@ -6,7 +6,9 @@ import logging
 
 from ..models.re_state import REElement, RERelation
 from ..services.llm import LLMService
+from ..services.argument_checker import verify_argument
 from ..routers.arguments_schemas import (
+    AddedPremise,
     DetectArgumentsResponse,
     LLMArgumentsResponse,
     translate_from_lookup,
@@ -24,18 +26,28 @@ def arg_fingerprint(arg: List[int]) -> Tuple:
     return (tuple(sorted(arg[:-1])), arg[-1])
 
 
+ARGUMENT_RELATION_TYPES = (
+    "entails",
+    "precludes",
+    "jointly_entails",
+    "jointly_precludes",
+)
+
+
 def existing_arg_fingerprints(
     relations: List[RERelation], reverse_lookup: Dict[str, int]
 ) -> Set[Tuple]:
-    """Return fingerprints of all jointly_entails/jointly_precludes argument groups already in the state.
+    """Return fingerprints of all argument groups already in the state.
 
-    Groups are reconstructed from relations that share an ``argument_id``.
-    Only complete groups (all premise IDs present in ``reverse_lookup``) are
-    included.  ``jointly_precludes`` conclusions use a negative index.
+    Covers single-premise (``entails``/``precludes``) as well as multi-premise
+    (``jointly_*``) argument relations.  Groups are reconstructed from relations
+    that share an ``argument_id``.  Only complete groups (all premise IDs present
+    in ``reverse_lookup``) are included.  Precludes-type conclusions use a
+    negative index, mirroring the ¬-notation of detected arguments.
     """
     groups: Dict[str, Dict] = {}
     for r in relations:
-        if r.type not in ("jointly_entails", "jointly_precludes") or not r.argument_id:
+        if r.type not in ARGUMENT_RELATION_TYPES or not r.argument_id:
             continue
         if r.argument_id not in groups:
             groups[r.argument_id] = {"froms": [], "to": r.to_id, "type": r.type}
@@ -48,7 +60,7 @@ def existing_arg_fingerprints(
         ]
         conclusion_index = reverse_lookup.get(group["to"])
         if conclusion_index is not None and len(premise_indices) == len(group["froms"]):
-            if group["type"] == "jointly_precludes":
+            if group["type"] in ("precludes", "jointly_precludes"):
                 conclusion_index = -conclusion_index
             fingerprints.add(
                 arg_fingerprint(sorted(premise_indices) + [conclusion_index])
@@ -81,7 +93,7 @@ def format_existing_args_for_prompt(
     """
     groups: Dict[str, Dict] = {}
     for r in relations:
-        if r.type not in ("jointly_entails", "jointly_precludes") or not r.argument_id:
+        if r.type not in ARGUMENT_RELATION_TYPES or not r.argument_id:
             continue
         if r.argument_id not in groups:
             groups[r.argument_id] = {"froms": [], "to": r.to_id, "type": r.type}
@@ -94,22 +106,32 @@ def format_existing_args_for_prompt(
         ]
         conclusion_index = reverse_lookup.get(group["to"])
         if conclusion_index is not None and len(premise_indices) == len(group["froms"]):
-            if group["type"] == "jointly_precludes":
+            negated = group["type"] in ("precludes", "jointly_precludes")
+            if negated:
                 conclusion_index = -conclusion_index
             arg = sorted(premise_indices) + [conclusion_index]
             premise_ids = ", ".join(group["froms"])
-            lines.append(f"  {arg}  ({premise_ids} → {group['to']})")
+            conclusion_label = ("¬" if negated else "") + group["to"]
+            lines.append(f"  {arg}  ({premise_ids} → {conclusion_label})")
     return "\n".join(lines)
 
 
-def build_prompt(lookup: Dict[int, REElement], relations: List[RERelation] = []) -> str:
-    """Build the LLM prompt requesting all strictly logically valid arguments over the sentence pool.
+def build_prompt(
+    lookup: Dict[int, REElement],
+    relations: List[RERelation] = [],
+    topic: str = "",
+) -> str:
+    """Build the LLM prompt requesting formally valid argument reconstructions.
 
-    Injects existing arguments (from ``relations``) so the model is told not to
-    reproduce them.  The response format is JSON with ``"arguments"`` and
-    ``"added_premises"`` keys.
+    The sentence pool is presented as logically independent atoms, so every
+    substantive argument requires added premises that close the inferential
+    gap.  Each added premise carries its logical ``form`` (verified by
+    ``services.argument_checker``) and a ``role``: substantive ``"premise"``
+    or meaning ``"postulate"``.  Existing arguments (from ``relations``) are
+    injected so the model does not reproduce them.
     """
-    element_lines = "\n".join(f"  {n}: {e.text}" for n, e in lookup.items())
+    element_lines = "\n".join(f"  {n} [{e.type}]: {e.text}" for n, e in lookup.items())
+    next_index = max(lookup) + 1 if lookup else 1
 
     reverse_lookup = {e.id: n for n, e in lookup.items()}
     existing_str = format_existing_args_for_prompt(relations, reverse_lookup)
@@ -118,45 +140,66 @@ def build_prompt(lookup: Dict[int, REElement], relations: List[RERelation] = [])
         if existing_str
         else ""
     )
+    topic_line = (
+        f'\nThe sentences belong to a reflective-equilibrium analysis of the topic: "{topic}"\n'
+        if topic
+        else ""
+    )
 
     return f"""\
-You are an expert in philosophical logic, semantics, and linguistics.
-
-Sentences to map into arguments:
+You are an expert in philosophical logic and argument reconstruction.
+{topic_line}
+Sentence pool:
 {element_lines}
-Each key-value pair consists of the sentence (value) and its numerical representation (key) as a sentence in propositional logic.
-The negation of sentence n is represented by -n (e.g. -3 means "it is not the case that [sentence 3]").
+Each sentence is treated as an atomic proposition, identified by its integer key. The negation of sentence n is written -n (e.g. -3 means "it is not the case that [sentence 3]").
 {existing_section}
 Task:
-List all of the possible strictly logically valid arguments that can be formed with the sentences, including arguments that use negations.
-Arguments may include negated premises (e.g. [-3, 4, 7] means ¬sentence-3 and sentence-4 together entail sentence-7) and arguments whose conclusion is the negation of an existing sentence (e.g. [3, 4, -7] means sentence-3 and sentence-4 jointly entail ¬sentence-7).
-If there are arguments with a suppressed premise, add the premise as a dictionary with a unique integer index, the content of the premise, and its type.
-The type can take the value "judgment", "principle", or "theory" if it is a background theory.
-Output: Each argument in the list is itself a list, in which the final member is the conclusion and all previous members are the premises.
-In the lists, the sentences are just represented through their key.
-For example, in [3, 4, 7], 7 is the conclusion and [3, 4] are the premises.
-In [-3, 4, 7], the conclusion is sentence 7 and the premises are ¬sentence-3 and sentence-4.
-In [3, 4, -7], the conclusion is ¬sentence-7 and the premises are sentence-3 and sentence-4.
+Identify the substantive arguments that can be reconstructed from these sentences — arguments a philosopher would recognize as worth recording, not trivial logical manipulations.
+
+Every reconstructed argument must be STRICTLY FORMALLY VALID. Because the numbered sentences are logically independent atoms, this means every argument needs at least one added premise that closes the inferential gap. For each added premise, supply:
+- "index": an unused integer. Number added premises consecutively upward starting at {next_index} (the sentence indices up to {next_index - 1} are taken; never reuse them).
+- "type": "judgment", "principle", or "theory" (a background theory).
+- "text": the premise in natural language.
+- "form": its logical content as a propositional formula over sentence keys, using ~ (not), & (and), | (or), -> (if-then). Example: "(3 & 4) -> 7". The form must not mention the premise's own index — it states the premise's content in terms of the other sentences.
+- "role": one of:
+  - "postulate" — a meaning postulate: true solely in virtue of what the sentences mean. Rejecting it while accepting the argument's other premises would show a misunderstanding of the words, not a substantive position (e.g. a bridge between two formulations of the same thought, or the incompatibility of two directly contradictory claims).
+  - "premise" — a claim with normative or empirical content of its own, which a competent, informed speaker could reject as a substantive position.
+  When in doubt, use "premise".
+
+Constraints:
+- At most 3 pool sentences as premises per argument.
+- The conclusion must be a pool sentence or its negation, and must not appear among the premises.
+- No redundant premises: every premise must be needed for validity.
+- Premises must be jointly consistent (no arguments from contradiction).
+- An added premise with role "premise" must be an independently contentful general claim — not a mere restatement of the argument as a conditional. If the only bridge you can find merely restates the inference and is not true in virtue of meaning, omit the argument.
+
+Output: each argument is a list of integers whose final member is the conclusion and all previous members are premises. For example, in [14, {next_index}, 1], the conclusion is sentence 1 and the premises are sentence 14 and added premise {next_index}. In [3, {next_index + 1}, -7], the conclusion is ¬sentence-7. Premises may also be negated (e.g. -3).
 
 Respond with valid JSON only, in exactly this format:
 {{
   "arguments": [
-        [1, 5],
-        [3, 4, 7],
-        [1, 3, 6],
-        [2, -5],
-        [3, 4, -7],
-        ...
+        [14, {next_index}, 1],
+        [3, {next_index + 1}, -7]
   ],
   "added_premises": [
     {{
-      "index": 7,
-      "type": "judgment",
-      "text": "..."
+      "index": {next_index},
+      "type": "principle",
+      "text": "A general, independently contentful claim connecting sentence 14 to sentence 1.",
+      "form": "14 -> 1",
+      "role": "premise"
     }},
+    {{
+      "index": {next_index + 1},
+      "type": "principle",
+      "text": "A statement true in virtue of the meanings of sentences 3 and 7.",
+      "form": "3 -> ~7",
+      "role": "postulate"
+    }}
   ]
 }}
-."""
+
+If no substantive arguments can be reconstructed, return {{"arguments": [], "added_premises": []}}."""
 
 
 def add_new_premises_to_lookup(
@@ -320,11 +363,81 @@ def dummy_detect_arguments(
     )
 
 
+def verify_and_partition(
+    detected: List[List[int]],
+    added_premises: List[AddedPremise],
+) -> Tuple[List[List[int]], List[List[str]], List[AddedPremise], int]:
+    """Formally verify each detected argument and separate meaning postulates from premises.
+
+    Each argument is checked by ``services.argument_checker`` (using the added
+    premises' ``form`` strings), auto-trimmed of redundant premises, and then
+    stripped of meaning-postulate indices — a postulate licenses the inference
+    but does not enter the element pool, so the surfaced argument runs directly
+    from its substantive premises to its conclusion, with the postulate texts
+    reported separately.
+
+    Returns ``(kept_args, postulates_per_arg, used_premises, rejected_count)``:
+    the verified numeric arguments (postulates stripped), the parallel list of
+    postulate texts each argument relies on, the ``role="premise"`` added
+    premises actually used by a kept argument, and the number of proposals
+    rejected as formally invalid (or as resting on postulates alone).
+    """
+    forms = {p.index: p.form for p in added_premises if p.form}
+    by_index = {p.index: p for p in added_premises}
+    # Trim preference: when a postulate and a substantive premise are
+    # interchangeable, drop the postulate — keeping the substantive version
+    # keeps the contestable commitment visible as a rejectable element (the
+    # "when in doubt, premise" asymmetry).  Pool sentences are dropped last.
+    trim_priority = {
+        p.index: (0 if p.role == "postulate" else 1) for p in added_premises
+    }
+
+    kept_args: List[List[int]] = []
+    postulates_per_arg: List[List[str]] = []
+    used_premise_indices: Set[int] = set()
+    rejected = 0
+
+    for arg in detected:
+        result = verify_argument(arg, forms, trim_priority)
+        if not result.accepted:
+            logger.info(f"Rejected argument {arg}: {result.reason}")
+            rejected += 1
+            continue
+        trimmed = result.argument
+        if trimmed != arg:
+            logger.info(f"Auto-trimmed argument {arg} to {trimmed}.")
+
+        postulate_texts = [
+            by_index[abs(n)].text
+            for n in trimmed[:-1]
+            if abs(n) in by_index and by_index[abs(n)].role == "postulate"
+        ]
+        stripped = [
+            n
+            for n in trimmed[:-1]
+            if not (abs(n) in by_index and by_index[abs(n)].role == "postulate")
+        ] + [trimmed[-1]]
+        if len(stripped) < 2:
+            logger.info(f"Rejected argument {arg}: rests on meaning postulates alone.")
+            rejected += 1
+            continue
+
+        kept_args.append(stripped)
+        postulates_per_arg.append(postulate_texts)
+        used_premise_indices |= {abs(n) for n in stripped[:-1] if abs(n) in by_index}
+
+    used_premises = [by_index[i] for i in sorted(used_premise_indices)]
+    return kept_args, postulates_per_arg, used_premises, rejected
+
+
 async def get_arguments_from_llm(
-    lookup: Dict[int, REElement], llm: LLMService, relations: List[RERelation] = []
+    lookup: Dict[int, REElement],
+    llm: LLMService,
+    relations: List[RERelation] = [],
+    topic: str = "",
 ) -> LLMArgumentsResponse:
     """Send the element lookup to the LLM and parse the JSON argument response."""
-    prompt = build_prompt(lookup, relations)
+    prompt = build_prompt(lookup, relations, topic)
     result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,
