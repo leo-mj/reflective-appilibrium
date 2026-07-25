@@ -8,7 +8,7 @@ import { makeLLMClient } from "./llmClientFactory.js";
 
 export const fetchRelatednessMatrix = makeLLMClient({
   endpoint: "/api/matrix/analyze",
-  dummyData: () => ({ ...JSON.parse(_dummyMatrix), _model: "sample data model" }),
+  dummyData: () => ({ ...JSON.parse(_dummyMatrix), _model: "claude-fable-5" }),
   buildBody: (state) => ({ topic: state.topic, elements: state.elements }),
   transformResponse: (data) => ({
     overview: data.overview,

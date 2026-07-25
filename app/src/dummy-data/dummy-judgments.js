@@ -3,7 +3,7 @@
 // Used automatically in PROD, or in DEV when the "Use sample data" toggle is on.
 
 const dummyJudgments = {
-  model: "sample data model",
+  model: "claude-fable-5",
   suggestions: [
     {
       question:
