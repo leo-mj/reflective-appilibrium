@@ -152,7 +152,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
                     rels,
                     positions,
                     elementById,
-                    historyEdgeVisuals(rels[0], wIds, snappedRound),
+                    historyEdgeVisuals(rels[0], wIds, snappedRound, rels),
                   )}
                 </React.Fragment>
               ))}
