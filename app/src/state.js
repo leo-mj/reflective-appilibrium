@@ -8,7 +8,7 @@
  *    Replace the `elements`, `relations`, `coherence`, and `log` arrays with real
  *    data produced by the Claude RE Skill when generating a visualisation artifact.
  *
- * 2. **Sample state** (`dummy-state.js`) — a rich fixture used in both dev and
+ * 2. **Sample state** (`sample-state.js`) — a rich fixture used in both dev and
  *    prod.  Always loaded as the initial state so visitors (and developers)
  *    see a populated example on first load.
  *
@@ -17,7 +17,7 @@
 
 /** @import { REState } from './types.js' */
 
-import _dummyState from "./dummy-data/dummy-state.js"; // dev fixture — not used in production builds
+import _sampleState from "./sample-data/sample-state.js"; // dev fixture — not used in production builds
 import { argumentRelationType } from "./utils/stateUtils.js";
 
 // ============================================================
@@ -66,7 +66,7 @@ const _inlineState = {
  *
  * @type {REState}
  */
-export const SAMPLE_STATE = _dummyState;
+export const SAMPLE_STATE = _sampleState;
 
 /**
  * Factory that returns a blank RE state for a given topic.

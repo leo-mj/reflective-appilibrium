@@ -1,9 +1,9 @@
 // Sample relation suggestions for the RelationSuggestTab.
-// Topic: obligations to future generations (matches dummy-state.js).
+// Topic: obligations to future generations (matches sample-state.js).
 // Used automatically in PROD, or in DEV when the "Use sample data" toggle is on.
 // None of these duplicate relations already present in the sample state.
 
-const dummyRelations = {
+const sampleRelations = {
   model: "claude-fable-5",
   suggestions: [
     {
@@ -65,4 +65,4 @@ const dummyRelations = {
   ],
 };
 
-export default dummyRelations;
+export default sampleRelations;

@@ -261,98 +261,236 @@ def translate_arguments(
 
 
 # Sample arguments keyed to the sample RE state (obligations to future generations).
-# Full element order (all 20, including withdrawn):
-# 1:J1  2:J2  3:J3  4:J4  5:J5  6:J6(w)  7:J7  8:J8  9:J9  10:J10  11:J11(w)  12:J12
-# 13:P1  14:P2  15:P3  16:P4(w)  17:P5  18:P6  19:T1  20:T2
-# Negative indices represent negations: -n = ¬sentence-n
+# Mirrors app/src/sample-data/sample-arguments.js, but stores each argument as its
+# FULL formal reconstruction: substantive added premises (22–29) are unanalyzed
+# sentences, and every inferential step is closed by a meaning postulate (30–44)
+# carrying its logical form.  The dummy path runs these through the same
+# verify_and_partition pipeline as live LLM output, so the fixture is formally
+# verified on every request and postulates are stripped from the surfaced
+# arguments exactly as in production.
+#
+# Element indices (position in sample-state elements, including withdrawn):
+# 1:J1 … 13:J13, 14:P1 … 19:P6, 20:T1, 21:T2.  Negative indices: -n = ¬sentence-n.
+DUMMY_ADDED_PREMISES: List[Dict] = [
+    # ── Substantive premises (surfaced as elements when their argument is accepted) ──
+    {
+        "index": 22,
+        "type": "judgment",
+        "role": "premise",
+        "text": "Burying large quantities of radioactive waste without containment bequeaths the next generation land and groundwater burdened with an uncontained long-term hazard, leaving them worse off than we found things.",
+    },
+    {
+        "index": 23,
+        "type": "principle",
+        "role": "premise",
+        "text": "Beings who possess or will possess the capacity for well-being and who will be affected by our decisions are owed obligations of justice.",
+    },
+    {
+        "index": 24,
+        "type": "judgment",
+        "role": "premise",
+        "text": "People living in 2100 and beyond will be causally affected by climate policies adopted today.",
+    },
+    {
+        "index": 25,
+        "type": "principle",
+        "role": "premise",
+        "text": "Future generations will be affected by present political decisions but cannot take part in making them; obligations of justice owed to such people can be discharged only through institutional mechanisms that represent their interests.",
+    },
+    {
+        "index": 26,
+        "type": "principle",
+        "role": "premise",
+        "text": "An act or omission is wrong only if there is or will be someone whom it wrongs (person-affecting restriction).",
+    },
+    {
+        "index": 27,
+        "type": "principle",
+        "role": "premise",
+        "text": "Obligations to future people attach de dicto — to whoever will exist — even when they cannot attach de re to any specific future individual.",
+    },
+    {
+        "index": 28,
+        "type": "principle",
+        "role": "premise",
+        "text": "Where obligations of justice are owed, the welfare of those protected must be given its full weight in present deliberation, however uncertain their existence.",
+    },
+    {
+        "index": 29,
+        "type": "judgment",
+        "role": "premise",
+        "text": "A society's failure to prevent its own distant extinction wrongs no one now alive and, with respect to future people, merely fails to bring them into existence.",
+    },
+    # ── Meaning postulates (verified, then folded into relation explanations) ──
+    {
+        "index": 30,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(14 & 22) -> 1",
+        "text": "An act that does exactly what a generation's standing duty forbids — leaving the next generation worse off — is thereby wrong.",
+    },
+    {
+        "index": 31,
+        "type": "principle",
+        "role": "postulate",
+        "form": "16 -> 10",
+        "text": "Interests being discounted for temporal distance just is obligations toward their holders weakening with temporal distance.",
+    },
+    {
+        "index": 32,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(18 & 24) -> 2",
+        "text": "If justice is owed to all who will be affected, and the people of 2100 and beyond will be affected by present climate policy, then climate policy owes their welfare consideration.",
+    },
+    {
+        "index": 33,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(18 & 25) -> 12",
+        "text": "If justice is owed to future generations and can be discharged only through representative mechanisms, then such mechanisms ought to exist.",
+    },
+    {
+        "index": 34,
+        "type": "principle",
+        "role": "postulate",
+        "form": "18 -> 10",
+        "text": "Owing justice to people regardless of when they exist just is not discounting their interests for their temporal distance.",
+    },
+    {
+        "index": 35,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(20 & 23) -> 18",
+        "text": "If what matters for moral patienthood is well-being capacity, and those with well-being capacity who are affected are owed justice, then justice is owed to all who will be affected, whenever they exist.",
+    },
+    {
+        "index": 36,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(21 & 27) -> 9",
+        "text": "If obligations attach to future people de dicto though not de re, then the non-identity problem reduces our obligations (the de re loss) but does not eliminate them (the de dicto survival).",
+    },
+    {
+        "index": 37,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(20 & 21) -> 15",
+        "text": "If moral patienthood needs no identity and future people form a determinate class, then obligations toward merely probable beings are possible.",
+    },
+    {
+        "index": 38,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(15 & 16) -> 5",
+        "text": "If obligations can attach to probable beings and diminish only with existence-uncertainty, then slight discounting for genuine existence-uncertainty is permissible.",
+    },
+    {
+        "index": 39,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(17 & 26) -> ~1",
+        "text": "If only presently existing beings can be wronged and wrongness requires a wronged party, then an act harming only the not-yet-existing is not wrong.",
+    },
+    {
+        "index": 40,
+        "type": "principle",
+        "role": "postulate",
+        "form": "17 -> ~15",
+        "text": "That only currently existing beings can bear obligations directly contradicts obligations existing toward merely probable future beings.",
+    },
+    {
+        "index": 41,
+        "type": "principle",
+        "role": "postulate",
+        "form": "15 -> ~6",
+        "text": "That obligations can exist toward probable future beings directly contradicts our having no obligations to those who do not yet exist.",
+    },
+    {
+        "index": 42,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(18 & 28) -> ~5",
+        "text": "If justice is owed to whoever will be affected and justice demands full weight despite uncertainty, then even slight uncertainty-discounting is impermissible.",
+    },
+    {
+        "index": 43,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(19 & 7) -> ~10",
+        "text": "If temporal proximity modulates obligation strength and parental duties outrank duties to distant strangers, then interests may be discounted with temporal distance after all.",
+    },
+    {
+        "index": 44,
+        "type": "principle",
+        "role": "postulate",
+        "form": "(13 & 29 & 26) -> ~8",
+        "text": "If wronging requires a wronged party, extinction wrongs no one now alive and merely fails to create future people, and non-creation wrongs no one, then allowing extinction is not wrong.",
+    },
+]
+
 DUMMY_ARGUMENTS: List[List[int]] = [
-    # Suppressed-premise arguments (indices 21–23 added by dummy_detect_arguments):
-    # 21:J (radioactive waste leaves future generations worse off — bridge for P1→J1)
-    # 22:P (well-being capacity grounds justice obligations — bridge for T1→P5)
-    # 23:J (people in 2100 are causally affected by today's climate policy — bridge for P5→J2)
-    [
-        13,
-        21,
-        1,
-    ],  # P1 + J21 → J1 (sufficientarian + factual bridge → radioactive waste wrong)
-    [13, 3],  # P1 → J3 (sufficientarian → resource depletion)
-    [13, 4],  # P1 → J4 (sufficientarian → liveable environment)
-    [14, 8],  # P2 → J8 (probabilistic obligation → extinction prevention)
-    [14, 5],  # P2 → J5 (probabilistic obligation → uncertainty discounting)
-    [15, 10],  # P3 → J10 (uncertainty not temporal → equal counting)
-    [17, 23, 2],  # P5 + J23 → J2 (Rawlsian + causal bridge → climate policy)
-    [17, 12],  # P5 → J12 (Rawlsian → democratic institutions)
-    [17, 10],  # P5 → J10 (Rawlsian → equal counting)
-    [18, 7],  # P6 → J7 (proximity modulates → parental obligations)
-    [
-        19,
-        22,
-        17,
-    ],  # T1 + P22 → P5 (well-being capacity + justice bridge → Rawlsian valid)
-    [19, 14],  # T1 → P2 (identity not required → probabilistic obligation)
-    [20, 14],  # T2 → P2 (class determinacy → probabilistic obligation)
-    [19, 20, 14],  # T1 + T2 → P2 (conjunction)
-    [13, 17, 10],  # P1 + P5 → J10 (sufficientarian + Rawlsian → equal counting)
-    [14, 15, 5],  # P2 + P3 → J5 (probabilistic + uncertainty threshold → discounting)
-    # Negation arguments:
-    [
-        5,
-        -10,
-    ],  # J5 → ¬J10 (permissible discounting entails rejection of strict equal counting)
-    [
-        16,
-        -1,
-    ],  # P4 → ¬J1 (if only current beings matter, radioactive waste is not wrong)
-    [
-        14,
-        -6,
-    ],  # P2 → ¬J6 (probabilistic obligation entails rejection of "no obligations to non-existent")
-    [
-        18,
-        7,
-        -10,
-    ],  # P6 + J7 → ¬J10 (if proximity modulates and parents > strangers, strict equal counting fails)
+    [14, 22, 30, 1],  # P1 + waste-inheritance → J1
+    [16, 31, 10],  # P3 → J10
+    [18, 24, 32, 2],  # P5 + 2100-affected → J2
+    [18, 25, 33, 12],  # P5 + representation → J12
+    [18, 34, 10],  # P5 → J10
+    [20, 23, 35, 18],  # T1 + well-being-grounds-justice → P5
+    [21, 27, 36, 9],  # T2 + de-dicto → J9
+    [20, 21, 37, 15],  # T1 + T2 → P2 (in sample state as arg-sample-1)
+    [15, 16, 38, 5],  # P2 + P3 → J5 (in sample state as arg-sample-3)
+    [17, 26, 39, -1],  # P4 + person-affecting → ¬J1
+    [17, 40, -15],  # P4 → ¬P2
+    [15, 41, -6],  # P2 → ¬J6
+    [18, 28, 42, -5],  # P5 + full-weight → ¬J5
+    [19, 7, 43, -10],  # P6 + J7 → ¬J10 (in sample state as arg-sample-5)
+    [13, 29, 26, 44, -8],  # J13 + extinction-as-non-creation + person-affecting → ¬J8
 ]
 
 
 def dummy_detect_arguments(
-    n_unnegated_sentence_pool: int, elements: List[REElement], round: str
+    elements: List[REElement],
+    round: str,
+    relations: List[RERelation] = [],
 ) -> DetectArgumentsResponse:
-    """Return a hard-coded argument set for the sample 'obligations to future generations' RE state.
+    """Return the sample argument set, run through the production pipeline.
 
-    Filters ``DUMMY_ARGUMENTS`` to those whose indices fall within the current
-    sentence pool size, then adds the three suppressed-premise elements (indices
-    21–23) to the lookup.
+    Uses the same verification, postulate-stripping, and state-deduplication
+    steps as the live LLM path, so the fixture doubles as an end-to-end check
+    of the checker: every sample argument must verify with zero rejections.
+    Arguments referencing elements missing from the current (possibly
+    truncated) state are skipped.
     """
     initial_lookup = {index + 1: e for index, e in enumerate(elements)}
-    added_premises = [
-        {
-            "index": 21,
-            "type": "judgment",
-            "text": "Burying large quantities of radioactive waste without containment, knowing it will poison groundwater for millennia, constitutes leaving future generations materially worse off than we found things.",
-        },
-        {
-            "index": 22,
-            "type": "principle",
-            "text": "Beings who possess or will possess the capacity for well-being and who will be affected by our decisions are owed obligations of justice.",
-        },
-        {
-            "index": 23,
-            "type": "judgment",
-            "text": "People living in 2100 and beyond will be causally affected by climate policies adopted today.",
-        },
+    premises = [AddedPremise(**p) for p in DUMMY_ADDED_PREMISES]
+    premise_indices = {p.index for p in premises}
+    candidates = [
+        arg
+        for arg in DUMMY_ARGUMENTS
+        if all(abs(n) in initial_lookup or abs(n) in premise_indices for n in arg)
     ]
-    pool_size = n_unnegated_sentence_pool + len(added_premises)
-    num_arguments = [
-        arg for arg in DUMMY_ARGUMENTS if all(abs(n) <= pool_size for n in arg)
-    ]
+
+    verified, postulates, used_premises, rejected = verify_and_partition(
+        candidates, premises
+    )
     lookup_w_premises = add_new_premises_to_lookup(
-        added_premises=added_premises,
+        added_premises=[p.model_dump() for p in used_premises],
         lookup=initial_lookup,
         elements=elements,
         round=round,
-        model="sample data model",
+        model="claude-fable-5",
     )
+
+    reverse_lookup = {e.id: n for n, e in lookup_w_premises.items()}
+    existing = existing_arg_fingerprints(relations, reverse_lookup)
+    kept_pairs = [
+        (arg, post)
+        for arg, post in zip(verified, postulates)
+        if arg_fingerprint(arg) not in existing
+    ]
+    num_arguments = [arg for arg, _ in kept_pairs]
+    argument_postulates = [post for _, post in kept_pairs]
+
     translated = translate_arguments(
         detected_arguments=num_arguments, lookup=lookup_w_premises
     )
@@ -360,6 +498,8 @@ def dummy_detect_arguments(
         num_arguments=num_arguments,
         translated_arguments=translated,
         lookup=lookup_w_premises,
+        argument_postulates=argument_postulates,
+        rejected_count=rejected,
     )
 
 

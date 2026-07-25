@@ -57,9 +57,9 @@ async def detect_arguments(
         if use_dummy:
             logger.info("Returning sample arguments")
             return dummy_detect_arguments(
-                n_unnegated_sentence_pool=n_unnegated_sentence_pool,
                 elements=request.elements,
                 round=request.round,
+                relations=request.relations,
             )
 
         logger.info(

@@ -1,12 +1,12 @@
 // Sample argument detection for the DetectArgumentsTab.
 import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
-// Topic: obligations to future generations (matches dummy-state.js).
-// Mirrors the Python _dummy_detect_arguments logic from backend/routers/arguments.py.
+// Topic: obligations to future generations (matches sample-state.js).
+// Mirrors the Python dummy_detect_arguments logic from backend/services/arguments.py.
 
 // Negative indices represent negations: -n = ¬sentence-n
-// Element indices (position in dummy-state elements): J1–J13 = 1–13,
+// Element indices (position in sample-state elements): J1–J13 = 1–13,
 // P1–P6 = 14–19, T1 = 20, T2 = 21.
-const _DUMMY_ARGUMENTS = [
+const _SAMPLE_ARGUMENTS = [
   // Indices 22–29 are added premises:
   // 22:J (next generation inherits the waste hazard — bridge for P1→J1)
   // 23:P (well-being capacity grounds justice — bridge for T1→P5)
@@ -23,14 +23,14 @@ const _DUMMY_ARGUMENTS = [
   [18, 10],
   [20, 23, 18],
   [21, 27, 9],
-  [20, 21, 15],     // T1 + T2 → P2 (already in state as arg-dummy-1; filtered at runtime)
-  [15, 16, 5],      // P2 + P3 → J5 (already in state as arg-dummy-3; filtered at runtime)
+  [20, 21, 15],     // T1 + T2 → P2 (already in state as arg-sample-1; filtered at runtime)
+  [15, 16, 5],      // P2 + P3 → J5 (already in state as arg-sample-3; filtered at runtime)
   // Negation arguments:
   [17, 26, -1],     // P4 + P26 → ¬J1 (only future people are affected, they cannot be wronged, and wrongness requires a wronged party)
   [17, -15],        // P4 → ¬P2 (presentism directly contradicts probabilistic obligation)
   [15, -6],         // P2 → ¬J6 (J6 claims obligations to the non-existent are impossible in principle; P2 asserts their possibility)
   [18, 28, -5],     // P5 + P28 → ¬J5 (justice owed to future people gives their welfare full weight despite uncertainty — counterpoint to P2 + P3 → J5)
-  [19, 7, -10],     // P6 + J7 → ¬J10 (already in state as arg-dummy-5; filtered at runtime)
+  [19, 7, -10],     // P6 + J7 → ¬J10 (already in state as arg-sample-5; filtered at runtime)
   [13, 29, 26, -8], // J13 + J29 + P26 → ¬J8 (allowing extinction wrongs no one now alive or future, and wrongness requires a wronged party)
 ];
 
@@ -143,12 +143,12 @@ export function argFingerprint(arg, lookup) {
  * @param {Array} [relations=[]]
  * @returns {{ num_arguments: number[][], translated_arguments: Array[], lookup: Object, model: string, input_tokens: number, output_tokens: number }}
  */
-export function getDummyArguments(elements, round, relations = []) {
+export function getSampleArguments(elements, round, relations = []) {
   const initialLookup = Object.fromEntries(elements.map((e, i) => [i + 1, e]));
   const poolSize = elements.length + _ADDED_PREMISES.length;
   const lookup = addNewPremisesToLookup(initialLookup, _ADDED_PREMISES, elements, round, "claude-fable-5");
   const existingFingerprints = buildExistingArgFingerprints(relations);
-  const numArguments = _DUMMY_ARGUMENTS.filter(
+  const numArguments = _SAMPLE_ARGUMENTS.filter(
     (arg) =>
       arg.every((n) => Math.abs(n) <= poolSize) &&
       argFingerprint(arg, lookup) !== null &&

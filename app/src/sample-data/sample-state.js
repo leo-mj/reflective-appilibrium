@@ -508,48 +508,48 @@ export default {
     },
 
     // Arguments (entails for single-premise; jointly_entails for multi-premise)
-    // arg-dummy-3: P2 + P3 → J5  (detected round 4: P3 arrives round 4)
+    // arg-sample-3: P2 + P3 → J5  (detected round 4: P3 arrives round 4)
     {
-      from: "P2", to: "J5", type: "jointly_entails", argumentId: "arg-dummy-3",
+      from: "P2", to: "J5", type: "jointly_entails", argumentId: "arg-sample-3",
       explanation: "Probabilistic obligation (P2) allows uncertain future existence to ground present duties; the diminution principle (P3) says only existence-uncertainty (not temporal distance) may reduce obligation strength; together they permit the slight welfare discounting asserted by J5.",
       addedRound: 4,
       origin: "claude-fable-5",
     },
     {
-      from: "P3", to: "J5", type: "jointly_entails", argumentId: "arg-dummy-3",
+      from: "P3", to: "J5", type: "jointly_entails", argumentId: "arg-sample-3",
       explanation: "Probabilistic obligation (P2) allows uncertain future existence to ground present duties; the diminution principle (P3) says only existence-uncertainty (not temporal distance) may reduce obligation strength; together they permit the slight welfare discounting asserted by J5.",
       addedRound: 4,
       origin: "claude-fable-5",
     },
-    // arg-dummy-1: T1 + T2 → P2  (detected round 6: T2 arrives round 6)
+    // arg-sample-1: T1 + T2 → P2  (detected round 6: T2 arrives round 6)
     {
-      from: "T1", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1",
+      from: "T1", to: "P2", type: "jointly_entails", argumentId: "arg-sample-1",
       explanation: "T1 makes moral patienthood turn on well-being capacity rather than identity or present existence; T2 secures a determinate class of future people to whom obligations could attach; together they remove both standard barriers to obligations toward the not-yet-existing, so such obligations are possible (P2).",
       addedRound: 6,
       origin: "claude-fable-5",
     },
     {
-      from: "T2", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1",
+      from: "T2", to: "P2", type: "jointly_entails", argumentId: "arg-sample-1",
       explanation: "T1 makes moral patienthood turn on well-being capacity rather than identity or present existence; T2 secures a determinate class of future people to whom obligations could attach; together they remove both standard barriers to obligations toward the not-yet-existing, so such obligations are possible (P2).",
       addedRound: 6,
       origin: "claude-fable-5",
     },
-    // arg-dummy-4: P1 → J3
+    // arg-sample-4: P1 → J3
     {
-      from: "P1", to: "J3", type: "entails", argumentId: "arg-dummy-4",
+      from: "P1", to: "J3", type: "entails", argumentId: "arg-sample-4",
       explanation: "The sufficientarian threshold directly entails that depleting all natural resources for short-term economic gain is wrong, since it leaves the next generation worse off than it found things.",
       addedRound: 2,
       origin: "claude-fable-5",
     },
-    // arg-dummy-5: P6 + J7 → ¬J10  (detected round 6: P6 arrives round 6)
+    // arg-sample-5: P6 + J7 → ¬J10  (detected round 6: P6 arrives round 6)
     {
-      from: "P6", to: "J10", type: "jointly_precludes", argumentId: "arg-dummy-5",
+      from: "P6", to: "J10", type: "jointly_precludes", argumentId: "arg-sample-5",
       explanation: "P6 counts temporal proximity among the modulators of obligation strength, and J7 fixes the direction of modulation: greater proximity means stronger obligations. Together they imply that obligations weaken across temporal distance, contradicting the temporal neutrality asserted by J10.",
       addedRound: 6,
       origin: "claude-fable-5",
     },
     {
-      from: "J7", to: "J10", type: "jointly_precludes", argumentId: "arg-dummy-5",
+      from: "J7", to: "J10", type: "jointly_precludes", argumentId: "arg-sample-5",
       explanation: "P6 counts temporal proximity among the modulators of obligation strength, and J7 fixes the direction of modulation: greater proximity means stronger obligations. Together they imply that obligations weaken across temporal distance, contradicting the temporal neutrality asserted by J10.",
       addedRound: 6,
       origin: "claude-fable-5",

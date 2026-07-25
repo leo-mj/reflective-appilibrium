@@ -1,9 +1,9 @@
 // Sample principle suggestions for the PrincipleSuggestTab.
-// Topic: obligations to future generations (matches dummy-state.js).
+// Topic: obligations to future generations (matches sample-state.js).
 // Used automatically in PROD, or in DEV when the "Use sample data" toggle is on.
 // Deliberately non-overlapping with P1–P6 already in the sample state.
 
-const dummyPrinciples = {
+const samplePrinciples = {
   model: "claude-fable-5",
   suggestions: [
     {
@@ -30,4 +30,4 @@ const dummyPrinciples = {
   ],
 };
 
-export default dummyPrinciples;
+export default samplePrinciples;

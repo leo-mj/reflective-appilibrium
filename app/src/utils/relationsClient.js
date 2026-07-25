@@ -3,11 +3,11 @@
  * @module utils/relationsClient
  */
 
-import dummyRelations from "../dummy-data/dummy-relations.js";
+import sampleRelations from "../sample-data/sample-relations.js";
 import { makeLLMClient } from "./llmClientFactory.js";
 
 export const fetchRelationSuggestions = makeLLMClient({
   endpoint: "/api/relations/suggest",
-  dummyData: dummyRelations,
+  dummyData: sampleRelations,
   buildBody: (state) => ({ topic: state.topic, elements: state.elements, existing_relations: state.relations }),
 });

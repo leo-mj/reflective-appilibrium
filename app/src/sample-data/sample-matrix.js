@@ -1,4 +1,4 @@
-const _dummyMatrix = `
+const _sampleMatrix = `
     {
   \"overview\": 
         \"The elements cluster strongly around intergenerational ethics, especially duties to future people, environmental stewardship, and institutional representation of future interests. A second, tighter cluster concerns how such duties are grounded and qualified: uncertainty, temporal distance, probabilistic existence, the non-identity problem, and whether there is any duty to bring future people into existence at all. The main tensions are between stronger egalitarian or justice-based claims about future persons and weaker, proximity-sensitive or uncertainty-sensitive qualifications.\",
@@ -434,4 +434,4 @@ const _dummyMatrix = `
     }
 `;
 
-export default _dummyMatrix;
+export default _sampleMatrix;
