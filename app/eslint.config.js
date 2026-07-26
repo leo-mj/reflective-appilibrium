@@ -26,4 +26,10 @@ export default defineConfig([
       "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
     },
   },
+  {
+    // Build config runs in Node, not the browser: it reads process.env to
+    // derive the GitHub Pages base path from the repo name.
+    files: ["vite.config.js"],
+    languageOptions: { globals: globals.node },
+  },
 ]);

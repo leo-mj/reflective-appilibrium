@@ -66,6 +66,7 @@ export function GraphPanel({
   selectedRel,
   onSelectRel,
   onAddElement,
+  onReviseElementText,
   onAddRelation,
   onDeleteRelationsByArgId,
   onQuestionnaireSelectAnswer,
@@ -252,6 +253,7 @@ export function GraphPanel({
               useDummy={useDummyAssist}
               verifyArguments={verifyArguments}
               onAddElement={onAddElement}
+              onReviseElementText={onReviseElementText}
               onAddRelation={onAddRelation}
               onDeleteRelationsByArgId={onDeleteRelationsByArgId}
               autoFetch={autoFetch}

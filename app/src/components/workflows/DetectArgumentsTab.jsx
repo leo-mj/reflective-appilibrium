@@ -92,7 +92,7 @@ function IdBadge({ element, isAdded = false }) {
 }
 
 function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
-  const isEditing = isAdded && onDraftChange != null;
+  const isEditing = onDraftChange != null;
   return (
     <div
       style={{
@@ -150,6 +150,8 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
  * @param {string[]} props.postulates  Meaning-postulate texts this argument relies on.
  * @param {{status:'accepted'|'rejected', argumentId?:string}|undefined} props.decision
  * @param {Object|null} props.editingDrafts  Map premiseId→text, or null if not editing.
+ *   Covers every premise, added and existing alike: an existing premise may need
+ *   rewording before the reconstruction goes through.
  * @param {Function} props.onAccept
  * @param {Function} props.onReject
  * @param {Function} props.onModify
@@ -172,7 +174,6 @@ function ArgumentCard({
 }) {
   const conclusion = argument.at(-1);
   const premises = argument.slice(0, -1);
-  const hasAddedPremises = argument.some((el) => addedIds.has(el.id));
   const isEditing = editingDrafts != null;
   const isAccepted = decision?.status === "accepted";
   const isRejected = decision?.status === "rejected";
@@ -195,11 +196,7 @@ function ArgumentCard({
           element={p}
           isAdded={addedIds.has(p.id)}
           draft={editingDrafts?.[p.id]}
-          onDraftChange={
-            isEditing && addedIds.has(p.id)
-              ? (text) => onModifyChange(p.id, text)
-              : null
-          }
+          onDraftChange={isEditing ? (text) => onModifyChange(p.id, text) : null}
         />
       ))}
       <div
@@ -267,18 +264,20 @@ function ArgumentCard({
             </button>
           </>
         ) : isEditing ? (
+          // Accept-then-modify-slot ordering, matching the other suggestion tabs.
           <>
-            <CancelButton onClick={onModifyCancel} />
             <AcceptButton
               onClick={() => onAccept(editingDrafts)}
               accentColor={ACCENT}
             />
+            <RejectButton onClick={onReject} />
+            <CancelButton onClick={onModifyCancel} />
           </>
         ) : (
           <>
-            {hasAddedPremises && <ModifyButton onClick={onModify} />}
-            <RejectButton onClick={onReject} />
             <AcceptButton onClick={() => onAccept({})} accentColor={ACCENT} />
+            <RejectButton onClick={onReject} />
+            <ModifyButton onClick={onModify} />
           </>
         )}
       </div>
@@ -293,6 +292,8 @@ function ArgumentCard({
  * @param {REState}  props.state
  * @param {boolean}  [props.useDummy]
  * @param {Function} [props.onAddElement]
+ * @param {Function} [props.onReviseElementText]  (elementId, text) — rewords an
+ *   element already in the state, recorded as a revision.
  * @param {Function} [props.onAddRelation]
  * @param {Function} [props.onDeleteRelationsByArgId]
  */
@@ -301,6 +302,7 @@ export function DetectArgumentsTab({
   useDummy = false,
   verifyArguments = true,
   onAddElement,
+  onReviseElementText,
   onAddRelation,
   onDeleteRelationsByArgId,
   autoFetch,
@@ -391,6 +393,18 @@ export function DetectArgumentsTab({
           confidence: el.confidence,
           origin: wasEdited ? withUserEdit(el.origin) : el.origin,
         });
+      }
+    }
+
+    // A premise that already exists in the state is reworded in place rather
+    // than duplicated: the user is fixing the wording of the element they
+    // already hold, so the edit has to land on it and be recorded as a revision.
+    // Only premises are editable, so the conclusion never reaches this loop.
+    for (const el of premises) {
+      if (addedIds.has(el.id)) continue;
+      const editedText = drafts?.[el.id];
+      if (editedText != null && editedText !== el.text) {
+        onReviseElementText?.(el.id, editedText);
       }
     }
 

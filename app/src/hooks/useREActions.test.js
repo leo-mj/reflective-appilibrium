@@ -286,6 +286,68 @@ describe("handleEditSave", () => {
   });
 });
 
+// ─── handleReviseElementText ──────────────────────────────────────────────────
+//
+// Used by Detect Arguments when the user rewords an existing premise so the
+// reconstruction goes through. Must record the same revision bookkeeping as the
+// edit modal, and must not fire when the text is unchanged.
+
+describe("handleReviseElementText", () => {
+  it("updates text and records the revision like handleEditSave does", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J1", "Reworded text"));
+    const el = result.current.state.elements[0];
+    expect(el.text).toBe("Reworded text");
+    expect(el.status).toBe("revised");
+    expect(el.previousText).toBe("Original text");
+    expect(el.revisedRound).toBe(2);
+    expect(result.current.state.round).toBe(2);
+  });
+
+  it("marks an LLM-authored element as user-edited", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ elements: [makeEl({ origin: "gpt-4o" })] })),
+    );
+    act(() => result.current.handleReviseElementText("J1", "Reworded text"));
+    expect(result.current.state.elements[0].origin).toBe("gpt-4o & user");
+  });
+
+  it("leaves a user-authored origin unchanged", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J1", "Reworded text"));
+    expect(result.current.state.elements[0].origin).toBe("user");
+  });
+
+  it("is a no-op when the text is unchanged", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J1", "Original text"));
+    expect(result.current.state.elements[0].status).toBe("active");
+    expect(result.current.state.round).toBe(1);
+    expect(result.current.state.log).toHaveLength(0);
+  });
+
+  it("is a no-op for an unknown element id", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J99", "Reworded text"));
+    expect(result.current.state.elements[0].text).toBe("Original text");
+    expect(result.current.state.round).toBe(1);
+  });
+
+  it("leaves other elements untouched", () => {
+    const { result } = renderHook(() =>
+      useREActions(
+        baseState({
+          elements: [makeEl(), makeEl({ id: "P1", type: "principle" })],
+        }),
+      ),
+    );
+    act(() => result.current.handleReviseElementText("J1", "Reworded text"));
+    const p1 = result.current.state.elements[1];
+    expect(p1.text).toBe("Original text");
+    expect(p1.status).toBe("active");
+  });
+});
+
 // ─── handleRelEditSave ────────────────────────────────────────────────────────
 
 describe("handleRelEditSave", () => {

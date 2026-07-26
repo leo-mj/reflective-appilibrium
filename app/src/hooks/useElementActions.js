@@ -76,6 +76,50 @@ export function useElementActions({
     setEditingEl(null);
   };
 
+  /**
+   * Reword one existing element in place, without going through the edit modal.
+   *
+   * Detect Arguments needs this: a user reviewing a reconstruction may find that
+   * an existing premise has to be reworded before the argument goes through, and
+   * that edit has to land on the element already in the state rather than create
+   * a new one. Records the same bookkeeping as `handleEditSave` — previousText,
+   * revisedRound, and a user-edited origin — so a rewording reached this way is
+   * indistinguishable in the history from one made in the editor.
+   *
+   * @param {string} elementId
+   * @param {string} newText
+   */
+  const handleReviseElementText = (elementId, newText) => {
+    const oldEl = state.elements.find((e) => e.id === elementId);
+    if (!oldEl || newText === oldEl.text) return;
+    const newRound = state.round + 1;
+    mutate((prev) => ({
+      ...prev,
+      round: newRound,
+      elements: prev.elements.map((e) =>
+        e.id === elementId
+          ? {
+              ...e,
+              text: newText,
+              origin: withUserEdit(e.origin),
+              status: "revised",
+              previousText: e.text,
+              revisedRound: newRound,
+            }
+          : e,
+      ),
+      log: [
+        ...prev.log,
+        makeLogEntry(
+          newRound,
+          `${elementId} was reworded by the user while accepting an argument.`,
+          "Changes applied",
+          makeDiff(["text"], oldEl, { text: newText }).join("; "),
+        ),
+      ],
+    }));
+  };
+
   const handleWithdrawRequest = (elementId) => {
     setWithdrawingId(elementId);
   };
@@ -191,6 +235,7 @@ export function useElementActions({
     setWithdrawingId,
     handleEditRequest,
     handleEditSave,
+    handleReviseElementText,
     handleWithdrawRequest,
     handleWithdrawConfirm,
     handleAddElement,
