@@ -3,11 +3,11 @@
  * @module utils/judgmentsClient
  */
 
-import dummyJudgments from "../dummy-data/dummy-judgments.js";
+import sampleJudgments from "../sample-data/sample-judgments.js";
 import { makeLLMClient } from "./llmClientFactory.js";
 
 export const fetchJudgmentElicitations = makeLLMClient({
   endpoint: "/api/judgments/elicit",
-  dummyData: dummyJudgments,
+  dummyData: sampleJudgments,
   buildBody: (state) => ({ topic: state.topic, elements: state.elements, log: state.log }),
 });

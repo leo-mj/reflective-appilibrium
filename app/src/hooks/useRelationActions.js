@@ -5,7 +5,12 @@
  */
 
 import { useState } from "react";
-import { makeDiff, makeLogEntry, ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
+import {
+  makeDiff,
+  makeLogEntry,
+  ARGUMENT_RELATION_TYPES,
+  withUserEdit,
+} from "../utils/stateUtils.js";
 
 /**
  * @param {{ state, mutate, selectedRel, setSelected, setSelectedRel, setRecentlyAddedRel, setRecentlyAdded }} deps
@@ -23,13 +28,19 @@ export function useRelationActions({
 
   const handleRelEditSave = (formData) => {
     const newRound = state.round + 1;
+    // The edit form has no Origin field, so any text change to a relation
+    // that came from an LLM suggestion is auto-attributed as user-edited too.
+    const textChanged = formData.explanation !== editingRel.explanation;
+    const origin = textChanged
+      ? withUserEdit(editingRel.origin)
+      : editingRel.origin;
     const diffs = makeDiff(["type", "explanation"], editingRel, formData);
     mutate((prev) => ({
       ...prev,
       round: newRound,
       relations: prev.relations.map((r) =>
         r === editingRel
-          ? { ...editingRel, ...formData, status: "revised", revisedRound: newRound }
+          ? { ...editingRel, ...formData, origin, status: "revised", revisedRound: newRound }
           : r,
       ),
       log: [
@@ -87,7 +98,10 @@ export function useRelationActions({
 
   const handleAddRelation = (formData, { select = true, pinRecent = false } = {}) => {
     const newRound = state.round + 1;
-    const newRel = { ...formData, addedRound: newRound };
+    // Manual add UIs (graph modals, TextTab bar, workflow panels) don't expose
+    // an Origin field, so default to "user"; LLM-driven callers (RelationSuggestTab,
+    // DetectArgumentsTab) already pass their own origin in formData.
+    const newRel = { origin: "user", ...formData, addedRound: newRound };
     mutate((prev) => ({
       ...prev,
       round: newRound,

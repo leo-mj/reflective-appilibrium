@@ -63,13 +63,19 @@ export function resolveEdge(relation, positions, elementById) {
  * Future edges (not yet added at `snappedRound`) are hidden instantly;
  * past edges fade in over 2.2 s.
  *
- * @param {RERelation}  relation
- * @param {Set<string>} wIds         - IDs of withdrawn elements at this round.
- * @param {number}      snappedRound
+ * For a joint argument, pass every relation in the group as `groupRels`: the
+ * whole argument greys out if the conclusion or ANY premise is withdrawn, since
+ * without every premise the conclusion is no longer jointly entailed.
+ *
+ * @param {RERelation}   relation
+ * @param {Set<string>}  wIds         - IDs of withdrawn elements at this round.
+ * @param {number}       snappedRound
+ * @param {RERelation[]} [groupRels]  - Sibling relations for a joint argument; defaults to `[relation]`.
  * @returns {{ isWithdrawn: boolean, opacity: number, transition: string }}
  */
-export function historyEdgeVisuals(relation, wIds, snappedRound) {
-  const isWithdrawn = wIds.has(relation.from) || wIds.has(relation.to);
+export function historyEdgeVisuals(relation, wIds, snappedRound, groupRels = null) {
+  const edges = groupRels ?? [relation];
+  const isWithdrawn = edges.some((r) => wIds.has(r.from) || wIds.has(r.to));
   const isFuture = (relation.addedRound || 1) > snappedRound;
   return {
     isWithdrawn,
@@ -82,14 +88,22 @@ export function historyEdgeVisuals(relation, wIds, snappedRound) {
  * Computes edge visual props for the Graph tab.
  * Applies selection dimming, selectedRel stroke-width boost, and hit area.
  *
+ * For a joint argument, pass every relation in the group as `groupRels`: the
+ * whole argument greys out if the conclusion or ANY premise is withdrawn, since
+ * without every premise the conclusion is no longer jointly entailed.
+ *
  * @param {RERelation}                    relation
  * @param {Set<string>}                   wIds
  * @param {function(RERelation): boolean} dimEdge
  * @param {Set<RERelation>|null}          selectedRelGroup - set of relations in the selected argument group
+ * @param {RERelation[]}                  [groupRels]      - Sibling relations for a joint argument; defaults to `[relation]`.
  * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, strokeWidth: number, transition: string, hitArea: boolean }}
  */
-export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRelGroup) {
-  const isWithdrawn = wIds.has(relation.from) || wIds.has(relation.to) || relation.status === "withdrawn";
+export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRelGroup, groupRels = null) {
+  const edges = groupRels ?? [relation];
+  const isWithdrawn = edges.some(
+    (r) => wIds.has(r.from) || wIds.has(r.to) || r.status === "withdrawn",
+  );
   const isRejected = relation.status === "rejected";
   const baseOpacity = isWithdrawn ? 0.25 : isRejected ? 0.35 : 0.7;
   return {

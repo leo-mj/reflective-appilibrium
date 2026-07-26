@@ -16,6 +16,7 @@ from ..dependencies import get_llm_service
 from ..models.re_state import REElement, RERelation, RelationType
 from ..services.llm import LLMService
 from ..services.prompts import build_relations_prompt
+from ..services.response_schemas import RELATIONS_SCHEMA
 
 router = APIRouter(prefix="/api/relations", tags=["relations"])
 logger = logging.getLogger(__name__)
@@ -74,6 +75,7 @@ async def suggest_relations(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
         json_mode=True,
+        json_schema=RELATIONS_SCHEMA,
     )
     try:
         data = json.loads(result.text)

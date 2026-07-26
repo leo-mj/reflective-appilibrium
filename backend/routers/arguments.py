@@ -21,8 +21,10 @@ from ..services.arguments import (
     dummy_detect_arguments,
     get_arguments_from_llm,
     add_new_premises_to_lookup,
-    filter_existing_arguments,
+    arg_fingerprint,
+    existing_arg_fingerprints,
     translate_arguments,
+    partition_arguments,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,7 +41,7 @@ async def detect_arguments(
     """Detect logically valid arguments over the current element set.
 
     Builds a sentence-index lookup from the request elements, queries the LLM
-    (or the dummy fixture when ``use_dummy=true``), filters out arguments already
+    (or the sample fixture when ``use_dummy=true``), filters out arguments already
     present in the state, adds any LLM-supplied suppressed premises to the lookup,
     and returns the deduplicated numeric arguments alongside their translated forms.
 
@@ -53,11 +55,11 @@ async def detect_arguments(
         )
     try:
         if use_dummy:
-            logger.info("Returning dummy arguments")
+            logger.info("Returning sample arguments")
             return dummy_detect_arguments(
-                n_unnegated_sentence_pool=n_unnegated_sentence_pool,
                 elements=request.elements,
                 round=request.round,
+                relations=request.relations,
             )
 
         logger.info(
@@ -65,30 +67,69 @@ async def detect_arguments(
         )
         initial_lookup = {index + 1: e for index, e in enumerate(request.elements)}
         llm_response = await get_arguments_from_llm(
-            llm=llm, lookup=initial_lookup, relations=request.relations
+            llm=llm,
+            lookup=initial_lookup,
+            relations=request.relations,
+            topic=request.topic,
         )
         logger.info(
             f"Received {len(llm_response.detected_arguments)} arguments from LLM."
         )
 
+        # Formal verification (when request.verify): check validity, auto-trim
+        # redundant premises, split meaning postulates (kept out of the pool)
+        # from substantive added premises (surfaced as elements).  When
+        # verification is off the checker is bypassed and arguments are
+        # surfaced as proposed.
+        if not request.verify:
+            logger.info(
+                "Argument checker disabled; surfacing LLM arguments unverified."
+            )
+        verified, postulates, used_premises, rejected = partition_arguments(
+            llm_response.detected_arguments,
+            llm_response.added_premises,
+            verify=request.verify,
+            pool_indices=initial_lookup.keys(),
+        )
+        if rejected:
+            logger.info(f"Rejected {rejected} argument(s) in formal verification.")
+
         lookup_w_premises = add_new_premises_to_lookup(
             lookup=initial_lookup,
-            added_premises=llm_response.added_premises,
+            added_premises=[p.model_dump() for p in used_premises],
             elements=request.elements,
             round=request.round,
             model=llm.model,
         )
-        filtered_arguments = filter_existing_arguments(
-            llm_response.detected_arguments, request.relations, lookup_w_premises
-        )
+
+        # Dedup against arguments already in the state, keeping the postulate
+        # list parallel.  Runs after postulate-stripping so that a re-detected
+        # argument matches its stored (postulate-free) form.
+        reverse_lookup = {e.id: n for n, e in lookup_w_premises.items()}
+        existing = existing_arg_fingerprints(request.relations, reverse_lookup)
+        kept_pairs = [
+            (arg, post)
+            for arg, post in zip(verified, postulates)
+            if arg_fingerprint(arg) not in existing
+        ]
+        if len(kept_pairs) < len(verified):
+            logger.info(
+                f"Filtered out {len(verified) - len(kept_pairs)} argument(s) already present in the state."
+            )
+        num_arguments = [arg for arg, _ in kept_pairs]
+        argument_postulates = [post for _, post in kept_pairs]
+
         translated = translate_arguments(
-            detected_arguments=filtered_arguments, lookup=lookup_w_premises
+            detected_arguments=num_arguments, lookup=lookup_w_premises
         )
 
         return DetectArgumentsResponse(
-            num_arguments=filtered_arguments,
+            num_arguments=num_arguments,
             translated_arguments=translated,
             lookup=lookup_w_premises,
+            argument_postulates=argument_postulates,
+            rejected_count=rejected,
+            model=llm.model,
             input_tokens=llm_response.input_tokens,
             output_tokens=llm_response.output_tokens,
         )

@@ -24,6 +24,38 @@ export function getLLMHeaders() {
 }
 
 /**
+ * Returns the model name the next LLM request will use — the BYOK session
+ * override if one is saved, else the build-time default. Used to disclose,
+ * before a request is sent, which model will receive the data.
+ *
+ * @returns {string|null}
+ */
+export function getConfiguredModel() {
+  try {
+    const raw = sessionStorage.getItem("llmSettings");
+    if (raw) {
+      const { model } = JSON.parse(raw);
+      if (model) return model;
+    }
+  } catch {
+    // Malformed sessionStorage value — fall through to the build-time default.
+  }
+  return import.meta.env.VITE_DEFAULT_MODEL || null;
+}
+
+/**
+ * Tooltip copy disclosing that clicking the wrapped control sends data to an
+ * LLM, naming the model that's currently configured to receive it.
+ *
+ * @param {string} [detail]  What gets sent, e.g. "your current RE state".
+ * @returns {string}
+ */
+export function sendsToLlmText(detail = "your current RE state") {
+  const model = getConfiguredModel();
+  return `Sends ${detail} to ${model || "the configured LLM"}.`;
+}
+
+/**
  * Returns cumulative token usage for this session from sessionStorage.
  *
  * @returns {{ input: number, output: number }}

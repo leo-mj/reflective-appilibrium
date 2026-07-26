@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     sessions_dir: str = str(Path(__file__).parent.parent / "sessions")
 
+    # Output cap for a single Anthropic completion, which the Messages API
+    # requires explicitly.  Not sent to OpenAI-compatible providers, which do
+    # not require it and would be newly constrained by it.  The relation and
+    # argument tasks scale their output with the element count, so a too-low
+    # value truncates the reply mid-JSON; the service logs a warning when a
+    # response stops at the cap.
+    llm_max_tokens: int = 4096
+
     @field_validator("cors_origins")
     @classmethod
     def no_wildcard(cls, v: str) -> str:

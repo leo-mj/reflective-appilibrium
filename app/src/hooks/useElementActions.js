@@ -5,7 +5,12 @@
  */
 
 import { useState } from "react";
-import { nextElementId, makeDiff, makeLogEntry } from "../utils/stateUtils.js";
+import {
+  nextElementId,
+  makeDiff,
+  makeLogEntry,
+  withUserEdit,
+} from "../utils/stateUtils.js";
 
 /**
  * @param {{ state, mutate, selected, setSelected, setSelectedRel, setRecentlyAdded, setRecentlyAddedRel }} deps
@@ -32,9 +37,19 @@ export function useElementActions({
     const oldEl = editingEl;
     // eslint-disable-next-line no-unused-vars
     const { withdrawnRound, reason, ...oldElBase } = oldEl;
+    // If the text actually changed and the user didn't touch the Origin
+    // field themselves, mark an LLM-authored origin as also user-edited
+    // rather than silently keeping "llm" for text the user rewrote.
+    const textChanged = formData.text !== oldEl.text;
+    const originTouchedByUser = formData.origin !== oldEl.origin;
+    const origin =
+      textChanged && !originTouchedByUser
+        ? withUserEdit(oldEl.origin)
+        : formData.origin;
     const newEl = {
       ...oldElBase,
       ...formData,
+      origin,
       status: "revised",
       previousText: oldEl.text,
       revisedRound: newRound,
@@ -42,7 +57,7 @@ export function useElementActions({
     const diffs = makeDiff(
       ["type", "confidence", "status", "origin", "text"],
       oldEl,
-      formData,
+      { ...formData, origin },
     );
     mutate((prev) => ({
       ...prev,

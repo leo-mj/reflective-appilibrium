@@ -13,7 +13,13 @@ import {
   TAB_LABELS,
   TAB_TOOLTIPS,
 } from "../../constants/tabConstants.jsx";
-import { btn, metaTabBtn, menuIconStyle, menuDividerStyle, inlineDividerStyle } from "./appHeaderStyles.js";
+import {
+  btn,
+  metaTabBtn,
+  menuIconStyle,
+  menuDividerStyle,
+  inlineDividerStyle,
+} from "./appHeaderStyles.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
@@ -52,6 +58,8 @@ export function AppHeaderWide({
   onExpandAll,
   hideNonEntailsRels,
   setHideNonEntailsRels,
+  verifyArguments,
+  setVerifyArguments,
   weights,
   weightsChanged,
   onWeightsChange,
@@ -294,6 +302,20 @@ export function AppHeaderWide({
                   </button>
 
                   {BACKEND_ENABLED && (
+                    <Tooltip text="When on, detected arguments are verified for formal validity, auto-trimmed, and stripped of meaning postulates. When off, the model's raw arguments are surfaced unchecked.">
+                      <button
+                        onClick={close(() => setVerifyArguments((s) => !s))}
+                        style={{ ...menuItem, textAlign: "left" }}
+                      >
+                        <span style={menuIconStyle}>
+                          {verifyArguments ? "✓" : "✗"}
+                        </span>
+                        Argument checker: {verifyArguments ? "on" : "off"}
+                      </button>
+                    </Tooltip>
+                  )}
+
+                  {BACKEND_ENABLED && (
                     <>
                       <div style={menuDividerStyle} />
 
@@ -307,7 +329,11 @@ export function AppHeaderWide({
                         <span style={menuIconStyle}>⚖</span>
                         Model weights{weightsChanged ? " *" : ""}
                         <span
-                          style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}
+                          style={{
+                            marginLeft: "auto",
+                            fontSize: 9,
+                            color: C.dim,
+                          }}
                         >
                           {weightsOpen ? "▲" : "▼"}
                         </span>
@@ -507,9 +533,7 @@ export function AppHeaderWide({
             </button>
           </Tooltip>
         )}
-        <div
-          style={inlineDividerStyle}
-        />
+        <div style={inlineDividerStyle} />
         {visibleSubTabs.map((t) => (
           <Tooltip key={t} text={TAB_TOOLTIPS[t]}>
             <button

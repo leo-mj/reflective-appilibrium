@@ -3,11 +3,11 @@
  * @module utils/principlesClient
  */
 
-import dummyPrinciples from "../dummy-data/dummy-principles.js";
+import samplePrinciples from "../sample-data/sample-principles.js";
 import { makeLLMClient } from "./llmClientFactory.js";
 
 export const fetchPrincipleSuggestions = makeLLMClient({
   endpoint: "/api/principles/suggest",
-  dummyData: dummyPrinciples,
+  dummyData: samplePrinciples,
   buildBody: (state) => ({ topic: state.topic, elements: state.elements }),
 });

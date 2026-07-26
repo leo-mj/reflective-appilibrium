@@ -46,7 +46,7 @@ export default {
       addedRound: 3
     },
     {
-      id: "J8", type: "judgment", status: "active", confidence: "moderate", origin: "assistant-suggested → user-adopted",
+      id: "J8", type: "judgment", status: "active", confidence: "moderate", origin: "user",
       text: "A society that could prevent its own extinction at modest cost but chooses not to acts wrongly.",
       addedRound: 4
     },
@@ -79,7 +79,7 @@ export default {
       addedRound: 2
     },
     {
-      id: "P2", type: "principle", status: "active", confidence: "moderate", origin: "assistant-suggested → user-adopted",
+      id: "P2", type: "principle", status: "active", confidence: "moderate", origin: "user",
       text: "Moral obligations can exist toward beings whose existence is probable, even if not certain (probabilistic obligation).",
       addedRound: 3
     },
@@ -96,19 +96,19 @@ export default {
       addedRound: 2, withdrawnRound: 3
     },
     {
-      id: "P5", type: "principle", status: "active", confidence: "moderate", origin: "assistant-suggested → user-adopted",
+      id: "P5", type: "principle", status: "active", confidence: "moderate", origin: "user",
       text: "Obligations of justice are owed to all who will be affected by our decisions, regardless of when they come to exist (Rawlsian extension).",
       addedRound: 5
     },
     {
-      id: "P6", type: "principle", status: "active", confidence: "low", origin: "assistant-suggested → user-adopted",
+      id: "P6", type: "principle", status: "active", confidence: "low", origin: "user",
       text: "Proximity (temporal, social, relational) modulates the strength but not the existence of moral obligations.",
       addedRound: 6
     },
 
     // ── Background Theories (from Round 5+) ──
     {
-      id: "T1", type: "theory", status: "active", confidence: "moderate", origin: "assistant-suggested → user-adopted",
+      id: "T1", type: "theory", status: "active", confidence: "moderate", origin: "user",
       text: "Personal identity is not required for moral patienthood — what matters is the capacity for well-being, which future people will have.",
       addedRound: 5
     },

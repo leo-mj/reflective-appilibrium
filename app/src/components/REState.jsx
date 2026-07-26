@@ -34,6 +34,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [addBarCtrlTo, setAddBarCtrlTo] = useState(null);
   const [workflowLoops, setWorkflowLoops] = useState(0);
   const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
+  const [verifyArguments, setVerifyArguments] = useState(true);
   const [equilibriumPreviewWithdrawnIds, setEquilibriumPreviewWithdrawnIds] =
     useState(null);
   const DEFAULT_WEIGHTS = {
@@ -236,6 +237,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     ready,
     isSample,
     hideNonEntailsRels,
+    verifyArguments,
   };
 
   return (
@@ -299,6 +301,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         }}
         hideNonEntailsRels={hideNonEntailsRels}
         setHideNonEntailsRels={setHideNonEntailsRels}
+        verifyArguments={verifyArguments}
+        setVerifyArguments={setVerifyArguments}
         weights={weights}
         weightsChanged={weightsChanged}
         onWeightsChange={setWeights}

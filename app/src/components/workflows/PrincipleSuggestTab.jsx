@@ -13,6 +13,9 @@ import { quickScore } from "../../utils/simulateRethonClient.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { fetchPrincipleSuggestions } from "../../utils/principlesClient.js";
 import { AddElementPanel } from "../user_edits/WorkflowAddPanels.jsx";
+import { Tooltip } from "../Tooltip.jsx";
+import { sendsToLlmText } from "../../utils/openaiClient.js";
+import { llmOrigin } from "../../utils/stateUtils.js";
 import {
   AcceptButton,
   RejectButton,
@@ -21,6 +24,7 @@ import {
   ChatButton,
   ModifyTextarea,
   ErrorBanner,
+  AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import {
   nextPhaseEnabled,
@@ -71,26 +75,28 @@ function Toolbar({
         {model && <span style={{ color: C.dim }}> · {model}</span>}
       </div>
       <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <button
-          onClick={onSuggest}
-          disabled={suggestDisabled}
-          style={{
-            background: "transparent",
-            border: `1px solid ${suggestDisabled ? C.border : C.principle.high}`,
-            color: suggestDisabled ? C.dim : C.principle.high,
-            borderRadius: 6,
-            padding: "5px 12px",
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: suggestDisabled ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-          }}
-        >
-          {loading ? <SpinnerIcon /> : <span>↺</span>}
-          {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
-        </button>
+        <Tooltip text={sendsToLlmText()}>
+          <button
+            onClick={onSuggest}
+            disabled={suggestDisabled}
+            style={{
+              background: "transparent",
+              border: `1px solid ${suggestDisabled ? C.border : C.principle.high}`,
+              color: suggestDisabled ? C.dim : C.principle.high,
+              borderRadius: 6,
+              padding: "5px 12px",
+              fontSize: 12,
+              fontWeight: "bold",
+              cursor: suggestDisabled ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            }}
+          >
+            {loading ? <SpinnerIcon /> : <span>↺</span>}
+            {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
+          </button>
+        </Tooltip>
         {workflowPhase && (
           <>
             <div
@@ -125,6 +131,9 @@ function Toolbar({
  * @param {Function} props.onModify
  * @param {Function} props.onModifyChange  Called with the new draft string.
  * @param {Function} props.onModifyCancel
+ * @param {boolean}  [props.suggestionsAreSample]  These suggestions came from the
+ *   sample fixtures; hides the AI discussion affordance, which has no sample
+ *   path and would issue a live LLM call.
  */
 function SuggestionCard({
   suggestion,
@@ -137,6 +146,7 @@ function SuggestionCard({
   onModify,
   onModifyChange,
   onModifyCancel,
+  suggestionsAreSample = false,
 }) {
   const isEditing = draft !== null;
   const [convOpen, setConvOpen] = useState(false);
@@ -177,7 +187,14 @@ function SuggestionCard({
             {suggestion.text}
           </div>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            flexShrink: 0,
+          }}
+        >
           <ScoreDeltaBadge
             state={state}
             text={draft ?? suggestion.text}
@@ -193,11 +210,13 @@ function SuggestionCard({
           ) : (
             <ModifyButton onClick={onModify} />
           )}
-          <ChatButton
-            isOpen={convOpen}
-            accentColor={C.principle.high}
-            onClick={() => setConvOpen((o) => !o)}
-          />
+          {!suggestionsAreSample && (
+            <ChatButton
+              isOpen={convOpen}
+              accentColor={C.principle.high}
+              onClick={() => setConvOpen((o) => !o)}
+            />
+          )}
         </div>
       </div>
       <div
@@ -218,7 +237,9 @@ function SuggestionCard({
             padding: "3px 6px",
           }}
         >
-          {typeof suggestion.confidence === "number" ? suggestion.confidence.toFixed(2) : suggestion.confidence}
+          {typeof suggestion.confidence === "number"
+            ? suggestion.confidence.toFixed(2)
+            : suggestion.confidence}
         </span>
         {suggestion.covers.length > 0 && (
           <span style={{ fontSize: 10, color: C.dim }}>
@@ -229,7 +250,9 @@ function SuggestionCard({
       <div style={{ color: C.dim, lineHeight: 1.6 }}>
         {suggestion.explanation}
       </div>
-      {convOpen && <ConversationPanel state={state} suggestion={suggestion} />}
+      {!suggestionsAreSample && convOpen && (
+        <ConversationPanel state={state} suggestion={suggestion} />
+      )}
     </div>
   );
 }
@@ -250,6 +273,7 @@ export function PrincipleSuggestTab({
   workflowPhase,
   onAdvanceWorkflow,
   useDummy = false,
+  suggestionsAreSample = false,
   suggestionsDisabled = false,
   weights = null,
 }) {
@@ -268,7 +292,9 @@ export function PrincipleSuggestTab({
     quickScore(state.elements, state.relations, weights).then((scores) => {
       if (!cancelled) setBaseline(scores ?? null);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [state.elements, state.relations, weights]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const judgments = state.elements.filter(
@@ -304,11 +330,13 @@ export function PrincipleSuggestTab({
     editing?.suggestion === suggestion ? editing.draft : suggestion.text;
 
   const accept = (suggestion) => {
+    const wasEdited =
+      editing?.suggestion === suggestion && editing.draft !== suggestion.text;
     onAddElement({
       type: "principle",
       text: resolvedText(suggestion),
       confidence: suggestion.confidence,
-      origin: "llm",
+      origin: llmOrigin(wasEdited, model),
     });
     setEditing(null);
     setSuggestions((prev) => prev.filter((s) => s !== suggestion));
@@ -345,6 +373,9 @@ export function PrincipleSuggestTab({
           suggestionsDisabled={suggestionsDisabled}
         />
         {error && <ErrorBanner message={error} />}
+        {suggestions !== null && suggestions.length > 0 && (
+          <AiDisclosureBanner model={model} />
+        )}
 
         {judgments.length + principles.length <= 1 && (
           <div style={{ fontSize: 12, color: C.dim }}>
@@ -374,6 +405,7 @@ export function PrincipleSuggestTab({
               setEditing((prev) => ({ ...prev, draft: text }))
             }
             onModifyCancel={() => setEditing(null)}
+            suggestionsAreSample={suggestionsAreSample}
           />
         ))}
       </div>

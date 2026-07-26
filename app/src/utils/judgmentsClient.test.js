@@ -8,7 +8,7 @@
 // fetch is replaced with a vi.stubGlobal spy so we can assert whether the
 // network path was taken without making real HTTP requests.
 import { vi, describe, it, expect, afterEach } from "vitest";
-import dummyJudgments from "../dummy-data/dummy-judgments.js";
+import sampleJudgments from "../sample-data/sample-judgments.js";
 
 afterEach(() => {
   vi.resetModules();
@@ -43,7 +43,7 @@ describe("fetchJudgmentElicitations", () => {
     );
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(result).toEqual(dummyJudgments);
+    expect(result).toEqual(sampleJudgments);
   });
 
   it("dev + sample + useDummy unchecked: calls the backend, returns real response", async () => {
@@ -85,6 +85,6 @@ describe("fetchJudgmentElicitations", () => {
     );
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(result).toEqual(dummyJudgments);
+    expect(result).toEqual(sampleJudgments);
   });
 });

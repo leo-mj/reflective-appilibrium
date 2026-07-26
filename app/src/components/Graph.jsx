@@ -491,7 +491,7 @@ export function Graph({
               rels,
               positions,
               elementById,
-              graphEdgeVisuals(rels[0], wIds, dimEdge, selectedArgRelSet),
+              graphEdgeVisuals(rels[0], wIds, dimEdge, selectedArgRelSet, rels),
             )}
           </React.Fragment>
         )}

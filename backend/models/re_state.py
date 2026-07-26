@@ -18,6 +18,13 @@ ElementType = Literal["judgment", "principle", "theory"]
 Status = Literal["active", "revised", "withdrawn", "rejected", "possible"]
 Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
+# Confidence records how strongly *the user* holds an element, so it is not the
+# LLM's to assign: suggestions are surfaced at the middle of the frontend's
+# three-point scale (low 0.33 / moderate 0.67 / high 1.0 — see
+# ``LEGACY_CONFIDENCE`` in app/src/utils/importMarkdown.js) and the user adjusts
+# it on acceptance.  This is the same default the manual add-element panels use.
+DEFAULT_CONFIDENCE: float = 0.67
+
 
 class REElement(BaseModel):
     """A single node in the RE graph — a judgment, principle, or background theory.
@@ -86,6 +93,7 @@ class RERelation(BaseModel):
     explanation: str = Field(max_length=2_000, default="")
     added_round: int = Field(alias="addedRound", ge=1)
     argument_id: Optional[str] = Field(None, alias="argumentId", max_length=200)
+    origin: Optional[str] = Field(None, max_length=200)
 
     status: Optional[Status] = None
     revised_round: Optional[int] = Field(None, alias="revisedRound", ge=1)

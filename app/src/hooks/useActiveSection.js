@@ -9,6 +9,7 @@ const SECTION_KEYS = [
   "judgments",
   "principles",
   "theories",
+  "arguments",
   "relations",
   "coherence",
   "clusters",

@@ -164,3 +164,63 @@ export function argumentRelationType(premiseCount, negated) {
     ? (negated ? "precludes" : "entails")
     : (negated ? "jointly_precludes" : "jointly_entails");
 }
+
+/**
+ * Composes a relation explanation from the meaning postulates an argument
+ * relies on. Postulates verify the inference (they are true in virtue of the
+ * sentences' meanings) but are kept out of the element pool; folding their
+ * texts into the created relation's explanation keeps the inferential bridge
+ * visible so the user can contest it later.
+ *
+ * @param {string[]} [postulates] - Meaning-postulate texts for one argument.
+ * @returns {string} `"Valid given: …"`, or `""` when there are no postulates.
+ */
+export function argumentPostulateExplanation(postulates) {
+  if (!postulates || postulates.length === 0) return "";
+  return `Valid given: ${postulates.join(" ")}`;
+}
+
+/**
+ * Human-readable label for a relation type. The stored identifier stays
+ * `"depends"` (used as a color key, in the backend schema, and in saved
+ * state); only the user-facing wording reads "depends on" so edges render as
+ * "A depends on B".
+ *
+ * @param {string} type - Relation type identifier.
+ * @returns {string}
+ */
+export function relationTypeLabel(type) {
+  return type === "depends" ? "depends on" : type;
+}
+
+// ─── Origin helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Marks an element's `origin` as also user-edited, unless it already says so.
+ * Used when an LLM suggestion is modified before acceptance, or when a
+ * previously LLM-authored element is later revised by the user.
+ *
+ * @param {string} origin - The element's current origin, e.g. `"LLM"` or a model name.
+ * @returns {string} e.g. `"LLM+user"`; unchanged if already user-attributed.
+ */
+export function withUserEdit(origin) {
+  if (!origin || origin.includes("user")) return origin;
+  return `${origin} & user`;
+}
+
+/** Fallback origin for an LLM suggestion when the specific model is unknown. */
+export const LLM_ORIGIN = "LLM";
+
+/**
+ * Origin for an accepted LLM suggestion: the specific model name when known
+ * (e.g. `"gpt-4o"`), else the generic `"LLM"` fallback — plus `"+user"` if
+ * the user edited the suggestion's text before accepting it.
+ *
+ * @param {boolean} wasEdited
+ * @param {string} [model] - The model that produced the suggestion, if known.
+ * @returns {string}
+ */
+export function llmOrigin(wasEdited, model) {
+  const base = model || LLM_ORIGIN;
+  return wasEdited ? withUserEdit(base) : base;
+}

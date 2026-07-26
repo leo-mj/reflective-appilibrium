@@ -10,7 +10,13 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { detectArguments } from "../../utils/argumentsClient.js";
-import { nextElementId, argumentRelationType } from "../../utils/stateUtils.js";
+import {
+  nextElementId,
+  argumentRelationType,
+  argumentPostulateExplanation,
+  withUserEdit,
+  llmOrigin,
+} from "../../utils/stateUtils.js";
 import {
   AcceptButton,
   RejectButton,
@@ -18,8 +24,11 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
+  AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { AddArgumentPanel } from "../user_edits/WorkflowAddPanels.jsx";
+import { Tooltip } from "../Tooltip.jsx";
+import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 
 const ACCENT = C.judgment.high;
@@ -138,6 +147,7 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
  * @param {Object}   props
  * @param {Array}    props.argument
  * @param {Set}      props.addedIds
+ * @param {string[]} props.postulates  Meaning-postulate texts this argument relies on.
  * @param {{status:'accepted'|'rejected', argumentId?:string}|undefined} props.decision
  * @param {Object|null} props.editingDrafts  Map premiseId→text, or null if not editing.
  * @param {Function} props.onAccept
@@ -150,6 +160,7 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
 function ArgumentCard({
   argument,
   addedIds,
+  postulates = [],
   decision,
   editingDrafts,
   onAccept,
@@ -202,6 +213,22 @@ function ArgumentCard({
         ↓
       </div>
       <ArgumentRow element={conclusion} isAdded={addedIds.has(conclusion.id)} />
+
+      {postulates.length > 0 && (
+        <div
+          style={{
+            fontSize: 10,
+            color: C.dim,
+            fontStyle: "italic",
+            lineHeight: 1.5,
+            marginTop: 6,
+            paddingLeft: BADGE_W / 2 - 3,
+          }}
+        >
+          <span style={{ fontWeight: "bold" }}>Valid given: </span>
+          {postulates.join(" ")}
+        </div>
+      )}
 
       {/* Action bar */}
       <div
@@ -272,6 +299,7 @@ function ArgumentCard({
 export function DetectArgumentsTab({
   state,
   useDummy = false,
+  verifyArguments = true,
   onAddElement,
   onAddRelation,
   onDeleteRelationsByArgId,
@@ -323,7 +351,9 @@ export function DetectArgumentsTab({
     setSubmittedElementIds({});
     setEditing(null);
     try {
-      const data = await detectArguments(state, useDummy);
+      const data = await detectArguments(state, useDummy, {
+        verify: verifyArguments,
+      });
       setResult(data);
     } catch (e) {
       setError(e.message);
@@ -350,14 +380,16 @@ export function DetectArgumentsTab({
     for (const el of arg) {
       if (addedIds.has(el.id) && !(el.id in newSubmittedIds)) {
         const newId = nextElementId(runningElements, el.type);
+        const editedText = drafts?.[el.id];
+        const wasEdited = editedText != null && editedText !== el.text;
         runningElements = [...runningElements, { ...el, id: newId }];
         newSubmittedIds[el.id] = newId;
         onAddElement?.({
           id: newId,
           type: el.type,
-          text: drafts?.[el.id] ?? el.text,
+          text: editedText ?? el.text,
           confidence: el.confidence,
-          origin: el.origin,
+          origin: wasEdited ? withUserEdit(el.origin) : el.origin,
         });
       }
     }
@@ -375,6 +407,11 @@ export function DetectArgumentsTab({
         premises.length,
         conclusion.negated,
       );
+      // Fold the meaning postulates this argument relies on into the relation
+      // explanation, so the inferential bridge stays visible after acceptance.
+      const explanation = argumentPostulateExplanation(
+        result.argument_postulates?.[argIndex],
+      );
       for (const premise of premises) {
         onAddRelation?.(
           {
@@ -382,7 +419,8 @@ export function DetectArgumentsTab({
             to: conclusionId,
             type: relationType,
             argumentId,
-            explanation: "",
+            explanation,
+            origin: llmOrigin(false, result.model),
           },
           { select: false, pinRecent: true },
         );
@@ -445,26 +483,28 @@ export function DetectArgumentsTab({
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <button
-              onClick={detect}
-              disabled={disabled}
-              style={{
-                background: "transparent",
-                border: `1px solid ${disabled ? C.border : ACCENT}`,
-                color: disabled ? C.dim : ACCENT,
-                borderRadius: 6,
-                padding: "5px 12px",
-                fontSize: 12,
-                fontWeight: "bold",
-                cursor: disabled ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
-              {loading ? <SpinnerIcon /> : <span>↺</span>}
-              {loading ? "Detecting…" : result ? "Re-detect" : "Detect"}
-            </button>
+            <Tooltip text={sendsToLlmText()}>
+              <button
+                onClick={detect}
+                disabled={disabled}
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${disabled ? C.border : ACCENT}`,
+                  color: disabled ? C.dim : ACCENT,
+                  borderRadius: 6,
+                  padding: "5px 12px",
+                  fontSize: 12,
+                  fontWeight: "bold",
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                {loading ? <SpinnerIcon /> : <span>↺</span>}
+                {loading ? "Detecting…" : result ? "Re-detect" : "Detect"}
+              </button>
+            </Tooltip>
             {workflowPhase && (
               <>
                 <div
@@ -493,6 +533,9 @@ export function DetectArgumentsTab({
         )}
 
         {error && <ErrorBanner message={error} />}
+        {result && result.translated_arguments.length > 0 && (
+          <AiDisclosureBanner model={result.model} />
+        )}
 
         {result && (
           <>
@@ -512,6 +555,23 @@ export function DetectArgumentsTab({
               title="Arguments"
               count={result.translated_arguments.length}
             />
+            {verifyArguments && result.rejected_count > 0 && (
+              <Tooltip text="Proposals the argument checker could not verify — formally invalid, resting on meaning postulates alone, or relying on a premise that was discarded — are dropped rather than surfaced.">
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: C.dim,
+                    marginBottom: 8,
+                    display: "inline-block",
+                    cursor: "help",
+                  }}
+                >
+                  {result.rejected_count} proposal
+                  {result.rejected_count !== 1 ? "s" : ""} rejected by the
+                  argument checker
+                </div>
+              </Tooltip>
+            )}
             {result.translated_arguments.length === 0 ? (
               <div style={{ fontSize: 12, color: C.dim }}>
                 No arguments detected.
@@ -522,6 +582,7 @@ export function DetectArgumentsTab({
                   key={i}
                   argument={arg}
                   addedIds={addedIds}
+                  postulates={result.argument_postulates?.[i] ?? []}
                   decision={decisions[i]}
                   editingDrafts={
                     editing?.argIndex === i ? editing.drafts : null

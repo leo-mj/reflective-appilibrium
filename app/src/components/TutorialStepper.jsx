@@ -12,7 +12,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { C } from "../constants/colors.js";
-import { LLM_ENABLED } from "../config.js";
+import { LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
 
 const CARD_W = 280;
 const RING_PAD = 5;
@@ -67,7 +67,7 @@ function buildSteps(hideNonEntailsRels) {
       target: "tab-clusters",
       tab: "clusters",
     },
-    ...(LLM_ENABLED
+    ...(MATRIX_ENABLED && LLM_ENABLED
       ? [
           {
             id: "tab-matrix",

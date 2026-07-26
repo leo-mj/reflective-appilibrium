@@ -1,23 +1,24 @@
-// Dummy relation suggestions for the RelationSuggestTab.
-// Topic: obligations to future generations (matches dummy-state.js).
-// Used automatically in PROD, or in DEV when the "Use dummy suggestions" toggle is on.
+// Sample relation suggestions for the RelationSuggestTab.
+// Topic: obligations to future generations (matches sample-state.js).
+// Used automatically in PROD, or in DEV when the "Use sample data" toggle is on.
+// None of these duplicate relations already present in the sample state.
 
-const dummyRelations = {
-  model: "dummy",
+const sampleRelations = {
+  model: "claude-fable-5",
   suggestions: [
     {
       from: "J1",
       to: "P1",
       type: "supports",
       explanation:
-        "(This is a dummy suggestion.) The radioactive waste case is a paradigm instance of leaving the next generation worse off, directly evidencing the sufficientarian threshold principle.",
+        "The radioactive waste case is a paradigm instance of leaving the next generation worse off, directly evidencing the sufficientarian threshold principle.",
     },
     {
       from: "J8",
       to: "P1",
-      type: "depends",
+      type: "undermines",
       explanation:
-        "The claim that extinction risk wrongs future people presupposes a principle that each generation must not leave the next worse off — without P1 in play the judgment loses its grounding.",
+        "If humanity went extinct, there would be no next generation to be left worse off — so the sufficientarian threshold by itself cannot explain the wrongness asserted in J8. The extinction case suggests the threshold principle is not the whole story.",
     },
     {
       from: "J9",
@@ -36,16 +37,16 @@ const dummyRelations = {
     {
       from: "J3",
       to: "J7",
-      type: "conflicts",
+      type: "undermines",
       explanation:
-        "J3 asserts a general duty of resource stewardship owed to unknown future persons, whereas J7 restricts strong future-oriented obligations to one's own children — the two yield incompatible verdicts on the scope of intergenerational duty.",
+        "J3 asserts an impartial stewardship duty owed to unknown future persons, which puts pressure on J7's strong partiality toward one's own children — if the general duty is as weighty as J3 claims, the gap J7 posits narrows. P6 makes the underlying tension explicit without resolving it.",
     },
     {
-      from: "P5",
+      from: "J2",
       to: "J12",
       type: "supports",
       explanation:
-        "The principle that justice extends to all parties affected by present decisions directly justifies the institutional representation of future generations demanded by J12.",
+        "Discharging the climate-policy duty in J2 over century timescales requires durable decision-making structures, which is exactly the institutional representation J12 demands.",
     },
     {
       from: "J5",
@@ -64,4 +65,4 @@ const dummyRelations = {
   ],
 };
 
-export default dummyRelations;
+export default sampleRelations;

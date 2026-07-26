@@ -8,7 +8,7 @@
  *    Replace the `elements`, `relations`, `coherence`, and `log` arrays with real
  *    data produced by the Claude RE Skill when generating a visualisation artifact.
  *
- * 2. **Dummy state** (`dummy-state.js`) — a rich fixture used in both dev and
+ * 2. **Sample state** (`sample-state.js`) — a rich fixture used in both dev and
  *    prod.  Always loaded as the initial state so visitors (and developers)
  *    see a populated example on first load.
  *
@@ -17,7 +17,7 @@
 
 /** @import { REState } from './types.js' */
 
-import _dummyState from "./dummy-data/dummy-state.js"; // dev fixture — not used in production builds
+import _sampleState from "./sample-data/sample-state.js"; // dev fixture — not used in production builds
 import { argumentRelationType } from "./utils/stateUtils.js";
 
 // ============================================================
@@ -38,7 +38,7 @@ const _inlineState = {
   elements: [
     // { id: "J1", type: "judgment", status: "active", confidence: 1.0, origin: "user", text: "...", addedRound: 1 },
     // { id: "P1", type: "principle", status: "active", confidence: 0.67, origin: "user", text: "...", addedRound: 1 },
-    // { id: "T1", type: "theory", status: "active", confidence: 1.0, origin: "assistant-suggested → user-adopted", text: "...", addedRound: 5 },
+    // { id: "T1", type: "theory", status: "active", confidence: 1.0, origin: "llm", text: "...", addedRound: 5 },
     // For revised elements, add: previousText: "...", revisedRound: N
     // For withdrawn elements, add: reason: "...", withdrawnRound: N
   ],
@@ -60,13 +60,13 @@ const _inlineState = {
 /**
  * The active RE state used by all components.
  *
- * Always the dummy fixture so both dev and prod start with a populated
+ * Always the sample data fixture so both dev and prod start with a populated
  * example.  The inline skeleton above is kept as a copy-paste template for
  * generating visualisation artifacts from Claude RE Skill output.
  *
  * @type {REState}
  */
-export const SAMPLE_STATE = _dummyState;
+export const SAMPLE_STATE = _sampleState;
 
 /**
  * Factory that returns a blank RE state for a given topic.

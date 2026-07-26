@@ -4,7 +4,7 @@
  */
 
 import { lazy, Suspense, useState } from "react";
-import { APP_ENV, LLM_ENABLED } from "../config.js";
+import { APP_ENV, LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
@@ -86,11 +86,19 @@ export function GraphPanel({
   isSample,
   recentlyAdded,
   weights,
+  verifyArguments,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
+  // True whenever the suggestions on screen came from the sample fixtures
+  // rather than a live model — the same condition makeLLMClient branches on.
+  // Note this covers demo builds, where LLM_ENABLED is false and the "Use
+  // sample data" toggle is never rendered: everything is sample data there,
+  // so anything that would need a live call must stay hidden.
+  const suggestionsAreSample = !LLM_ENABLED || useDummyAssist;
   const autoFetch = !!workflowPhase;
-  const isAssistPanel = ASSIST_TABS.includes(tab) || SIMULATE_TABS.includes(tab);
+  const isAssistPanel =
+    ASSIST_TABS.includes(tab) || SIMULATE_TABS.includes(tab);
   return (
     <div
       style={{
@@ -130,7 +138,7 @@ export function GraphPanel({
               onChange={(e) => setUseDummyAssist(e.target.checked)}
               style={{ accentColor: C.supports, cursor: "pointer" }}
             />
-            Use dummy suggestions
+            Use sample data
           </label>
         )}
       <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
@@ -168,7 +176,7 @@ export function GraphPanel({
             hideNonEntailsRels={hideNonEntailsRels}
           />
         )}
-        {tab === "matrix" && (
+        {MATRIX_ENABLED && tab === "matrix" && (
           <Suspense fallback={null}>
             <CoherenceMatrixTab
               state={state}
@@ -188,6 +196,7 @@ export function GraphPanel({
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
+              suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
@@ -202,8 +211,8 @@ export function GraphPanel({
               workflowPhase={workflowPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-
               useDummy={useDummyAssist}
+              suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
             />
@@ -220,6 +229,7 @@ export function GraphPanel({
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
+              suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
             />
@@ -240,6 +250,7 @@ export function GraphPanel({
             <DetectArgumentsTab
               state={state}
               useDummy={useDummyAssist}
+              verifyArguments={verifyArguments}
               onAddElement={onAddElement}
               onAddRelation={onAddRelation}
               onDeleteRelationsByArgId={onDeleteRelationsByArgId}

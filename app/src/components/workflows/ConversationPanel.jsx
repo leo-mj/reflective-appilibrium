@@ -13,7 +13,9 @@ import {
   startConversation,
   sendConversationMessage,
 } from "../../utils/conversationsClient.js";
-import { ErrorBanner } from "../SuggestionActions.jsx";
+import { ErrorBanner, AiTag } from "../SuggestionActions.jsx";
+import { Tooltip } from "../Tooltip.jsx";
+import { sendsToLlmText } from "../../utils/openaiClient.js";
 
 /**
  * @param {Object}   props
@@ -39,18 +41,21 @@ export function ConversationPanel({ state, suggestion }) {
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setLoading(true);
     try {
-      let reply, sid;
+      let reply, sid, model;
       if (sessionId) {
-        ({ reply } = await sendConversationMessage(sessionId, text));
+        ({ reply, model } = await sendConversationMessage(sessionId, text));
       } else {
-        ({ reply, session_id: sid } = await startConversation(
-          state,
-          suggestion,
-          text,
-        ));
+        ({
+          reply,
+          session_id: sid,
+          model,
+        } = await startConversation(state, suggestion, text));
         setSessionId(sid);
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: reply, model },
+      ]);
     } catch (e) {
       setError(e.message);
       setMessages((prev) => prev.slice(0, -1));
@@ -81,6 +86,7 @@ export function ConversationPanel({ state, suggestion }) {
               m.role === "assistant" ? `2px solid ${C.border}` : "none",
           }}
         >
+          {m.role === "assistant" && <AiTag model={m.model} />}
           {m.content}
         </div>
       ))}
@@ -111,23 +117,25 @@ export function ConversationPanel({ state, suggestion }) {
             outline: "none",
           }}
         />
-        <button
-          onClick={send}
-          disabled={loading || !input.trim()}
-          style={{
-            background: loading || !input.trim() ? C.border : C.supports,
-            border: "none",
-            borderRadius: 4,
-            padding: "4px 10px",
-            margin: "4px 8px 4px 0",
-            fontSize: 11,
-            color: "#fff",
-            cursor: loading || !input.trim() ? "not-allowed" : "pointer",
-            flexShrink: 0,
-          }}
-        >
-          {loading ? "…" : "Ask"}
-        </button>
+        <Tooltip text={sendsToLlmText("your current RE state")}>
+          <button
+            onClick={send}
+            disabled={loading || !input.trim()}
+            style={{
+              background: loading || !input.trim() ? C.border : C.supports,
+              border: "none",
+              borderRadius: 4,
+              padding: "4px 10px",
+              margin: "4px 8px 4px 0",
+              fontSize: 11,
+              color: "#fff",
+              cursor: loading || !input.trim() ? "not-allowed" : "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {loading ? "…" : "Ask"}
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

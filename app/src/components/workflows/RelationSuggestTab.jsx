@@ -12,6 +12,9 @@ import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import { fetchRelationSuggestions } from "../../utils/relationsClient.js";
 import { AddRelationPanel } from "../user_edits/WorkflowAddPanels.jsx";
+import { Tooltip } from "../Tooltip.jsx";
+import { sendsToLlmText } from "../../utils/openaiClient.js";
+import { llmOrigin, relationTypeLabel } from "../../utils/stateUtils.js";
 import {
   AcceptButton,
   RejectButton,
@@ -20,6 +23,7 @@ import {
   ChatButton,
   ModifyTextarea,
   ErrorBanner,
+  AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import {
   nextPhaseEnabled,
@@ -81,26 +85,28 @@ function Toolbar({
         {model && <span style={{ color: C.dim }}> · {model}</span>}
       </div>
       <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <button
-          onClick={onSuggest}
-          disabled={suggestDisabled}
-          style={{
-            background: "transparent",
-            border: `1px solid ${suggestDisabled ? C.border : C.supports}`,
-            color: suggestDisabled ? C.dim : C.supports,
-            borderRadius: 6,
-            padding: "5px 12px",
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: suggestDisabled ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-          }}
-        >
-          {loading ? <SpinnerIcon /> : <span>↺</span>}
-          {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
-        </button>
+        <Tooltip text={sendsToLlmText()}>
+          <button
+            onClick={onSuggest}
+            disabled={suggestDisabled}
+            style={{
+              background: "transparent",
+              border: `1px solid ${suggestDisabled ? C.border : C.supports}`,
+              color: suggestDisabled ? C.dim : C.supports,
+              borderRadius: 6,
+              padding: "5px 12px",
+              fontSize: 12,
+              fontWeight: "bold",
+              cursor: suggestDisabled ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            }}
+          >
+            {loading ? <SpinnerIcon /> : <span>↺</span>}
+            {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
+          </button>
+        </Tooltip>
         {workflowPhase && (
           <>
             <div
@@ -135,6 +141,9 @@ function Toolbar({
  * @param {Function} props.onModify
  * @param {Function} props.onModifyChange  Called with the new draft string.
  * @param {Function} props.onModifyCancel
+ * @param {boolean}  [props.suggestionsAreSample]  These suggestions came from the
+ *   sample fixtures; hides the AI discussion affordance, which has no sample
+ *   path and would issue a live LLM call.
  */
 function SuggestionCard({
   suggestion,
@@ -145,6 +154,7 @@ function SuggestionCard({
   onModify,
   onModifyChange,
   onModifyCancel,
+  suggestionsAreSample = false,
 }) {
   const color = REL_COLOR[suggestion.type] ?? C.dim;
   const isEditing = draft !== null;
@@ -184,7 +194,7 @@ function SuggestionCard({
             padding: "1px 6px",
           }}
         >
-          {suggestion.type}
+          {relationTypeLabel(suggestion.type)}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
           <AcceptButton onClick={onAccept} accentColor={C.supports} />
@@ -194,11 +204,13 @@ function SuggestionCard({
           ) : (
             <ModifyButton onClick={onModify} />
           )}
-          <ChatButton
-            isOpen={convOpen}
-            accentColor={color}
-            onClick={() => setConvOpen((o) => !o)}
-          />
+          {!suggestionsAreSample && (
+            <ChatButton
+              isOpen={convOpen}
+              accentColor={color}
+              onClick={() => setConvOpen((o) => !o)}
+            />
+          )}
         </div>
       </div>
       {isEditing ? (
@@ -212,7 +224,9 @@ function SuggestionCard({
           {suggestion.explanation}
         </div>
       )}
-      {convOpen && <ConversationPanel state={state} suggestion={suggestion} />}
+      {!suggestionsAreSample && convOpen && (
+        <ConversationPanel state={state} suggestion={suggestion} />
+      )}
     </div>
   );
 }
@@ -235,6 +249,7 @@ export function RelationSuggestTab({
   workflowPhase,
   onAdvanceWorkflow,
   useDummy = false,
+  suggestionsAreSample = false,
   suggestionsDisabled = false,
 }) {
   /** @type {[Array<{from: string, to: string, type: string, explanation: string}>|null, Function]} */
@@ -275,12 +290,16 @@ export function RelationSuggestTab({
     editing?.suggestion === suggestion ? editing.draft : suggestion.explanation;
 
   const accept = (suggestion) => {
+    const wasEdited =
+      editing?.suggestion === suggestion &&
+      editing.draft !== suggestion.explanation;
     onAddRelation(
       {
         from: suggestion.from,
         to: suggestion.to,
         type: suggestion.type,
         explanation: resolvedExplanation(suggestion),
+        origin: llmOrigin(wasEdited, model),
       },
       { select: false },
     );
@@ -320,6 +339,9 @@ export function RelationSuggestTab({
         />
 
         {error && <ErrorBanner message={error} />}
+        {suggestions !== null && suggestions.length > 0 && (
+          <AiDisclosureBanner model={model} />
+        )}
 
         {activeElements.length < 2 && (
           <div style={{ fontSize: 12, color: C.dim }}>
@@ -346,6 +368,7 @@ export function RelationSuggestTab({
               setEditing((prev) => ({ ...prev, draft: text }))
             }
             onModifyCancel={() => setEditing(null)}
+            suggestionsAreSample={suggestionsAreSample}
           />
         ))}
       </div>

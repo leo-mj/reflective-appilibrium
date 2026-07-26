@@ -1,4 +1,4 @@
-# Assistive Equilibrium
+# Reflective Appilibrium
 
 Wide reflective equilibrium (RE) tool. Research project on LLM-assisted RE.
 Three phases: Phase 1 = Claude Skill (working);
@@ -37,7 +37,7 @@ Directional; a pair can have multiple. Full matrix in `skill/re-relations-refere
     furtherArguments: Array,
   },
   elements: [{ id, type, status, confidence, origin, text, addedRound, ?previousText, ?revisedRound, ?reason, ?withdrawnRound, ?questionnaireIndex }],
-  relations: [{ from, to, type, explanation, addedRound }],
+  relations: [{ from, to, type, explanation, addedRound, ?origin }],
   coherence: { tensions: [], orphans: [], clusters: [] },
   log: [{ round, findings, options, decision, changes }]
 }
