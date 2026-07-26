@@ -7,21 +7,21 @@ It is part of a research project exploring in how far LLMs can assist in RE proc
 
 The app ships in two configurations. Both are the same React SPA — the demo is not a reduced build, it is the full interface with the AI and simulation features switched off and replaced by pre-set examples.
 
-- **Demo version** — a static site. No server, no API key, nothing leaves the browser. Live at <https://leo-mj.github.io/assistive-equilibrium/>.
+- **Demo version** — a static site. No server, no API key, nothing leaves the browser. Live at <https://leo-mj.github.io/reflective-appilibrium/>.
 - **Backend version** — the SPA plus a FastAPI server that provides LLM access, session storage, and the rethon RE simulation. Run it locally or deploy the backend yourself.
 
-| Capability                                                        | Demo                   | Backend  |
-| ----------------------------------------------------------------- | ---------------------- | -------- |
+| Capability                                                                                  | Demo                   | Backend  |
+| ------------------------------------------------------------------------------------------- | ---------------------- | -------- |
 | Graph, Text, History and Clusters tabs; manual editing of elements, relations and arguments | ✓                      | ✓        |
-| Markdown import / export (with the graph embedded as SVG)          | ✓                      | ✓        |
-| Questionnaire mode — guided RE from a pre-populated argument graph | ✓                      | ✓        |
-| Guided tour and tutorial overlays                                  | ✓                      | ✓        |
-| Assist tabs (Judgments, Principles, Arguments, Relations)          | pre-set examples only¹ | live LLM |
-| Discuss panel — follow-up conversation about a suggestion          | ✗                      | ✓        |
-| Simulate tab — formal rethon RE process and equilibrium scores     | ✗                      | ✓        |
-| Equilibrium scores in the Text tab (per round, per withdrawal)     | ✗                      | ✓        |
-| Saving and reloading sessions on the server                        | ✗²                     | ✓        |
-| LLM settings — provider, model, bring-your-own-key                 | ✗                      | ✓        |
+| Markdown import / export (with the graph embedded as SVG)                                   | ✓                      | ✓        |
+| Questionnaire mode — guided RE from a pre-populated argument graph                          | ✓                      | ✓        |
+| Guided tour and tutorial overlays                                                           | ✓                      | ✓        |
+| Assist tabs (Judgments, Principles, Arguments, Relations)                                   | pre-set examples only¹ | live LLM |
+| Discuss panel — follow-up conversation about a suggestion                                   | ✗                      | ✓        |
+| Simulate tab — formal rethon RE process and equilibrium scores                              | ✗                      | ✓        |
+| Equilibrium scores in the Text tab (per round, per withdrawal)                              | ✗                      | ✓        |
+| Saving and reloading sessions on the server                                                 | ✗²                     | ✓        |
+| LLM settings — provider, model, bring-your-own-key                                          | ✗                      | ✓        |
 
 ¹ In the demo, the Assist tabs return pre-set example suggestions when you are working on the sample process, and are disabled on a process of your own. A banner at the top of the app says so.
 ² The demo can still export the full state to Markdown and re-import it later.
@@ -30,7 +30,7 @@ The relatedness-matrix tab is currently switched off in both versions (`MATRIX_E
 
 ## Demo version
 
-Nothing to install — open <https://leo-mj.github.io/assistive-equilibrium/>.
+Nothing to install — open <https://leo-mj.github.io/reflective-appilibrium/>.
 
 To build it yourself:
 
@@ -40,7 +40,7 @@ npm install
 npm run build
 ```
 
-Deploy the resulting `dist/` folder to any static host. Note that the production build sets a base path of `/assistive-equilibrium/` (see [app/vite.config.js](app/vite.config.js)); change it if you deploy at a different path.
+Deploy the resulting `dist/` folder to any static host. Note that the production build sets a base path of `/reflective-appilibrium/` (see [app/vite.config.js](app/vite.config.js)); change it if you deploy at a different path.
 
 ## Backend version
 
@@ -88,7 +88,7 @@ DEFAULT_MODEL=gpt-4o-mini
 CORS_ORIGINS=http://localhost:5173
 
 # Where RE sessions are stored. Defaults to <repo-root>/sessions.
-# SESSIONS_DIR=/var/data/assistive-equilibrium/sessions
+# SESSIONS_DIR=/var/data/reflective-appilibrium/sessions
 ```
 
 To run against a local model only (e.g. Ollama):

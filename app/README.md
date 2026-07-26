@@ -1,4 +1,4 @@
-# Assistive Equilibrium — Web App
+# Reflective Appilibrium — Web App
 
 A React + Vite visualisation tool for wide reflective equilibrium (RE) in ethics.
 

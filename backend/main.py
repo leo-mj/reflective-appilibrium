@@ -1,5 +1,5 @@
 """
-Assistive Equilibrium — FastAPI backend (V2, local).
+Reflective Appilibrium — FastAPI backend (V2, local).
 
 Start with:
     uvicorn backend.main:app --reload
@@ -35,7 +35,7 @@ logging.getLogger("backend").setLevel(logging.INFO)
 # ── App ────────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Assistive Equilibrium API",
+    title="Reflective Appilibrium API",
     version="0.1.0",
     description="Backend for the V2 local RE tool.",
 )

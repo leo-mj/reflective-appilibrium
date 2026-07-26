@@ -1,4 +1,4 @@
-# Assistive Equilibrium
+# Reflective Appilibrium
 
 Wide reflective equilibrium (RE) tool. Research project on LLM-assisted RE.
 Three phases: Phase 1 = Claude Skill (working);
