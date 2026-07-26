@@ -10,7 +10,7 @@ import logging
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..dependencies import get_llm_service
@@ -59,12 +59,26 @@ async def analyze(
     request: MatrixRequest,
     llm: Annotated[LLMService, Depends(get_llm_service)],
 ) -> MatrixResponse:
-    """Compute a relatedness matrix for the provided RE elements."""
+    """Compute a relatedness matrix for the provided RE elements.
+
+    Raises 422 when fewer than two elements survive filtering.  ``MatrixRequest``
+    enforces a minimum of 2 on the *submitted* list, but withdrawn elements and
+    background theories are dropped below, so a valid request can still leave
+    too few elements to relate.
+    """
     active = [
         e
         for e in request.elements
         if e.status != "withdrawn" and e.type in ("judgment", "principle")
     ]
+    if len(active) < 2:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "A relatedness matrix needs at least 2 active judgments or "
+                f"principles, got {len(active)}."
+            ),
+        )
     logger.info(
         f"Requesting relatedness matrix from model '{llm.model}' for {len(active)} elements."
     )

@@ -207,11 +207,11 @@ Respond with valid JSON only, in exactly this format:
       "role": "postulate"
     }},
     {{
-        "index": {next_index + 2},
-        "type": "judgment",
-        "role": "premise",
-        "text": "A society's failure to prevent its own distant extinction wrongs no one now alive and, with respect to future people, merely fails to bring them into existence.",
-    }},
+      "index": {next_index + 2},
+      "type": "judgment",
+      "role": "premise",
+      "text": "A society's failure to prevent its own distant extinction wrongs no one now alive and, with respect to future people, merely fails to bring them into existence."
+    }}
   ]
 }}
 

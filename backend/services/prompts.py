@@ -13,6 +13,9 @@ Relation types (all are directional — check both A→B and B→A):
 - undermines: A weakens B without flatly contradicting it; reduces plausibility or confidence
 - depends: A presupposes B; A cannot hold (or loses its grounding) if B is withdrawn
 
+Use ONLY these four types. Formal-inference types such as "entails" or "precludes" \
+are recorded elsewhere, by the argument-reconstruction step, and must never appear here.
+
 A single pair can have multiple relations (e.g. P supports J in one respect but undermines it in another). Record each separately.
 When in doubt whether a relation exists, include it — the user can reject it. Missing connections degrade coherence evaluation."""
 
@@ -24,10 +27,19 @@ def build_matrix_prompt(topic: str, elements: list[REElement]) -> str:
     diagonal 1.0 entries and a ``pairDescriptions`` dict keyed by
     ``"A→B"`` with one entry per unordered pair (the frontend looks up
     both directions, so key order does not matter).
+
+    Raises ``ValueError`` for fewer than two elements: a relatedness matrix
+    needs a pair to relate, and the example block below needs two IDs to
+    render.  Callers should reject such requests before reaching this point.
     """
-    element_list = "\n".join(f"{e.id} [{e.type}]: {e.text}" for e in elements)
     ids = [e.id for e in elements]
-    example_ids = ids[:3] if len(ids) >= 3 else ids
+    if len(ids) < 2:
+        raise ValueError(
+            f"A relatedness matrix needs at least 2 elements, got {len(ids)}."
+        )
+
+    element_list = "\n".join(f"{e.id} [{e.type}]: {e.text}" for e in elements)
+    example_ids = ids[:3]
 
     return f"""\
 You are assisting a reflective equilibrium (RE) analysis in ethics.
@@ -113,29 +125,32 @@ def build_judgments_prompt(
 ) -> str:
     """Build the LLM prompt for judgment elicitation.
 
-    Active and withdrawn elements are listed separately so the model can
-    target genuine gaps rather than re-eliciting already-recorded positions.
+    Active, withdrawn, and rejected elements are listed separately so the model
+    can target genuine gaps rather than re-eliciting already-recorded positions.
+    Rejected elements matter most here: they are suggestions the user has
+    explicitly declined, and omitting them from the prompt makes the model
+    offer them again.
     Only the five most recent log entries are included to stay within token limits.
     """
     active = [e for e in elements if e.status not in {"withdrawn", "rejected"}]
     withdrawn = [e for e in elements if e.status == "withdrawn"]
+    rejected = [e for e in elements if e.status == "rejected"]
 
+    # Each fallback tests the *rendered* text, not the source list: a non-empty
+    # list whose entries are all filtered out (e.g. log entries with no
+    # findings) would otherwise render as a blank section with no marker.
     active_lines = (
-        "\n".join(f"  {e.id} [{e.type}]: {e.text}" for e in active)
-        if active
-        else "  (none)"
+        "\n".join(f"  {e.id} [{e.type}]: {e.text}" for e in active) or "  (none)"
     )
-    withdrawn_lines = (
-        "\n".join(f"  {e.id}: {e.text}" for e in withdrawn) if withdrawn else "  (none)"
-    )
+    withdrawn_lines = "\n".join(f"  {e.id}: {e.text}" for e in withdrawn) or "  (none)"
+    rejected_lines = "\n".join(f"  {e.id}: {e.text}" for e in rejected) or "  (none)"
     log_lines = (
         "\n".join(
             f"  Round {entry.round}: {entry.findings}"
             for entry in log[-5:]
             if entry.findings
         )
-        if log
-        else "  (none)"
+        or "  (none)"
     )
 
     return f"""\
@@ -145,8 +160,11 @@ Topic: "{topic}"
 Current elements (active):
 {active_lines}
 
-Previously withdrawn elements (for context — these were reconsidered):
+Previously withdrawn elements (the user held these, then gave them up):
 {withdrawn_lines}
+
+Previously rejected suggestions (the user was offered these and declined them):
+{rejected_lines}
 
 Recent round notes:
 {log_lines}
@@ -163,7 +181,8 @@ Guidelines:
 - Target gaps: aspects of the topic the existing judgments do not yet address.
 - Vary the angle: use cases from different ethical traditions, edge cases, \
 near-miss scenarios, or analogies from other domains.
-- Do not re-elicit judgments already present or withdrawn.
+- Do not re-elicit judgments already present, withdrawn, or rejected. A rejected \
+suggestion has been considered and declined; do not offer it again, in any rephrasing.
 - Keep questions concise (1–2 sentences) and concrete.
 - Each position should be a stand-alone moral verdict (not a rephrasing of the question).
 - Positions within one question should be mutually exclusive — a user should be \
@@ -193,26 +212,30 @@ def build_principles_prompt(
 
     Both active judgments and existing principles are included so the model
     can avoid redundant proposals and estimate how many new principles are
-    warranted (target: roughly one per three elements).
+    warranted (ceiling: roughly one per three elements, never fewer than 2).
+    The ceiling is an upper bound only — returning no suggestions is a valid
+    answer when the existing principles already systematise the judgments.
     """
-    judgment_lines = "\n".join(f"  {e.id}: {e.text}" for e in judgments)
+    judgment_lines = "\n".join(f"  {e.id}: {e.text}" for e in judgments) or "  (none)"
     principle_lines = (
-        "\n".join(f"  {e.id}: {e.text}" for e in existing_principles)
-        if existing_principles
-        else "  (none)"
+        "\n".join(f"  {e.id}: {e.text}" for e in existing_principles) or "  (none)"
     )
 
     return f"""\
 You are assisting a reflective equilibrium (RE) analysis in ethics.
 Topic: "{topic}"
 
-Existing judgments and principles to systematise:
+Judgments to systematise:
 {judgment_lines}
+
+Principles already recorded:
 {principle_lines}
 
-Task: propose at least 2 and up to {max(2, (len(judgments) + len(existing_principles)) // 3)} \
+Task: propose up to {max(2, (len(judgments) + len(existing_principles)) // 3)} \
 NEW principles that would systematise as many of the judgments
-and/or principles above as possible. Each principle should:
+and/or principles above as possible. Propose only principles the material \
+actually warrants — a smaller set of well-grounded principles is better than \
+padding to the limit. Each principle should:
 - Be a general moral rule or norm (not a particular verdict).
 - Cover several judgments (list their IDs in "covers").
 - Not duplicate any already-recorded principle.
