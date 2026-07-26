@@ -24,7 +24,7 @@ from ..services.arguments import (
     arg_fingerprint,
     existing_arg_fingerprints,
     translate_arguments,
-    verify_and_partition,
+    partition_arguments,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,11 +76,20 @@ async def detect_arguments(
             f"Received {len(llm_response.detected_arguments)} arguments from LLM."
         )
 
-        # Formal verification: check validity, auto-trim redundant premises,
-        # split meaning postulates (kept out of the pool) from substantive
-        # added premises (surfaced as elements).
-        verified, postulates, used_premises, rejected = verify_and_partition(
-            llm_response.detected_arguments, llm_response.added_premises
+        # Formal verification (when request.verify): check validity, auto-trim
+        # redundant premises, split meaning postulates (kept out of the pool)
+        # from substantive added premises (surfaced as elements).  When
+        # verification is off the checker is bypassed and arguments are
+        # surfaced as proposed.
+        if not request.verify:
+            logger.info(
+                "Argument checker disabled; surfacing LLM arguments unverified."
+            )
+        verified, postulates, used_premises, rejected = partition_arguments(
+            llm_response.detected_arguments,
+            llm_response.added_premises,
+            verify=request.verify,
+            pool_indices=initial_lookup.keys(),
         )
         if rejected:
             logger.info(f"Rejected {rejected} argument(s) in formal verification.")
@@ -120,6 +129,7 @@ async def detect_arguments(
             lookup=lookup_w_premises,
             argument_postulates=argument_postulates,
             rejected_count=rejected,
+            model=llm.model,
             input_tokens=llm_response.input_tokens,
             output_tokens=llm_response.output_tokens,
         )

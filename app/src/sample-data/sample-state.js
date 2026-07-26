@@ -216,6 +216,21 @@ export default {
       text: "The non-identity problem shows that specific future individuals are metaphysically indeterminate, but future people as a class are not.",
       addedRound: 6,
     },
+
+    // A judgment the user accepted earlier that is not yet tied into any
+    // argument (deliberately left unconnected). Detect Arguments reconstructs
+    // P1 + J14 → J1 from it, demonstrating argument detection over existing
+    // elements rather than newly proposed premises. Kept last so it occupies
+    // positional index 22 in the argument fixture (sample-arguments.js).
+    {
+      id: "J14",
+      type: "judgment",
+      status: "active",
+      confidence: 1.0,
+      origin: "user",
+      text: "Burying large quantities of radioactive waste without containment bequeaths the next generation land and groundwater burdened with an uncontained long-term hazard, leaving them worse off than we found things.",
+      addedRound: 1,
+    },
   ],
   relations: [
     // P1 supports

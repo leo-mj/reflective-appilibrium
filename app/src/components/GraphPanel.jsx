@@ -86,6 +86,7 @@ export function GraphPanel({
   isSample,
   recentlyAdded,
   weights,
+  verifyArguments,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
@@ -240,6 +241,7 @@ export function GraphPanel({
             <DetectArgumentsTab
               state={state}
               useDummy={useDummyAssist}
+              verifyArguments={verifyArguments}
               onAddElement={onAddElement}
               onAddRelation={onAddRelation}
               onDeleteRelationsByArgId={onDeleteRelationsByArgId}

@@ -7,12 +7,21 @@ from ..models.re_state import ElementType, REElement, RERelation
 
 
 class DetectArgumentsRequest(BaseModel):
-    """Payload for ``POST /api/arguments/detect``."""
+    """Payload for ``POST /api/arguments/detect``.
+
+    ``verify`` controls the formal argument checker: when ``True`` (default)
+    each LLM-proposed argument is verified, auto-trimmed, and stripped of
+    meaning postulates before being surfaced.  When ``False`` the checker is
+    bypassed — arguments are surfaced exactly as proposed and every added
+    premise (postulates included) enters the pool — for inspecting raw model
+    output or working with models that cannot supply valid logical forms.
+    """
 
     elements: List[REElement]
     relations: List[RERelation] = []
     round: str
     topic: str = ""
+    verify: bool = True
 
 
 class AddedPremise(BaseModel):
@@ -60,7 +69,8 @@ class DetectArgumentsResponse(BaseModel):
     further translations without re-requesting.  ``argument_postulates`` is parallel to
     ``num_arguments``: the meaning-postulate texts each argument relies on (usually
     empty).  ``rejected_count`` is the number of LLM proposals that failed formal
-    verification and were dropped.
+    verification and were dropped.  ``model`` is the model that generated the
+    arguments (mirrors the other assist endpoints, so the UI can disclose it).
     """
 
     num_arguments: List[List[int]]
@@ -68,6 +78,7 @@ class DetectArgumentsResponse(BaseModel):
     lookup: Dict
     argument_postulates: List[List[str]] = []
     rejected_count: int = 0
+    model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
 

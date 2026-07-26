@@ -4,6 +4,8 @@ from typing import List, Dict, Tuple, Set
 import json
 import logging
 
+from pydantic import ValidationError
+
 from ..models.re_state import REElement, RERelation
 from ..services.llm import LLMService
 from ..services.argument_checker import verify_argument
@@ -166,12 +168,20 @@ Every reconstructed argument must be STRICTLY FORMALLY VALID. Because the number
   - "premise" — a claim with normative or empirical content of its own, which a competent, informed speaker could reject as a substantive position.
   When in doubt, use "premise".
 
+Added premises must be substantive, not restatements.
+The lazy way to force validity is to add the bare conditional "If <premise>, then <conclusion>" — text that just strings the argument's own premise and conclusion together with "if … then". Such a premise re-encodes the inference instead of justifying it; it is worthless. Never produce one.
+A good "premise"-role addition is a GENERAL claim that reaches beyond this single argument — a principle or judgment that could do work in other inferences and that a competent, informed person could reject on substantive grounds while granting the listed premises. Its "form" may well be a simple implication (e.g. "16 -> 8"); that is fine. What must not be trivial is the TEXT: it states the general principle this argument instantiates, never the instance itself.
+Self-test: strip the specific subject matter out of the premise and conclusion — does a general claim remain? If the addition only makes sense as "if THIS premise then THIS conclusion", it is a restatement: find a genuinely general bridge, or omit the argument.
+Worked example — bridging "Allowing avoidable extinction wrongs the future people who would otherwise have existed" to "A society that could prevent its own extinction at modest cost but does not acts wrongly":
+  - BAD (restatement — never do this): "If allowing avoidable extinction wrongs future people, then a society that could prevent its extinction at modest cost but does not acts wrongly."
+  - GOOD (general bridge): "Knowingly permitting an outcome that wrongs others, when one could prevent it at modest cost, is itself to act wrongly." — it governs other cases too, and one could dispute it (e.g. deny that modest-cost avoidability makes the omission wrong) while still granting the premise.
+
 Constraints:
 - At most 3 pool sentences as premises per argument.
 - The conclusion must be a pool sentence or its negation, and must not appear among the premises.
 - No redundant premises: every premise must be needed for validity.
 - Premises must be jointly consistent (no arguments from contradiction).
-- An added premise with role "premise" must be an independently contentful general claim — not a mere restatement of the argument as a conditional. If the only bridge you can find merely restates the inference and is not true in virtue of meaning, omit the argument.
+- No restatement premises (see "Added premises must be substantive" above): if the only bridge you can find merely re-encodes the inference as a conditional and is not true in virtue of meaning, omit the argument.
 
 Output: each argument is a list of integers whose final member is the conclusion and all previous members are premises. For example, in [14, {next_index}, 1], the conclusion is sentence 1 and the premises are sentence 14 and added premise {next_index}. In [3, {next_index + 1}, -7], the conclusion is ¬sentence-7. Premises may also be negated (e.g. -3).
 
@@ -195,7 +205,13 @@ Respond with valid JSON only, in exactly this format:
       "text": "A statement true in virtue of the meanings of sentences 3 and 7.",
       "form": "3 -> ~7",
       "role": "postulate"
-    }}
+    }},
+    {{
+        "index": {next_index + 2},
+        "type": "judgment",
+        "role": "premise",
+        "text": "A society's failure to prevent its own distant extinction wrongs no one now alive and, with respect to future people, merely fails to bring them into existence.",
+    }},
   ]
 }}
 
@@ -262,7 +278,7 @@ def translate_arguments(
 
 # Sample arguments keyed to the sample RE state (obligations to future generations).
 # Mirrors app/src/sample-data/sample-arguments.js, but stores each argument as its
-# FULL formal reconstruction: substantive added premises (22–29) are unanalyzed
+# FULL formal reconstruction: substantive added premises (23–29) are unanalyzed
 # sentences, and every inferential step is closed by a meaning postulate (30–44)
 # carrying its logical form.  The dummy path runs these through the same
 # verify_and_partition pipeline as live LLM output, so the fixture is formally
@@ -270,15 +286,13 @@ def translate_arguments(
 # arguments exactly as in production.
 #
 # Element indices (position in sample-state elements, including withdrawn):
-# 1:J1 … 13:J13, 14:P1 … 19:P6, 20:T1, 21:T2.  Negative indices: -n = ¬sentence-n.
+# 1:J1 … 13:J13, 14:P1 … 19:P6, 20:T1, 21:T2, 22:J14 (the premise promoted into
+# the state, so P1 + J14 → J1 is detected over existing elements).  Index 22 is
+# therefore a pool element, not an added premise.  Negative indices: -n = ¬sentence-n.
+# (The frontend additionally routes premises 24 and 29 through Elicit Judgments;
+# this checker fixture keeps them as added premises.)
 DUMMY_ADDED_PREMISES: List[Dict] = [
     # ── Substantive premises (surfaced as elements when their argument is accepted) ──
-    {
-        "index": 22,
-        "type": "judgment",
-        "role": "premise",
-        "text": "Burying large quantities of radioactive waste without containment bequeaths the next generation land and groundwater burdened with an uncontained long-term hazard, leaving them worse off than we found things.",
-    },
     {
         "index": 23,
         "type": "principle",
@@ -500,6 +514,7 @@ def dummy_detect_arguments(
         lookup=lookup_w_premises,
         argument_postulates=argument_postulates,
         rejected_count=rejected,
+        model="claude-fable-5",
     )
 
 
@@ -522,6 +537,8 @@ def verify_and_partition(
     premises actually used by a kept argument, and the number of proposals
     rejected as formally invalid (or as resting on postulates alone).
     """
+    logger.info(f"Checking {len(detected)} arguments.")
+
     forms = {p.index: p.form for p in added_premises if p.form}
     by_index = {p.index: p for p in added_premises}
     # Trim preference: when a postulate and a substantive premise are
@@ -570,6 +587,75 @@ def verify_and_partition(
     return kept_args, postulates_per_arg, used_premises, rejected
 
 
+def partition_arguments(
+    detected: List[List[int]],
+    added_premises: List[AddedPremise],
+    verify: bool,
+    pool_indices,
+) -> Tuple[List[List[int]], List[List[str]], List[AddedPremise], int]:
+    """Dispatch to formal verification or the checker-disabled passthrough.
+
+    First, in either mode, any argument referencing an index that is neither a
+    pool sentence (``pool_indices``) nor a surviving added premise is dropped
+    outright.  This covers arguments built on a premise that was discarded as
+    malformed (see ``parse_added_premises``): without its bridge premise such
+    an argument is unsound, and its index would not resolve in the lookup — so
+    it must go, not be handed to the checker as a bare atom.  Dropped arguments
+    are counted toward ``rejected``.
+
+    When ``verify`` is true the survivors go through ``verify_and_partition``.
+    When it is false the checker is bypassed: every surviving argument is
+    surfaced as proposed and every added premise — postulates included — is
+    treated as a pool element, since without verification there is no basis for
+    stripping meaning postulates or trimming redundant premises.
+
+    Returns the same ``(kept_args, postulates_per_arg, used_premises,
+    rejected)`` shape either way, so the router treats both paths uniformly.
+    """
+    valid = set(pool_indices) | {p.index for p in added_premises}
+    resolvable = [arg for arg in detected if all(abs(n) in valid for n in arg)]
+    unresolved = len(detected) - len(resolvable)
+    if unresolved:
+        logger.info(
+            f"Dropped {unresolved} argument(s) referencing an index with no pool "
+            f"sentence or valid added premise (e.g. a discarded malformed premise)."
+        )
+
+    if verify:
+        kept, postulates, used, rejected = verify_and_partition(
+            resolvable, added_premises
+        )
+        return kept, postulates, used, rejected + unresolved
+
+    return resolvable, [[] for _ in resolvable], list(added_premises), unresolved
+
+
+def parse_added_premises(raw) -> List[AddedPremise]:
+    """Validate each added-premise entry individually, dropping malformed ones.
+
+    A single premise that violates ``AddedPremise`` — most commonly an LLM
+    putting ``"postulate"`` in ``type`` (an element type) instead of in
+    ``role`` — must not sink the whole response.  Each entry is validated on
+    its own; well-formed premises are kept, malformed ones are logged and
+    skipped.  An argument that relied on a dropped premise then fails formal
+    verification and is rejected by the checker rather than surfaced.
+    """
+    if not isinstance(raw, list):
+        logger.warning(
+            f"Ignoring non-list added_premises payload: {type(raw).__name__}"
+        )
+        return []
+    premises: List[AddedPremise] = []
+    for i, item in enumerate(raw):
+        try:
+            premises.append(AddedPremise.model_validate(item))
+        except ValidationError as e:
+            logger.warning(
+                f"Skipping malformed added premise at position {i}: {e.error_count()} error(s); {item!r}"
+            )
+    return premises
+
+
 async def get_arguments_from_llm(
     lookup: Dict[int, REElement],
     llm: LLMService,
@@ -586,7 +672,7 @@ async def get_arguments_from_llm(
     data = json.loads(result.text)
     return LLMArgumentsResponse(
         detected_arguments=data.get("arguments", []),
-        added_premises=data.get("added_premises", []),
+        added_premises=parse_added_premises(data.get("added_premises", [])),
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
     )

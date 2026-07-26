@@ -50,6 +50,8 @@ export function AppHeaderNarrow({
   onExpandAll,
   hideNonEntailsRels,
   setHideNonEntailsRels,
+  verifyArguments,
+  setVerifyArguments,
   weights,
   weightsChanged,
   onWeightsChange,
@@ -184,6 +186,16 @@ export function AppHeaderNarrow({
             <span style={menuIconStyle}>→</span>
             {hideNonEntailsRels ? "All relations" : "Arguments only"}
           </button>
+
+          {BACKEND_ENABLED && (
+            <button
+              onClick={close(() => setVerifyArguments((s) => !s))}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>{verifyArguments ? "✓" : "✗"}</span>
+              Argument checker: {verifyArguments ? "on" : "off"}
+            </button>
+          )}
 
           <div style={menuDividerStyle} />
 

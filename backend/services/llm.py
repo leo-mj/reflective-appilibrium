@@ -10,15 +10,33 @@ Swap ``base_url`` in .env or via BYOK headers to target OpenAI, Anthropic,
 Mistral, Ollama, vLLM, etc. without changing call sites.
 """
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
 
 from anthropic import AsyncAnthropic
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, BadRequestError
 
+
+logger = logging.getLogger(__name__)
 
 _ANTHROPIC_BASE = "https://api.anthropic.com"
+
+
+def _is_unsupported_temperature(exc: BadRequestError) -> bool:
+    """True when a provider 400 is specifically about an unsupported temperature.
+
+    OpenAI reasoning models (the o-series and the GPT-5 family) reject any
+    non-default temperature with a 400 whose ``param``/message names
+    ``temperature`` — e.g. "Unsupported value: 'temperature' does not support
+    0.0 with this model. Only the default (1) value is supported."  We match on
+    that so the retry never swallows unrelated bad requests (a bad model name,
+    a malformed payload).
+    """
+    if getattr(exc, "param", None) == "temperature":
+        return True
+    return "temperature" in str(exc).lower()
 
 
 def _extract_json(text: str) -> str:
@@ -173,12 +191,28 @@ class LLMService:
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
 
-        response = await client.chat.completions.create(
-            model=self.model,
-            messages=messages,  # type: ignore[arg-type]
-            temperature=temperature,
-            **kwargs,
-        )
+        try:
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=messages,  # type: ignore[arg-type]
+                temperature=temperature,
+                **kwargs,
+            )
+        except BadRequestError as exc:
+            if not _is_unsupported_temperature(exc):
+                raise
+            # Reasoning models accept only the provider's default temperature;
+            # retry once without the parameter rather than failing the request.
+            logger.info(
+                "Model %s rejected temperature=%s; retrying with the provider default.",
+                self.model,
+                temperature,
+            )
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=messages,  # type: ignore[arg-type]
+                **kwargs,
+            )
         usage = response.usage
         return (
             response.choices[0].message.content,

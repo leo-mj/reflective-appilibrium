@@ -96,8 +96,15 @@ export function LLMSettingsModal({ open, onClose }) {
         const data = await res.json();
         setTestStatus({ ok: true, message: `Connected — model: ${data.model}` });
       } else {
-        const text = await res.text();
-        setTestStatus({ ok: false, message: text || `Error ${res.status}` });
+        const raw = await res.text();
+        let message = raw || `Error ${res.status}`;
+        try {
+          const detail = JSON.parse(raw)?.detail;
+          if (detail) message = typeof detail === "string" ? detail : JSON.stringify(detail);
+        } catch {
+          /* not JSON — show the raw text */
+        }
+        setTestStatus({ ok: false, message });
       }
     } catch (err) {
       setTestStatus({ ok: false, message: err.message });

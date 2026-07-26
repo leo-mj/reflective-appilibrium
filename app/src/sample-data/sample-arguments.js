@@ -1,21 +1,38 @@
 // Sample argument detection for the DetectArgumentsTab.
 import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
+import { ELICITABLE_ARGUMENT_PREMISES } from "./sample-judgments.js";
 // Topic: obligations to future generations (matches sample-state.js).
 // Mirrors the Python dummy_detect_arguments logic from backend/services/arguments.py.
+//
+// Each argument is stored in its FINAL, surfaced form: the postulate-stripped
+// output the backend pipeline produces after verify_and_partition. Because the
+// numbered sentences are logically independent atoms, every argument relies on
+// a meaning postulate (Carnap 1952) that bridges the inferential gap. Those
+// postulates are verified and then folded out of the pool on the backend; here
+// they are stored directly as `_ARGUMENT_POSTULATES` (parallel to the argument
+// list) so the offline demo surfaces the same "Valid given: …" bridge texts
+// without re-implementing the checker.
+//
+// Detection over EXISTING elements vs. newly proposed premises:
+//   - Index 22 is J14, a judgment already in the sample state, so P1 + J14 → J1
+//     is detected purely from existing elements.
+//   - Indices 24 and 29 double as Elicit-Judgments options (their texts live in
+//     ELICITABLE_ARGUMENT_PREMISES). If the user accepted one there, getSampleArguments
+//     matches it by text in the current pool and reuses it instead of re-proposing it.
+//   - The remaining indices (23, 25–28) are genuinely new premises the LLM adds.
 
 // Negative indices represent negations: -n = ¬sentence-n
 // Element indices (position in sample-state elements): J1–J13 = 1–13,
-// P1–P6 = 14–19, T1 = 20, T2 = 21.
+// P1–P6 = 14–19, T1 = 20, T2 = 21, J14 = 22.
 const _SAMPLE_ARGUMENTS = [
-  // Indices 22–29 are added premises:
-  // 22:J (next generation inherits the waste hazard — bridge for P1→J1)
+  // Index 22 is J14 (a pool element). Indices 23–29 are added premises:
   // 23:P (well-being capacity grounds justice — bridge for T1→P5)
-  // 24:J (people in 2100 causally affected — bridge for P5→J2)
+  // 24:J (people in 2100 causally affected — ELICITABLE — bridge for P5→J2)
   // 25:P (affected but unrepresented, so representation required — bridge for P5→J12)
   // 26:P (person-affecting restriction: wrong only if someone is wronged — shared bridge for P4→¬J1 and J13→¬J8)
   // 27:P (de dicto obligations survive de re indeterminacy — bridge for T2→J9)
   // 28:P (justice gives protected welfare full weight despite uncertainty — bridge for P5→¬J5)
-  // 29:J (extinction as mere non-creation — bridge for J13→¬J8)
+  // 29:J (extinction as mere non-creation — ELICITABLE — bridge for J13→¬J8)
   [14, 22, 1],
   [16, 10],
   [18, 24, 2],
@@ -34,46 +51,74 @@ const _SAMPLE_ARGUMENTS = [
   [13, 29, 26, -8], // J13 + J29 + P26 → ¬J8 (allowing extinction wrongs no one now alive or future, and wrongness requires a wronged party)
 ];
 
+// Parallel to _SAMPLE_ARGUMENTS: the meaning-postulate text(s) each argument
+// relies on (backend added-premise indices 30–44; each argument uses exactly
+// one). Surfaced to the user as the argument's "Valid given: …" bridge.
+const _ARGUMENT_POSTULATES = [
+  ["An act that does exactly what a generation's standing duty forbids — leaving the next generation worse off — is thereby wrong."],
+  ["Interests being discounted for temporal distance just is obligations toward their holders weakening with temporal distance."],
+  ["If justice is owed to all who will be affected, and the people of 2100 and beyond will be affected by present climate policy, then climate policy owes their welfare consideration."],
+  ["If justice is owed to future generations and can be discharged only through representative mechanisms, then such mechanisms ought to exist."],
+  ["Owing justice to people regardless of when they exist just is not discounting their interests for their temporal distance."],
+  ["If what matters for moral patienthood is well-being capacity, and those with well-being capacity who are affected are owed justice, then justice is owed to all who will be affected, whenever they exist."],
+  ["If obligations attach to future people de dicto though not de re, then the non-identity problem reduces our obligations (the de re loss) but does not eliminate them (the de dicto survival)."],
+  ["If moral patienthood needs no identity and future people form a determinate class, then obligations toward merely probable beings are possible."],
+  ["If obligations can attach to probable beings and diminish only with existence-uncertainty, then slight discounting for genuine existence-uncertainty is permissible."],
+  ["If only presently existing beings can be wronged and wrongness requires a wronged party, then an act harming only the not-yet-existing is not wrong."],
+  ["That only currently existing beings can bear obligations directly contradicts obligations existing toward merely probable future beings."],
+  ["That obligations can exist toward probable future beings directly contradicts our having no obligations to those who do not yet exist."],
+  ["If justice is owed to whoever will be affected and justice demands full weight despite uncertainty, then even slight uncertainty-discounting is impermissible."],
+  ["If temporal proximity modulates obligation strength and parental duties outrank duties to distant strangers, then interests may be discounted with temporal distance after all."],
+  ["If wronging requires a wronged party, extinction wrongs no one now alive and merely fails to create future people, and non-creation wrongs no one, then allowing extinction is not wrong."],
+];
+
+// Added premises the LLM proposes to close each inferential gap. Index 22 is
+// omitted: it was promoted into the sample state as J14. Premises 24 and 29 use
+// the shared ELICITABLE_ARGUMENT_PREMISES texts so that, if the user accepted
+// them in Elicit Judgments, getSampleArguments reuses the accepted element
+// instead of re-proposing the premise.
 const _ADDED_PREMISES = [
-  {
-    index: 22,
-    type: "judgment",
-    text: "Burying large quantities of radioactive waste without containment bequeaths the next generation land and groundwater burdened with an uncontained long-term hazard, leaving them worse off than we found things.",
-  },
   {
     index: 23,
     type: "principle",
+    role: "premise",
     text: "Beings who possess or will possess the capacity for well-being and who will be affected by our decisions are owed obligations of justice.",
   },
   {
     index: 24,
     type: "judgment",
-    text: "People living in 2100 and beyond will be causally affected by climate policies adopted today.",
+    role: "premise",
+    text: ELICITABLE_ARGUMENT_PREMISES.affected2100,
   },
   {
     index: 25,
     type: "principle",
+    role: "premise",
     text: "Future generations will be affected by present political decisions but cannot take part in making them; obligations of justice owed to such people can be discharged only through institutional mechanisms that represent their interests.",
   },
   {
     index: 26,
     type: "principle",
+    role: "premise",
     text: "An act or omission is wrong only if there is or will be someone whom it wrongs (person-affecting restriction).",
   },
   {
     index: 27,
     type: "principle",
+    role: "premise",
     text: "Obligations to future people attach de dicto — to whoever will exist — even when they cannot attach de re to any specific future individual.",
   },
   {
     index: 28,
     type: "principle",
+    role: "premise",
     text: "Where obligations of justice are owed, the welfare of those protected must be given its full weight in present deliberation, however uncertain their existence.",
   },
   {
     index: 29,
     type: "judgment",
-    text: "A society's failure to prevent its own distant extinction wrongs no one now alive and, with respect to future people, merely fails to bring them into existence.",
+    role: "premise",
+    text: ELICITABLE_ARGUMENT_PREMISES.extinctionNonCreation,
   },
 ];
 
@@ -134,26 +179,65 @@ export function argFingerprint(arg, lookup) {
   return `${premises.join(",")}->${conclusion}`;
 }
 
+// Canonical indices 1–22 refer to the base sample-state elements (J1–J14).
+// Indices 23–29 are the added premises above. Keep in sync with sample-state.js.
+const BASE_POOL_SIZE = 22;
+
 /**
  * Returns a sample DetectArgumentsResponse for the given elements, round, and existing relations.
- * Arguments already present as jointly_entails groups in the state are excluded.
+ *
+ * Canonical argument indices are resolved to actual lookup indices at call time.
+ * Base elements (1–22) map to their positions in the current pool. Each added
+ * premise maps to an existing element when its text is already present — e.g. a
+ * premise the user accepted earlier in Elicit Judgments, which is then NOT
+ * re-proposed — otherwise to a fresh index appended after the current pool.
+ * Resolving dynamically (rather than at fixed indices 23–29) keeps the fixture
+ * correct even after the pool has grown. Arguments already recorded as argument
+ * relations in the state are excluded.
  *
  * @param {Array} elements
  * @param {string|number} round
  * @param {Array} [relations=[]]
- * @returns {{ num_arguments: number[][], translated_arguments: Array[], lookup: Object, model: string, input_tokens: number, output_tokens: number }}
+ * @returns {{ num_arguments: number[][], translated_arguments: Array[], argument_postulates: string[][], lookup: Object, model: string, rejected_count: number, input_tokens: number, output_tokens: number }}
  */
 export function getSampleArguments(elements, round, relations = []) {
-  const initialLookup = Object.fromEntries(elements.map((e, i) => [i + 1, e]));
-  const poolSize = elements.length + _ADDED_PREMISES.length;
-  const lookup = addNewPremisesToLookup(initialLookup, _ADDED_PREMISES, elements, round, "claude-fable-5");
+  const baseLookup = Object.fromEntries(elements.map((e, i) => [i + 1, e]));
+  const textToIndex = new Map(elements.map((e, i) => [e.text, i + 1]));
+
+  // Map each canonical index to an actual lookup index.
+  const actualIndex = {};
+  for (let i = 1; i <= BASE_POOL_SIZE; i += 1) actualIndex[i] = i;
+  let nextIndex = elements.length + 1;
+  const premisesToInject = [];
+  for (const premise of _ADDED_PREMISES) {
+    const existing = textToIndex.get(premise.text);
+    if (existing != null) {
+      actualIndex[premise.index] = existing; // already in the pool — reuse it
+    } else {
+      actualIndex[premise.index] = nextIndex;
+      premisesToInject.push({ ...premise, index: nextIndex });
+      nextIndex += 1;
+    }
+  }
+
+  const lookup = addNewPremisesToLookup(baseLookup, premisesToInject, elements, round, "claude-fable-5");
+  const remap = (n) => {
+    const mapped = actualIndex[Math.abs(n)];
+    return n < 0 ? -mapped : mapped;
+  };
+
   const existingFingerprints = buildExistingArgFingerprints(relations);
-  const numArguments = _SAMPLE_ARGUMENTS.filter(
-    (arg) =>
-      arg.every((n) => Math.abs(n) <= poolSize) &&
-      argFingerprint(arg, lookup) !== null &&
-      !existingFingerprints.has(argFingerprint(arg, lookup))
-  );
+  // Remap, then filter arguments and their postulates together so the two stay
+  // parallel (mirrors the backend's kept_pairs zip in verify_and_partition).
+  const kept = _SAMPLE_ARGUMENTS.map((arg, i) => ({
+    arg: arg.map(remap),
+    postulates: _ARGUMENT_POSTULATES[i] ?? [],
+  })).filter(({ arg }) => {
+    const fp = argFingerprint(arg, lookup);
+    return fp !== null && !existingFingerprints.has(fp);
+  });
+  const numArguments = kept.map((k) => k.arg);
+  const argumentPostulates = kept.map((k) => k.postulates);
   const translatedArguments = numArguments.map((arg) =>
     arg.map((n) => {
       const el = lookup[Math.abs(n)];
@@ -163,8 +247,10 @@ export function getSampleArguments(elements, round, relations = []) {
   return {
     num_arguments: numArguments,
     translated_arguments: translatedArguments,
+    argument_postulates: argumentPostulates,
     lookup,
     model: "claude-fable-5",
+    rejected_count: 0,
     input_tokens: 0,
     output_tokens: 0,
   };

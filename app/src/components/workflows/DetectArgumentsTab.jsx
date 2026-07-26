@@ -13,6 +13,7 @@ import { detectArguments } from "../../utils/argumentsClient.js";
 import {
   nextElementId,
   argumentRelationType,
+  argumentPostulateExplanation,
   withUserEdit,
   llmOrigin,
 } from "../../utils/stateUtils.js";
@@ -146,6 +147,7 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
  * @param {Object}   props
  * @param {Array}    props.argument
  * @param {Set}      props.addedIds
+ * @param {string[]} props.postulates  Meaning-postulate texts this argument relies on.
  * @param {{status:'accepted'|'rejected', argumentId?:string}|undefined} props.decision
  * @param {Object|null} props.editingDrafts  Map premiseId→text, or null if not editing.
  * @param {Function} props.onAccept
@@ -158,6 +160,7 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
 function ArgumentCard({
   argument,
   addedIds,
+  postulates = [],
   decision,
   editingDrafts,
   onAccept,
@@ -210,6 +213,22 @@ function ArgumentCard({
         ↓
       </div>
       <ArgumentRow element={conclusion} isAdded={addedIds.has(conclusion.id)} />
+
+      {postulates.length > 0 && (
+        <div
+          style={{
+            fontSize: 10,
+            color: C.dim,
+            fontStyle: "italic",
+            lineHeight: 1.5,
+            marginTop: 6,
+            paddingLeft: BADGE_W / 2 - 3,
+          }}
+        >
+          <span style={{ fontWeight: "bold" }}>Valid given: </span>
+          {postulates.join(" ")}
+        </div>
+      )}
 
       {/* Action bar */}
       <div
@@ -280,6 +299,7 @@ function ArgumentCard({
 export function DetectArgumentsTab({
   state,
   useDummy = false,
+  verifyArguments = true,
   onAddElement,
   onAddRelation,
   onDeleteRelationsByArgId,
@@ -331,7 +351,9 @@ export function DetectArgumentsTab({
     setSubmittedElementIds({});
     setEditing(null);
     try {
-      const data = await detectArguments(state, useDummy);
+      const data = await detectArguments(state, useDummy, {
+        verify: verifyArguments,
+      });
       setResult(data);
     } catch (e) {
       setError(e.message);
@@ -385,6 +407,11 @@ export function DetectArgumentsTab({
         premises.length,
         conclusion.negated,
       );
+      // Fold the meaning postulates this argument relies on into the relation
+      // explanation, so the inferential bridge stays visible after acceptance.
+      const explanation = argumentPostulateExplanation(
+        result.argument_postulates?.[argIndex],
+      );
       for (const premise of premises) {
         onAddRelation?.(
           {
@@ -392,7 +419,7 @@ export function DetectArgumentsTab({
             to: conclusionId,
             type: relationType,
             argumentId,
-            explanation: "",
+            explanation,
             origin: llmOrigin(false, result.model),
           },
           { select: false, pinRecent: true },
@@ -528,6 +555,23 @@ export function DetectArgumentsTab({
               title="Arguments"
               count={result.translated_arguments.length}
             />
+            {verifyArguments && result.rejected_count > 0 && (
+              <Tooltip text="Proposals the argument checker could not verify — formally invalid, resting on meaning postulates alone, or relying on a premise that was discarded — are dropped rather than surfaced.">
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: C.dim,
+                    marginBottom: 8,
+                    display: "inline-block",
+                    cursor: "help",
+                  }}
+                >
+                  {result.rejected_count} proposal
+                  {result.rejected_count !== 1 ? "s" : ""} rejected by the
+                  argument checker
+                </div>
+              </Tooltip>
+            )}
             {result.translated_arguments.length === 0 ? (
               <div style={{ fontSize: 12, color: C.dim }}>
                 No arguments detected.
@@ -538,6 +582,7 @@ export function DetectArgumentsTab({
                   key={i}
                   argument={arg}
                   addedIds={addedIds}
+                  postulates={result.argument_postulates?.[i] ?? []}
                   decision={decisions[i]}
                   editingDrafts={
                     editing?.argIndex === i ? editing.drafts : null

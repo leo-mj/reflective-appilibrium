@@ -5,6 +5,7 @@ import {
   makeDiff,
   makeLogEntry,
   sortElementIds,
+  argumentPostulateExplanation,
 } from "./stateUtils.js";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -163,5 +164,27 @@ describe("sortElementIds", () => {
 
   it("returns 0 for identical IDs", () => {
     expect(sortElementIds("J1", "J1")).toBe(0);
+  });
+});
+
+// ─── argumentPostulateExplanation ─────────────────────────────────────────────
+
+describe("argumentPostulateExplanation", () => {
+  it("returns empty string for no postulates", () => {
+    expect(argumentPostulateExplanation([])).toBe("");
+    expect(argumentPostulateExplanation(undefined)).toBe("");
+    expect(argumentPostulateExplanation(null)).toBe("");
+  });
+
+  it("prefixes a single postulate with 'Valid given: '", () => {
+    expect(argumentPostulateExplanation(["A entails B."])).toBe(
+      "Valid given: A entails B.",
+    );
+  });
+
+  it("joins multiple postulates with a space after the prefix", () => {
+    expect(argumentPostulateExplanation(["First bridge.", "Second bridge."])).toBe(
+      "Valid given: First bridge. Second bridge.",
+    );
   });
 });

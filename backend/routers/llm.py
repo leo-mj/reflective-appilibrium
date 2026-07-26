@@ -7,7 +7,7 @@ Exposes the LLM service over HTTP so the frontend never handles API keys.
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..config import Settings, get_settings
@@ -65,12 +65,22 @@ async def configured_providers(
 async def test_connection(
     llm: Annotated[LLMService, Depends(get_llm_service)],
 ) -> dict:
-    """Verify that the supplied API key and model are reachable."""
-    await llm.complete(
-        messages=[{"role": "user", "content": "Reply with the single word OK."}],
-        temperature=0.0,
-        json_mode=False,
-    )
+    """Verify that the supplied API key and model are reachable.
+
+    Provider errors (bad key, unknown model, unsupported parameter) are surfaced
+    verbatim as a 400 so the settings modal can show the real reason instead of a
+    generic 500.
+    """
+    try:
+        await llm.complete(
+            messages=[{"role": "user", "content": "Reply with the single word OK."}],
+            temperature=0.0,
+            json_mode=False,
+        )
+    except Exception as exc:  # noqa: BLE001 — this endpoint's job is to report why
+        message = getattr(exc, "message", None) or str(exc)
+        logger.info(f"Connection test failed for model '{llm.model}': {message}")
+        raise HTTPException(status_code=400, detail=message)
     return {"status": "ok", "model": llm.model}
 
 
