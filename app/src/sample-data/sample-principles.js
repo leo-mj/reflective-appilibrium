@@ -15,7 +15,7 @@ const samplePrinciples = {
     },
     {
       text: "Each generation owes obligations directly to its immediate successors, whose own obligations to their successors transmit duties down the generations (chain of obligation).",
-      confidence: 0.33,
+      confidence: 0.67,
       covers: ["J1", "J3", "J7"],
       explanation:
         "Grounds duties to distant generations through overlapping generations, without invoking contested direct obligations to remote future people. It also explains the parental asymmetry in J7 — offering an alternative route to P2 and P5 that the user may wish to weigh against them.",

@@ -224,7 +224,7 @@ Respond with valid JSON only, in exactly this format:
     }},
     {{
       "index": {next_index + 2},
-      "type": "judgment",
+      "type": "principle",
       "role": "postulate",
       "form": "{s3} -> ~{s1}",
       "text": "A statement true in virtue of the meanings of sentences {s3} and {s1}."

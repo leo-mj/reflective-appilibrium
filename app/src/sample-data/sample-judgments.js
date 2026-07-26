@@ -23,7 +23,7 @@ const sampleJudgments = {
       judgments: [
         {
           text: "Knowingly creating serious hazards for future people is morally wrong, even when no currently living person will be affected.",
-          confidence: 1.0,
+          confidence: 0.67,
         },
         {
           text: "The action is permissible provided the company discloses the risk and sets aside remediation funds.",
@@ -31,7 +31,7 @@ const sampleJudgments = {
         },
         {
           text: "Without a determinate victim, no wrong is committed — future people's interests cannot yet ground obligations.",
-          confidence: 0.33,
+          confidence: 0.67,
         },
       ],
     },
@@ -63,7 +63,7 @@ const sampleJudgments = {
         },
         {
           text: "There is no injustice: each generation is entitled to use available resources for its own flourishing.",
-          confidence: 0.33,
+          confidence: 0.67,
         },
       ],
     },
@@ -73,7 +73,7 @@ const sampleJudgments = {
       judgments: [
         {
           text: "Democratic institutions have a duty to formally represent the interests of future generations in their decision-making processes.",
-          confidence: 0.33,
+          confidence: 0.67,
         },
         {
           text: "Future generations' interests should inform policy but should not override democratically expressed preferences of living citizens.",
@@ -87,11 +87,11 @@ const sampleJudgments = {
       judgments: [
         {
           text: ELICITABLE_ARGUMENT_PREMISES.affected2100,
-          confidence: 1.0,
+          confidence: 0.67,
         },
         {
           text: "Beyond a few decades causal chains become too diffuse to say present policy determinately affects any particular future outcome.",
-          confidence: 0.33,
+          confidence: 0.67,
         },
       ],
     },
@@ -101,7 +101,7 @@ const sampleJudgments = {
       judgments: [
         {
           text: ELICITABLE_ARGUMENT_PREMISES.extinctionNonCreation,
-          confidence: 0.33,
+          confidence: 0.67,
         },
         {
           text: "Allowing avoidable extinction wrongs the future people who would otherwise have come to exist and lived good lives.",
