@@ -188,15 +188,18 @@ suggestion has been considered and declined; do not offer it again, in any rephr
 - Positions within one question should be mutually exclusive — a user should be \
 able to hold at most one without contradiction.
 
+Do not rate, rank, or score the positions, and do not indicate which you find \
+more plausible — how strongly each is held is the user's to decide.
+
 Respond with valid JSON only, in exactly this format:
 {{
   "suggestions": [
     {{
       "question": "A brief thought experiment or question.",
       "judgments": [
-        {{"text": "One plausible position in response to the question.", "confidence": 1.0}},
-        {{"text": "Another plausible position.", "confidence": 0.67}},
-        {{"text": "A more cautious or defeasible position.", "confidence": 0.33}}
+        {{"text": "One plausible position in response to the question."}},
+        {{"text": "Another plausible position."}},
+        {{"text": "A more cautious or defeasible position."}}
       ]
     }}
   ]
@@ -240,12 +243,14 @@ padding to the limit. Each principle should:
 - Cover several judgments (list their IDs in "covers").
 - Not duplicate any already-recorded principle.
 
+Do not rate, rank, or score the principles you propose — how strongly each is \
+held is the user's to decide.
+
 Respond with valid JSON only, in exactly this format:
 {{
   "suggestions": [
     {{
       "text": "One-sentence statement of the principle.",
-      "confidence": 1.0,
       "covers": ["J1", "J3"],
       "explanation": "One sentence explaining how this principle systematises the listed judgments."
     }}

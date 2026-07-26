@@ -127,13 +127,26 @@ def build_prompt(
 
     The sentence pool is presented as logically independent atoms, so every
     substantive argument requires added premises that close the inferential
-    gap.  Each added premise carries its logical ``form`` (verified by
-    ``services.argument_checker``) and a ``role``: substantive ``"premise"``
-    or meaning ``"postulate"``.  Existing arguments (from ``relations``) are
-    injected so the model does not reproduce them.
+    gap.  An added premise carries a ``role``: a ``"postulate"`` is a meaning
+    postulate and supplies the logical ``form`` that licenses the inference
+    (verified by ``services.argument_checker``); a substantive ``"premise"``
+    is itself a new unanalyzed atom and carries no form, which keeps it free
+    to state a claim in its own right rather than a conditional shaped to fit
+    the inference.  This mirrors ``DUMMY_ADDED_PREMISES``, where every
+    postulate has a form and no substantive premise does.
+
+    Existing arguments (from ``relations``) are injected so the model does not
+    reproduce them.
     """
     element_lines = "\n".join(f"  {n} [{e.type}]: {e.text}" for n, e in lookup.items())
     next_index = max(lookup) + 1 if lookup else 1
+
+    # Worked indices are drawn from the real pool, so the example never cites a
+    # sentence that does not exist and never collides with an added-premise
+    # index.  The router guarantees at least 3 pool sentences; the padding
+    # keeps the three distinct if this is ever called with fewer.
+    pool_ids = sorted(lookup)
+    s1, s2, s3 = (pool_ids + [next_index + 3, next_index + 4, next_index + 5])[:3]
 
     reverse_lookup = {e.id: n for n, e in lookup.items()}
     existing_str = format_existing_args_for_prompt(relations, reverse_lookup)
@@ -158,19 +171,23 @@ Each sentence is treated as an atomic proposition, identified by its integer key
 Task:
 Identify the substantive arguments that can be reconstructed from these sentences — arguments a philosopher would recognize as worth recording, not trivial logical manipulations.
 
-Every reconstructed argument must be STRICTLY FORMALLY VALID. Because the numbered sentences are logically independent atoms, this means every argument needs at least one added premise that closes the inferential gap. For each added premise, supply:
+Every reconstructed argument must be STRICTLY FORMALLY VALID. Because the numbered sentences are logically independent atoms, no argument over pool sentences alone is valid: each one needs added premises that close the inferential gap. Added premises come in two kinds, set by "role":
+  - "premise" — a substantive claim with normative or empirical content of its own, which a competent, informed speaker could reject as a position. It enters the pool as a NEW atomic sentence, so it takes no "form".
+  - "postulate" — a meaning postulate: true solely in virtue of what the sentences mean. Rejecting it while accepting the argument's other premises would show a misunderstanding of the words, not a substantive position (e.g. a bridge between two formulations of the same thought, or the incompatibility of two directly contradictory claims). The postulate is what makes the step go through, so it MUST carry a "form".
+  When in doubt between the two, use "premise".
+
+Since substantive premises are atoms like the pool sentences, every argument needs at least one postulate — the one whose form licenses the step from that argument's premises to its conclusion.
+
+For each added premise, supply:
 - "index": an unused integer. Number added premises consecutively upward starting at {next_index} (the sentence indices up to {next_index - 1} are taken; never reuse them).
 - "type": "judgment", "principle", or "theory" (a background theory).
 - "text": the premise in natural language.
-- "form": its logical content as a propositional formula over sentence keys, using ~ (not), & (and), | (or), -> (if-then). Example: "(3 & 4) -> 7". The form must not mention the premise's own index — it states the premise's content in terms of the other sentences.
-- "role": one of:
-  - "postulate" — a meaning postulate: true solely in virtue of what the sentences mean. Rejecting it while accepting the argument's other premises would show a misunderstanding of the words, not a substantive position (e.g. a bridge between two formulations of the same thought, or the incompatibility of two directly contradictory claims).
-  - "premise" — a claim with normative or empirical content of its own, which a competent, informed speaker could reject as a substantive position.
-  When in doubt, use "premise".
+- "role": "premise" or "postulate", as above.
+- "form": REQUIRED for a "postulate", OMITTED for a "premise". The postulate's logical content as a propositional formula over the OTHER indices — pool sentences and the substantive premises of the same argument — using ~ (not), & (and), | (or), -> (if-then). Example: "({s1} & {next_index}) -> {s2}". The form must never mention the postulate's own index.
 
 Added premises must be substantive, not restatements.
 The lazy way to force validity is to add the bare conditional "If <premise>, then <conclusion>" — text that just strings the argument's own premise and conclusion together with "if … then". Such a premise re-encodes the inference instead of justifying it; it is worthless. Never produce one.
-A good "premise"-role addition is a GENERAL claim that reaches beyond this single argument — a principle or judgment that could do work in other inferences and that a competent, informed person could reject on substantive grounds while granting the listed premises. Its "form" may well be a simple implication (e.g. "16 -> 8"); that is fine. What must not be trivial is the TEXT: it states the general principle this argument instantiates, never the instance itself.
+A good "premise"-role addition is a GENERAL claim that reaches beyond this single argument — a principle or judgment that could do work in other inferences and that a competent, informed person could reject on substantive grounds while granting the listed premises. Because it carries no "form", nothing pushes it toward the shape of a conditional: state it as the standalone claim it is, in its full content, and let the postulate do the connecting work.
 Self-test: strip the specific subject matter out of the premise and conclusion — does a general claim remain? If the addition only makes sense as "if THIS premise then THIS conclusion", it is a restatement: find a genuinely general bridge, or omit the argument.
 Worked example — bridging "Allowing avoidable extinction wrongs the future people who would otherwise have existed" to "A society that could prevent its own extinction at modest cost but does not acts wrongly":
   - BAD (restatement — never do this): "If allowing avoidable extinction wrongs future people, then a society that could prevent its extinction at modest cost but does not acts wrongly."
@@ -183,34 +200,34 @@ Constraints:
 - Premises must be jointly consistent (no arguments from contradiction).
 - No restatement premises (see "Added premises must be substantive" above): if the only bridge you can find merely re-encodes the inference as a conditional and is not true in virtue of meaning, omit the argument.
 
-Output: each argument is a list of integers whose final member is the conclusion and all previous members are premises. For example, in [14, {next_index}, 1], the conclusion is sentence 1 and the premises are sentence 14 and added premise {next_index}. In [3, {next_index + 1}, -7], the conclusion is ¬sentence-7. Premises may also be negated (e.g. -3).
+Output: each argument is a list of integers whose final member is the conclusion and all previous members are premises. For example, in [{s1}, {next_index}, {next_index + 1}, {s2}], the conclusion is sentence {s2} and the premises are pool sentence {s1}, substantive premise {next_index}, and postulate {next_index + 1}. In [{s3}, {next_index + 2}, -{s1}], the conclusion is ¬sentence-{s1}. Premises may also be negated (e.g. -{s3}).
 
 Respond with valid JSON only, in exactly this format:
 {{
   "arguments": [
-        [14, {next_index}, 1],
-        [3, {next_index + 1}, -7]
+    [{s1}, {next_index}, {next_index + 1}, {s2}],
+    [{s3}, {next_index + 2}, -{s1}]
   ],
   "added_premises": [
     {{
       "index": {next_index},
       "type": "principle",
-      "text": "A general, independently contentful claim connecting sentence 14 to sentence 1.",
-      "form": "14 -> 1",
-      "role": "premise"
+      "role": "premise",
+      "text": "A general, independently contentful claim, stated in its own right — NOT a conditional linking sentence {s1} to sentence {s2}."
     }},
     {{
       "index": {next_index + 1},
       "type": "principle",
-      "text": "A statement true in virtue of the meanings of sentences 3 and 7.",
-      "form": "3 -> ~7",
-      "role": "postulate"
+      "role": "postulate",
+      "form": "({s1} & {next_index}) -> {s2}",
+      "text": "A statement true in virtue of what sentence {s1} and the premise added at {next_index} mean, taken together with sentence {s2}."
     }},
     {{
       "index": {next_index + 2},
       "type": "judgment",
-      "role": "premise",
-      "text": "A society's failure to prevent its own distant extinction wrongs no one now alive and, with respect to future people, merely fails to bring them into existence."
+      "role": "postulate",
+      "form": "{s3} -> ~{s1}",
+      "text": "A statement true in virtue of the meanings of sentences {s3} and {s1}."
     }}
   ]
 }}

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from ..dependencies import get_llm_service
-from ..models.re_state import REElement
+from ..models.re_state import DEFAULT_CONFIDENCE, REElement
 from ..services.llm import LLMService
 from ..services.prompts import build_principles_prompt
 
@@ -39,11 +39,13 @@ class PrincipleSuggestion(BaseModel):
     """A single LLM-proposed principle.
 
     ``covers`` lists the IDs of the judgments (and/or existing principles)
-    that this principle would systematise.
+    that this principle would systematise.  ``confidence`` is always
+    ``DEFAULT_CONFIDENCE`` — see ``JudgmentOption`` in the judgments router for
+    why the model does not get to set it.
     """
 
     text: str = Field(max_length=2_000)
-    confidence: Confidence
+    confidence: Confidence = DEFAULT_CONFIDENCE
     covers: list[str] = Field(default_factory=list)
     explanation: str = Field(max_length=2_000)
 
@@ -81,7 +83,11 @@ async def suggest_principles(
         json_mode=True,
     )
     data = json.loads(result.text)
-    suggestions = [PrincipleSuggestion(**s) for s in data.get("suggestions", [])]
+    # Overwrite rather than trust — see the judgments router for the rationale.
+    suggestions = [
+        PrincipleSuggestion.model_validate({**s, "confidence": DEFAULT_CONFIDENCE})
+        for s in data.get("suggestions", [])
+    ]
     logger.info(f"Received {len(suggestions)} principle suggestions from LLM.")
 
     return SuggestPrinciplesResponse(

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from ..dependencies import get_llm_service
-from ..models.re_state import REElement, RELogEntry
+from ..models.re_state import DEFAULT_CONFIDENCE, REElement, RELogEntry
 from ..services.llm import LLMService
 from ..services.prompts import build_judgments_prompt
 
@@ -42,10 +42,16 @@ Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class JudgmentOption(BaseModel):
-    """One of several jointly exhaustive positions a user might hold in response to a question."""
+    """One of several jointly exhaustive positions a user might hold in response to a question.
+
+    ``confidence`` is always ``DEFAULT_CONFIDENCE``: the field exists because the
+    frontend requires one on every judgment, but its value is the user's to set,
+    not the model's.  The elicitation prompt asks for no score, and the endpoint
+    overrides any the model volunteers anyway.
+    """
 
     text: str = Field(max_length=2_000)
-    confidence: Confidence
+    confidence: Confidence = DEFAULT_CONFIDENCE
 
 
 class JudgmentSuggestion(BaseModel):
@@ -89,7 +95,20 @@ async def elicit_judgments(
         json_mode=True,
     )
     data = json.loads(result.text)
-    suggestions = [JudgmentSuggestion(**s) for s in data.get("suggestions", [])]
+    # Overwrite rather than trust: a model that scores its options despite the
+    # prompt must not have those scores reach the user as if they were theirs.
+    suggestions = [
+        JudgmentSuggestion.model_validate(
+            {
+                **s,
+                "judgments": [
+                    {**j, "confidence": DEFAULT_CONFIDENCE}
+                    for j in s.get("judgments", [])
+                ],
+            }
+        )
+        for s in data.get("suggestions", [])
+    ]
     total_judgments = sum(len(s.judgments) for s in suggestions)
     logger.info(
         f"Received {len(suggestions)} judgment elicitation suggestions "
