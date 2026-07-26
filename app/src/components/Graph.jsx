@@ -13,7 +13,6 @@ import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import { useGraphClick } from "../hooks/useGraphClick.js";
 import {
-  nodeRadius,
   getNeighbours,
   parallelEdgeOffsets,
   groupJointArguments,

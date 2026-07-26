@@ -330,7 +330,7 @@ export function JudgmentElicitTab({
     return () => {
       cancelled = true;
     };
-  }, [state.elements, state.relations, weights]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.elements, state.relations, weights]);  
 
   const elicit = async () => {
     setLoading(true);

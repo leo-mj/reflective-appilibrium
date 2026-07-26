@@ -145,7 +145,7 @@ export function usePan() {
       y: my - (my - panRef.current.y) * scale,
     });
     _setZoom(newZoom);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   const zoomIn = () =>
     _setZoom(Math.min(ZOOM_MAX, zoomRef.current * ZOOM_BTN_STEP));
@@ -159,7 +159,7 @@ export function usePan() {
   const resetView = useCallback((newPan, newZoom = 1) => {
     _setPan(newPan);
     _setZoom(newZoom);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   return {
     pan,

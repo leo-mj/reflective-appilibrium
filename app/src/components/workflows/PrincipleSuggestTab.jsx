@@ -295,7 +295,7 @@ export function PrincipleSuggestTab({
     return () => {
       cancelled = true;
     };
-  }, [state.elements, state.relations, weights]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.elements, state.relations, weights]);  
 
   const judgments = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.type === "judgment",

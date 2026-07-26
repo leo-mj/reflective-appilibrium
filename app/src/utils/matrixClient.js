@@ -3,12 +3,12 @@
  * @module utils/matrixClient
  */
 
-import _sampleMatrix from "../sample-data/sample-matrix.js";
+import sampleMatrix from "../sample-data/sample-matrix.json";
 import { makeLLMClient } from "./llmClientFactory.js";
 
 export const fetchRelatednessMatrix = makeLLMClient({
   endpoint: "/api/matrix/analyze",
-  dummyData: () => ({ ...JSON.parse(_sampleMatrix), _model: "claude-fable-5" }),
+  dummyData: () => ({ ...sampleMatrix, _model: "claude-fable-5" }),
   buildBody: (state) => ({ topic: state.topic, elements: state.elements }),
   transformResponse: (data) => ({
     overview: data.overview,

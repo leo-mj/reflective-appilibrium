@@ -12,7 +12,6 @@ import {
 
 const j1 = { id: "J1", type: "judgment", status: "active", addedRound: 1 };
 const j2 = { id: "J2", type: "judgment", status: "active", addedRound: 2 };
-const p1 = { id: "P1", type: "principle", status: "active", addedRound: 1 };
 const j3withdrawn = {
   id: "J3",
   type: "judgment",
