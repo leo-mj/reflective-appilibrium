@@ -90,6 +90,12 @@ export function GraphPanel({
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
+  // True whenever the suggestions on screen came from the sample fixtures
+  // rather than a live model — the same condition makeLLMClient branches on.
+  // Note this covers demo builds, where LLM_ENABLED is false and the "Use
+  // sample data" toggle is never rendered: everything is sample data there,
+  // so anything that would need a live call must stay hidden.
+  const suggestionsAreSample = !LLM_ENABLED || useDummyAssist;
   const autoFetch = !!workflowPhase;
   const isAssistPanel =
     ASSIST_TABS.includes(tab) || SIMULATE_TABS.includes(tab);
@@ -190,6 +196,7 @@ export function GraphPanel({
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
+              suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
@@ -205,6 +212,7 @@ export function GraphPanel({
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
+              suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
             />
@@ -221,6 +229,7 @@ export function GraphPanel({
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
+              suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
             />

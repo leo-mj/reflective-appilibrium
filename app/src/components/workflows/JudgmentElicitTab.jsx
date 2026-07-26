@@ -130,8 +130,9 @@ function Toolbar({
  * @param {Function} props.onModify           Called with the judgment object to start editing.
  * @param {Function} props.onModifyChange     Called with the new draft string.
  * @param {Function} props.onModifyCancel     Called when the user cancels editing.
- * @param {boolean}  [props.useDummy]         Sample-data mode; hides the AI discussion
- *   affordance, which has no sample path and would issue a live LLM call.
+ * @param {boolean}  [props.suggestionsAreSample]  These suggestions came from the
+ *   sample fixtures; hides the AI discussion affordance, which has no sample
+ *   path and would issue a live LLM call.
  */
 function SuggestionCard({
   suggestion,
@@ -144,7 +145,7 @@ function SuggestionCard({
   onModify,
   onModifyChange,
   onModifyCancel,
-  useDummy = false,
+  suggestionsAreSample = false,
 }) {
   const [hovered, setHovered] = useState(null);
   const [convOpen, setConvOpen] = useState({});
@@ -254,7 +255,7 @@ function SuggestionCard({
                 ) : (
                   <ModifyButton onClick={() => onModify(j)} />
                 )}
-                {!useDummy && (
+                {!suggestionsAreSample && (
                   <ChatButton
                     isOpen={isConvOpen}
                     accentColor={C.judgment.high}
@@ -263,7 +264,7 @@ function SuggestionCard({
                 )}
               </div>
             </div>
-            {!useDummy && isConvOpen && (
+            {!suggestionsAreSample && isConvOpen && (
               <ConversationPanel
                 state={state}
                 suggestion={{ question: suggestion.question, ...j }}
@@ -306,6 +307,7 @@ export function JudgmentElicitTab({
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
   useDummy = false,
+  suggestionsAreSample = false,
   suggestionsDisabled = false,
   weights = null,
 }) {
@@ -428,7 +430,7 @@ export function JudgmentElicitTab({
               setEditing((prev) => ({ ...prev, draft: text }))
             }
             onModifyCancel={() => setEditing(null)}
-            useDummy={useDummy}
+            suggestionsAreSample={suggestionsAreSample}
           />
         ))}
       </div>

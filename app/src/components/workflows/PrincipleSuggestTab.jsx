@@ -131,8 +131,9 @@ function Toolbar({
  * @param {Function} props.onModify
  * @param {Function} props.onModifyChange  Called with the new draft string.
  * @param {Function} props.onModifyCancel
- * @param {boolean}  [props.useDummy]  Sample-data mode; hides the AI discussion
- *   affordance, which has no sample path and would issue a live LLM call.
+ * @param {boolean}  [props.suggestionsAreSample]  These suggestions came from the
+ *   sample fixtures; hides the AI discussion affordance, which has no sample
+ *   path and would issue a live LLM call.
  */
 function SuggestionCard({
   suggestion,
@@ -145,7 +146,7 @@ function SuggestionCard({
   onModify,
   onModifyChange,
   onModifyCancel,
-  useDummy = false,
+  suggestionsAreSample = false,
 }) {
   const isEditing = draft !== null;
   const [convOpen, setConvOpen] = useState(false);
@@ -209,7 +210,7 @@ function SuggestionCard({
           ) : (
             <ModifyButton onClick={onModify} />
           )}
-          {!useDummy && (
+          {!suggestionsAreSample && (
             <ChatButton
               isOpen={convOpen}
               accentColor={C.principle.high}
@@ -249,7 +250,7 @@ function SuggestionCard({
       <div style={{ color: C.dim, lineHeight: 1.6 }}>
         {suggestion.explanation}
       </div>
-      {!useDummy && convOpen && (
+      {!suggestionsAreSample && convOpen && (
         <ConversationPanel state={state} suggestion={suggestion} />
       )}
     </div>
@@ -272,6 +273,7 @@ export function PrincipleSuggestTab({
   workflowPhase,
   onAdvanceWorkflow,
   useDummy = false,
+  suggestionsAreSample = false,
   suggestionsDisabled = false,
   weights = null,
 }) {
@@ -403,7 +405,7 @@ export function PrincipleSuggestTab({
               setEditing((prev) => ({ ...prev, draft: text }))
             }
             onModifyCancel={() => setEditing(null)}
-            useDummy={useDummy}
+            suggestionsAreSample={suggestionsAreSample}
           />
         ))}
       </div>
