@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from ..models.re_state import REElement, RERelation
 from ..services.llm import LLMService
+from ..services.response_schemas import ARGUMENTS_SCHEMA
 from ..services.argument_checker import verify_argument
 from ..routers.arguments_schemas import (
     AddedPremise,
@@ -251,7 +252,7 @@ def add_new_premises_to_lookup(
     if not added_premises:
         logger.info("No new premises to add to lookup.")
         return lookup
-    logger.info(f"Adding {len(added_premises)} to lookup.")
+    logger.info(f"Adding {len(added_premises)} new premises to lookup.")
     updated_lookup = {**lookup}
     max_ids_dict = {
         "J": len([e for e in elements if e.type == "judgment"]),
@@ -685,6 +686,7 @@ async def get_arguments_from_llm(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,
         json_mode=True,
+        json_schema=ARGUMENTS_SCHEMA,
     )
     data = json.loads(result.text)
     return LLMArgumentsResponse(

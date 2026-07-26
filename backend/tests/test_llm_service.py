@@ -99,9 +99,13 @@ def _bad_request(message: str) -> BadRequestError:
     return BadRequestError(message, response=resp, body=None)
 
 
-def _fake_openai_response(text: str):
+def _fake_openai_response(text: str, finish_reason: str = "stop"):
     return SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=text))],
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content=text), finish_reason=finish_reason
+            )
+        ],
         usage=SimpleNamespace(prompt_tokens=5, completion_tokens=7),
     )
 

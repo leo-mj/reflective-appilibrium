@@ -17,6 +17,7 @@ from ..dependencies import get_llm_service
 from ..models.re_state import DEFAULT_CONFIDENCE, REElement
 from ..services.llm import LLMService
 from ..services.prompts import build_principles_prompt
+from ..services.response_schemas import PRINCIPLES_SCHEMA
 
 router = APIRouter(prefix="/api/principles", tags=["principles"])
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ async def suggest_principles(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,
         json_mode=True,
+        json_schema=PRINCIPLES_SCHEMA,
     )
     data = json.loads(result.text)
     # Overwrite rather than trust — see the judgments router for the rationale.

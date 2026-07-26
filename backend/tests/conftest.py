@@ -30,7 +30,14 @@ def mock_llm_complete():
                 (),
                 {
                     "choices": [
-                        type("C", (), {"message": type("M", (), {"content": "OK"})()})()
+                        type(
+                            "C",
+                            (),
+                            {
+                                "message": type("M", (), {"content": "OK"})(),
+                                "finish_reason": "stop",
+                            },
+                        )()
                     ],
                     "usage": type(
                         "U", (), {"prompt_tokens": 5, "completion_tokens": 1}

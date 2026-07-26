@@ -17,6 +17,7 @@ from ..dependencies import get_llm_service
 from ..models.re_state import DEFAULT_CONFIDENCE, REElement, RELogEntry
 from ..services.llm import LLMService
 from ..services.prompts import build_judgments_prompt
+from ..services.response_schemas import JUDGMENTS_SCHEMA
 
 router = APIRouter(prefix="/api/judgments", tags=["judgments"])
 logger = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ async def elicit_judgments(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.6,
         json_mode=True,
+        json_schema=JUDGMENTS_SCHEMA,
     )
     data = json.loads(result.text)
     # Overwrite rather than trust: a model that scores its options despite the

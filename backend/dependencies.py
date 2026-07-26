@@ -70,5 +70,6 @@ def get_llm_service(
         api_key=api_key,
         base_url=x_base_url,
         model=x_model or settings.default_model,
+        max_tokens=settings.llm_max_tokens,
     )
     return LLMService(config)
