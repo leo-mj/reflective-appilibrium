@@ -4,7 +4,7 @@
  */
 
 import { lazy, Suspense, useState } from "react";
-import { APP_ENV, LLM_ENABLED } from "../config.js";
+import { APP_ENV, LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
@@ -170,7 +170,7 @@ export function GraphPanel({
             hideNonEntailsRels={hideNonEntailsRels}
           />
         )}
-        {tab === "matrix" && (
+        {MATRIX_ENABLED && tab === "matrix" && (
           <Suspense fallback={null}>
             <CoherenceMatrixTab
               state={state}

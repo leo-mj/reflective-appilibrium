@@ -141,6 +141,8 @@ function Toolbar({
  * @param {Function} props.onModify
  * @param {Function} props.onModifyChange  Called with the new draft string.
  * @param {Function} props.onModifyCancel
+ * @param {boolean}  [props.useDummy]  Sample-data mode; hides the AI discussion
+ *   affordance, which has no sample path and would issue a live LLM call.
  */
 function SuggestionCard({
   suggestion,
@@ -151,6 +153,7 @@ function SuggestionCard({
   onModify,
   onModifyChange,
   onModifyCancel,
+  useDummy = false,
 }) {
   const color = REL_COLOR[suggestion.type] ?? C.dim;
   const isEditing = draft !== null;
@@ -200,11 +203,13 @@ function SuggestionCard({
           ) : (
             <ModifyButton onClick={onModify} />
           )}
-          <ChatButton
-            isOpen={convOpen}
-            accentColor={color}
-            onClick={() => setConvOpen((o) => !o)}
-          />
+          {!useDummy && (
+            <ChatButton
+              isOpen={convOpen}
+              accentColor={color}
+              onClick={() => setConvOpen((o) => !o)}
+            />
+          )}
         </div>
       </div>
       {isEditing ? (
@@ -218,7 +223,9 @@ function SuggestionCard({
           {suggestion.explanation}
         </div>
       )}
-      {convOpen && <ConversationPanel state={state} suggestion={suggestion} />}
+      {!useDummy && convOpen && (
+        <ConversationPanel state={state} suggestion={suggestion} />
+      )}
     </div>
   );
 }
@@ -359,6 +366,7 @@ export function RelationSuggestTab({
               setEditing((prev) => ({ ...prev, draft: text }))
             }
             onModifyCancel={() => setEditing(null)}
+            useDummy={useDummy}
           />
         ))}
       </div>

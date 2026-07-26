@@ -32,7 +32,7 @@ import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 import { AppHeaderNarrow } from "./app_header/AppHeaderNarrow.jsx";
 import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
 import { C } from "../constants/colors.js";
-import { BACKEND_ENABLED, LLM_ENABLED } from "../config.js";
+import { BACKEND_ENABLED, LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
 
 /**
  * @param {Object}   props
@@ -164,7 +164,7 @@ export function AppHeader({
   )
     .filter((t) => !hideNonEntailsRels || t !== "suggestRelations")
     .filter((t) => model === "questionnaire" || t !== "questionnaire")
-    .filter((t) => LLM_ENABLED || t !== "matrix");
+    .filter((t) => (MATRIX_ENABLED && LLM_ENABLED) || t !== "matrix");
 
   const importModals = (
     <>
