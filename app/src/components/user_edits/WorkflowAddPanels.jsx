@@ -10,7 +10,7 @@
 import { useState } from "react";
 
 import { C } from "../../constants/colors.js";
-import { sortElementIds } from "../../utils/stateUtils.js";
+import { sortElementIds, newArgumentId } from "../../utils/stateUtils.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { SELECT_STYLE, PANEL_STYLE, makeRelationDefaults } from "./addPanelShared.js";
 
@@ -179,7 +179,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
         : "jointly_precludes";
 
   const handleSubmit = () => {
-    const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+    const argumentId = newArgumentId();
     premises.forEach((premise, i) => {
       onAddRelation(
         {

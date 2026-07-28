@@ -15,7 +15,7 @@ import { sortElementIds } from "../../utils/stateUtils.js";
  * @typedef {Object} AddRelationFormData
  * @property {string} from
  * @property {string} to
- * @property {'supports'|'conflicts'|'undermines'|'depends'} type
+ * @property {'supports'|'conflicts'|'undermines'|'depends'|'entails'|'precludes'} type
  * @property {string} explanation
  */
 
@@ -25,7 +25,7 @@ import { sortElementIds } from "../../utils/stateUtils.js";
  * @param {Object} props
  * @param {AddRelationFormData} props.form
  * @param {import('react').Dispatch<import('react').SetStateAction<AddRelationFormData>>} props.setForm
- * @param {REElement[]} props.elements - Non-withdrawn elements to choose from.
+ * @param {REElement[]} props.elements - Elements to choose from; may include withdrawn ones.
  */
 export function AddRelationForm({ form, setForm, elements }) {
   /** @param {string} field @param {string} value */
@@ -72,10 +72,18 @@ export function AddRelationForm({ form, setForm, elements }) {
           onChange={(e) => set("type", e.target.value)}
           style={INPUT_STYLE}
         >
-          <option value="supports">Supports</option>
-          <option value="conflicts">Conflicts</option>
-          <option value="undermines">Undermines</option>
-          <option value="depends">Depends on</option>
+          <optgroup label="Dialectical">
+            <option value="supports">Supports</option>
+            <option value="conflicts">Conflicts</option>
+            <option value="undermines">Undermines</option>
+            <option value="depends">Depends on</option>
+          </optgroup>
+          {/* A binary form can only express a one-premise argument; the joint
+              variants need the argument panel. */}
+          <optgroup label="Argument">
+            <option value="entails">Entails</option>
+            <option value="precludes">Precludes</option>
+          </optgroup>
         </select>
       </FormField>
       <FormField label="Explanation">
@@ -93,7 +101,7 @@ export function AddRelationForm({ form, setForm, elements }) {
  * Modal for adding a new directed relation between two existing elements.
  *
  * @param {Object}      props
- * @param {REElement[]} props.elements - Non-withdrawn elements to choose from.
+ * @param {REElement[]} props.elements - Elements to choose from; may include withdrawn ones.
  * @param {number}      props.currentRound
  * @param {function(AddRelationFormData): void} props.onSave
  * @param {function(): void} props.onCancel

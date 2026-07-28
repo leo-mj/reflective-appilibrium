@@ -150,6 +150,19 @@ describe("handleAddRelation", () => {
     expect(rels[1].addedRound).toBe(2);
   });
 
+  it("leaves a withdrawn endpoint withdrawn", () => {
+    // An argument may rest on a premise that was withdrawn later; recording it
+    // must not quietly bring that premise back into the position.
+    const withdrawn = makeEl({ id: "J2", status: "withdrawn", withdrawnRound: 1 });
+    const { result } = renderHook(() =>
+      useREActions(baseState({ elements: [makeEl(), withdrawn] })),
+    );
+    act(() => {
+      result.current.handleAddRelation({ from: "J2", to: "P1", type: "entails", explanation: "" });
+    });
+    expect(result.current.state.elements.find((e) => e.id === "J2")).toEqual(withdrawn);
+  });
+
   it("increments state.round and appends a log entry", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {

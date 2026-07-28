@@ -152,6 +152,16 @@ export const ARGUMENT_RELATION_TYPES = new Set([
 ]);
 
 /**
+ * Generates the id shared by every relation belonging to one argument. Joint
+ * arguments are grouped by it when rendering, selecting, and deleting.
+ *
+ * @returns {string}
+ */
+export function newArgumentId() {
+  return `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+}
+
+/**
  * Returns the relation type for an argument based on premise count and
  * whether the conclusion is negated.
  *

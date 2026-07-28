@@ -17,7 +17,12 @@ import {
   parallelEdgeOffsets,
   groupJointArguments,
 } from "../utils/graphHelpers.js";
-import { elementsAtRound, argumentRelationType } from "../utils/stateUtils.js";
+import {
+  elementsAtRound,
+  argumentRelationType,
+  newArgumentId,
+  ARGUMENT_RELATION_TYPES,
+} from "../utils/stateUtils.js";
 import {
   GraphCanvas,
   OffscreenIndicators,
@@ -113,11 +118,26 @@ function AddButtonsOverlay({
   );
 }
 
-function ArgAccumulatorBar({ selected, ctrlArgNodes, onConfirm, onCancel }) {
+/**
+ * Floating bar summarising a ctrl+click selection, with a button to turn it
+ * into an argument — or, when `asRelation`, into a single relation whose type
+ * is picked in the modal that follows.
+ */
+function CtrlSelectionBar({
+  selected,
+  ctrlArgNodes,
+  asRelation,
+  onConfirm,
+  onCancel,
+}) {
   if (!selected || ctrlArgNodes.length === 0) return null;
   const all = [selected, ...ctrlArgNodes];
   const premises = all.slice(0, -1);
   const conclusion = all.at(-1);
+  // A relation's type is not chosen yet, so the bar stays neutral rather than
+  // borrowing the entails colour.
+  const accent = asRelation ? C.border : C.jointly_entails;
+  const label = asRelation ? C.text : C.jointly_entails;
   return (
     <div
       style={{
@@ -126,7 +146,7 @@ function ArgAccumulatorBar({ selected, ctrlArgNodes, onConfirm, onCancel }) {
         left: "50%",
         transform: "translateX(-50%)",
         background: C.panel,
-        border: `1px solid ${C.jointly_entails}`,
+        border: `1px solid ${accent}`,
         borderRadius: 8,
         padding: "8px 12px",
         display: "flex",
@@ -143,7 +163,7 @@ function ArgAccumulatorBar({ selected, ctrlArgNodes, onConfirm, onCancel }) {
         {premises.join(", ")}
         <span
           style={{
-            color: C.jointly_entails,
+            color: label,
             fontWeight: "bold",
             margin: "0 6px",
           }}
@@ -155,16 +175,16 @@ function ArgAccumulatorBar({ selected, ctrlArgNodes, onConfirm, onCancel }) {
       <button
         onClick={onConfirm}
         style={{
-          background: C.jointly_entails + "22",
-          border: `1px solid ${C.jointly_entails}`,
+          background: asRelation ? "transparent" : C.jointly_entails + "22",
+          border: `1px solid ${accent}`,
           borderRadius: 4,
-          color: C.jointly_entails,
+          color: label,
           fontSize: 12,
           padding: "2px 10px",
           cursor: "pointer",
         }}
       >
-        Add Argument
+        {asRelation ? "Add relation" : "Add argument"}
       </button>
       <button
         onClick={onCancel}
@@ -189,10 +209,11 @@ function GraphModals({
   setAddingElType,
   addingRel,
   setAddingRel,
+  addingRelPrefill,
   addingArg,
   setAddingArg,
   addingArgPrefill,
-  activeEls,
+  linkableEls,
   round,
   onAddElement,
   onAddRelation,
@@ -212,10 +233,18 @@ function GraphModals({
       )}
       {addingRel && (
         <AddRelationModal
-          elements={activeEls}
+          elements={linkableEls}
           currentRound={round}
+          initialFrom={addingRelPrefill?.from}
+          initialTo={addingRelPrefill?.to}
           onSave={(formData) => {
-            onAddRelation(formData);
+            // Entails/precludes chosen here is a one-premise argument, so it
+            // needs the argumentId every argument relation carries.
+            onAddRelation(
+              ARGUMENT_RELATION_TYPES.has(formData.type)
+                ? { ...formData, argumentId: newArgumentId() }
+                : formData,
+            );
             setAddingRel(false);
           }}
           onCancel={() => setAddingRel(false)}
@@ -223,12 +252,12 @@ function GraphModals({
       )}
       {addingArg && (
         <AddArgumentModal
-          elements={activeEls}
+          elements={linkableEls}
           currentRound={round}
           initialPremises={addingArgPrefill?.premises}
           initialConclusion={addingArgPrefill?.conclusion}
           onSave={({ premises, conclusion, negated, explanation }) => {
-            const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+            const argumentId = newArgumentId();
             const type = argumentRelationType(premises.length, negated);
             premises.forEach((premise, i) => {
               onAddRelation(
@@ -305,6 +334,7 @@ export function Graph({
   const [addingRel, setAddingRel] = useState(false);
   const [addingArg, setAddingArg] = useState(false);
   const [addingArgPrefill, setAddingArgPrefill] = useState(null);
+  const [addingRelPrefill, setAddingRelPrefill] = useState(null);
   // { base: string|null, nodes: string[] } — nodes invalidate automatically when selected !== base
   const [ctrlArgState, setCtrlArgState] = useState({ base: null, nodes: [] });
   const ctrlArgNodes = ctrlArgState.base === selected ? ctrlArgState.nodes : [];
@@ -324,9 +354,17 @@ export function Graph({
     if (el.type === "theory") return !hiddenLegendKeys?.has("T");
     return true;
   };
-  const visibleEls = [...active, ...withdrawn, ...rejectedEls].filter(
-    isElVisible,
+  // Elements a relation or argument may be built from. Withdrawn ones qualify:
+  // an argument can rest on a premise that was later withdrawn, and recording
+  // it leaves that premise withdrawn. Declined suggestions do not.
+  const linkableEls = [...active, ...withdrawn].filter(
+    (e) => isElVisible(e) && e.status !== "rejected",
   );
+  const linkableIds = new Set(linkableEls.map((e) => e.id));
+  // `elementsAtRound` splits purely on round and withdrawal, so a rejected
+  // element comes back in `active` too. Excluding it there and re-adding it
+  // here is what keeps it from being rendered twice.
+  const visibleEls = [...linkableEls, ...rejectedEls.filter(isElVisible)];
   const visIds = new Set(visibleEls.map((e) => e.id));
   const visRels = state.relations.filter(
     (r) =>
@@ -405,6 +443,10 @@ export function Graph({
     onSelectRel,
     setTooltip,
     onCtrlNodeClick: (id) => {
+      // A node outside the pool would be dropped by the modal's id list, so
+      // refuse to accumulate it rather than lose it silently.
+      if (!linkableIds.has(id)) return;
+      if (selected && !linkableIds.has(selected)) return;
       if (selected && id !== selected && !ctrlArgNodes.includes(id)) {
         setCtrlArgState((prev) => ({
           base: selected,
@@ -420,9 +462,10 @@ export function Graph({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const activeEls = state.elements.filter((e) =>
-    ["active", "revised"].includes(e.status),
-  );
+  // A relation is binary, so it is only on offer for a two-node selection, and
+  // only where non-argument relations are visible at all.
+  const ctrlSelectionIsRelation =
+    !hideNonEntailsRels && ctrlArgNodes.length === 1;
 
   return (
     <>
@@ -445,20 +488,29 @@ export function Graph({
           <>
             <AddButtonsOverlay
               onAddEl={setAddingElType}
-              onAddRel={() => setAddingRel(true)}
+              onAddRel={() => {
+                setAddingRelPrefill(null);
+                setAddingRel(true);
+              }}
               onAddArg={() => setAddingArg(true)}
               hideNonEntailsRels={hideNonEntailsRels}
             />
-            <ArgAccumulatorBar
+            <CtrlSelectionBar
               selected={selected}
               ctrlArgNodes={ctrlArgNodes}
+              asRelation={ctrlSelectionIsRelation}
               onConfirm={() => {
                 const all = [selected, ...ctrlArgNodes];
-                setAddingArgPrefill({
-                  premises: all.slice(0, -1),
-                  conclusion: all.at(-1),
-                });
-                setAddingArg(true);
+                if (ctrlSelectionIsRelation) {
+                  setAddingRelPrefill({ from: all[0], to: all[1] });
+                  setAddingRel(true);
+                } else {
+                  setAddingArgPrefill({
+                    premises: all.slice(0, -1),
+                    conclusion: all.at(-1),
+                  });
+                  setAddingArg(true);
+                }
                 clearCtrlArg();
               }}
               onCancel={clearCtrlArg}
@@ -519,14 +571,18 @@ export function Graph({
         addingElType={addingElType}
         setAddingElType={setAddingElType}
         addingRel={addingRel}
-        setAddingRel={setAddingRel}
+        setAddingRel={(v) => {
+          if (!v) setAddingRelPrefill(null);
+          setAddingRel(v);
+        }}
+        addingRelPrefill={addingRelPrefill}
         addingArg={addingArg}
         setAddingArg={(v) => {
           if (!v) setAddingArgPrefill(null);
           setAddingArg(v);
         }}
         addingArgPrefill={addingArgPrefill}
-        activeEls={activeEls}
+        linkableEls={linkableEls}
         round={state.round}
         onAddElement={onAddElement}
         onAddRelation={onAddRelation}

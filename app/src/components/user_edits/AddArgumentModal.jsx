@@ -21,7 +21,9 @@ const ghostBtn = {
 
 /**
  * @param {Object}      props
- * @param {import('../../types.js').REElement[]} props.elements - Active elements to choose from.
+ * @param {import('../../types.js').REElement[]} props.elements - Elements to choose from.
+ *   May include withdrawn ones: an argument can rest on a premise that was later
+ *   withdrawn, and recording it leaves that premise withdrawn.
  * @param {number}      props.currentRound
  * @param {function({ premises: string[], conclusion: string, negated: boolean, explanation: string }): void} props.onSave
  * @param {function(): void} props.onCancel

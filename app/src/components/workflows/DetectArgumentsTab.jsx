@@ -14,6 +14,7 @@ import {
   nextElementId,
   argumentRelationType,
   argumentPostulateExplanation,
+  newArgumentId,
   withUserEdit,
   llmOrigin,
 } from "../../utils/stateUtils.js";
@@ -414,7 +415,7 @@ export function DetectArgumentsTab({
 
     // Add one relation per premise → conclusion, grouped by a shared argumentId.
     // Single-premise args use entails/precludes; multi-premise use jointly_entails/jointly_precludes.
-    const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+    const argumentId = newArgumentId();
     if (premises.length > 0) {
       const conclusionId = resolveId(conclusion);
       const relationType = argumentRelationType(
