@@ -13,7 +13,7 @@ import {
   findMergeCandidates,
 } from "./clusterUtils.js";
 import { buildPrincipleCovers } from "./textTabHelpers.js";
-import { sortElementIds } from "./stateUtils.js";
+import { sortElementIds, historyOf } from "./stateUtils.js";
 import { generateGraphSVG, svgToDataUrl } from "./generateSVG.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -30,28 +30,52 @@ function esc(text) {
 
 // ─── Sections ─────────────────────────────────────────────────────────────────
 
+const STATUS_TAG = {
+  withdrawn: " *(withdrawn)*",
+  revised: " *(revised)*",
+  rejected: " *(rejected)*",
+};
+
+/** One human-readable line per recorded event, oldest first. */
+function historyEntries(item) {
+  return historyOf(item).map((ev) => {
+    switch (ev.type) {
+      case "revised":
+        return `Round ${ev.round}: reworded${
+          ev.previousText ? ` from "${esc(ev.previousText)}"` : ""
+        }`;
+      case "withdrawn":
+        return `Round ${ev.round}: withdrawn${
+          ev.reason ? ` — ${esc(ev.reason)}` : ""
+        }`;
+      case "reinstated":
+        return `Round ${ev.round}: reinstated`;
+      case "rejected":
+        return `Round ${ev.round}: rejected`;
+      default:
+        return `Round ${ev.round}: ${esc(ev.type)}`;
+    }
+  });
+}
+
 function elementsSection(elements, type, label, pCovers) {
   const els = elements.filter((e) => e.type === type);
   if (!els.length) return "";
   const lines = [`### ${label}\n`];
   for (const el of els) {
-    const statusTag =
-      el.status === "withdrawn"
-        ? " *(withdrawn)*"
-        : el.status === "revised"
-          ? " *(revised)*"
-          : "";
+    const statusTag = STATUS_TAG[el.status] ?? "";
     const covers = pCovers[el.id]?.length
       ? `\n*Covers: ${pCovers[el.id].join(", ")}*`
       : "";
     const bodyText =
       el.status === "withdrawn" ? `~~${esc(el.text)}~~` : esc(el.text);
-    const prev = el.previousText
-      ? `\n> Previously: "${esc(el.previousText)}"`
-      : "";
-    const reason = el.reason ? `\n> Withdrawn: ${esc(el.reason)}` : "";
+    // The full trail, so a wording revised more than once is still recoverable
+    // from the prose and not only from the JSON block.
+    const trail = historyEntries(el)
+      .map((line) => `\n> ${line}`)
+      .join("");
     lines.push(
-      `**${el.id}** · ${el.confidence}${statusTag}\n${bodyText}${covers}${prev}${reason}\n`,
+      `**${el.id}** · ${el.confidence}${statusTag}\n${bodyText}${covers}${trail}\n`,
     );
   }
   return lines.join("\n");
@@ -60,9 +84,12 @@ function elementsSection(elements, type, label, pCovers) {
 function relationsSection(relations) {
   if (!relations.length) return "";
   const lines = relations.map((r) => {
-    const withdrawn = r.status === "withdrawn" ? " *(withdrawn)*" : "";
+    const statusTag = STATUS_TAG[r.status] ?? "";
     const explanation = r.explanation ? `: ${esc(r.explanation)}` : "";
-    return `- **${r.from}** → *${r.type}* → **${r.to}**${withdrawn}${explanation}`;
+    const trail = historyEntries(r)
+      .map((line) => `\n  - ${line}`)
+      .join("");
+    return `- **${r.from}** → *${r.type}* → **${r.to}**${statusTag}${explanation}${trail}`;
   });
   return "## Relations\n\n" + lines.join("\n");
 }
@@ -154,13 +181,14 @@ function logSection(log) {
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
- * Generates a markdown document from `state` and triggers a browser download.
- * `positions` is the force-simulation position map from `useStablePositions`.
+ * Renders `state` as a markdown document. Split out from `downloadMarkdown` so
+ * the document itself can be asserted on without touching the DOM.
  *
  * @param {REState}    state
  * @param {PositionMap} positions
+ * @returns {string}
  */
-export function downloadMarkdown(state, positions) {
+export function buildMarkdown(state, positions) {
   const date = new Date().toISOString().slice(0, 10);
   const visIds = new Set(state.elements.map((e) => e.id));
   const pCovers = buildPrincipleCovers(
@@ -192,7 +220,18 @@ export function downloadMarkdown(state, positions) {
     stateBlock,
   ].filter(Boolean);
 
-  const markdown = parts.join("\n\n---\n\n");
+  return parts.join("\n\n---\n\n");
+}
+
+/**
+ * Generates a markdown document from `state` and triggers a browser download.
+ * `positions` is the force-simulation position map from `useStablePositions`.
+ *
+ * @param {REState}    state
+ * @param {PositionMap} positions
+ */
+export function downloadMarkdown(state, positions) {
+  const markdown = buildMarkdown(state, positions);
   const slug = state.topic.slice(0, 30).replace(/\s+/g, "-").toLowerCase();
   const filename = `re-${slug}-round${state.round}.md`;
 

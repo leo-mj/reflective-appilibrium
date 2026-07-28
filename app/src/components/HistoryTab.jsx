@@ -11,7 +11,11 @@ import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import { usePlayback } from "../hooks/usePlayback.js";
-import { elementsAtRound, ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
+import {
+  elementsAtRound,
+  asOfRound,
+  ARGUMENT_RELATION_TYPES,
+} from "../utils/stateUtils.js";
 import {
   GraphCanvas,
   OffscreenIndicators,
@@ -73,9 +77,16 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
     });
   }, [snappedRound]);
 
+  // Projected back to the round being played, so hover tooltips show the status,
+  // wording and withdrawal reason that were in force then rather than now.
+  const elementsNow = useMemo(
+    () => state.elements.map((e) => asOfRound(e, snappedRound)),
+    [state.elements, snappedRound],
+  );
+
   const elementById = useMemo(
-    () => new Map(state.elements.map((e) => [e.id, e])),
-    [state.elements],
+    () => new Map(elementsNow.map((e) => [e.id, e])),
+    [elementsNow],
   );
 
   const { withdrawn } = elementsAtRound(state.elements, snappedRound);
@@ -159,7 +170,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
             </>
           );
         })()}
-        {state.elements.map((el) =>
+        {elementsNow.map((el) =>
           renderNode(
             el,
             positions,
