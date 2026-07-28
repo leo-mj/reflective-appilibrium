@@ -52,6 +52,23 @@ describe("elementsAtRound", () => {
     expect(withdrawn).toHaveLength(0);
   });
 
+  it("shows a reinstated element as withdrawn only for the rounds it was gone", () => {
+    const j4 = {
+      id: "J4",
+      type: "judgment",
+      status: "active",
+      addedRound: 1,
+      withdrawnRound: 3,
+      reinstatedRound: 6,
+    };
+    const at = (round) => elementsAtRound([j4], round);
+    expect(at(2).active.map((e) => e.id)).toEqual(["J4"]);
+    expect(at(4).withdrawn.map((e) => e.id)).toEqual(["J4"]);
+    expect(at(5).withdrawn.map((e) => e.id)).toEqual(["J4"]);
+    expect(at(6).active.map((e) => e.id)).toEqual(["J4"]);
+    expect(at(7).withdrawn).toHaveLength(0);
+  });
+
   it("returns empty lists when no elements are added yet", () => {
     const { active, withdrawn } = elementsAtRound([j2], 1);
     expect(active).toHaveLength(0);

@@ -126,11 +126,27 @@ export function useStablePositions(state, dims) {
     // the UI never stays invisible indefinitely on slow machines or large graphs.
     const READY_TIMEOUT_MS = 1500;
     sim.on("end", () => setReady(true));
-    setTimeout(() => setReady(true), READY_TIMEOUT_MS);
+    const readyTimer = setTimeout(() => setReady(true), READY_TIMEOUT_MS);
 
     simRef.current = sim;
-    return () => sim.stop();
-  }, [state.elements.length, state.relations.length, dims.w, dims.h]);
+    return () => {
+      sim.stop();
+      clearTimeout(readyTimer);
+    };
+    // Keyed on counts rather than on state.elements/state.relations themselves.
+    // Those arrays are rebuilt by every mutation, so depending on them would
+    // restart the layout whenever an element's text, confidence, or status
+    // changed — scrambling the positions the user is currently reading. Only a
+    // node or edge appearing or disappearing should re-run the simulation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    state.elements.length,
+    state.relations.length,
+    dims.w,
+    dims.h,
+    halfWidth,
+    halfHeight,
+  ]);
 
   return { positions, ready };
 }

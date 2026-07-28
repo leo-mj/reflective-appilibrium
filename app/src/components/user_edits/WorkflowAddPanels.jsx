@@ -17,6 +17,7 @@ import {
 } from "../../utils/stateUtils.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { ElementOptions } from "./ElementOptions.jsx";
+import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
 import { SELECT_STYLE, PANEL_STYLE, makeRelationDefaults } from "./addPanelShared.js";
 
 
@@ -406,10 +407,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
           onChange={(e) => set("type", e.target.value)}
           style={{ ...SELECT_STYLE, color: C[form.type] }}
         >
-          <option value="supports">supports</option>
-          <option value="conflicts">conflicts</option>
-          <option value="undermines">undermines</option>
-          <option value="depends">depends on</option>
+          <RelationTypeOptions />
         </select>
         <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
           →

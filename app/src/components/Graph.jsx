@@ -22,7 +22,6 @@ import {
   argumentRelationType,
   linkableElements,
   newArgumentId,
-  ARGUMENT_RELATION_TYPES,
 } from "../utils/stateUtils.js";
 import {
   GraphCanvas,
@@ -239,13 +238,7 @@ function GraphModals({
           initialFrom={addingRelPrefill?.from}
           initialTo={addingRelPrefill?.to}
           onSave={(formData) => {
-            // Entails/precludes chosen here is a one-premise argument, so it
-            // needs the argumentId every argument relation carries.
-            onAddRelation(
-              ARGUMENT_RELATION_TYPES.has(formData.type)
-                ? { ...formData, argumentId: newArgumentId() }
-                : formData,
-            );
+            onAddRelation(formData);
             setAddingRel(false);
           }}
           onCancel={() => setAddingRel(false)}

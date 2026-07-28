@@ -4,7 +4,7 @@
  * @module components/Tooltip
  */
 
-import { useState, useRef, cloneElement, Children } from "react";
+import { useState, useRef, useEffect, cloneElement, Children } from "react";
 import { createPortal } from "react-dom";
 import { C } from "../constants/colors.js";
 
@@ -20,6 +20,10 @@ import { C } from "../constants/colors.js";
 export function Tooltip({ text, children, delay = 400 }) {
   const [pos, setPos] = useState(null);
   const timer = useRef(null);
+
+  // A trigger can disappear mid-hover (a suggestion card being accepted, say),
+  // which fires no mouseleave.
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   // The trigger node comes from the hover event rather than a ref, so nothing
   // has to be attached to the child. That keeps any ref the child already

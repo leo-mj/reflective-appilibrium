@@ -13,6 +13,7 @@ import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import { sortElementIds } from "../../utils/stateUtils.js";
 import { ElementOptions } from "./ElementOptions.jsx";
+import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
 import { SELECT_STYLE, makeRelationDefaults } from "./addPanelShared.js";
 
 const ELEMENT_DEFAULTS = {
@@ -251,10 +252,7 @@ export function AddBar({
                 onChange={(e) => setRel("type", e.target.value)}
                 style={{ ...SELECT_STYLE, color: C[relationForm.type] }}
               >
-                <option value="supports">supports</option>
-                <option value="conflicts">conflicts</option>
-                <option value="undermines">undermines</option>
-                <option value="depends">depends on</option>
+                <RelationTypeOptions />
               </select>
               <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
                 →

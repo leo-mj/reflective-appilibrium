@@ -169,7 +169,7 @@ export function StatusLabel({ status }) {
 
 // ─── Action buttons ───────────────────────────────────────────────────────────
 
-export function ActionButtons({ onRevise, onWithdraw }) {
+export function ActionButtons({ onRevise, onWithdraw, onReinstate }) {
   return (
     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
       <button onClick={onRevise} style={GHOST_BTN_STYLE}>
@@ -178,6 +178,14 @@ export function ActionButtons({ onRevise, onWithdraw }) {
       {onWithdraw && (
         <button onClick={onWithdraw} style={WITHDRAW_BTN_STYLE}>
           Withdraw
+        </button>
+      )}
+      {onReinstate && (
+        <button
+          onClick={onReinstate}
+          style={{ ...GHOST_BTN_STYLE, color: C.supports }}
+        >
+          Reinstate
         </button>
       )}
     </div>

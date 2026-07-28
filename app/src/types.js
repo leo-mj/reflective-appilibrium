@@ -27,6 +27,9 @@ export {};
  * - `revised`   — text was changed in a later round; `previousText` and `revisedRound` are set
  * - `withdrawn` — removed from the equilibrium; `reason` and `withdrawnRound` are set
  * - `rejected`  — a declined LLM suggestion; `rejectedRound` is set
+ *
+ * Withdrawal and rejection are both reversible: reinstating returns an element to
+ * `active`, so a later argument can bring it back into play.
  * - `possible`  — pre-loaded but not yet affirmed by the user; invisible in graph and text tab
  *
  * @typedef {'active'|'revised'|'withdrawn'|'rejected'|'possible'} ElementStatus
@@ -78,6 +81,9 @@ export {};
  * @property {number}          [revisedRound]  - Round in which text was revised (revised only).
  * @property {string}          [reason]        - Explanation for withdrawal (withdrawn only).
  * @property {number}          [withdrawnRound] - Round in which element was withdrawn (withdrawn only).
+ * @property {number}          [reinstatedRound] - Round in which a withdrawal was undone. Paired
+ *   with `withdrawnRound` it marks the rounds the element was absent. Only the most
+ *   recent withdrawal is tracked; earlier cycles remain in the log alone.
  * @property {number}          [rejectedRound]  - Round in which element was rejected (rejected only).
  * @property {boolean}         [negated]        - True when this element appears as a negated sentence in a rethon position (simulation only; defaults to false).
  */

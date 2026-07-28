@@ -225,23 +225,28 @@ describe("ctrl+click relation building", () => {
     fireEvent.click(button(container, "Save"));
   }
 
-  it("gives an argument type its own argumentId", () => {
+  // Grouping an argument relation under an argumentId is handleAddRelation's
+  // job, and is covered in useREActions.test.js.
+  it("submits the chosen argument type", () => {
     const onAddRelation = vi.fn();
     addRelationVia(onAddRelation, "entails");
 
     expect(onAddRelation).toHaveBeenCalledTimes(1);
-    const [rel] = onAddRelation.mock.calls[0];
-    expect(rel).toMatchObject({ from: "J1", to: "P1", type: "entails" });
-    expect(rel.argumentId).toMatch(/^arg-/);
+    expect(onAddRelation.mock.calls[0][0]).toMatchObject({
+      from: "J1",
+      to: "P1",
+      type: "entails",
+    });
   });
 
-  it("leaves a dialectical relation ungrouped", () => {
+  it("defaults to a dialectical type", () => {
     const onAddRelation = vi.fn();
     addRelationVia(onAddRelation);
 
-    expect(onAddRelation).toHaveBeenCalledTimes(1);
-    const [rel] = onAddRelation.mock.calls[0];
-    expect(rel).toMatchObject({ from: "J1", to: "P1", type: "supports" });
-    expect(rel).not.toHaveProperty("argumentId");
+    expect(onAddRelation.mock.calls[0][0]).toMatchObject({
+      from: "J1",
+      to: "P1",
+      type: "supports",
+    });
   });
 });

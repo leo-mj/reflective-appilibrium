@@ -26,8 +26,12 @@
  */
 export function elementsAtRound(elements, round) {
   const addedBy = (e) => (e.addedRound || 1) <= round;
+  // Withdrawal is an interval, not a flag: an element reinstated later was still
+  // absent for the rounds in between, and history should show that.
   const withdrawnBy = (e) =>
-    e.status === "withdrawn" && e.withdrawnRound && e.withdrawnRound <= round;
+    e.withdrawnRound &&
+    e.withdrawnRound <= round &&
+    !(e.reinstatedRound && e.reinstatedRound <= round);
 
   const active = elements.filter((e) => addedBy(e) && !withdrawnBy(e));
   const withdrawn = elements.filter((e) => addedBy(e) && withdrawnBy(e));

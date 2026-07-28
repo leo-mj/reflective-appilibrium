@@ -9,6 +9,7 @@ import {
   makeDiff,
   makeLogEntry,
   ARGUMENT_RELATION_TYPES,
+  newArgumentId,
   withUserEdit,
 } from "../utils/stateUtils.js";
 
@@ -102,6 +103,12 @@ export function useRelationActions({
     // an Origin field, so default to "user"; LLM-driven callers (RelationSuggestTab,
     // DetectArgumentsTab) already pass their own origin in formData.
     const newRel = { origin: "user", ...formData, addedRound: newRound };
+    // Argument relations are grouped by argumentId. The argument panels supply
+    // their own so joint premises share one; a relation form that happens to
+    // pick entails/precludes is a one-premise argument and needs its own.
+    if (ARGUMENT_RELATION_TYPES.has(newRel.type) && !newRel.argumentId) {
+      newRel.argumentId = newArgumentId();
+    }
     mutate((prev) => ({
       ...prev,
       round: newRound,

@@ -150,6 +150,32 @@ describe("handleAddRelation", () => {
     expect(rels[1].addedRound).toBe(2);
   });
 
+  it("groups an argument type under a generated argumentId", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => {
+      result.current.handleAddRelation({ from: "J1", to: "P1", type: "entails", explanation: "" });
+    });
+    expect(result.current.state.relations.at(-1).argumentId).toMatch(/^arg-/);
+  });
+
+  it("leaves a dialectical type ungrouped", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => {
+      result.current.handleAddRelation({ from: "J1", to: "P1", type: "supports", explanation: "" });
+    });
+    expect(result.current.state.relations.at(-1).argumentId).toBeUndefined();
+  });
+
+  it("keeps a caller-supplied argumentId so joint premises stay together", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => {
+      result.current.handleAddRelation({
+        from: "J1", to: "P1", type: "jointly_entails", argumentId: "arg-fixed", explanation: "",
+      });
+    });
+    expect(result.current.state.relations.at(-1).argumentId).toBe("arg-fixed");
+  });
+
   it("leaves a withdrawn endpoint withdrawn", () => {
     // An argument may rest on a premise that was withdrawn later; recording it
     // must not quietly bring that premise back into the position.
@@ -402,6 +428,71 @@ describe("handleRelEditSave", () => {
       result.current.handleRelEditSave({ type: "conflicts", explanation: "x" });
     });
     expect(result.current.editingRel).toBeNull();
+  });
+});
+
+// ─── handleReinstateElement ───────────────────────────────────────────────────
+
+describe("handleReinstateElement", () => {
+  const withdrawn = () =>
+    makeEl({ id: "J1", status: "withdrawn", withdrawnRound: 2, reason: "Too broad" });
+  const rejected = () =>
+    makeEl({ id: "J1", status: "rejected", rejectedRound: 2 });
+
+  it("returns a withdrawn element to active and records the round", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [withdrawn()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("active");
+    expect(el.reinstatedRound).toBe(5);
+    // Kept, so history still knows when it was gone.
+    expect(el.withdrawnRound).toBe(2);
+  });
+
+  it("returns a rejected element to active and clears rejectedRound", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [rejected()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("active");
+    expect(el.rejectedRound).toBeUndefined();
+  });
+
+  it("increments the round and logs the decision", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [withdrawn()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    expect(result.current.state.round).toBe(5);
+    expect(result.current.state.log.at(-1).decision).toBe("Reinstated");
+  });
+
+  it("ignores elements that are already in play", () => {
+    const { result } = renderHook(() => useREActions(baseState({ round: 4 })));
+    act(() => result.current.handleReinstateElement("J1"));
+    expect(result.current.state.round).toBe(4);
+    expect(result.current.state.log).toHaveLength(0);
+  });
+
+  it("ignores an unknown id", () => {
+    const { result } = renderHook(() => useREActions(baseState({ round: 4 })));
+    act(() => result.current.handleReinstateElement("J99"));
+    expect(result.current.state.round).toBe(4);
+  });
+
+  it("clears reinstatedRound when the element is withdrawn again", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [withdrawn()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    act(() => result.current.handleWithdrawConfirm("J1", "changed my mind"));
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("withdrawn");
+    expect(el.reinstatedRound).toBeUndefined();
+    expect(el.withdrawnRound).toBe(6);
   });
 });
 

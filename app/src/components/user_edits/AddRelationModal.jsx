@@ -10,6 +10,7 @@ import { C } from "../../constants/colors.js";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
 import { ElementOptions } from "./ElementOptions.jsx";
+import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
 
 /**
  * @typedef {Object} AddRelationFormData
@@ -63,18 +64,7 @@ export function AddRelationForm({ form, setForm, elements }) {
           onChange={(e) => set("type", e.target.value)}
           style={INPUT_STYLE}
         >
-          <optgroup label="Dialectical">
-            <option value="supports">Supports</option>
-            <option value="conflicts">Conflicts</option>
-            <option value="undermines">Undermines</option>
-            <option value="depends">Depends on</option>
-          </optgroup>
-          {/* A binary form can only express a one-premise argument; the joint
-              variants need the argument panel. */}
-          <optgroup label="Argument">
-            <option value="entails">Entails</option>
-            <option value="precludes">Precludes</option>
-          </optgroup>
+          <RelationTypeOptions capitalized />
         </select>
       </FormField>
       <FormField label="Explanation">

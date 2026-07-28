@@ -28,6 +28,7 @@ export function ElementCard({ e, dim }) {
     pCovers,
     onEditRequest,
     onWithdrawRequest,
+    onReinstate,
     badgeColor,
     search,
     withdrawalDeltas,
@@ -100,6 +101,7 @@ export function ElementCard({ e, dim }) {
         <ActionButtons
           onRevise={() => onEditRequest(e.id)}
           onWithdraw={!isW && !isR ? () => onWithdrawRequest(e.id) : null}
+          onReinstate={isW || isR ? () => onReinstate(e.id) : null}
         />
       </div>
       <div
@@ -117,7 +119,9 @@ export function ElementCard({ e, dim }) {
           Previously: "{e.previousText}"
         </div>
       )}
-      {e.reason && (
+      {/* Kept on the element after reinstatement as history, but only shown
+          while it is actually withdrawn. */}
+      {isW && e.reason && (
         <div style={{ ...META_LABEL_STYLE, color: C.dim }}>
           Withdrawn: {e.reason}
         </div>
