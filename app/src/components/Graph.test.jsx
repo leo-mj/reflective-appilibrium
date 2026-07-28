@@ -138,14 +138,37 @@ describe("ctrl+click argument building", () => {
     expect(ids.size).toBe(1);
   });
 
-  it("ignores a ctrl+click on a rejected suggestion", () => {
+  it("keeps a rejected suggestion as a premise too", () => {
+    // A declined suggestion earns a second look by being argued for, so it has
+    // to be reachable here.
     const { container, svg } = setup();
 
     clickNode(svg, "J1");
     clickNode(svg, "P2", { ctrl: true }); // rejected
+    clickNode(svg, "P1", { ctrl: true });
+    fireEvent.click(button(container, "Add argument"));
 
-    expect(button(container, "Add argument")).toBeUndefined();
-    expect(button(container, "Add relation")).toBeUndefined();
+    expect(modalSelects(container).map((s) => s.value)).toEqual([
+      "J1",
+      "P2",
+      "P1",
+    ]);
+  });
+
+  it("labels the elements that are not currently in play", () => {
+    const { container, svg } = setup();
+
+    clickNode(svg, "J1");
+    clickNode(svg, "P1", { ctrl: true });
+    fireEvent.click(button(container, "Add relation"));
+
+    const [from] = modalSelects(container);
+    expect([...from.options].map((o) => o.textContent)).toEqual([
+      "J1",
+      "J2 (withdrawn)",
+      "P1",
+      "P2 (rejected)",
+    ]);
   });
 });
 

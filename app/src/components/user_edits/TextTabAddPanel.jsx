@@ -12,6 +12,7 @@ import { useState } from "react";
 
 import { C } from "../../constants/colors.js";
 import { sortElementIds } from "../../utils/stateUtils.js";
+import { ElementOptions } from "./ElementOptions.jsx";
 import { SELECT_STYLE, makeRelationDefaults } from "./addPanelShared.js";
 
 const ELEMENT_DEFAULTS = {
@@ -23,7 +24,7 @@ const ELEMENT_DEFAULTS = {
 
 /**
  * @param {Object}      props
- * @param {REElement[]} props.elements   - Active (non-withdrawn) elements.
+ * @param {REElement[]} props.elements   - Elements that may be referenced; see linkableElements.
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
  */
@@ -240,11 +241,7 @@ export function AddBar({
                 onChange={(e) => setRel("from", e.target.value)}
                 style={SELECT_STYLE}
               >
-                {ids.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
+                <ElementOptions elements={elements} />
               </select>
               <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
                 →
@@ -267,11 +264,7 @@ export function AddBar({
                 onChange={(e) => setRel("to", e.target.value)}
                 style={SELECT_STYLE}
               >
-                {ids.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
+                <ElementOptions elements={elements} />
               </select>
               {relationForm.from === relationForm.to && ids.length >= 2 && (
                 <span style={{ fontSize: 10, color: C.conflicts }}>

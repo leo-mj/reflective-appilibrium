@@ -9,7 +9,7 @@ import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
-import { sortElementIds } from "../../utils/stateUtils.js";
+import { ElementOptions } from "./ElementOptions.jsx";
 
 /**
  * @typedef {Object} AddRelationFormData
@@ -31,7 +31,6 @@ export function AddRelationForm({ form, setForm, elements }) {
   /** @param {string} field @param {string} value */
   const set = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
-  const ids = elements.map((e) => e.id);
   const selfLoop = form.from === form.to;
   return (
     <>
@@ -41,11 +40,7 @@ export function AddRelationForm({ form, setForm, elements }) {
           onChange={(e) => set("from", e.target.value)}
           style={INPUT_STYLE}
         >
-          {ids.sort(sortElementIds).map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
+          <ElementOptions elements={elements} />
         </select>
       </FormField>
       <FormField label="To">
@@ -54,11 +49,7 @@ export function AddRelationForm({ form, setForm, elements }) {
           onChange={(e) => set("to", e.target.value)}
           style={INPUT_STYLE}
         >
-          {ids.sort(sortElementIds).map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
+          <ElementOptions elements={elements} />
         </select>
         {selfLoop && (
           <div style={{ fontSize: 10, color: C.conflicts, marginTop: 4 }}>

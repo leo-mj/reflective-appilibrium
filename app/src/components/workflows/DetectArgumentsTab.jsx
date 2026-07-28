@@ -14,6 +14,7 @@ import {
   nextElementId,
   argumentRelationType,
   argumentPostulateExplanation,
+  linkableElements,
   newArgumentId,
   withUserEdit,
   llmOrigin,
@@ -620,9 +621,7 @@ export function DetectArgumentsTab({
         )}
       </div>
       <AddArgumentPanel
-        elements={state.elements.filter((e) =>
-          ["active", "revised"].includes(e.status),
-        )}
+        elements={linkableElements(state.elements)}
         onAddRelation={onAddRelation}
       />
     </div>

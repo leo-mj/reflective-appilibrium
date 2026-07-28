@@ -152,6 +152,38 @@ export const ARGUMENT_RELATION_TYPES = new Set([
 ]);
 
 /**
+ * Elements a new relation or argument may be built from — everything except
+ * `possible`, which the user has not affirmed yet.
+ *
+ * Withdrawn and rejected elements deliberately stay eligible: a new argument is
+ * how one earns a second look, and being referenced never changes an element's
+ * status. Reinstating it is a separate, explicit decision.
+ *
+ * @param {REElement[]} elements
+ * @returns {REElement[]}
+ */
+export function linkableElements(elements) {
+  return elements.filter((e) => e.status !== "possible");
+}
+
+/**
+ * Sorted ids to seed a picker's initial selection from. Every linkable element
+ * stays *selectable*, but a form should open on something currently in play
+ * rather than on whichever withdrawn element happens to sort first.
+ *
+ * @param {REElement[]} elements
+ * @returns {string[]}
+ */
+export function defaultPickerIds(elements) {
+  const inPlay = elements.filter(
+    (e) => e.status !== "withdrawn" && e.status !== "rejected",
+  );
+  return (inPlay.length ? inPlay : elements)
+    .map((e) => e.id)
+    .sort(sortElementIds);
+}
+
+/**
  * Generates the id shared by every relation belonging to one argument. Joint
  * arguments are grouped by it when rendering, selecting, and deleting.
  *

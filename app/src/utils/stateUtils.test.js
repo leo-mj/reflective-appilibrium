@@ -6,6 +6,8 @@ import {
   makeLogEntry,
   sortElementIds,
   argumentPostulateExplanation,
+  linkableElements,
+  defaultPickerIds,
 } from "./stateUtils.js";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -54,6 +56,53 @@ describe("elementsAtRound", () => {
     const { active, withdrawn } = elementsAtRound([j2], 1);
     expect(active).toHaveLength(0);
     expect(withdrawn).toHaveLength(0);
+  });
+});
+
+// ─── linkableElements ─────────────────────────────────────────────────────────
+
+describe("linkableElements", () => {
+  const byStatus = (status) => ({ id: `J${status.length}`, status });
+
+  it("keeps withdrawn and rejected elements available", () => {
+    const els = ["active", "revised", "withdrawn", "rejected"].map(byStatus);
+    expect(linkableElements(els)).toEqual(els);
+  });
+
+  it("excludes elements the user has not affirmed yet", () => {
+    const possible = byStatus("possible");
+    expect(linkableElements([j1, possible])).toEqual([j1]);
+  });
+
+  it("keeps elements with no status set", () => {
+    const bare = { id: "J9" };
+    expect(linkableElements([bare])).toEqual([bare]);
+  });
+});
+
+// ─── defaultPickerIds ─────────────────────────────────────────────────────────
+
+describe("defaultPickerIds", () => {
+  it("seeds from elements that are in play", () => {
+    const els = [
+      { id: "J1", status: "withdrawn" },
+      { id: "J2", status: "active" },
+      { id: "P1", status: "rejected" },
+      { id: "P2", status: "revised" },
+    ];
+    expect(defaultPickerIds(els)).toEqual(["J2", "P2"]);
+  });
+
+  it("falls back to the whole pool when nothing is in play", () => {
+    const els = [
+      { id: "J2", status: "withdrawn" },
+      { id: "J1", status: "rejected" },
+    ];
+    expect(defaultPickerIds(els)).toEqual(["J1", "J2"]);
+  });
+
+  it("returns an empty list for no elements", () => {
+    expect(defaultPickerIds([])).toEqual([]);
   });
 });
 

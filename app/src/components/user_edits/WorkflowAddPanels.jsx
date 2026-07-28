@@ -10,8 +10,13 @@
 import { useState } from "react";
 
 import { C } from "../../constants/colors.js";
-import { sortElementIds, newArgumentId } from "../../utils/stateUtils.js";
+import {
+  sortElementIds,
+  defaultPickerIds,
+  newArgumentId,
+} from "../../utils/stateUtils.js";
 import { Tooltip } from "../Tooltip.jsx";
+import { ElementOptions } from "./ElementOptions.jsx";
 import { SELECT_STYLE, PANEL_STYLE, makeRelationDefaults } from "./addPanelShared.js";
 
 
@@ -139,13 +144,15 @@ export function AddElementPanel({ elementType, onAddElement }) {
  * Persistent bottom panel for manually adding a jointly_entails argument.
  *
  * @param {Object}      props
- * @param {REElement[]} props.elements - Active (non-withdrawn) elements.
+ * @param {REElement[]} props.elements - Elements that may be referenced; see linkableElements.
  * @param {function}    props.onAddRelation
  */
 export function AddArgumentPanel({ elements, onAddRelation }) {
   const ids = elements.map((e) => e.id).sort(sortElementIds);
-  const [premises, setPremises] = useState([ids[0] ?? ""]);
-  const [conclusion, setConclusion] = useState(ids[1] ?? ids[0] ?? "");
+  // Any linkable element can be picked, but the form opens on ones in play.
+  const seed = defaultPickerIds(elements);
+  const [premises, setPremises] = useState([seed[0] ?? ""]);
+  const [conclusion, setConclusion] = useState(seed[1] ?? seed[0] ?? "");
   const [explanation, setExplanation] = useState("");
   const [mode, setMode] = useState("entails"); // "entails" | "precludes"
 
@@ -154,7 +161,9 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
   const addPremise = () =>
     setPremises((prev) => [
       ...prev,
-      ids.find((id) => !prev.includes(id) && id !== conclusion) ?? ids[0] ?? "",
+      seed.find((id) => !prev.includes(id) && id !== conclusion) ??
+        seed[0] ??
+        "",
     ]);
   const removePremise = (i) =>
     setPremises((prev) => prev.filter((_, j) => j !== i));
@@ -192,8 +201,8 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
         { select: false, pinRecent: i === premises.length - 1 },
       );
     });
-    setPremises([ids[0] ?? ""]);
-    setConclusion(ids[1] ?? ids[0] ?? "");
+    setPremises([seed[0] ?? ""]);
+    setConclusion(seed[1] ?? seed[0] ?? "");
     setExplanation("");
   };
 
@@ -254,11 +263,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
                 onChange={(e) => setPremise(i, e.target.value)}
                 style={SELECT_STYLE}
               >
-                {ids.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
+                <ElementOptions elements={elements} />
               </select>
               {premises.length > 1 && (
                 <button onClick={() => removePremise(i)} style={ghostBtn}>
@@ -309,11 +314,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
           onChange={(e) => setConclusion(e.target.value)}
           style={{ ...SELECT_STYLE, alignSelf: "center" }}
         >
-          {ids.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
+          <ElementOptions elements={elements} />
         </select>
       </div>
       <textarea
@@ -349,7 +350,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
  * Minimal add-relation panel for use inside the RelationSuggestTab.
  *
  * @param {Object}      props
- * @param {REElement[]} props.elements - Active (non-withdrawn) elements.
+ * @param {REElement[]} props.elements - Elements that may be referenced; see linkableElements.
  * @param {function}    props.onAddRelation
  */
 export function AddRelationPanel({ elements, onAddRelation }) {
@@ -395,11 +396,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
           onChange={(e) => set("from", e.target.value)}
           style={SELECT_STYLE}
         >
-          {ids.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
+          <ElementOptions elements={elements} />
         </select>
         <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
           →
@@ -422,11 +419,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
           onChange={(e) => set("to", e.target.value)}
           style={SELECT_STYLE}
         >
-          {ids.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
+          <ElementOptions elements={elements} />
         </select>
         {form.from === form.to && ids.length >= 2 && (
           <span style={{ fontSize: 10, color: C.conflicts }}>From ≠ To</span>

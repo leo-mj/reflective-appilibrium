@@ -20,6 +20,7 @@ import {
 import {
   elementsAtRound,
   argumentRelationType,
+  linkableElements,
   newArgumentId,
   ARGUMENT_RELATION_TYPES,
 } from "../utils/stateUtils.js";
@@ -354,17 +355,18 @@ export function Graph({
     if (el.type === "theory") return !hiddenLegendKeys?.has("T");
     return true;
   };
-  // Elements a relation or argument may be built from. Withdrawn ones qualify:
-  // an argument can rest on a premise that was later withdrawn, and recording
-  // it leaves that premise withdrawn. Declined suggestions do not.
-  const linkableEls = [...active, ...withdrawn].filter(
-    (e) => isElVisible(e) && e.status !== "rejected",
-  );
-  const linkableIds = new Set(linkableEls.map((e) => e.id));
-  // `elementsAtRound` splits purely on round and withdrawal, so a rejected
-  // element comes back in `active` too. Excluding it there and re-adding it
-  // here is what keeps it from being rendered twice.
-  const visibleEls = [...linkableEls, ...rejectedEls.filter(isElVisible)];
+  const visibleEls = [
+    // `elementsAtRound` splits purely on round and withdrawal, so a rejected
+    // element comes back in `active` too; dropping it here stops it from being
+    // drawn twice.
+    ...active.filter((e) => e.status !== "rejected"),
+    ...withdrawn,
+    ...rejectedEls,
+  ].filter(isElVisible);
+  // What the add modals may reference. Deliberately not narrowed by the legend:
+  // hiding withdrawn nodes to declutter the canvas should not also remove them
+  // from the pickers.
+  const linkableEls = linkableElements(state.elements);
   const visIds = new Set(visibleEls.map((e) => e.id));
   const visRels = state.relations.filter(
     (r) =>
@@ -443,10 +445,6 @@ export function Graph({
     onSelectRel,
     setTooltip,
     onCtrlNodeClick: (id) => {
-      // A node outside the pool would be dropped by the modal's id list, so
-      // refuse to accumulate it rather than lose it silently.
-      if (!linkableIds.has(id)) return;
-      if (selected && !linkableIds.has(selected)) return;
       if (selected && id !== selected && !ctrlArgNodes.includes(id)) {
         setCtrlArgState((prev) => ({
           base: selected,

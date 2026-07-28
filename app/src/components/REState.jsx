@@ -3,7 +3,7 @@ import { C } from "../constants/colors.js";
 import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
-import { stateAtRound } from "../utils/stateUtils.js";
+import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
@@ -356,9 +356,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
       {isWide && !isAssistTab && !isSimulateTab && (
         <AddBar
-          elements={state.elements.filter((e) =>
-            ["active", "revised"].includes(e.status),
-          )}
+          elements={linkableElements(state.elements)}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
           selected={selected}

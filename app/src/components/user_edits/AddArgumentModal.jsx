@@ -7,7 +7,8 @@ import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
-import { sortElementIds } from "../../utils/stateUtils.js";
+import { ElementOptions } from "./ElementOptions.jsx";
+import { sortElementIds, defaultPickerIds } from "../../utils/stateUtils.js";
 
 const ghostBtn = {
   background: "transparent",
@@ -32,15 +33,17 @@ const ghostBtn = {
  */
 export function AddArgumentModal({ elements, currentRound, onSave, onCancel, initialPremises, initialConclusion }) {
   const ids = elements.map((e) => e.id).sort(sortElementIds);
+  // Any linkable element can be picked, but an unseeded form opens on ones in play.
+  const seed = defaultPickerIds(elements);
   const [premises, setPremises] = useState(
     initialPremises?.filter((id) => ids.includes(id)).length
       ? initialPremises.filter((id) => ids.includes(id))
-      : [ids[0] ?? ""]
+      : [seed[0] ?? ""]
   );
   const [conclusion, setConclusion] = useState(
     initialConclusion && ids.includes(initialConclusion)
       ? initialConclusion
-      : (ids[1] ?? ids[0] ?? "")
+      : (seed[1] ?? seed[0] ?? "")
   );
   const [explanation, setExplanation] = useState("");
   const [negated, setNegated] = useState(false);
@@ -51,7 +54,9 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
   const addPremise = () =>
     setPremises((prev) => [
       ...prev,
-      ids.find((id) => !prev.includes(id) && id !== conclusion) ?? ids[0] ?? "",
+      seed.find((id) => !prev.includes(id) && id !== conclusion) ??
+        seed[0] ??
+        "",
     ]);
 
   const removePremise = (i) =>
@@ -82,11 +87,7 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
                 onChange={(e) => setPremise(i, e.target.value)}
                 style={{ ...INPUT_STYLE, flex: 1 }}
               >
-                {ids.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
+                <ElementOptions elements={elements} />
               </select>
               {premises.length > 1 && (
                 <button onClick={() => removePremise(i)} style={ghostBtn}>
@@ -146,11 +147,7 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
           onChange={(e) => setConclusion(e.target.value)}
           style={INPUT_STYLE}
         >
-          {ids.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
+          <ElementOptions elements={elements} />
         </select>
       </FormField>
 

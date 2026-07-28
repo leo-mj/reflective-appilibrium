@@ -1,5 +1,5 @@
 import { C } from "../../constants/colors.js";
-import { sortElementIds } from "../../utils/stateUtils.js";
+import { defaultPickerIds } from "../../utils/stateUtils.js";
 
 export const SELECT_STYLE = {
   background: C.bg,
@@ -22,7 +22,7 @@ export const PANEL_STYLE = {
 
 /** @param {import('../../types.js').REElement[]} elements */
 export function makeRelationDefaults(elements) {
-  const ids = elements.map((e) => e.id).sort(sortElementIds);
+  const ids = defaultPickerIds(elements);
   return {
     from: ids[0] ?? "",
     to: ids[1] ?? "",
