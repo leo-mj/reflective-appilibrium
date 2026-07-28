@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useREActions } from "./useREActions.js";
+import { textAtRound } from "../utils/stateUtils.js";
 
 vi.mock("../utils/importMarkdown.js", () => ({
   importStateFromFile: vi.fn(),
@@ -431,6 +432,62 @@ describe("handleRelEditSave", () => {
   });
 });
 
+// ─── Revision history ─────────────────────────────────────────────────────────
+
+describe("revision history", () => {
+  it("keeps every wording, not just the last", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J1", "Second wording"));
+    act(() => result.current.handleReviseElementText("J1", "Third wording"));
+
+    const el = result.current.state.elements[0];
+    expect(el.text).toBe("Third wording");
+    expect(el.history).toEqual([
+      { round: 2, type: "revised", previousText: "Original text" },
+      { round: 3, type: "revised", previousText: "Second wording" },
+    ]);
+    // The first wording used to be unrecoverable after the second edit.
+    expect(textAtRound(el, 1)).toBe("Original text");
+    expect(textAtRound(el, 2)).toBe("Second wording");
+    expect(textAtRound(el, 3)).toBe("Third wording");
+  });
+
+  it("records a relation's previous explanation", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.setEditingRel(result.current.state.relations[0]));
+    act(() =>
+      result.current.handleRelEditSave({
+        type: "supports",
+        explanation: "Reworded",
+      }),
+    );
+    expect(result.current.state.relations[0].history).toEqual([
+      { round: 2, type: "revised", previousText: "J1 supports P1" },
+    ]);
+  });
+
+  it("records reinstatement when a withdrawn element is revised", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawConfirm("J1", "Too broad"));
+    act(() => result.current.handleEditRequest("J1"));
+    act(() =>
+      result.current.handleEditSave({
+        type: "judgment",
+        confidence: 1.0,
+        origin: "user",
+        text: "Reworded",
+      }),
+    );
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("revised");
+    expect(el.history.map((h) => [h.round, h.type])).toEqual([
+      [2, "withdrawn"],
+      [3, "reinstated"],
+      [3, "revised"],
+    ]);
+  });
+});
+
 // ─── handleReinstateElement ───────────────────────────────────────────────────
 
 describe("handleReinstateElement", () => {
@@ -439,26 +496,31 @@ describe("handleReinstateElement", () => {
   const rejected = () =>
     makeEl({ id: "J1", status: "rejected", rejectedRound: 2 });
 
-  it("returns a withdrawn element to active and records the round", () => {
+  it("returns a withdrawn element to active and records the event", () => {
     const { result } = renderHook(() =>
       useREActions(baseState({ round: 4, elements: [withdrawn()] })),
     );
     act(() => result.current.handleReinstateElement("J1"));
     const el = result.current.state.elements[0];
     expect(el.status).toBe("active");
-    expect(el.reinstatedRound).toBe(5);
-    // Kept, so history still knows when it was gone.
-    expect(el.withdrawnRound).toBe(2);
+    // The legacy round is migrated into the list, so history is kept.
+    expect(el.history).toEqual([
+      { round: 2, type: "withdrawn", reason: "Too broad" },
+      { round: 5, type: "reinstated" },
+    ]);
   });
 
-  it("returns a rejected element to active and clears rejectedRound", () => {
+  it("returns a rejected element to active, keeping the rejection in history", () => {
     const { result } = renderHook(() =>
       useREActions(baseState({ round: 4, elements: [rejected()] })),
     );
     act(() => result.current.handleReinstateElement("J1"));
     const el = result.current.state.elements[0];
     expect(el.status).toBe("active");
-    expect(el.rejectedRound).toBeUndefined();
+    expect(el.history).toEqual([
+      { round: 2, type: "rejected" },
+      { round: 5, type: "reinstated" },
+    ]);
   });
 
   it("increments the round and logs the decision", () => {
@@ -483,28 +545,43 @@ describe("handleReinstateElement", () => {
     expect(result.current.state.round).toBe(4);
   });
 
-  it("clears reinstatedRound when the element is withdrawn again", () => {
+  it("records every withdraw/reinstate cycle", () => {
     const { result } = renderHook(() =>
       useREActions(baseState({ round: 4, elements: [withdrawn()] })),
     );
     act(() => result.current.handleReinstateElement("J1"));
     act(() => result.current.handleWithdrawConfirm("J1", "changed my mind"));
+    act(() => result.current.handleReinstateElement("J1"));
     const el = result.current.state.elements[0];
-    expect(el.status).toBe("withdrawn");
-    expect(el.reinstatedRound).toBeUndefined();
-    expect(el.withdrawnRound).toBe(6);
+    expect(el.status).toBe("active");
+    expect(el.history.map((h) => [h.round, h.type])).toEqual([
+      [2, "withdrawn"],
+      [5, "reinstated"],
+      [6, "withdrawn"],
+      [7, "reinstated"],
+    ]);
+  });
+
+  it("does not reopen a closed period when reinstated twice", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [withdrawn()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    const after = result.current.state.elements[0].history;
+    act(() => result.current.handleReinstateElement("J1"));
+    expect(result.current.state.elements[0].history).toEqual(after);
   });
 });
 
 // ─── handleWithdrawConfirm ────────────────────────────────────────────────────
 
 describe("handleWithdrawConfirm", () => {
-  it("sets element status to 'withdrawn' with withdrawnRound and reason", () => {
+  it("sets element status to 'withdrawn' with an event and reason", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleWithdrawConfirm("J1", "No longer relevant"));
     const el = result.current.state.elements[0];
     expect(el.status).toBe("withdrawn");
-    expect(el.withdrawnRound).toBe(2);
+    expect(el.history).toEqual([{ round: 2, type: "withdrawn", reason: "No longer relevant" }]);
     expect(el.reason).toBe("No longer relevant");
   });
 
@@ -555,16 +632,67 @@ describe("handleWithdrawConfirm", () => {
   });
 });
 
+// ─── handleReinstateRelation ──────────────────────────────────────────────────
+
+describe("handleReinstateRelation", () => {
+  it("returns a withdrawn relation to active and records the event", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawRelRequest(result.current.state.relations[0]));
+    act(() => result.current.handleReinstateRelation(result.current.state.relations[0]));
+    const rel = result.current.state.relations[0];
+    expect(rel.status).toBe("active");
+    expect(rel.history).toEqual([
+      { round: 2, type: "withdrawn" },
+      { round: 3, type: "reinstated" },
+    ]);
+  });
+
+  it("ignores a relation that is not withdrawn", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReinstateRelation(result.current.state.relations[0]));
+    expect(result.current.state.round).toBe(1);
+    expect(result.current.state.log).toHaveLength(0);
+  });
+
+  it("reinstates every relation of an argument together", () => {
+    const argRels = [
+      makeRel({ from: "J1", to: "P1", type: "jointly_entails", argumentId: "arg-1" }),
+      makeRel({ from: "J2", to: "P1", type: "jointly_entails", argumentId: "arg-1" }),
+    ];
+    const { result } = renderHook(() =>
+      useREActions(baseState({ relations: argRels })),
+    );
+    act(() => result.current.handleWithdrawRelRequest(result.current.state.relations[0]));
+    expect(result.current.state.relations.every((r) => r.status === "withdrawn")).toBe(true);
+
+    act(() => result.current.handleReinstateRelation(result.current.state.relations[0]));
+    expect(result.current.state.relations.every((r) => r.status === "active")).toBe(true);
+    for (const r of result.current.state.relations) {
+      expect(r.history).toEqual([
+        { round: 2, type: "withdrawn" },
+        { round: 3, type: "reinstated" },
+      ]);
+    }
+  });
+
+  it("logs the decision", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawRelRequest(result.current.state.relations[0]));
+    act(() => result.current.handleReinstateRelation(result.current.state.relations[0]));
+    expect(result.current.state.log.at(-1).decision).toBe("Reinstated");
+  });
+});
+
 // ─── handleWithdrawRelRequest ─────────────────────────────────────────────────
 
 describe("handleWithdrawRelRequest", () => {
-  it("sets relation status to 'withdrawn' with withdrawnRound", () => {
+  it("sets relation status to 'withdrawn' and records the event", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     const rel = result.current.state.relations[0];
     act(() => result.current.handleWithdrawRelRequest(rel));
     const updated = result.current.state.relations[0];
     expect(updated.status).toBe("withdrawn");
-    expect(updated.withdrawnRound).toBe(2);
+    expect(updated.history).toEqual([{ round: 2, type: "withdrawn" }]);
   });
 
   it("increments state.round and appends a log entry with decision 'Withdrawn'", () => {

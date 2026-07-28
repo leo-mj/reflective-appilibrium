@@ -140,6 +140,7 @@ export function ArgumentCard({ rels, dim }) {
     onSelect,
     onEditRelRequest,
     onWithdrawRelRequest,
+    onReinstateRel,
     badgeColor,
     search,
   } = useContext(Ctx);
@@ -200,6 +201,9 @@ export function ArgumentCard({ rels, dim }) {
               onRevise={() => onEditRelRequest(r)}
               onWithdraw={
                 r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null
+              }
+              onReinstate={
+                r.status === "withdrawn" ? () => onReinstateRel(r) : null
               }
             />
           </div>
@@ -291,6 +295,7 @@ export function RelationCard({ r, dim }) {
     onSelect,
     onEditRelRequest,
     onWithdrawRelRequest,
+    onReinstateRel,
     badgeColor,
     search,
   } = useContext(Ctx);
@@ -337,6 +342,9 @@ export function RelationCard({ r, dim }) {
             onRevise={() => onEditRelRequest(r)}
             onWithdraw={
               r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null
+            }
+            onReinstate={
+              r.status === "withdrawn" ? () => onReinstateRel(r) : null
             }
           />
         </div>

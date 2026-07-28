@@ -9,12 +9,17 @@ import {
   nextElementId,
   makeDiff,
   makeLogEntry,
+  historyOf,
+  isWithdrawnNow,
+  withEvent,
   withUserEdit,
 } from "../utils/stateUtils.js";
 
 /**
  * @param {{ state, mutate, selected, setSelected, setSelectedRel, setRecentlyAdded, setRecentlyAddedRel }} deps
  */
+const RETHON_REASON = "Withdrawn by rethon equilibrium simulation.";
+
 export function useElementActions({
   state,
   mutate,
@@ -35,8 +40,16 @@ export function useElementActions({
   const handleEditSave = (formData) => {
     const newRound = state.round + 1;
     const oldEl = editingEl;
-    // eslint-disable-next-line no-unused-vars
-    const { withdrawnRound, reason, ...oldElBase } = oldEl;
+    /* eslint-disable-next-line no-unused-vars */
+    const { withdrawnRound, reinstatedRound, withdrawals, reason, ...oldElBase } =
+      oldEl;
+    // Revising a withdrawn element brings it back, so record that too rather
+    // than silently dropping the withdrawal as the legacy fields did.
+    const history = [
+      ...historyOf(oldEl),
+      ...(isWithdrawnNow(oldEl) ? [{ round: newRound, type: "reinstated" }] : []),
+      { round: newRound, type: "revised", previousText: oldEl.text },
+    ];
     // If the text actually changed and the user didn't touch the Origin
     // field themselves, mark an LLM-authored origin as also user-edited
     // rather than silently keeping "llm" for text the user rewrote.
@@ -53,6 +66,7 @@ export function useElementActions({
       status: "revised",
       previousText: oldEl.text,
       revisedRound: newRound,
+      history,
     };
     const diffs = makeDiff(
       ["type", "confidence", "status", "origin", "text"],
@@ -105,6 +119,11 @@ export function useElementActions({
               status: "revised",
               previousText: e.text,
               revisedRound: newRound,
+              history: withEvent(e, {
+                round: newRound,
+                type: "revised",
+                previousText: e.text,
+              }),
             }
           : e,
       ),
@@ -134,10 +153,7 @@ export function useElementActions({
           ? {
               ...e,
               status: "withdrawn",
-              withdrawnRound: newRound,
-              // Clears any earlier reinstatement so the pair always describes
-              // the current withdrawal.
-              reinstatedRound: undefined,
+              history: withEvent(e, { round: newRound, type: "withdrawn", reason: reason ?? "" }),
               reason: reason ?? "",
               previousText: undefined,
               revisedRound: undefined,
@@ -184,10 +200,9 @@ export function useElementActions({
    * withdrawing and rejecting, and what makes an argument built on such an
    * element worth building.
    *
-   * `withdrawnRound` is kept and paired with `reinstatedRound` so history
-   * playback still shows the element as absent for the rounds it was gone.
-   * Only the most recent withdrawal is tracked this way; earlier cycles survive
-   * in the log but not in the round-by-round view.
+   * Recorded as an event rather than by erasing the withdrawal, so history
+   * playback still shows the element as absent for the rounds it was gone, and
+   * any number of withdraw/reinstate cycles survives.
    *
    * @param {string} elementId
    */
@@ -204,9 +219,8 @@ export function useElementActions({
           ? {
               ...e,
               status: "active",
-              ...(wasRejected
-                ? { rejectedRound: undefined }
-                : { reinstatedRound: newRound }),
+              reason: undefined,
+              history: withEvent(e, { round: newRound, type: "reinstated" }),
             }
           : e,
       ),
@@ -227,7 +241,14 @@ export function useElementActions({
       let running = prev.elements;
       const newEls = formDatas.map((fd) => {
         const id = nextElementId(running, fd.type);
-        const el = { id, status: "rejected", addedRound: prev.round, rejectedRound: prev.round, ...fd };
+        const el = {
+          id,
+          status: "rejected",
+          addedRound: prev.round,
+          rejectedRound: prev.round,
+          history: [{ round: prev.round, type: "rejected" }],
+          ...fd,
+        };
         running = [...running, el];
         return el;
       });
@@ -258,8 +279,8 @@ export function useElementActions({
         return {
           ...e,
           status: "withdrawn",
-          withdrawnRound: newRound,
-          reason: "Withdrawn by rethon equilibrium simulation.",
+          history: withEvent(e, { round: newRound, type: "withdrawn", reason: RETHON_REASON }),
+          reason: RETHON_REASON,
         };
       }),
       log: [

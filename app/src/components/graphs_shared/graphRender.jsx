@@ -12,6 +12,7 @@
 
 import { C, confOp, TRANSITION } from "../../constants/colors.js";
 import { nodeRadius, computeJunction } from "../../utils/graphHelpers.js";
+import { isWithdrawnAt } from "../../utils/stateUtils.js";
 import { GraphEdge, GraphNode, PulseRing } from "./GraphElements.jsx";
 
 // ─── Tooltip handler factory ──────────────────────────────────────────────────
@@ -75,7 +76,11 @@ export function resolveEdge(relation, positions, elementById) {
  */
 export function historyEdgeVisuals(relation, wIds, snappedRound, groupRels = null) {
   const edges = groupRels ?? [relation];
-  const isWithdrawn = edges.some((r) => wIds.has(r.from) || wIds.has(r.to));
+  // Either endpoint being gone takes the edge with it, and the relation can also
+  // have been withdrawn on its own while both endpoints stayed in play.
+  const isWithdrawn = edges.some(
+    (r) => wIds.has(r.from) || wIds.has(r.to) || isWithdrawnAt(r, snappedRound),
+  );
   const isFuture = (relation.addedRound || 1) > snappedRound;
   return {
     isWithdrawn,

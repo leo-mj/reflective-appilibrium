@@ -19,6 +19,12 @@
 const MAX_FILE_SIZE = 500_000; // 500 KB
 const ELEMENT_TYPES = new Set(["judgment", "principle", "theory"]);
 const STATUSES = new Set(["active", "revised", "withdrawn", "rejected", "possible"]);
+const HISTORY_EVENT_TYPES = new Set([
+  "withdrawn",
+  "reinstated",
+  "revised",
+  "rejected",
+]);
 const LEGACY_CONFIDENCE = { high: 1.0, moderate: 0.67, low: 0.33 };
 const RELATION_TYPES = new Set([
   "supports",
@@ -57,6 +63,34 @@ function bool(v, field) {
   if (typeof v !== "boolean")
     throw new Error(`"${field}" must be a boolean, got ${typeof v}`);
   return v;
+}
+
+/** Validates a per-item `history` list of round-stamped events. */
+function history(v, field) {
+  let prevRound = -Infinity;
+  return arr(v, field, 1_000).map((ev, i) => {
+    if (!ev || typeof ev !== "object" || Array.isArray(ev))
+      throw new Error(`"${field}[${i}]" must be an object`);
+    const type = str(ev.type, `${field}[${i}].type`, 20);
+    if (!HISTORY_EVENT_TYPES.has(type))
+      throw new Error(`"${field}[${i}].type" "${type}" is not valid`);
+    const round = num(ev.round, `${field}[${i}].round`);
+    // Every reader folds the list front to back, so order is load-bearing.
+    if (round < prevRound)
+      throw new Error(`"${field}[${i}].round" is out of chronological order`);
+    prevRound = round;
+
+    const result = { round, type };
+    if (ev.reason !== undefined)
+      result.reason = str(ev.reason, `${field}[${i}].reason`, 2_000);
+    if (ev.previousText !== undefined)
+      result.previousText = str(
+        ev.previousText,
+        `${field}[${i}].previousText`,
+        10_000,
+      );
+    return result;
+  });
 }
 
 // ─── Questionnaire spec validator ─────────────────────────────────────────────
@@ -210,6 +244,8 @@ function validateElement(e, i) {
     result.reason = str(e.reason, `${ctx}.reason`, 2_000);
   if (e.withdrawnRound !== undefined)
     result.withdrawnRound = num(e.withdrawnRound, `${ctx}.withdrawnRound`);
+  if (e.history !== undefined)
+    result.history = history(e.history, `${ctx}.history`);
   if (e.rejectedRound !== undefined)
     result.rejectedRound = num(e.rejectedRound, `${ctx}.rejectedRound`);
   if (e.negated !== undefined)
@@ -243,6 +279,8 @@ function validateRelation(r, i) {
     result.revisedRound = num(r.revisedRound, `${ctx}.revisedRound`);
   if (r.withdrawnRound !== undefined)
     result.withdrawnRound = num(r.withdrawnRound, `${ctx}.withdrawnRound`);
+  if (r.history !== undefined)
+    result.history = history(r.history, `${ctx}.history`);
   if (r.rejectedRound !== undefined)
     result.rejectedRound = num(r.rejectedRound, `${ctx}.rejectedRound`);
   if (r.argumentId !== undefined)

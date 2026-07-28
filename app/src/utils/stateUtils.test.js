@@ -8,6 +8,13 @@ import {
   argumentPostulateExplanation,
   linkableElements,
   defaultPickerIds,
+  historyOf,
+  isWithdrawnAt,
+  isWithdrawnNow,
+  withEvent,
+  textAtRound,
+  asOfRound,
+  stateAtRound,
 } from "./stateUtils.js";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -52,27 +59,209 @@ describe("elementsAtRound", () => {
     expect(withdrawn).toHaveLength(0);
   });
 
-  it("shows a reinstated element as withdrawn only for the rounds it was gone", () => {
+  it("reflects every withdraw/reinstate cycle", () => {
     const j4 = {
       id: "J4",
       type: "judgment",
-      status: "active",
+      status: "withdrawn",
       addedRound: 1,
-      withdrawnRound: 3,
-      reinstatedRound: 6,
+      withdrawals: [
+        { from: 3, to: 6 },
+        { from: 8 },
+      ],
     };
-    const at = (round) => elementsAtRound([j4], round);
-    expect(at(2).active.map((e) => e.id)).toEqual(["J4"]);
-    expect(at(4).withdrawn.map((e) => e.id)).toEqual(["J4"]);
-    expect(at(5).withdrawn.map((e) => e.id)).toEqual(["J4"]);
-    expect(at(6).active.map((e) => e.id)).toEqual(["J4"]);
-    expect(at(7).withdrawn).toHaveLength(0);
+    const gone = (round) =>
+      elementsAtRound([j4], round).withdrawn.map((e) => e.id);
+    expect(gone(2)).toEqual([]);
+    expect(gone(3)).toEqual(["J4"]);
+    expect(gone(5)).toEqual(["J4"]);
+    expect(gone(6)).toEqual([]); // back
+    expect(gone(7)).toEqual([]);
+    expect(gone(8)).toEqual(["J4"]); // gone again
+    expect(gone(99)).toEqual(["J4"]); // still gone
   });
 
   it("returns empty lists when no elements are added yet", () => {
     const { active, withdrawn } = elementsAtRound([j2], 1);
     expect(active).toHaveLength(0);
     expect(withdrawn).toHaveLength(0);
+  });
+});
+
+// ─── Item history ─────────────────────────────────────────────────────────────
+
+describe("historyOf", () => {
+  it("returns a stored list as-is", () => {
+    const events = [{ round: 2, type: "withdrawn" }];
+    expect(historyOf({ history: events })).toBe(events);
+  });
+
+  it("rebuilds events from the legacy scalar fields, in order", () => {
+    expect(
+      historyOf({
+        withdrawnRound: 6,
+        reinstatedRound: 8,
+        reason: "Too broad",
+        revisedRound: 3,
+        previousText: "Older wording",
+      }),
+    ).toEqual([
+      { round: 3, type: "revised", previousText: "Older wording" },
+      { round: 6, type: "withdrawn", reason: "Too broad" },
+      { round: 8, type: "reinstated" },
+    ]);
+  });
+
+  it("rebuilds events from the interim withdrawals list", () => {
+    expect(
+      historyOf({ withdrawals: [{ from: 2, to: 4 }, { from: 7 }], reason: "Why" }),
+    ).toEqual([
+      { round: 2, type: "withdrawn" },
+      { round: 4, type: "reinstated" },
+      // `reason` described the latest withdrawal, so it lands there only.
+      { round: 7, type: "withdrawn", reason: "Why" },
+    ]);
+  });
+
+  it("returns nothing for an untouched item", () => {
+    expect(historyOf({ id: "J1" })).toEqual([]);
+    expect(historyOf(undefined)).toEqual([]);
+  });
+});
+
+describe("isWithdrawnAt", () => {
+  const item = {
+    history: [
+      { round: 3, type: "withdrawn" },
+      { round: 6, type: "reinstated" },
+      { round: 8, type: "withdrawn" },
+    ],
+  };
+
+  it("applies an event from its own round onward", () => {
+    expect(isWithdrawnAt(item, 2)).toBe(false);
+    expect(isWithdrawnAt(item, 3)).toBe(true); // withdrawal takes effect
+    expect(isWithdrawnAt(item, 5)).toBe(true);
+    expect(isWithdrawnAt(item, 6)).toBe(false); // reinstatement takes effect
+  });
+
+  it("runs the latest withdrawal forward indefinitely", () => {
+    expect(isWithdrawnAt(item, 8)).toBe(true);
+    expect(isWithdrawnAt(item, 1000)).toBe(true);
+  });
+});
+
+describe("isWithdrawnNow", () => {
+  it("is true only when the latest presence event is a withdrawal", () => {
+    expect(isWithdrawnNow({ history: [{ round: 3, type: "withdrawn" }] })).toBe(true);
+    expect(
+      isWithdrawnNow({
+        history: [
+          { round: 3, type: "withdrawn" },
+          { round: 6, type: "reinstated" },
+        ],
+      }),
+    ).toBe(false);
+    expect(isWithdrawnNow({})).toBe(false);
+  });
+
+  it("ignores revisions after a withdrawal", () => {
+    expect(
+      isWithdrawnNow({
+        history: [
+          { round: 3, type: "withdrawn" },
+          { round: 5, type: "revised", previousText: "x" },
+        ],
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("withEvent", () => {
+  it("appends, migrating legacy fields into the list first", () => {
+    expect(
+      withEvent({ withdrawnRound: 2, reinstatedRound: 4 }, {
+        round: 7,
+        type: "withdrawn",
+      }),
+    ).toEqual([
+      { round: 2, type: "withdrawn" },
+      { round: 4, type: "reinstated" },
+      { round: 7, type: "withdrawn" },
+    ]);
+  });
+});
+
+describe("textAtRound", () => {
+  const item = {
+    text: "Third wording",
+    history: [
+      { round: 3, type: "revised", previousText: "First wording" },
+      { round: 7, type: "revised", previousText: "Second wording" },
+    ],
+  };
+
+  it("returns the wording in force at that round", () => {
+    expect(textAtRound(item, 2)).toBe("First wording");
+    expect(textAtRound(item, 5)).toBe("Second wording");
+    expect(textAtRound(item, 9)).toBe("Third wording");
+  });
+
+  it("falls back to a relation's explanation", () => {
+    const rel = { explanation: "Because", history: [] };
+    expect(textAtRound(rel, 4)).toBe("Because");
+  });
+});
+
+describe("asOfRound", () => {
+  const item = {
+    id: "J1",
+    text: "Now",
+    status: "withdrawn",
+    reason: "Superseded",
+    previousText: "Before",
+    history: [
+      { round: 3, type: "revised", previousText: "Before" },
+      { round: 5, type: "withdrawn", reason: "Superseded" },
+    ],
+  };
+
+  it("projects status, wording and reason back", () => {
+    const at2 = asOfRound(item, 2);
+    expect(at2.status).toBe("active");
+    expect(at2.text).toBe("Before");
+    expect(at2.reason).toBeUndefined();
+    expect(at2.previousText).toBeUndefined();
+  });
+
+  it("keeps a revision visible once it has happened", () => {
+    const at4 = asOfRound(item, 4);
+    expect(at4.status).toBe("revised");
+    expect(at4.text).toBe("Now");
+    expect(at4.previousText).toBe("Before");
+  });
+
+  it("returns the same object when nothing differs", () => {
+    expect(asOfRound(item, 9)).toBe(item);
+  });
+
+  it("leaves an item with no recorded history untouched", () => {
+    const bare = { id: "J2", status: "possible", text: "x" };
+    expect(asOfRound(bare, 4)).toBe(bare);
+  });
+
+  it("reports a rejection that was later reinstated", () => {
+    const el = {
+      id: "J3",
+      text: "x",
+      status: "active",
+      history: [
+        { round: 2, type: "rejected" },
+        { round: 6, type: "reinstated" },
+      ],
+    };
+    expect(asOfRound(el, 3).status).toBe("rejected");
+    expect(asOfRound(el, 6).status).toBe("active");
   });
 });
 
@@ -120,6 +309,55 @@ describe("defaultPickerIds", () => {
 
   it("returns an empty list for no elements", () => {
     expect(defaultPickerIds([])).toEqual([]);
+  });
+});
+
+// ─── stateAtRound ─────────────────────────────────────────────────────────────
+
+describe("stateAtRound", () => {
+  const state = {
+    topic: "t",
+    round: 9,
+    elements: [
+      { id: "J1", type: "judgment", status: "active", addedRound: 1 },
+      {
+        id: "P1",
+        type: "principle",
+        status: "withdrawn",
+        addedRound: 1,
+        withdrawals: [{ from: 3, to: 6 }, { from: 8 }],
+      },
+    ],
+    relations: [
+      {
+        from: "J1",
+        to: "P1",
+        type: "supports",
+        addedRound: 2,
+        status: "withdrawn",
+        withdrawals: [{ from: 4 }],
+      },
+    ],
+    log: [],
+  };
+  const statusOf = (round, id) =>
+    stateAtRound(state, round).elements.find((e) => e.id === id).status;
+
+  it("rewrites element status to what it was that round", () => {
+    expect(statusOf(2, "P1")).toBe("active");
+    expect(statusOf(4, "P1")).toBe("withdrawn");
+    expect(statusOf(7, "P1")).toBe("active");
+    expect(statusOf(8, "P1")).toBe("withdrawn");
+  });
+
+  it("rewrites relation status the same way", () => {
+    const relAt = (round) => stateAtRound(state, round).relations[0];
+    expect(relAt(3).status).toBe("active");
+    expect(relAt(5).status).toBe("withdrawn");
+  });
+
+  it("still excludes relations added after the round", () => {
+    expect(stateAtRound(state, 1).relations).toHaveLength(0);
   });
 });
 

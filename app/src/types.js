@@ -22,15 +22,38 @@ export {};
  */
 
 /**
+ * One thing that happened to an element or relation, in a given round.
+ *
+ * Events are the record of how an item got to its current state: `status`,
+ * `text`, `previousText` and `reason` are the projection of this list onto
+ * "now", and {@link module:utils/stateUtils.asOfRound} projects it onto any
+ * earlier round for history playback.
+ *
+ * - `withdrawn`  — taken out of the equilibrium; carries `reason`
+ * - `reinstated` — an earlier withdrawal or rejection undone
+ * - `revised`    — text (or, for a relation, explanation) changed; carries the
+ *                  wording it had *before* this round, as `previousText`
+ * - `rejected`   — a suggestion the user declined
+ *
+ * @typedef {Object} REHistoryEvent
+ * @property {number} round
+ * @property {'withdrawn'|'reinstated'|'revised'|'rejected'} type
+ * @property {string} [reason]
+ * @property {string} [previousText]
+ */
+
+/**
  * Lifecycle status of an element.
  * - `active`    — currently in play
  * - `revised`   — text was changed in a later round; `previousText` and `revisedRound` are set
  * - `withdrawn` — removed from the equilibrium; `reason` and `withdrawnRound` are set
  * - `rejected`  — a declined LLM suggestion; `rejectedRound` is set
  *
- * Withdrawal and rejection are both reversible: reinstating returns an element to
- * `active`, so a later argument can bring it back into play.
  * - `possible`  — pre-loaded but not yet affirmed by the user; invisible in graph and text tab
+ *
+ * Withdrawal and rejection are both reversible: reinstating returns an element to
+ * `active`, so a later argument can bring it back into play. `status` is the
+ * *current* state only — the round-by-round record lives in `history`.
  *
  * @typedef {'active'|'revised'|'withdrawn'|'rejected'|'possible'} ElementStatus
  */
@@ -80,10 +103,10 @@ export {};
  * @property {string}          [previousText]  - Original wording before revision (revised only).
  * @property {number}          [revisedRound]  - Round in which text was revised (revised only).
  * @property {string}          [reason]        - Explanation for withdrawal (withdrawn only).
- * @property {number}          [withdrawnRound] - Round in which element was withdrawn (withdrawn only).
- * @property {number}          [reinstatedRound] - Round in which a withdrawal was undone. Paired
- *   with `withdrawnRound` it marks the rounds the element was absent. Only the most
- *   recent withdrawal is tracked; earlier cycles remain in the log alone.
+ * @property {REHistoryEvent[]} [history] - Everything that has happened to this element,
+ *   in round order. See {@link module:utils/stateUtils.historyOf}.
+ * @property {number}          [withdrawnRound] - Legacy single-round withdrawal, still read
+ *   from older saved states. New writes record a `history` event instead.
  * @property {number}          [rejectedRound]  - Round in which element was rejected (rejected only).
  * @property {boolean}         [negated]        - True when this element appears as a negated sentence in a rethon position (simulation only; defaults to false).
  */
@@ -103,7 +126,10 @@ export {};
  * @property {string}        [argumentId]    - Set on `entails` relations only; all premises of the same detected argument share this ID.
  * @property {ElementStatus} [status]        - Lifecycle status; absence or `"active"` means currently in play.
  * @property {number}        [revisedRound]  - Round in which this relation was last revised.
- * @property {number}        [withdrawnRound] - Round in which this relation was withdrawn.
+ * @property {REHistoryEvent[]} [history] - Everything that has happened to this relation,
+ *   tracked exactly as for elements.
+ * @property {number}        [withdrawnRound] - Legacy single-round withdrawal, still read
+ *   from older saved states.
  * @property {number}        [rejectedRound]  - Round in which this relation was rejected.
  */
 
