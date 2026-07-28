@@ -45,6 +45,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Warnings do not fail the build; only rules configured as errors do.
+      - name: Lint
+        run: npm run lint
+
       - name: Run tests
         run: npm test
 

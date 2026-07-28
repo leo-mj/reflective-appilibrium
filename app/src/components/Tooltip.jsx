@@ -20,13 +20,16 @@ import { C } from "../constants/colors.js";
 export function Tooltip({ text, children, delay = 400 }) {
   const [pos, setPos] = useState(null);
   const timer = useRef(null);
-  const ref = useRef(null);
 
-  function show() {
+  // The trigger node comes from the hover event rather than a ref, so nothing
+  // has to be attached to the child. That keeps any ref the child already
+  // carries intact, and avoids reading a ref during render. `currentTarget` is
+  // cleared once the handler returns, so it is captured before the timer runs.
+  function show(node) {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      if (!ref.current) return;
-      const r = ref.current.getBoundingClientRect();
+      if (!node.isConnected) return;
+      const r = node.getBoundingClientRect();
       setPos({ top: r.bottom + 6, cx: Math.round(r.left + r.width / 2) });
     }, delay);
   }
@@ -40,9 +43,13 @@ export function Tooltip({ text, children, delay = 400 }) {
 
   if (!text) return child;
 
+  // react-hooks/refs flags any ref-touching function handed to a call during
+  // render, and show/hide touch the timer ref. cloneElement does not invoke
+  // them: React attaches them as DOM handlers and calls them on hover, which is
+  // exactly where a ref is meant to be read.
+  // eslint-disable-next-line react-hooks/refs
   const trigger = cloneElement(child, {
-    ref,
-    onMouseEnter(e) { child.props.onMouseEnter?.(e); show(); },
+    onMouseEnter(e) { child.props.onMouseEnter?.(e); show(e.currentTarget); },
     onMouseLeave(e) { child.props.onMouseLeave?.(e); hide(); },
   });
 

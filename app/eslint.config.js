@@ -24,6 +24,10 @@ export default defineConfig([
     },
     rules: {
       "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
+      // Dev-only hot-reload granularity: a module that exports both a component
+      // and a constant costs a full reload instead of a refresh, and nothing in
+      // production. Worth knowing about, not worth failing CI over.
+      "react-refresh/only-export-components": "warn",
     },
   },
   {

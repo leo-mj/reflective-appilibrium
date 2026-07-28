@@ -8,7 +8,7 @@
 
 /** @import { REElement } from '../../types.js' */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 import { C } from "../../constants/colors.js";
 import { sortElementIds } from "../../utils/stateUtils.js";
@@ -40,17 +40,29 @@ export function AddBar({
     makeRelationDefaults(elements),
   );
 
-  useEffect(() => {
-    if (!selected) return;
-    setActiveTab("relation");
-    setRelationForm((prev) => ({ ...prev, from: selected }));
-  }, [selected]);
+  // Selecting a node in the graph, or ctrl-selecting a second one, pre-fills the
+  // relation form. This adjusts state during render rather than in an effect so
+  // the panel never paints a frame showing the stale tab, and so a selection
+  // that arrives on mount is picked up the same way as a later one — hence the
+  // trackers start at null rather than at the current prop.
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [prevSelected, setPrevSelected] = useState(null);
+  if (selected !== prevSelected) {
+    setPrevSelected(selected);
+    if (selected) {
+      setActiveTab("relation");
+      setRelationForm((prev) => ({ ...prev, from: selected }));
+    }
+  }
 
-  useEffect(() => {
-    if (!ctrlTo) return;
-    setActiveTab("relation");
-    setRelationForm((prev) => ({ ...prev, to: ctrlTo }));
-  }, [ctrlTo]);
+  const [prevCtrlTo, setPrevCtrlTo] = useState(null);
+  if (ctrlTo !== prevCtrlTo) {
+    setPrevCtrlTo(ctrlTo);
+    if (ctrlTo) {
+      setActiveTab("relation");
+      setRelationForm((prev) => ({ ...prev, to: ctrlTo }));
+    }
+  }
 
   const setEl = (field, value) =>
     setElementForm((prev) => ({ ...prev, [field]: value }));
