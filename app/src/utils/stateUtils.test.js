@@ -14,6 +14,7 @@ import {
   withEvent,
   textAtRound,
   asOfRound,
+  statusRound,
   stateAtRound,
 } from "./stateUtils.js";
 
@@ -210,6 +211,48 @@ describe("textAtRound", () => {
   it("falls back to a relation's explanation", () => {
     const rel = { explanation: "Because", history: [] };
     expect(textAtRound(rel, 4)).toBe("Because");
+  });
+});
+
+describe("statusRound", () => {
+  const cycled = {
+    status: "withdrawn",
+    history: [
+      { round: 2, type: "withdrawn" },
+      { round: 4, type: "reinstated" },
+      { round: 6, type: "withdrawn" },
+    ],
+  };
+
+  it("dates the status from the event that produced it", () => {
+    expect(statusRound(cycled)).toBe(6);
+  });
+
+  it("uses the event in force at the viewed round, not a later one", () => {
+    // The whole point of the bound: at round 3 it has been out since 2.
+    expect(statusRound(cycled, 3)).toBe(2);
+    expect(statusRound(cycled, 5)).toBe(2);
+    expect(statusRound(cycled, 6)).toBe(6);
+  });
+
+  it("dates a revision and a rejection too", () => {
+    expect(
+      statusRound({ status: "revised", history: [{ round: 5, type: "revised" }] }),
+    ).toBe(5);
+    expect(
+      statusRound({ status: "rejected", history: [{ round: 3, type: "rejected" }] }),
+    ).toBe(3);
+  });
+
+  it("reads the legacy scalar fields", () => {
+    expect(statusRound({ status: "withdrawn", withdrawnRound: 7 })).toBe(7);
+    expect(statusRound({ status: "revised", revisedRound: 2 })).toBe(2);
+  });
+
+  it("returns nothing for a status no event dates", () => {
+    expect(statusRound({ status: "active", history: [] })).toBeUndefined();
+    expect(statusRound({ status: "withdrawn" })).toBeUndefined();
+    expect(statusRound(undefined)).toBeUndefined();
   });
 });
 

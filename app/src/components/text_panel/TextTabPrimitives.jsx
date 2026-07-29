@@ -157,14 +157,27 @@ export function Badge({ id }) {
 
 // ─── Status label ─────────────────────────────────────────────────────────────
 
-export function StatusLabel({ status }) {
-  if (status === "withdrawn")
-    return <MetaChip color={C.withdrawnMark}>withdrawn</MetaChip>;
-  if (status === "rejected")
-    return <MetaChip color={C.rejectedMark}>rejected</MetaChip>;
-  if (status === "revised")
-    return <MetaChip color={C.revised}>revised</MetaChip>;
-  return null;
+/**
+ * The status a non-active item is in, dated by the round it entered it.
+ * The round is omitted when nothing recorded it, which older states allow.
+ *
+ * @param {Object}  props
+ * @param {string}  props.status
+ * @param {number} [props.round] - See {@link module:utils/stateUtils.statusRound}.
+ */
+export function StatusLabel({ status, round }) {
+  const color = {
+    withdrawn: C.withdrawnMark,
+    rejected: C.rejectedMark,
+    revised: C.revised,
+  }[status];
+  if (!color) return null;
+  return (
+    <MetaChip color={color}>
+      {status}
+      {round ? ` · Round ${round}` : ""}
+    </MetaChip>
+  );
 }
 
 /**

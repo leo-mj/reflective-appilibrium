@@ -165,6 +165,30 @@ export function textAtRound(item, round) {
   return pendingWording ?? current;
 }
 
+/** Statuses that come from an event, and so can be dated. */
+const DATED_STATUSES = new Set(["withdrawn", "rejected", "revised"]);
+
+/**
+ * The round in which the item took on the status it is showing.
+ *
+ * Bounded by `round` so history playback dates a status by the event in force
+ * then, not by a later one: an item withdrawn in round 2, reinstated in 4 and
+ * withdrawn again in 6 reads as withdrawn since 2 when viewing round 3.
+ *
+ * @param {REElement|RERelation} item
+ * @param {number} [round] - The round being viewed. Defaults to the whole history.
+ * @returns {number|undefined} Undefined for a status nothing recorded.
+ */
+export function statusRound(item, round = Infinity) {
+  if (!DATED_STATUSES.has(item?.status)) return undefined;
+  let found;
+  for (const ev of historyOf(item)) {
+    if (ev.round > round) break;
+    if (ev.type === item.status) found = ev.round;
+  }
+  return found;
+}
+
 /**
  * The item as it stood at `round`: status, wording, and the withdrawal reason
  * and previous wording that were showing then. Returns the same object when

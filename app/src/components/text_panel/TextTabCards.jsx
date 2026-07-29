@@ -8,7 +8,7 @@
 import { useContext } from "react";
 import { C } from "../../constants/colors.js";
 import { CARD_STYLE, META_LABEL_STYLE, CONTENT_FONT_SIZE } from "../../constants/textTabStyles.js";
-import { relationTypeLabel } from "../../utils/stateUtils.js";
+import { relationTypeLabel, statusRound } from "../../utils/stateUtils.js";
 import { Ctx } from "./TextTabContext.js";
 import {
   MetaChip,
@@ -26,6 +26,7 @@ export { Highlight, Badge, SectionHeader, StatusLabel, ActionButtons, CoherenceG
 
 export function ElementCard({ e, dim }) {
   const {
+    state,
     pCovers,
     onEditRequest,
     onWithdrawRequest,
@@ -70,9 +71,9 @@ export function ElementCard({ e, dim }) {
           <MetaChip>
             Confidence: {typeof e.confidence === "number" ? e.confidence.toFixed(2) : e.confidence}
           </MetaChip>
-          <StatusLabel status={e.status} />
           {e.origin && <MetaChip>Origin: {e.origin}</MetaChip>}
           <AddedRound round={e.addedRound} />
+          <StatusLabel status={e.status} round={statusRound(e, state.round)} />
           {pCovers[e.id]?.length > 0 && (
             <MetaChip>covers: {pCovers[e.id].join(", ")}</MetaChip>
           )}
@@ -196,7 +197,7 @@ export function ArgumentCard({ rels, dim }) {
                 : "→ jointly entails →"}
             </span>
             <Badge id={r.to} />
-            <StatusLabel status={r.status} />
+            <StatusLabel status={r.status} round={statusRound(r, state.round)} />
           </div>
           <div onClick={(e) => e.stopPropagation()}>
             <ActionButtons
@@ -336,9 +337,9 @@ export function RelationCard({ r, dim }) {
             → {relationTypeLabel(r.type)} →
           </span>
           <Badge id={r.to} />
-          <StatusLabel status={r.status} />
           {r.origin && <MetaChip>Origin: {r.origin}</MetaChip>}
           <AddedRound round={r.addedRound} />
+          <StatusLabel status={r.status} round={statusRound(r, state.round)} />
         </div>
         <div onClick={(e) => e.stopPropagation()}>
           <ActionButtons

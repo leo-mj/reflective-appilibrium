@@ -108,4 +108,14 @@ describe("StatusLabel", () => {
     const { container } = render(<StatusLabel status="active" />);
     expect(container.textContent).toBe("");
   });
+
+  it("dates the status when the round is known", () => {
+    const { container } = render(<StatusLabel status="withdrawn" round={5} />);
+    expect(container.textContent).toBe("withdrawn · Round 5");
+  });
+
+  it("omits the round when nothing recorded it", () => {
+    const { container } = render(<StatusLabel status="revised" round={undefined} />);
+    expect(container.textContent).toBe("revised");
+  });
 });
