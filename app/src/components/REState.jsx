@@ -212,6 +212,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     expandAllKey,
     allExpanded,
     showZScores: tab === "history",
+    // Present only while the history slider is driving the panel, so the text
+    // makes clear it is a past round rather than the live state.
+    historyView:
+      tab === "history" ? { round: historyRound, maxRound: state.round } : null,
   };
 
   const graphPanelCommonProps = {
@@ -225,6 +229,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onSelectRel: handleSelectRel,
     onAddElement: handleAddElement,
     onReviseElementText: handleReviseElementText,
+    // Let the graph offer the same per-element actions as the text tab.
+    onEditRequest: handleEditRequest,
+    onWithdrawRequest: handleWithdrawRequest,
+    onReinstate: handleReinstateElement,
     onAddRelation: handleAddRelation,
     onDeleteRelationsByArgId: handleDeleteRelationsByArgId,
     onQuestionnaireSelectAnswer: handleQuestionnaireSelectAnswer,

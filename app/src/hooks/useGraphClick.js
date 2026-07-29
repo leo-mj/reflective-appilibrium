@@ -32,6 +32,7 @@ export function useGraphClick({
   onSelectRel,
   setTooltip,
   onCtrlNodeClick,
+  onNodeClick,
 }) {
   const clickOrigin = useRef(null);
 
@@ -91,9 +92,11 @@ export function useGraphClick({
       if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < hitRadius(el.type, el.confidence) ** 2) {
         if (e.ctrlKey || e.metaKey) {
           onCtrlNodeClick(el.id);
+          onNodeClick?.(null);
         } else {
           onSelectRel(() => null);
           onSelect((prev) => (prev === el.id ? null : el.id));
+          onNodeClick?.(el, e.clientX, e.clientY);
         }
         return;
       }
@@ -117,6 +120,7 @@ export function useGraphClick({
       const tlen = Math.hypot(tdx, tdy) || 1;
       const bx = tipX - (tdx / tlen) * 10, by = tipY - (tdy / tlen) * 10;
       if (distToQuadBezier(sx, sy, x1, y1, cx, cy, bx, by) < 8) {
+        onNodeClick?.(null);
         onSelect(() => null);
         onSelectRel((prev) => (prev === r ? null : r));
         return;
@@ -138,6 +142,7 @@ export function useGraphClick({
       const { jx, jy } = computeJunction(centX, centY, conclusionPos, tr);
       // Junction circle
       if (Math.hypot(sx - jx, sy - jy) < 10) {
+        onNodeClick?.(null);
         onSelect(() => null);
         onSelectRel((prev) => (prev === rels[0] ? null : rels[0]));
         return;
@@ -149,6 +154,7 @@ export function useGraphClick({
         const dist = Math.hypot(dx, dy) || 1;
         const x1 = pos.x + (dx / dist) * sr, y1 = pos.y + (dy / dist) * sr;
         if (distToSegment(sx, sy, x1, y1, jx, jy) < 8) {
+          onNodeClick?.(null);
           onSelect(() => null);
           onSelectRel((prev) => (prev === r ? null : r));
           return;
@@ -160,13 +166,15 @@ export function useGraphClick({
       const tipX = conclusionPos.x - (adx / adist) * tr;
       const tipY = conclusionPos.y - (ady / adist) * tr;
       if (distToSegment(sx, sy, jx, jy, tipX, tipY) < 8) {
+        onNodeClick?.(null);
         onSelect(() => null);
         onSelectRel((prev) => (prev === rels[0] ? null : rels[0]));
         return;
       }
     }
 
-    // Clicked background — clear selection.
+    // Clicked background — clear selection and any pinned tooltip.
+    onNodeClick?.(null);
     onSelect(() => null);
     onSelectRel(() => null);
   };

@@ -21,6 +21,7 @@ import {
 import { HighlightedSection, SectionListing } from "./text_panel/TextTabSections.jsx";
 import { ClusterSection } from "./text_panel/TextTabClusterSection.jsx";
 import { NavBar } from "./text_panel/TextTabNavBar.jsx";
+import { HistoryRoundBanner } from "./text_panel/TextTabPrimitives.jsx";
 import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
 import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
@@ -79,6 +80,7 @@ export function TextTab({
   hideNonEntailsRels,
   weights,
   showZScores = false,
+  historyView = null,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   const scrollRef = useRef(null);
@@ -335,6 +337,8 @@ export function TextTab({
               color: C.text,
             }}
           >
+            <HistoryRoundBanner historyView={historyView} />
+
             {highlightedIds && (
               <HighlightedSection
                 selectedRel={selectedRel}

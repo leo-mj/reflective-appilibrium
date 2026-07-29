@@ -266,6 +266,7 @@ export function GraphCanvas({
   zoomIn,
   zoomOut,
   tooltip,
+  tooltipActions,
   containerStyle,
   overlay,
   children,
@@ -327,7 +328,7 @@ export function GraphCanvas({
           </button>
         </div>
       )}
-      <NodeTooltip tooltip={tooltip} />
+      <NodeTooltip tooltip={tooltip} actions={tooltipActions} />
       {overlay}
     </div>
   );

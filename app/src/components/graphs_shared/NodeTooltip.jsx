@@ -25,9 +25,12 @@ import { C } from "../../constants/colors.js";
  *
  * @param {Object}            props
  * @param {TooltipState|null} props.tooltip - Current tooltip data, or `null` to hide.
+ * @param {React.ReactNode}   [props.actions] - Buttons for a pinned tooltip. Their
+ *   presence is what makes the card interactive; a hover tooltip stays
+ *   click-through so it never swallows a click meant for the canvas.
  * @returns {React.ReactElement|null}
  */
-export function NodeTooltip({ tooltip }) {
+export function NodeTooltip({ tooltip, actions = null }) {
   if (!tooltip) return null;
   const { x, y, el } = tooltip;
   // Clamp x so the tooltip (maxWidth 300 → half = 150) stays within the viewport.
@@ -46,9 +49,14 @@ export function NodeTooltip({ tooltip }) {
         borderRadius: 6,
         padding: "8px 12px",
         maxWidth: 300,
-        pointerEvents: "none",
+        pointerEvents: actions ? "auto" : "none",
+        boxShadow: actions ? "0 2px 10px rgba(0,0,0,0.35)" : "none",
         zIndex: 10,
       }}
+      // The canvas clears the pin on any background click, so a click landing
+      // on the card itself must not bubble out to it.
+      onPointerDown={actions ? (e) => e.stopPropagation() : undefined}
+      onPointerUp={actions ? (e) => e.stopPropagation() : undefined}
     >
       <div
         style={{
@@ -91,6 +99,19 @@ export function NodeTooltip({ tooltip }) {
         Confidence: {typeof el.confidence === "number" ? el.confidence.toFixed(2) : el.confidence} · Origin: {el.origin}
         {el.addedRound && ` · Added: Round ${el.addedRound}`}
       </div>
+      {actions && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: 8,
+            paddingTop: 6,
+            borderTop: `1px solid ${C.border}`,
+          }}
+        >
+          {actions}
+        </div>
+      )}
     </div>,
     document.body,
   );

@@ -34,11 +34,15 @@ import {
   graphEdgeVisuals,
   graphNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
+import { ActionButtons } from "./text_panel/TextTabPrimitives.jsx";
 import { AddElementModal } from "./user_edits/AddElementModal.jsx";
 import { AddRelationModal } from "./user_edits/AddRelationModal.jsx";
 import { AddArgumentModal } from "./user_edits/AddArgumentModal.jsx";
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
+
+/** Withdrawn and rejected elements offer Reinstate where others offer Withdraw. */
+const isInPlay = (el) => el.status !== "withdrawn" && el.status !== "rejected";
 
 const TYPE_COLORS = {
   judgment: C.judgment.high,
@@ -315,6 +319,9 @@ export function Graph({
   onSelectRel,
   onAddElement,
   onAddRelation,
+  onEditRequest,
+  onWithdrawRequest,
+  onReinstate,
   onCtrlSecondSelect,
   ready,
   recentlyAdded,
@@ -324,6 +331,9 @@ export function Graph({
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
+  // Clicking a node pins its tooltip open with the same actions the text tab
+  // offers. It takes precedence over the hover tooltip until dismissed.
+  const [pinned, setPinned] = useState(null);
   const [addingElType, setAddingElType] = useState(null);
   const [addingRel, setAddingRel] = useState(false);
   const [addingArg, setAddingArg] = useState(false);
@@ -437,6 +447,14 @@ export function Graph({
     onSelect,
     onSelectRel,
     setTooltip,
+    onNodeClick: (el, clientX, clientY) => {
+      // Clicking the pinned node again closes it, matching how selection toggles.
+      setPinned((prev) =>
+        !el || prev?.el?.id === el.id
+          ? null
+          : { x: clientX, y: clientY - 10, el },
+      );
+    },
     onCtrlNodeClick: (id) => {
       if (selected && id !== selected && !ctrlArgNodes.includes(id)) {
         setCtrlArgState((prev) => ({
@@ -473,7 +491,33 @@ export function Graph({
         applyWheel={applyWheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}
-        tooltip={tooltip}
+        tooltip={pinned ?? tooltip}
+        tooltipActions={
+          pinned && (
+            <ActionButtons
+              onRevise={() => {
+                onEditRequest?.(pinned.el.id);
+                setPinned(null);
+              }}
+              onWithdraw={
+                isInPlay(pinned.el)
+                  ? () => {
+                      onWithdrawRequest?.(pinned.el.id);
+                      setPinned(null);
+                    }
+                  : null
+              }
+              onReinstate={
+                isInPlay(pinned.el)
+                  ? null
+                  : () => {
+                      onReinstate?.(pinned.el.id);
+                      setPinned(null);
+                    }
+              }
+            />
+          )
+        }
         containerStyle={{ width: "100%", height: "100%" }}
         overlay={
           <>

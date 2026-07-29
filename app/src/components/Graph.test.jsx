@@ -46,7 +46,13 @@ const POSITIONS = {
   P2: { x: 700, y: 100 },
 };
 
-function Harness({ onAddRelation = () => {}, hideNonEntailsRels = false }) {
+function Harness({
+  onAddRelation = () => {},
+  hideNonEntailsRels = false,
+  onEditRequest = () => {},
+  onWithdrawRequest = () => {},
+  onReinstate = () => {},
+}) {
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
   return (
@@ -60,6 +66,9 @@ function Harness({ onAddRelation = () => {}, hideNonEntailsRels = false }) {
       onSelectRel={setSelectedRel}
       onAddElement={() => {}}
       onAddRelation={onAddRelation}
+      onEditRequest={onEditRequest}
+      onWithdrawRequest={onWithdrawRequest}
+      onReinstate={onReinstate}
       // Suppresses auto-fit, which would otherwise pan and zoom the view and
       // put the nodes somewhere other than their simulation coordinates.
       ready={false}
@@ -248,5 +257,89 @@ describe("ctrl+click relation building", () => {
       to: "P1",
       type: "supports",
     });
+  });
+});
+
+describe("clicking a node pins its tooltip", () => {
+  // The pinned card portals to document.body, so queries go through the body.
+  const card = () =>
+    [...document.body.querySelectorAll("div")].find(
+      (d) => d.style.position === "fixed" && d.textContent.includes("Revise"),
+    );
+
+  /** Any fixed-position portal card, with or without actions. */
+  const anyTooltip = () =>
+    [...document.body.querySelectorAll("div")].find(
+      (d) => d.style.position === "fixed" && d.textContent.includes("Confidence"),
+    );
+
+  it("shows a tooltip on hover, but without actions", () => {
+    const { svg } = setup();
+    // `:scope >` matters: the pan/zoom wrapper also contains every node label,
+    // so an unscoped text lookup matches it first.
+    const nodeGroup = [...svg.querySelectorAll("g[transform]")].find(
+      (g) => g.querySelector(":scope > text")?.textContent === "J1",
+    );
+    fireEvent.mouseOver(nodeGroup);
+
+    // Non-vacuous: the tooltip is there, it just has nothing to act on.
+    expect(anyTooltip()).toBeDefined();
+    expect(card()).toBeUndefined();
+  });
+
+  it("pins the tooltip with the text tab's actions", () => {
+    const { svg } = setup();
+    clickNode(svg, "J1");
+
+    const pinned = card();
+    expect(pinned).toBeDefined();
+    expect(pinned.textContent).toContain("J1");
+    expect([...pinned.querySelectorAll("button")].map((b) => b.textContent)).toEqual(
+      ["Revise", "Withdraw"],
+    );
+  });
+
+  it("offers reinstate instead for an element out of play", () => {
+    const { svg } = setup();
+    clickNode(svg, "J2"); // withdrawn
+    expect([...card().querySelectorAll("button")].map((b) => b.textContent)).toEqual(
+      ["Revise", "Reinstate"],
+    );
+  });
+
+  it("closes when the same node is clicked again", () => {
+    const { svg } = setup();
+    clickNode(svg, "J1");
+    expect(card()).toBeDefined();
+    clickNode(svg, "J1");
+    expect(card()).toBeUndefined();
+  });
+
+  it("closes when the background is clicked", () => {
+    const { svg } = setup();
+    clickNode(svg, "J1");
+    fireEvent.pointerDown(svg, { clientX: 20, clientY: 400, pointerId: 1, pointerType: "mouse" });
+    fireEvent.pointerUp(svg, { clientX: 20, clientY: 400, pointerId: 1, pointerType: "mouse" });
+    expect(card()).toBeUndefined();
+  });
+
+  it("does not pin on a ctrl+click, which is building an argument", () => {
+    const { svg } = setup();
+    clickNode(svg, "J1");
+    clickNode(svg, "P1", { ctrl: true });
+    expect(card()).toBeUndefined();
+  });
+
+  it("routes each action to its handler and closes", () => {
+    const onWithdrawRequest = vi.fn();
+    const { svg } = setup({ onWithdrawRequest });
+    clickNode(svg, "J1");
+    fireEvent.click(
+      [...card().querySelectorAll("button")].find(
+        (b) => b.textContent === "Withdraw",
+      ),
+    );
+    expect(onWithdrawRequest).toHaveBeenCalledWith("J1");
+    expect(card()).toBeUndefined();
   });
 });

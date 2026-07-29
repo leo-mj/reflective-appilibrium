@@ -36,9 +36,22 @@ Directional; a pair can have multiple. Full matrix in `skill/re-relations-refere
     participantArguments: Array,    // index arrays, last entry = conclusion
     furtherArguments: Array,
   },
-  elements: [{ id, type, status, confidence, origin, text, addedRound, ?previousText, ?revisedRound, ?reason, ?withdrawnRound, ?questionnaireIndex }],
-  relations: [{ from, to, type, explanation, addedRound, ?origin }],
+  elements: [{ id, type, status, confidence, origin, text, addedRound, ?history, ?previousText, ?revisedRound, ?reason, ?rejectedRound, ?questionnaireIndex }],
+  relations: [{ from, to, type, explanation, addedRound, ?origin, ?status, ?history, ?argumentId, ?revisedRound }],
   coherence: { tensions: [], orphans: [], clusters: [] },
   log: [{ round, findings, options, decision, changes }]
 }
 ```
+
+### Item history
+
+`status` on an element or relation is its state *now*. The round-by-round record
+is `history`: an ordered list of `{ round, type, ?reason, ?previousText }` events,
+where `type` is `withdrawn`, `reinstated`, `revised`, or `rejected`. An item may
+be withdrawn and reinstated any number of times.
+
+Read it through `utils/stateUtils.js` rather than directly — `historyOf` also
+migrates the older single-round fields (`withdrawnRound`, `revisedRound`,
+`rejectedRound`) that saved states still use. `isWithdrawnAt`, `textAtRound` and
+`asOfRound` answer what was true at a given round; `asOfRound` is what history
+playback uses to project an item back.

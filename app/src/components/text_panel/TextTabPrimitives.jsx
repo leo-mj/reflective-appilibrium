@@ -167,6 +167,42 @@ export function StatusLabel({ status }) {
   return null;
 }
 
+// ─── History round banner ─────────────────────────────────────────────────────
+
+/**
+ * Sticky marker naming the round the panel is showing. Only rendered while the
+ * history slider is driving it — without this the text reads as the live state,
+ * which is wrong in every round but the last.
+ *
+ * @param {Object} props
+ * @param {{ round: number, maxRound: number }|null} props.historyView
+ */
+export function HistoryRoundBanner({ historyView }) {
+  if (!historyView) return null;
+  const { round, maxRound } = historyView;
+  return (
+    <div
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 2,
+        background: C.panel,
+        borderBottom: `1px solid ${C.revised}`,
+        color: C.revised,
+        fontSize: 11,
+        fontWeight: "bold",
+        letterSpacing: 0.5,
+        padding: "5px 10px",
+        marginBottom: 6,
+      }}
+    >
+      {round === 0
+        ? `Round 0 of ${maxRound} — before anything was recorded`
+        : `Round ${round} of ${maxRound}${round === maxRound ? " — current" : ""}`}
+    </div>
+  );
+}
+
 // ─── Action buttons ───────────────────────────────────────────────────────────
 
 export function ActionButtons({ onRevise, onWithdraw, onReinstate }) {

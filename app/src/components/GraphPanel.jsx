@@ -83,6 +83,9 @@ export function GraphPanel({
   nextPhaseIsEnabled,
   hideNonEntailsRels,
   onCtrlSecondSelect,
+  onEditRequest,
+  onWithdrawRequest,
+  onReinstate,
   ready,
   isSample,
   recentlyAdded,
@@ -154,6 +157,9 @@ export function GraphPanel({
             onSelectRel={onSelectRel}
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
+            onEditRequest={onEditRequest}
+            onWithdrawRequest={onWithdrawRequest}
+            onReinstate={onReinstate}
             onCtrlSecondSelect={onCtrlSecondSelect}
             ready={ready}
             recentlyAdded={recentlyAdded}
