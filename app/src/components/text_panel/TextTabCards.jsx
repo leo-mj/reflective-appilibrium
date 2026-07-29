@@ -15,6 +15,7 @@ import {
   Badge,
   StatusLabel,
   ActionButtons,
+  AddedRound,
   Highlight,
 } from "./TextTabPrimitives.jsx";
 
@@ -71,6 +72,7 @@ export function ElementCard({ e, dim }) {
           </MetaChip>
           <StatusLabel status={e.status} />
           {e.origin && <MetaChip>Origin: {e.origin}</MetaChip>}
+          <AddedRound round={e.addedRound} />
           {pCovers[e.id]?.length > 0 && (
             <MetaChip>covers: {pCovers[e.id].join(", ")}</MetaChip>
           )}
@@ -276,11 +278,11 @@ export function ArgumentCard({ rels, dim }) {
           <Highlight text={rels[0].explanation} query={search} />
         </div>
       )}
-      {rels[0].origin && (
-        <div style={{ marginTop: 6 }}>
-          <MetaChip>Origin: {rels[0].origin}</MetaChip>
-        </div>
-      )}
+      <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {rels[0].origin && <MetaChip>Origin: {rels[0].origin}</MetaChip>}
+        {/* One round for the whole argument: its relations are added together. */}
+        <AddedRound round={rels[0].addedRound} />
+      </div>
     </div>
   );
 }
@@ -336,6 +338,7 @@ export function RelationCard({ r, dim }) {
           <Badge id={r.to} />
           <StatusLabel status={r.status} />
           {r.origin && <MetaChip>Origin: {r.origin}</MetaChip>}
+          <AddedRound round={r.addedRound} />
         </div>
         <div onClick={(e) => e.stopPropagation()}>
           <ActionButtons

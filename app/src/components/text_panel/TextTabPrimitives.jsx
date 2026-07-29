@@ -167,6 +167,18 @@ export function StatusLabel({ status }) {
   return null;
 }
 
+/**
+ * The round an element or relation first appeared in. Renders nothing when the
+ * round is missing, which older hand-written states allow.
+ *
+ * @param {Object}  props
+ * @param {number} [props.round]
+ */
+export function AddedRound({ round }) {
+  if (!round) return null;
+  return <MetaChip>Added: Round {round}</MetaChip>;
+}
+
 // ─── History round banner ─────────────────────────────────────────────────────
 
 /**
