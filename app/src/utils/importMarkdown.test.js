@@ -883,3 +883,112 @@ describe("importStateFromFile — questionnaire: elements with possible status",
     expect(result.elements[1].questionnaireIndex).toBe(2);
   });
 });
+
+// ─── History events ───────────────────────────────────────────────────────────
+//
+// `history` is the whitelist boundary for the round-by-round record, so an
+// imported file must not be able to smuggle in unknown event types, non-numeric
+// rounds, or a list whose order the folding readers would misinterpret.
+
+const withHistory = (history) => ({
+  ...MINIMAL_STATE,
+  elements: [{ ...BASE_EL, history }],
+});
+
+async function importElement(history) {
+  const result = await importStateFromFile(
+    makeFile(wrapInMarkdown(withHistory(history))),
+  );
+  return result.elements[0];
+}
+
+describe("importStateFromFile — element: history", () => {
+  it("preserves a full event list", async () => {
+    const history = [
+      { round: 2, type: "revised", previousText: "Older wording" },
+      { round: 4, type: "withdrawn", reason: "Too broad" },
+      { round: 7, type: "reinstated" },
+      { round: 9, type: "rejected" },
+    ];
+    expect(await importElement(history)).toMatchObject({ history });
+  });
+
+  it("does not set history when absent", async () => {
+    const result = await importStateFromFile(
+      makeFile(wrapInMarkdown({ ...MINIMAL_STATE, elements: [BASE_EL] })),
+    );
+    expect(result.elements[0]).not.toHaveProperty("history");
+  });
+
+  it("accepts an empty list", async () => {
+    expect((await importElement([])).history).toEqual([]);
+  });
+
+  it("drops fields that are not whitelisted", async () => {
+    const el = await importElement([
+      { round: 2, type: "withdrawn", reason: "r", evil: "payload" },
+    ]);
+    expect(el.history[0]).toEqual({ round: 2, type: "withdrawn", reason: "r" });
+  });
+
+  it("rejects an unknown event type", async () => {
+    await expect(importElement([{ round: 1, type: "exploded" }])).rejects.toThrow(
+      /is not valid/,
+    );
+  });
+
+  it("rejects a non-numeric round", async () => {
+    await expect(
+      importElement([{ round: "soon", type: "withdrawn" }]),
+    ).rejects.toThrow(/must be a finite number/);
+  });
+
+  it("rejects events out of chronological order", async () => {
+    await expect(
+      importElement([
+        { round: 6, type: "withdrawn" },
+        { round: 2, type: "reinstated" },
+      ]),
+    ).rejects.toThrow(/chronological order/);
+  });
+
+  it("allows two events in the same round", async () => {
+    // Revising a withdrawn element records reinstated + revised together.
+    const history = [
+      { round: 3, type: "reinstated" },
+      { round: 3, type: "revised", previousText: "x" },
+    ];
+    expect((await importElement(history)).history).toEqual(history);
+  });
+
+  it("rejects a non-array history", async () => {
+    await expect(importElement({ round: 1 })).rejects.toThrow(/must be an array/);
+  });
+
+  it("rejects a non-object event", async () => {
+    await expect(importElement(["withdrawn"])).rejects.toThrow(
+      /must be a string|must be an object/,
+    );
+  });
+
+  it("bounds the previousText payload", async () => {
+    await expect(
+      importElement([
+        { round: 1, type: "revised", previousText: "x".repeat(10_001) },
+      ]),
+    ).rejects.toThrow(/exceeds/);
+  });
+
+  it("preserves history on relations too", async () => {
+    const history = [{ round: 3, type: "withdrawn" }];
+    const result = await importStateFromFile(
+      makeFile(
+        wrapInMarkdown({
+          ...MINIMAL_STATE,
+          relations: [{ ...BASE_REL, history }],
+        }),
+      ),
+    );
+    expect(result.relations[0].history).toEqual(history);
+  });
+});

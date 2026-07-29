@@ -160,12 +160,14 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
   const setPremise = (i, id) =>
     setPremises((prev) => prev.map((p, j) => (j === i ? id : p)));
   const addPremise = () =>
-    setPremises((prev) => [
-      ...prev,
-      seed.find((id) => !prev.includes(id) && id !== conclusion) ??
-        seed[0] ??
-        "",
-    ]);
+    setPremises((prev) => {
+      // Prefer an unused in-play element, but fall back to the full pool: with
+      // few elements in play the only free one may be withdrawn or rejected,
+      // and appending a duplicate would just disable the submit button.
+      const taken = new Set([...prev, conclusion]);
+      const free = (list) => list.find((id) => !taken.has(id));
+      return [...prev, free(seed) ?? free(ids) ?? ""];
+    });
   const removePremise = (i) =>
     setPremises((prev) => prev.filter((_, j) => j !== i));
 

@@ -52,12 +52,12 @@ export function AddArgumentModal({ elements, currentRound, onSave, onCancel, ini
     setPremises((prev) => prev.map((p, j) => (j === i ? id : p)));
 
   const addPremise = () =>
-    setPremises((prev) => [
-      ...prev,
-      seed.find((id) => !prev.includes(id) && id !== conclusion) ??
-        seed[0] ??
-        "",
-    ]);
+    setPremises((prev) => {
+      // In-play first, then anything else linkable — see AddArgumentPanel.
+      const taken = new Set([...prev, conclusion]);
+      const free = (list) => list.find((id) => !taken.has(id));
+      return [...prev, free(seed) ?? free(ids) ?? ""];
+    });
 
   const removePremise = (i) =>
     setPremises((prev) => prev.filter((_, j) => j !== i));
