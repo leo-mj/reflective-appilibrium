@@ -177,6 +177,22 @@ describe("handleAddRelation", () => {
     expect(result.current.state.relations.at(-1).argumentId).toBe("arg-fixed");
   });
 
+  it("pins the new relation without selecting it when pinRecent is set", () => {
+    // How the argument panels add the last premise: highlight it, but leave the
+    // user's current selection alone.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSelectNode("J1"));
+    act(() => {
+      result.current.handleAddRelation(
+        { from: "J1", to: "P1", type: "supports", explanation: "" },
+        { select: false, pinRecent: true },
+      );
+    });
+    expect(result.current.recentlyAddedRel).toMatchObject({ from: "J1", to: "P1" });
+    expect(result.current.recentlyAdded).toBeNull();
+    expect(result.current.selected).toBe("J1");
+  });
+
   it("leaves a withdrawn endpoint withdrawn", () => {
     // An argument may rest on a premise that was withdrawn later; recording it
     // must not quietly bring that premise back into the position.
@@ -485,6 +501,94 @@ describe("revision history", () => {
       [3, "reinstated"],
       [3, "revised"],
     ]);
+  });
+});
+
+// ─── handleApplyRethonEquilibrium ─────────────────────────────────────────────
+
+describe("handleApplyRethonEquilibrium", () => {
+  const state = () =>
+    baseState({
+      elements: [
+        makeEl({ id: "J1" }),
+        makeEl({ id: "J2" }),
+        makeEl({ id: "J3", status: "withdrawn", withdrawnRound: 1 }),
+        makeEl({ id: "J4", status: "rejected", rejectedRound: 1 }),
+      ],
+    });
+  const byId = (result, id) =>
+    result.current.state.elements.find((e) => e.id === id);
+
+  it("withdraws everything outside the commitment set", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    expect(byId(result, "J1").status).toBe("active");
+    expect(byId(result, "J2").status).toBe("withdrawn");
+    expect(byId(result, "J2").reason).toMatch(/rethon/i);
+  });
+
+  it("records the withdrawal as an event", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    expect(byId(result, "J2").history).toEqual([
+      { round: 2, type: "withdrawn", reason: expect.stringMatching(/rethon/i) },
+    ]);
+  });
+
+  it("leaves already-withdrawn and rejected elements untouched", () => {
+    const before = state();
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    expect(byId(result, "J3")).toEqual(before.elements[2]);
+    expect(byId(result, "J4")).toEqual(before.elements[3]);
+  });
+
+  it("bumps the round and logs what was retained", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    expect(result.current.state.round).toBe(2);
+    expect(result.current.state.log.at(-1).changes).toContain("J1");
+  });
+});
+
+// ─── handleDeleteRelationsByArgId ─────────────────────────────────────────────
+
+describe("handleDeleteRelationsByArgId", () => {
+  const argRels = () => [
+    makeRel({ from: "J1", type: "jointly_entails", argumentId: "arg-1" }),
+    makeRel({ from: "J2", type: "jointly_entails", argumentId: "arg-1" }),
+    makeRel({ from: "J3", type: "supports", argumentId: "arg-1" }),
+    makeRel({ from: "J4", type: "jointly_entails", argumentId: "arg-2" }),
+  ];
+
+  it("removes only the argument relations of that argument", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ relations: argRels() })),
+    );
+    act(() => result.current.handleDeleteRelationsByArgId("arg-1"));
+    expect(result.current.state.relations.map((r) => r.from)).toEqual([
+      // The `supports` relation shares the id but is not part of the argument.
+      "J3",
+      "J4",
+    ]);
+  });
+
+  it("clears the selection when the deleted argument was selected", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ relations: argRels() })),
+    );
+    act(() => result.current.handleSelectRel(result.current.state.relations[0]));
+    expect(result.current.selectedRel).not.toBeNull();
+    act(() => result.current.handleDeleteRelationsByArgId("arg-1"));
+    expect(result.current.selectedRel).toBeNull();
+  });
+
+  it("does not bump the round — deletion is not a revision", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ relations: argRels() })),
+    );
+    act(() => result.current.handleDeleteRelationsByArgId("arg-1"));
+    expect(result.current.state.round).toBe(1);
   });
 });
 

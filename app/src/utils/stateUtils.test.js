@@ -245,6 +245,23 @@ describe("asOfRound", () => {
     expect(asOfRound(item, 9)).toBe(item);
   });
 
+  it("shows the reason belonging to the withdrawal in force", () => {
+    const twice = {
+      id: "J4",
+      text: "x",
+      status: "withdrawn",
+      reason: "Second reason",
+      history: [
+        { round: 2, type: "withdrawn", reason: "First reason" },
+        { round: 4, type: "reinstated" },
+        { round: 6, type: "withdrawn", reason: "Second reason" },
+      ],
+    };
+    expect(asOfRound(twice, 3).reason).toBe("First reason");
+    expect(asOfRound(twice, 5).reason).toBeUndefined();
+    expect(asOfRound(twice, 7).reason).toBe("Second reason");
+  });
+
   it("leaves an item with no recorded history untouched", () => {
     const bare = { id: "J2", status: "possible", text: "x" };
     expect(asOfRound(bare, 4)).toBe(bare);
