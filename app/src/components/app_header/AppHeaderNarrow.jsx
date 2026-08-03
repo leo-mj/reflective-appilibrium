@@ -84,7 +84,9 @@ export function AppHeaderNarrow({
   // same x. Tab icons default to 2em, which is wider than that box, so they are
   // asked for the box's size instead.
   const tabIcon = (t) => (
-    <span style={menuIconStyle}>{cloneElement(TAB_ICONS[t], { size: 20 })}</span>
+    <span style={menuIconStyle}>
+      {cloneElement(TAB_ICONS[t], { size: 20 })}
+    </span>
   );
 
   return (
@@ -125,9 +127,7 @@ export function AppHeaderNarrow({
           </button>
         </div>
       </div>
-      {BYOK_ENABLED && (
-        <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
-      )}
+      <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
       {menuOpen && (
         <div
@@ -268,6 +268,18 @@ export function AppHeaderNarrow({
           >
             Settings
           </div>
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              setLlmOpen(true);
+            }}
+            style={menuBtn()}
+          >
+            <span style={menuIconStyle}>⚙</span>
+            {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
+          </button>
+          <div style={menuDividerStyle} />
+
           <button
             onClick={close(() => setShowTabNav((s) => !s))}
             style={menuBtn()}
@@ -429,21 +441,6 @@ export function AppHeaderNarrow({
           >
             <span style={menuIconStyle}>↓</span>Export
           </button>
-          {BYOK_ENABLED && (
-            <>
-              <div style={menuDividerStyle} />
-              <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  setLlmOpen(true);
-                }}
-                style={menuBtn()}
-              >
-                <span style={menuIconStyle}>⚙</span>
-                {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
-              </button>
-            </>
-          )}
           {BACKEND_ENABLED && (
             <>
               <div style={menuDividerStyle} />

@@ -253,6 +253,21 @@ export function AppHeaderWide({
 
                   <div style={menuDividerStyle} />
 
+                  <Tooltip text="Configure your LLM provider, model name, and API key.">
+                    <button
+                      data-tutorial="btn-llm"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setLlmOpen(true);
+                      }}
+                      style={menuItem}
+                    >
+                      <span style={menuIconStyle}>⚙</span>
+                      {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
+                    </button>
+                  </Tooltip>
+                  <div style={menuDividerStyle} />
+
                   {metaTab !== "assist" && (
                     <button
                       onClick={close(() => setShowText((s) => !s))}
@@ -459,23 +474,6 @@ export function AppHeaderWide({
                       </button>
                     </Tooltip>
                   )}
-                  <div style={menuDividerStyle} />
-
-                  {BYOK_ENABLED && (
-                    <Tooltip text="Configure your LLM provider, model name, and API key.">
-                      <button
-                        data-tutorial="btn-llm"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setLlmOpen(true);
-                        }}
-                        style={menuItem}
-                      >
-                        <span style={menuIconStyle}>⚙</span>
-                        {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
-                      </button>
-                    </Tooltip>
-                  )}
                 </div>
               </>
             )}
@@ -483,9 +481,7 @@ export function AppHeaderWide({
         </div>
       </div>
 
-      {BYOK_ENABLED && (
-        <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
-      )}
+      <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
 
       {/* Row 2: tab bar */}

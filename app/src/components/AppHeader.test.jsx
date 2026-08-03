@@ -176,6 +176,20 @@ describe("the narrow text button", () => {
   });
 });
 
+describe("LLM settings", () => {
+  // Unlike the model weights, this one stays reachable without a backend: the
+  // modal explains what BYOK would involve, with its live controls disabled.
+  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+
+  for (const isWide of [true, false]) {
+    it(`is offered in the ${isWide ? "wide" : "narrow"} menu without a backend`, () => {
+      render(<AppHeader {...PROPS} isWide={isWide} />);
+      openMenu();
+      expect(screen.queryByText(/LLM settings/)).not.toBeNull();
+    });
+  }
+});
+
 describe("narrow menu order", () => {
   // The menu is the only navigation at this width, so moving between views is
   // what it is mostly opened for. Settings and one-off actions come after.
