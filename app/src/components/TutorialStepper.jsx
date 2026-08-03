@@ -18,13 +18,105 @@ const CARD_W = 280;
 const RING_PAD = 5;
 const GAP = 14;
 
-function buildSteps(hideNonEntailsRels) {
+/**
+ * Stacking order for the tour: dim < the narrow ☰ menu it walks < ring < card.
+ * Exported so the header can lift the menu into it rather than guess.
+ */
+export const TOUR_Z = { dim: 910, menu: 916, ring: 917, card: 920 };
+
+/**
+ * The tour a phone gets.
+ *
+ * The wide tour walks a tab bar that does not exist at this width — every one
+ * of its targets lives in `AppHeaderWide`, so each step would ring nothing and
+ * describe controls that are not on screen. Here the shape of the app is
+ * different, so the tour is: the graph, then the ☰ menu opened and walked
+ * section by section, which is where everything else actually is.
+ *
+ * Steps carrying `menu: true` open the menu before they are measured.
+ *
+ * @param {string} cycle - The RE cycle, named for whichever relation modes are on.
+ */
+function buildNarrowSteps(cycle) {
+  return [
+    {
+      id: "welcome",
+      title: "Welcome to Reflective APPilibrium",
+      text: "This short tour walks you through the interface.\nWarning: using the appilibrium does not guarantee finding moral truth!",
+      target: null,
+      tab: "graph",
+    },
+    {
+      id: "graph",
+      title: "Your position, as a graph",
+      text: "Behind this card is a directed graph of everything in your position — your judgments and principles, and the relations between them.\nTap a node to select it and highlight its neighbours. Tap a relation arrow to highlight the whole argument it belongs to.\nDrag to move around; use + and − to zoom.",
+      target: null,
+      tab: "graph",
+    },
+    {
+      id: "btn-menu",
+      title: "Everything else is in here",
+      text: "There is no room for a tab bar on a screen this narrow, so the rest of the app lives behind ☰.\nLet's open it and go through it.",
+      target: "btn-menu",
+      tab: "graph",
+    },
+    {
+      id: "menu-assist",
+      title: "Assist — the RE cycle",
+      text: `This is the heart of the process. Work through ${cycle}, then round again — each pass lets you refine your position until it holds together.\nStart Workflow runs the whole cycle for you, round by round.`,
+      target: "menu-assist",
+      menu: true,
+      tab: "graph",
+    },
+    {
+      id: "menu-analyze",
+      title: "Analyze — see where you stand",
+      text: "Text lists your position in full, with everything you can edit.\nGraph draws it. History replays the process round by round. Clusters shows the largest sets of your accepted elements that hold no conflict.",
+      target: "menu-analyze",
+      menu: true,
+      tab: "graph",
+    },
+    {
+      id: "menu-settings",
+      title: "Settings",
+      text: "Show or hide the section nav bar, expand or collapse the text toggles, bring in relations beyond logical entailment, and choose a font or a light theme.",
+      target: "menu-settings",
+      menu: true,
+      tab: "graph",
+    },
+    {
+      id: "menu-files",
+      title: "Import and export",
+      text: "Export writes the whole process out as a Markdown file. Import reads one back — your own, or one someone sent you.",
+      target: "menu-files",
+      menu: true,
+      tab: "graph",
+    },
+    {
+      id: "menu-undo",
+      title: "Undo",
+      text: "Undo the last change at any time. Changes are grouped by round, so this steps back through the process rather than through single keystrokes.",
+      target: "menu-undo",
+      menu: true,
+      tab: "graph",
+    },
+    {
+      id: "done",
+      title: "You're all set",
+      text: "Open ☰ → Guided tour at any time to see this again.\nLong-press a button to find out what it does.",
+      target: null,
+      tab: "graph",
+    },
+  ];
+}
+
+function buildWideSteps(hideNonEntailsRels) {
   const withRels = !hideNonEntailsRels;
   const cycle = withRels
     ? "Judgments → Principles → Relations → Arguments"
     : "Judgments → Principles → Arguments";
 
-  return [
+  const steps = [
     {
       id: "welcome",
       title: "Welcome to Reflective APPilibrium",
@@ -135,27 +227,45 @@ function buildSteps(hideNonEntailsRels) {
     {
       id: "btn-menu",
       title: "Settings menu",
-      text: "The ☰ menu gives access to: show/hide text panel, expand/collapse toggles, relations beyond logical entailment, font selection, dark/light theme, and import/export.",
+      text: "The ☰ menu gives access to: the section nav bar, expand/collapse toggles, relations beyond logical entailment, font selection, dark/light theme, and import/export.",
       target: "btn-menu",
       tab: null,
     },
     {
       id: "done",
       title: "You're all set",
-      text: "Press ? at any time to replay this tour. \n You can also hover over a button or tab to get some information on its function.",
+      text: "Press the ? button in the header at any time to replay this tour. \n You can also hover over a button or tab to get some information on its function.",
       target: null,
       tab: null,
     },
   ];
+
+  return steps;
 }
 
+/** The two layouts are different enough apps to need different tours. */
+function buildSteps(hideNonEntailsRels, isWide) {
+  if (isWide) return buildWideSteps(hideNonEntailsRels);
+  const cycle = hideNonEntailsRels
+    ? "Judgments → Principles → Arguments"
+    : "Judgments → Principles → Relations → Arguments";
+  return buildNarrowSteps(cycle);
+}
+
+/**
+ * @param {function} [props.onSetMenuOpen] - Opens or closes the narrow header's
+ *   ☰ menu. The narrow tour walks the menu's own entries, so it has to be open
+ *   — and in the DOM — before those steps can be measured.
+ */
 export function TutorialStepper({
   active,
   onClose,
   onSetTab,
+  onSetMenuOpen,
   hideNonEntailsRels,
+  isWide = true,
 }) {
-  const steps = buildSteps(hideNonEntailsRels);
+  const steps = buildSteps(hideNonEntailsRels, isWide);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState(null);
 
@@ -167,12 +277,20 @@ export function TutorialStepper({
       return;
     }
     const el = document.querySelector(`[data-tutorial="${step.target}"]`);
-    setRect(el ? el.getBoundingClientRect() : null);
+    if (!el) {
+      setRect(null);
+      return;
+    }
+    // A long menu on a short phone scrolls; a target below the fold would be
+    // ringed off-screen. Bring it up first, then read where it landed.
+    el.scrollIntoView?.({ block: "nearest" });
+    setRect(el.getBoundingClientRect());
   }, [step.target]);
 
   useEffect(() => {
     if (!active) return;
     if (step.tab) onSetTab(step.tab);
+    onSetMenuOpen?.(!!step.menu);
     // Two RAF frames: first lets the tab re-render, second measures final layout.
     const outer = requestAnimationFrame(() => {
       const inner = requestAnimationFrame(measure);
@@ -189,6 +307,8 @@ export function TutorialStepper({
 
   const handleClose = () => {
     setStepIdx(0);
+    // The tour opened the menu; leaving it hanging open would be a surprise.
+    onSetMenuOpen?.(false);
     onClose();
   };
 
@@ -205,18 +325,22 @@ export function TutorialStepper({
   const isFirst = stepIdx === 0;
   const isLast = stepIdx === steps.length - 1;
 
+  // A phone can be narrower than the card was drawn for, in which case a fixed
+  // 280 hangs off the right edge whatever the clamp below does.
+  const cardW = Math.min(CARD_W, vw - 16);
+
   // Position the card near the target or centered
   let cardTop, cardLeft;
   if (rect) {
     const cardH = 220;
     const spaceBelow = vh - rect.bottom - GAP;
     cardTop = spaceBelow >= cardH ? rect.bottom + GAP : rect.top - cardH - GAP;
-    cardLeft = rect.left + rect.width / 2 - CARD_W / 2;
-    cardLeft = Math.max(8, Math.min(vw - CARD_W - 8, cardLeft));
+    cardLeft = rect.left + rect.width / 2 - cardW / 2;
+    cardLeft = Math.max(8, Math.min(vw - cardW - 8, cardLeft));
     cardTop = Math.max(8, Math.min(vh - cardH - 8, cardTop));
   } else {
     cardTop = vh / 2 - 110;
-    cardLeft = vw / 2 - CARD_W / 2;
+    cardLeft = vw / 2 - cardW / 2;
   }
 
   return (
@@ -228,7 +352,7 @@ export function TutorialStepper({
           position: "fixed",
           inset: 0,
           background: "rgba(0,0,0,0.45)",
-          zIndex: 910,
+          zIndex: TOUR_Z.dim,
         }}
       />
 
@@ -243,7 +367,10 @@ export function TutorialStepper({
             height: rect.height + RING_PAD * 2,
             borderRadius: 7,
             boxShadow: `0 0 0 2px ${C.supports}, 0 0 0 2000px rgba(0,0,0,0.45)`,
-            zIndex: 915,
+            // Above the ☰ menu, which lifts itself over the dim while the tour
+            // walks it. The shadow only paints outside the ring, so the entry
+            // being described stays bright and the rest of the menu dims.
+            zIndex: TOUR_Z.ring,
             pointerEvents: "none",
           }}
         />
@@ -256,13 +383,18 @@ export function TutorialStepper({
           position: "fixed",
           top: cardTop,
           left: cardLeft,
-          width: CARD_W,
+          width: cardW,
+          // Steps that name a route through the ☰ menu run longer than the
+          // height the placement above assumes; scroll rather than spill off.
+          maxHeight: vh - 16,
+          overflowY: "auto",
+          boxSizing: "border-box",
           background: C.panel,
           border: `1px solid ${C.supports}`,
           borderRadius: 8,
           padding: 16,
           boxShadow: "0 6px 28px rgba(0,0,0,0.45)",
-          zIndex: 920,
+          zIndex: TOUR_Z.card,
           display: "flex",
           flexDirection: "column",
           gap: 10,
@@ -283,7 +415,16 @@ export function TutorialStepper({
           </div>
         </div>
 
-        <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.65 }}>
+        {/* The step texts break their lines with \n, which HTML would otherwise
+            collapse into spaces and run every sentence together. */}
+        <div
+          style={{
+            fontSize: 12,
+            color: C.dim,
+            lineHeight: 1.65,
+            whiteSpace: "pre-line",
+          }}
+        >
           {step.text}
         </div>
 

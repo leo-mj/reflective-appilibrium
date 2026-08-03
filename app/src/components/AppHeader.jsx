@@ -246,18 +246,41 @@ export function AppHeader({
     weightsChanged,
     onWeightsChange,
     onResetWeights,
+    onStartStepper: () => setStepperActive(true),
   };
+
+  // Mounted for both layouts. It used to hang off the wide branch alone, so on
+  // a phone the home page's "Take the tour" card set its sessionStorage flag,
+  // the initialiser above consumed the flag — and nothing ever appeared, with
+  // no second chance because the flag was gone.
+  const tutorial = (
+    <>
+      <TutorialOverlay active={tutorialMode} />
+      <TutorialStepper
+        active={stepperActive}
+        onClose={() => setStepperActive(false)}
+        onSetTab={setTab}
+        // The narrow tour walks the ☰ menu's own sections, so it drives the
+        // menu open and shut as it goes.
+        onSetMenuOpen={isWide ? undefined : setMenuOpen}
+        hideNonEntailsRels={hideNonEntailsRels}
+        isWide={isWide}
+      />
+    </>
+  );
 
   if (!isWide) {
     return (
       <>
         {hiddenInput}
         {importModals}
+        {tutorial}
         <AppHeaderNarrow
           {...shared}
           menuOpen={menuOpen}
           setMenuOpen={setMenuOpen}
           visibleSubTabs={visibleSubTabs}
+          tourActive={stepperActive}
         />
       </>
     );
@@ -267,19 +290,12 @@ export function AppHeader({
     <>
       {hiddenInput}
       {importModals}
-      <TutorialOverlay active={tutorialMode} />
-      <TutorialStepper
-        active={stepperActive}
-        onClose={() => setStepperActive(false)}
-        onSetTab={setTab}
-        hideNonEntailsRels={hideNonEntailsRels}
-      />
+      {tutorial}
       <AppHeaderWide
         {...shared}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         visibleSubTabs={visibleSubTabs}
-        onStartStepper={() => setStepperActive(true)}
       />
     </>
   );

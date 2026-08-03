@@ -19,6 +19,7 @@ import {
 import { btn, menuIconStyle, menuDividerStyle } from "./appHeaderStyles.js";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
+import { TOUR_Z } from "../TutorialStepper.jsx";
 
 export function AppHeaderNarrow({
   round,
@@ -54,6 +55,8 @@ export function AppHeaderNarrow({
   weightsChanged,
   onWeightsChange,
   onResetWeights,
+  onStartStepper,
+  tourActive,
 }) {
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
@@ -76,6 +79,16 @@ export function AppHeaderNarrow({
     justifyContent: "flex-start",
     gap: 8,
   });
+  // Each labelled block of the menu is one element, so the tour can ring a
+  // whole section rather than pick out single rows.
+  const group = { display: "flex", flexDirection: "column", gap: 2 };
+  const groupHeading = {
+    fontSize: 10,
+    color: C.dim,
+    fontWeight: "bold",
+    padding: "4px 4px 2px",
+    letterSpacing: "0.05em",
+  };
   const close = (fn) => () => {
     fn();
     setMenuOpen(false);
@@ -121,6 +134,7 @@ export function AppHeaderNarrow({
         </div>
         <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }}>
           <button
+            data-tutorial="btn-menu"
             onClick={() => setMenuOpen((m) => !m)}
             aria-label="Menu"
             aria-expanded={menuOpen}
@@ -136,7 +150,14 @@ export function AppHeaderNarrow({
         <div
           style={{
             position: "absolute",
-            zIndex: 100,
+            // The tour walks this menu section by section, so while it runs the
+            // menu has to sit above the tour's dim rather than under it. The
+            // ring draws higher still, and dims everything it does not enclose.
+            zIndex: tourActive ? TOUR_Z.menu : 100,
+            // Display only for the duration: a tap during the tour falls
+            // through to the dim, which is what closes the tour, rather than
+            // firing a menu item the card is in the middle of explaining.
+            pointerEvents: tourActive ? "none" : undefined,
             background: C.panel,
             border: `1px solid ${C.border}`,
             borderRadius: 6,
@@ -145,6 +166,7 @@ export function AppHeaderNarrow({
             flexDirection: "column",
             gap: 2,
             width: "100%",
+            overflowY: "auto",
             boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
           }}
         >
@@ -152,316 +174,292 @@ export function AppHeaderNarrow({
             <span style={menuIconStyle}>←</span>Home
           </button>
           <button
+            data-tutorial="menu-undo"
             onClick={close(onUndo)}
             disabled={!canUndo}
             style={{ ...menuBtn(), opacity: canUndo ? 1 : 0.4 }}
           >
             <span style={menuIconStyle}>↩</span>Undo
           </button>
-          <div style={menuDividerStyle} />
-          <div
-            style={{
-              fontSize: 10,
-              color: C.dim,
-              fontWeight: "bold",
-              padding: "4px 4px 2px",
-              letterSpacing: "0.05em",
-            }}
-          >
-            Assist
-          </div>
-          {ASSIST_TABS.filter(isTabVisible).map((t) => (
-            <button
-              key={t}
-              onClick={close(() => setTab(t))}
-              style={menuBtn(tab === t)}
-            >
-              {tabIcon(t)}
-              {TAB_LABELS[t]}
-            </button>
-          ))}
-          {workflowPhase ? (
-            <button
-              onClick={close(onStopWorkflow)}
-              style={{
-                ...menuBtn(),
-                color: C.conflicts,
-                borderColor: C.conflicts,
-              }}
-            >
-              <span style={menuIconStyle}>✕</span>Stop Workflow
-              <span style={{ marginLeft: 6, fontSize: 10, color: C.dim }}>
-                ({WORKFLOW_PHASE_LABELS[workflowPhase]}
-                {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""})
-              </span>
-            </button>
-          ) : (
-            <button
-              onClick={close(onStartWorkflow)}
-              style={{ ...menuBtn(), color: C.supports }}
-            >
-              <span style={menuIconStyle}>▶</span>Start Workflow
-            </button>
-          )}
-          <div style={menuDividerStyle} />
-          <div
-            style={{
-              fontSize: 10,
-              color: C.dim,
-              fontWeight: "bold",
-              padding: "4px 4px 2px",
-              letterSpacing: "0.05em",
-            }}
-          >
-            Analyze
-          </div>
-          {/* Text is a tab of its own at this width, not the side panel the
-              wide layout toggles, so it belongs beside the other views. */}
-          <button
-            onClick={close(() => setTab("text"))}
-            style={menuBtn(tab === "text")}
-          >
-            <span style={menuIconStyle}>≡</span>
-            Text
-          </button>
-          {ANALYZE_TABS.filter(isTabVisible).map((t) => (
-            <button
-              key={t}
-              onClick={close(() => setTab(t))}
-              style={menuBtn(tab === t)}
-            >
-              {tabIcon(t)}
-              {TAB_LABELS[t]}
-            </button>
-          ))}
-          {BACKEND_ENABLED && (
-            <>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: C.dim,
-                  fontWeight: "bold",
-                  padding: "4px 4px 2px",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Simulate
-              </div>
-              {SIMULATE_TABS.filter(isTabVisible).map((t) => (
-                <button
-                  key={t}
-                  onClick={close(() => setTab(t))}
-                  style={menuBtn(tab === t)}
-                >
-                  {tabIcon(t)}
-                  {TAB_LABELS[t]}
-                </button>
-              ))}
-            </>
-          )}
-          <div style={menuDividerStyle} />
-          <div
-            style={{
-              fontSize: 10,
-              color: C.dim,
-              fontWeight: "bold",
-              padding: "4px 4px 2px",
-              letterSpacing: "0.05em",
-            }}
-          >
-            Settings
-          </div>
-          <button
-            onClick={() => {
-              setMenuOpen(false);
-              setLlmOpen(true);
-            }}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>⚙</span>
-            {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
+          {/* Same place the wide layout keeps its ? button — right after Undo.
+              Without it the tour had no entry point at this width at all. */}
+          <button onClick={close(onStartStepper)} style={menuBtn()}>
+            <span style={menuIconStyle}>?</span>Guided tour
           </button>
           <div style={menuDividerStyle} />
-
-          <button
-            onClick={close(() => setShowTabNav((s) => !s))}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ display: "block" }}
-              >
-                <circle cx="11" cy="11" r="7" />
-                <line x1="16.5" y1="16.5" x2="22" y2="22" />
-              </svg>
-            </span>
-            {showTabNav ? "Hide nav bar" : "Show nav bar"}
-          </button>
-          <button onClick={close(onExpandAll)} style={menuBtn()}>
-            <span style={menuIconStyle}>⇅</span>
-            {allExpanded ? "Minimize all toggles" : "Expand all toggles"}
-          </button>
-          <button
-            onClick={close(() => setHideNonEntailsRels((s) => !s))}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>→</span>
-            {hideNonEntailsRels ? "All relations" : "Arguments only"}
-          </button>
-          {BACKEND_ENABLED && (
-            <button
-              onClick={close(() => setVerifyArguments((s) => !s))}
-              style={menuBtn()}
-            >
-              <span style={menuIconStyle}>{verifyArguments ? "✓" : "✗"}</span>
-              Argument checker: {verifyArguments ? "on" : "off"}
-            </button>
-          )}
-          {BACKEND_ENABLED && (
-            <>
-              <div style={menuDividerStyle} />
-
+          <div data-tutorial="menu-assist" style={group}>
+            <div style={groupHeading}>Assist</div>
+            {ASSIST_TABS.filter(isTabVisible).map((t) => (
               <button
-                onClick={() => setWeightsOpen((o) => !o)}
+                key={t}
+                onClick={close(() => setTab(t))}
+                style={menuBtn(tab === t)}
+              >
+                {tabIcon(t)}
+                {TAB_LABELS[t]}
+              </button>
+            ))}
+            {workflowPhase ? (
+              <button
+                onClick={close(onStopWorkflow)}
                 style={{
                   ...menuBtn(),
-                  color: weightsChanged ? C.principle.high : undefined,
+                  color: C.conflicts,
+                  borderColor: C.conflicts,
                 }}
               >
-                <span style={menuIconStyle}>⚖</span>
-                Model weights{weightsChanged ? " *" : ""}
-                <span style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}>
-                  {weightsOpen ? "▲" : "▼"}
+                <span style={menuIconStyle}>✕</span>Stop Workflow
+                <span style={{ marginLeft: 6, fontSize: 10, color: C.dim }}>
+                  ({WORKFLOW_PHASE_LABELS[workflowPhase]}
+                  {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""})
                 </span>
               </button>
-              {weightsOpen && (
-                <div style={{ padding: "4px 8px 8px 8px" }}>
-                  <WeightTriangle
-                    weights={weights}
-                    onChange={onWeightsChange}
-                    weightsChanged={weightsChanged}
-                  />
-                  {weightsChanged && (
-                    <button
-                      onClick={onResetWeights}
-                      style={{
-                        marginTop: 4,
-                        background: "transparent",
-                        border: `1px solid ${C.border}`,
-                        color: C.dim,
-                        borderRadius: 4,
-                        padding: "2px 8px",
-                        fontSize: 11,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-          <div style={menuDividerStyle} />
-          <button
-            onClick={() => {
-              setMenuOpen(false);
-              setFontOpen(true);
-            }}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>Aa</span>Select Font
-          </button>
-          <button
-            onClick={() => {
-              toggleTheme();
-              setMenuOpen(false);
-            }}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>
-              {isDark ? (
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ display: "block" }}
-                >
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="1" x2="12" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="23" />
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                  <line x1="1" y1="12" x2="3" y2="12" />
-                  <line x1="21" y1="12" x2="23" y2="12" />
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-              ) : (
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ display: "block" }}
-                >
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              )}
-            </span>
-            {isDark ? "Light mode" : "Dark mode"}
-          </button>
-          <div style={menuDividerStyle} />
-          <button
-            onClick={() => {
-              handleImportClick();
-              setMenuOpen(false);
-            }}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>↑</span>Import
-          </button>
-          <button
-            onClick={close(onDownload)}
-            style={{ ...menuBtn(), color: C.theory.high }}
-          >
-            <span style={menuIconStyle}>↓</span>Export
-          </button>
-          {BACKEND_ENABLED && (
-            <>
-              <div style={menuDividerStyle} />
+            ) : (
               <button
-                onClick={close(onSave)}
-                disabled={saveBusy}
-                title="Save session"
-                style={{
-                  ...menuBtn(),
-                  ...(saveColor
-                    ? { color: saveColor, borderColor: saveColor }
-                    : {}),
-                }}
+                onClick={close(onStartWorkflow)}
+                style={{ ...menuBtn(), color: C.supports }}
               >
-                {saveLabel}Save
+                <span style={menuIconStyle}>▶</span>Start Workflow
               </button>
-            </>
-          )}
+            )}
+          </div>
+          <div style={menuDividerStyle} />
+          <div data-tutorial="menu-analyze" style={group}>
+            <div style={groupHeading}>Analyze</div>
+            {/* Text is a tab of its own at this width, not the side panel the
+                wide layout toggles, so it belongs beside the other views. */}
+            <button
+              onClick={close(() => setTab("text"))}
+              style={menuBtn(tab === "text")}
+            >
+              <span style={menuIconStyle}>≡</span>
+              Text
+            </button>
+            {ANALYZE_TABS.filter(isTabVisible).map((t) => (
+              <button
+                key={t}
+                onClick={close(() => setTab(t))}
+                style={menuBtn(tab === t)}
+              >
+                {tabIcon(t)}
+                {TAB_LABELS[t]}
+              </button>
+            ))}
+            {BACKEND_ENABLED && (
+              <>
+                <div style={groupHeading}>Simulate</div>
+                {SIMULATE_TABS.filter(isTabVisible).map((t) => (
+                  <button
+                    key={t}
+                    onClick={close(() => setTab(t))}
+                    style={menuBtn(tab === t)}
+                  >
+                    {tabIcon(t)}
+                    {TAB_LABELS[t]}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+          <div style={menuDividerStyle} />
+          <div data-tutorial="menu-settings" style={group}>
+            <div style={groupHeading}>Settings</div>
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setLlmOpen(true);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>⚙</span>
+              {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
+            </button>
+            <div style={menuDividerStyle} />
+
+            <button
+              onClick={close(() => setShowTabNav((s) => !s))}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ display: "block" }}
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="16.5" y1="16.5" x2="22" y2="22" />
+                </svg>
+              </span>
+              {showTabNav ? "Hide nav bar" : "Show nav bar"}
+            </button>
+            <button onClick={close(onExpandAll)} style={menuBtn()}>
+              <span style={menuIconStyle}>⇅</span>
+              {allExpanded ? "Minimize all toggles" : "Expand all toggles"}
+            </button>
+            <button
+              onClick={close(() => setHideNonEntailsRels((s) => !s))}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>→</span>
+              {hideNonEntailsRels ? "All relations" : "Arguments only"}
+            </button>
+            {BACKEND_ENABLED && (
+              <button
+                onClick={close(() => setVerifyArguments((s) => !s))}
+                style={menuBtn()}
+              >
+                <span style={menuIconStyle}>{verifyArguments ? "✓" : "✗"}</span>
+                Argument checker: {verifyArguments ? "on" : "off"}
+              </button>
+            )}
+            {BACKEND_ENABLED && (
+              <>
+                <div style={menuDividerStyle} />
+
+                <button
+                  onClick={() => setWeightsOpen((o) => !o)}
+                  style={{
+                    ...menuBtn(),
+                    color: weightsChanged ? C.principle.high : undefined,
+                  }}
+                >
+                  <span style={menuIconStyle}>⚖</span>
+                  Model weights{weightsChanged ? " *" : ""}
+                  <span
+                    style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}
+                  >
+                    {weightsOpen ? "▲" : "▼"}
+                  </span>
+                </button>
+                {weightsOpen && (
+                  <div style={{ padding: "4px 8px 8px 8px" }}>
+                    <WeightTriangle
+                      weights={weights}
+                      onChange={onWeightsChange}
+                      weightsChanged={weightsChanged}
+                    />
+                    {weightsChanged && (
+                      <button
+                        onClick={onResetWeights}
+                        style={{
+                          marginTop: 4,
+                          background: "transparent",
+                          border: `1px solid ${C.border}`,
+                          color: C.dim,
+                          borderRadius: 4,
+                          padding: "2px 8px",
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            <div style={menuDividerStyle} />
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setFontOpen(true);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>Aa</span>Select Font
+            </button>
+            <button
+              onClick={() => {
+                toggleTheme();
+                setMenuOpen(false);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>
+                {isDark ? (
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ display: "block" }}
+                  >
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ display: "block" }}
+                  >
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                )}
+              </span>
+              {isDark ? "Light mode" : "Dark mode"}
+            </button>
+          </div>
+          <div style={menuDividerStyle} />
+          <div data-tutorial="menu-files" style={group}>
+            <button
+              onClick={() => {
+                handleImportClick();
+                setMenuOpen(false);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>↑</span>Import
+            </button>
+            <button
+              onClick={close(onDownload)}
+              style={{ ...menuBtn(), color: C.theory.high }}
+            >
+              <span style={menuIconStyle}>↓</span>Export
+            </button>
+            {BACKEND_ENABLED && (
+              <>
+                <div style={menuDividerStyle} />
+                <button
+                  onClick={close(onSave)}
+                  disabled={saveBusy}
+                  title="Save session"
+                  style={{
+                    ...menuBtn(),
+                    ...(saveColor
+                      ? { color: saveColor, borderColor: saveColor }
+                      : {}),
+                  }}
+                >
+                  {saveLabel}Save
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

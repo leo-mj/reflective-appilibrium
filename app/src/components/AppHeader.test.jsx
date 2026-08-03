@@ -20,6 +20,7 @@ vi.mock("../config.js", async (importOriginal) => ({
 
 import { AppHeader } from "./AppHeader.jsx";
 import { TAB_LABELS } from "../constants/tabConstants.jsx";
+import { TOUR_Z } from "./TutorialStepper.jsx";
 
 afterEach(() => {
   cleanup();
@@ -168,6 +169,53 @@ describe("the narrow text button", () => {
     const text = labels.findIndex((l) => l.endsWith("Text"));
     expect(text).toBeGreaterThan(-1);
     expect(labels.indexOf(TAB_LABELS.graph)).toBe(text + 1);
+  });
+});
+
+describe("the guided tour", () => {
+  // It was mounted by the wide branch alone. On a phone the home page's "Take
+  // the tour" card set its sessionStorage flag, the initialiser here consumed
+  // the flag on mount, and nothing rendered — with no second chance, since the
+  // flag was now gone.
+  const welcome = () => screen.queryByText(/Welcome to Reflective APPilibrium/);
+
+  it("runs when the home page asked for it, at either width", () => {
+    for (const isWide of [true, false]) {
+      sessionStorage.setItem("startTour", "1");
+      render(<AppHeader {...PROPS} isWide={isWide} />);
+      expect(welcome()).not.toBeNull();
+      cleanup();
+    }
+  });
+
+  it("can be started from the narrow menu", () => {
+    render(<AppHeader {...PROPS} isWide={false} />);
+    expect(welcome()).toBeNull();
+
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    fireEvent.click(screen.getByText("Guided tour"));
+    expect(welcome()).not.toBeNull();
+  });
+
+  it("opens the narrow menu itself once it gets that far", () => {
+    render(<AppHeader {...PROPS} isWide={false} />);
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    fireEvent.click(screen.getByText("Guided tour"));
+    // Starting the tour closes the menu again; the tour reopens it when it
+    // reaches the steps that walk it.
+    expect(document.querySelector('[data-tutorial="menu-assist"]')).toBeNull();
+
+    // welcome → the graph → the ☰ button → the first section inside it
+    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByText("Next →"));
+
+    expect(screen.getByText(/Assist — the RE cycle/)).toBeTruthy();
+    const section = document.querySelector('[data-tutorial="menu-assist"]');
+    expect(section).not.toBeNull();
+    // Lifted over the tour's dim, or the section being described reads as
+    // greyed out as everything else.
+    expect(section.closest('[style*="position: absolute"]').style.zIndex).toBe(
+      String(TOUR_Z.menu),
+    );
   });
 });
 
