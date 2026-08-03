@@ -5,10 +5,14 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
+
+/** "judgments" → "Judgments". The pills are single letters on their own. */
+const titleCase = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 /**
  * @param {Object}   props
- * @param {Array}    props.navItems      - [{ key, label, count }] filtered to visible sections.
+ * @param {Array}    props.navItems      - [{ key, label, name, count }] filtered to visible sections.
  * @param {string}   props.activeSection - Key of the currently scrolled-to section.
  * @param {function} props.isCollapsed   - (key) => boolean
  * @param {string}   props.search        - Current search query.
@@ -46,31 +50,33 @@ export function NavBar({
       {isWide &&
         navItems.map((item) => {
           const isActive = activeSection === item.key && !isCollapsed(item.key);
+          const name = titleCase(item.name ?? item.label);
           return (
-            <button
-              key={item.key}
-              onClick={() => onNavigate(item.key)}
-              aria-label={`Jump to ${item.name ?? item.label}${
-                item.count != null ? `, ${item.count}` : ""
-              }`}
-              aria-current={isActive ? "true" : undefined}
-              style={{
-                minHeight: 36,
-                boxSizing: "border-box",
-                padding: "4px 8px",
-                borderRadius: 10,
-                fontSize: 11,
-                cursor: "pointer",
-                border: `1px solid ${isActive ? C.text : C.border}`,
-                background: isActive ? C.border : "transparent",
-                color: isActive ? C.text : C.dim,
-                fontWeight: isActive ? "bold" : "normal",
-                transition: "all 0.15s",
-              }}
-            >
-              {item.label}
-              {item.count != null ? ` ${item.count}` : ""}
-            </button>
+            <Tooltip key={item.key} text={`Jump to ${name}`}>
+              <button
+                onClick={() => onNavigate(item.key)}
+                aria-label={`Jump to ${item.name ?? item.label}${
+                  item.count != null ? `, ${item.count}` : ""
+                }`}
+                aria-current={isActive ? "true" : undefined}
+                style={{
+                  minHeight: 36,
+                  boxSizing: "border-box",
+                  padding: "4px 8px",
+                  borderRadius: 10,
+                  fontSize: 11,
+                  cursor: "pointer",
+                  border: `1px solid ${isActive ? C.text : C.border}`,
+                  background: isActive ? C.border : "transparent",
+                  color: isActive ? C.text : C.dim,
+                  fontWeight: isActive ? "bold" : "normal",
+                  transition: "all 0.15s",
+                }}
+              >
+                {item.label}
+                {item.count != null ? ` (${item.count})` : ""}
+              </button>
+            </Tooltip>
           );
         })}
       <input
@@ -89,7 +95,9 @@ export function NavBar({
           color: C.text,
           outline: "none",
           minWidth: 70,
-          ...(isWide ? { marginLeft: "auto", width: "30%" } : { width: "100%" }),
+          ...(isWide
+            ? { marginLeft: "auto", width: "30%" }
+            : { width: "100%" }),
         }}
       />
     </div>

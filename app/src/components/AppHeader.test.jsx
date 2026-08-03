@@ -52,7 +52,7 @@ const PROPS = {
   canUndo: false,
   showTabNav: false,
   setShowTabNav: noop,
-  allExpanded: false,
+  allExpanded: true,
   onExpandAll: noop,
   hideNonEntailsRels: false,
   setHideNonEntailsRels: noop,
@@ -97,9 +97,9 @@ describe("narrow menu tab filtering", () => {
   });
 
   it("offers the questionnaire in questionnaire mode", () => {
-    expect(narrowTabs({ model: "questionnaire", tab: "questionnaire" })).toContain(
-      TAB_LABELS.questionnaire,
-    );
+    expect(
+      narrowTabs({ model: "questionnaire", tab: "questionnaire" }),
+    ).toContain(TAB_LABELS.questionnaire);
   });
 
   it("omits relation suggestions when non-entails relations are hidden", () => {
@@ -144,7 +144,14 @@ describe("the narrow text button", () => {
   it("switches to the text tab rather than toggling a side panel", () => {
     const setTab = vi.fn();
     const setShowText = vi.fn();
-    render(<AppHeader {...PROPS} isWide={false} setTab={setTab} setShowText={setShowText} />);
+    render(
+      <AppHeader
+        {...PROPS}
+        isWide={false}
+        setTab={setTab}
+        setShowText={setShowText}
+      />,
+    );
     openMenu();
 
     fireEvent.click(screen.getByText("Text"));
@@ -208,7 +215,13 @@ describe("narrow menu order", () => {
     for (const t of ["elicitJudgments", "graph", "clusters"]) {
       expect(idx(TAB_LABELS[t])).toBeGreaterThan(idx("Home"));
     }
-    for (const later of ["nav bar", "toggles", "Select Font", "Import", "Export"]) {
+    for (const later of [
+      "nav bar",
+      "toggles",
+      "Select Font",
+      "Import",
+      "Export",
+    ]) {
       expect(idx(later)).toBeGreaterThan(idx(TAB_LABELS.clusters));
     }
   });
@@ -242,7 +255,10 @@ describe("the two layouts agree", () => {
   // Compared per group, because the wide bar only ever shows the group the
   // current tab belongs to while the narrow menu lists them all at once.
   const groupOf = {
-    analyze: { tab: "graph", labels: ["graph", "history", "clusters", "matrix"] },
+    analyze: {
+      tab: "graph",
+      labels: ["graph", "history", "clusters", "matrix"],
+    },
     assist: {
       tab: "elicitJudgments",
       labels: [

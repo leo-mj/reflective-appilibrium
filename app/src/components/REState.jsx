@@ -29,7 +29,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   // menu item meant most people never found it.
   const [showTabNav, setShowTabNav] = useState(true);
   const [expandAllKey, setExpandAllKey] = useState(0);
-  const [allExpanded, setAllExpanded] = useState(false);
+  const [allExpanded, setAllExpanded] = useState(true);
   const [assistSidePanel, setAssistSidePanel] = useState("graph");
   const [historyRound, setHistoryRound] = useState(0);
   const [workflowPhase, setWorkflowPhase] = useState(null);
@@ -119,7 +119,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   // Focus mode keeps the same graphW as graph mode so switching between the two
   // doesn't restart the simulation and scramble node positions.
   const graphW =
-    usesSidePanel && (assistSidePanel === "graph" || assistSidePanel === "focus")
+    usesSidePanel &&
+    (assistSidePanel === "graph" || assistSidePanel === "focus")
       ? (dims.w - 44) / 2
       : hasSidePanel
         ? (dims.w - 32) / 2 - 12

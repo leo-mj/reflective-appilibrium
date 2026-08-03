@@ -18,7 +18,10 @@ import {
   RelationCard,
   SectionHeader,
 } from "./text_panel/TextTabCards.jsx";
-import { HighlightedSection, SectionListing } from "./text_panel/TextTabSections.jsx";
+import {
+  HighlightedSection,
+  SectionListing,
+} from "./text_panel/TextTabSections.jsx";
 import { ClusterSection } from "./text_panel/TextTabClusterSection.jsx";
 import { NavBar } from "./text_panel/TextTabNavBar.jsx";
 import { HistoryRoundBanner } from "./text_panel/TextTabPrimitives.jsx";
@@ -48,11 +51,11 @@ const NAV_SECTIONS = [
   { key: "judgments", label: "J", name: "judgments" },
   { key: "principles", label: "P", name: "principles" },
   { key: "theories", label: "T", name: "theories" },
-  { key: "arguments", label: "Arguments" },
-  { key: "relations", label: "Relations" },
+  { key: "arguments", label: "A", name: "arguments" },
+  { key: "relations", label: "R", name: "relations" },
   // { key: "coherence", label: "Coherence" },
-  { key: "clusters", label: "Clusters" },
-  { key: "log", label: "Log" },
+  { key: "clusters", label: "C", name: "clusters" },
+  { key: "log", label: "L", name: "log" },
 ];
 
 // ─── TextTab ──────────────────────────────────────────────────────────────────
@@ -212,16 +215,20 @@ export function TextTab({
   });
 
   // ── Navigation ───────────────────────────────────────────────────────────
-  const sectionRefs = {
-    judgments: refJudgments,
-    principles: refPrinciples,
-    theories: refTheories,
-    arguments: refArguments,
-    relations: refRelations,
-    coherence: refCoherence,
-    clusters: clusterSectionRef,
-    log: refLog,
-  };
+  // Stable, so useActiveSection can key its scroll listener on it.
+  const sectionRefs = useMemo(
+    () => ({
+      judgments: refJudgments,
+      principles: refPrinciples,
+      theories: refTheories,
+      arguments: refArguments,
+      relations: refRelations,
+      coherence: refCoherence,
+      clusters: clusterSectionRef,
+      log: refLog,
+    }),
+    [clusterSectionRef],
+  );
 
   const navigateTo = (key) => {
     setCollapsed((prev) => ({ ...prev, [key]: false }));
@@ -238,12 +245,7 @@ export function TextTab({
       requestAnimationFrame(() => navigateTo("relations"));
   }, [scrollToRelationsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const activeSection = useActiveSection(sectionRefs, scrollRef, [
-    selected,
-    selectedRel,
-    clusterCount,
-    state.log.length,
-  ]);
+  const activeSection = useActiveSection(sectionRefs, scrollRef);
 
   // ── Nav bar items ─────────────────────────────────────────────────────────
   // Split relations into argument groups (entails/precludes with a shared
@@ -251,7 +253,8 @@ export function TextTab({
   const argIds = new Set();
   let plainRelCount = 0;
   for (const r of displayRels) {
-    if (ARGUMENT_RELATION_TYPES.has(r.type) && r.argumentId) argIds.add(r.argumentId);
+    if (ARGUMENT_RELATION_TYPES.has(r.type) && r.argumentId)
+      argIds.add(r.argumentId);
     else plainRelCount++;
   }
   const argumentCount = argIds.size;
@@ -285,12 +288,17 @@ export function TextTab({
     clusters: { count: clusterCount || null, show: clusterCount > 0 },
     log: { count: state.log.length || null, show: state.log.length > 0 },
   };
-  const navItems = NAV_SECTIONS.map(({ key, label, name }) => ({
-    key,
-    label: key === "relations" && hideNonEntailsRels ? "Arguments" : label,
-    name,
-    ...sectionMeta[key],
-  })).filter((i) => i.show);
+  const navItems = NAV_SECTIONS.map(({ key, label, name }) => {
+    // In "hide non-entails" mode the relations section holds the arguments and
+    // is titled as such, so its pill and tooltip have to follow.
+    const asArguments = key === "relations" && hideNonEntailsRels;
+    return {
+      key,
+      label: asArguments ? "A" : label,
+      name: asArguments ? "arguments" : name,
+      ...sectionMeta[key],
+    };
+  }).filter((i) => i.show);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -482,7 +490,9 @@ export function TextTab({
                   width: "100%",
                 }}
               >
-                {roundScoresLoading ? "Calculating…" : "Calculate Z-scores per round"}
+                {roundScoresLoading
+                  ? "Calculating…"
+                  : "Calculate Z-scores per round"}
               </button>
             )}
           </div>

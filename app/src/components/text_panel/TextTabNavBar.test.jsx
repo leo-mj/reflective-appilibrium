@@ -4,15 +4,15 @@
 // onto a second row and leave the search a stub in the corner, so at that width
 // the search takes the bar to itself.
 import { vi, describe, it, expect, afterEach } from "vitest";
-import { render, fireEvent, cleanup } from "@testing-library/react";
+import { render, fireEvent, cleanup, act } from "@testing-library/react";
 
 import { NavBar } from "./TextTabNavBar.jsx";
 
 afterEach(cleanup);
 
 const ITEMS = [
-  { key: "judgments", label: "J", count: 14 },
-  { key: "principles", label: "P", count: 6 },
+  { key: "judgments", label: "J", name: "judgments", count: 14 },
+  { key: "principles", label: "P", name: "principles", count: 6 },
   { key: "clusters", label: "Clusters", count: 4 },
 ];
 
@@ -36,9 +36,9 @@ describe("when wide", () => {
   it("offers a pill per section", () => {
     const { container } = renderBar({ isWide: true });
     expect(pills(container).map((b) => b.textContent)).toEqual([
-      "J 14",
-      "P 6",
-      "Clusters 4",
+      "J (14)",
+      "P (6)",
+      "Clusters (4)",
     ]);
   });
 
@@ -67,6 +67,32 @@ describe("when narrow", () => {
     const { container } = renderBar({ isWide: false, onSearch });
     fireEvent.change(searchBox(container), { target: { value: "torture" } });
     expect(onSearch).toHaveBeenCalledWith("torture");
+  });
+});
+
+describe("pill tooltips", () => {
+  // A pill reading "J" says nothing on its own; the tooltip is what tells you
+  // where it goes before you click it.
+  it("spells out the section a letter stands for", async () => {
+    vi.useFakeTimers();
+    const { container } = renderBar({ isWide: true });
+    fireEvent.mouseEnter(pills(container)[0]);
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(document.body.textContent).toContain("Jump to Judgments");
+    vi.useRealTimers();
+  });
+
+  it("falls back to the label when no long name is given", async () => {
+    vi.useFakeTimers();
+    const { container } = renderBar({ isWide: true });
+    fireEvent.mouseEnter(pills(container)[2]);
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(document.body.textContent).toContain("Jump to Clusters");
+    vi.useRealTimers();
   });
 });
 
