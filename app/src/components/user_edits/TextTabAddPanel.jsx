@@ -181,6 +181,7 @@ export function AddBar({
           {activeTab === "element" ? (
             <>
               <select
+                aria-label="Element type"
                 value={elementForm.type}
                 onChange={(e) => setEl("type", e.target.value)}
                 style={SELECT_STYLE}
@@ -190,14 +191,17 @@ export function AddBar({
                 <option value="theory">Theory</option>
               </select>
               {[
-                { l: "L", v: 0.33 },
-                { l: "M", v: 0.67 },
-                { l: "H", v: 1.0 },
-              ].map(({ l, v }) => (
+                { l: "L", v: 0.33, name: "Low" },
+                { l: "M", v: 0.67, name: "Moderate" },
+                { l: "H", v: 1.0, name: "High" },
+              ].map(({ l, v, name }) => (
                 <button
                   key={l}
                   type="button"
                   onClick={() => setEl("confidence", v)}
+                  aria-label={`${name} confidence`}
+                  title={`${name} confidence`}
+                  aria-pressed={Math.abs(elementForm.confidence - v) < 0.01}
                   style={{
                     ...SELECT_STYLE,
                     padding: "3px 7px",
@@ -217,6 +221,7 @@ export function AddBar({
               ))}
               <input
                 type="number"
+                aria-label="Confidence, 0 to 1"
                 min={0}
                 max={1}
                 step={0.05}
@@ -229,6 +234,7 @@ export function AddBar({
                 style={{ ...SELECT_STYLE, width: 55 }}
               />
               <input
+                aria-label="Origin"
                 value={elementForm.origin}
                 onChange={(e) => setEl("origin", e.target.value)}
                 placeholder="Origin"
@@ -238,6 +244,7 @@ export function AddBar({
           ) : (
             <>
               <select
+                aria-label="Relation from"
                 value={relationForm.from}
                 onChange={(e) => setRel("from", e.target.value)}
                 style={SELECT_STYLE}
@@ -248,6 +255,7 @@ export function AddBar({
                 →
               </span>
               <select
+                aria-label="Relation type"
                 value={relationForm.type}
                 onChange={(e) => setRel("type", e.target.value)}
                 style={{ ...SELECT_STYLE, color: C[relationForm.type] }}
@@ -258,6 +266,7 @@ export function AddBar({
                 →
               </span>
               <select
+                aria-label="Relation to"
                 value={relationForm.to}
                 onChange={(e) => setRel("to", e.target.value)}
                 style={SELECT_STYLE}

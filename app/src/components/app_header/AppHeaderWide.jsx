@@ -109,22 +109,32 @@ export function AppHeaderWide({
         <div
           style={{ minWidth: 0, display: "flex", alignItems: "centre", gap: 5 }}
         >
-          <a href="https://www.tuhh.de/ethics/welcome" target="_blank">
-            <img src="ieit_logo.svg" style={{ height: 36 }} />
+          <a
+            href="https://www.tuhh.de/ethics/welcome"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <img
+              src="ieit_logo.svg"
+              alt="Institute for Ethics in IT, TU Hamburg"
+              style={{ height: 36 }}
+            />
           </a>
-          <img src="favicon.svg" style={{ height: 36 }} />
+          {/* Decorative: the app is already named in the heading beside it. */}
+          <img src="favicon.svg" alt="" style={{ height: 36 }} />
           <div>
-            <div
+            <h1
               style={{
                 fontSize: 16,
                 fontWeight: "bold",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
+                margin: 0,
               }}
             >
               Reflective Equilibrium — Round {round}
-            </div>
+            </h1>
             <TopicLabel
               topic={topic}
               style={{ fontSize: 14, color: C.dim, marginTop: 2 }}
@@ -193,6 +203,7 @@ export function AppHeaderWide({
           <Tooltip text="Start the step-by-step tour.">
             <button
               onClick={onStartStepper}
+              aria-label="Start the step-by-step tour"
               style={{
                 ...btn(false),
                 color: C.dim,
@@ -212,6 +223,8 @@ export function AppHeaderWide({
               <button
                 data-tutorial="btn-menu"
                 onClick={() => setMenuOpen((o) => !o)}
+                aria-label="Settings menu"
+                aria-expanded={menuOpen}
                 style={{ ...btn(menuOpen), border: `1px solid ${C.text}` }}
               >
                 ☰

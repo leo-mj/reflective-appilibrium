@@ -11,6 +11,7 @@
 
 import { createPortal } from "react-dom";
 import { C } from "../../constants/colors.js";
+import { confidenceDetail } from "../../utils/confidenceLabel.js";
 
 /**
  * @typedef {Object} TooltipState
@@ -96,7 +97,9 @@ export function NodeTooltip({ tooltip, actions = null }) {
         </div>
       )}
       <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
-        Confidence: {typeof el.confidence === "number" ? el.confidence.toFixed(2) : el.confidence} · Origin: {el.origin}
+        {/* Already a hover surface, so the exact value goes inline rather than
+            behind a title nobody could reach. */}
+        Confidence: {confidenceDetail(el.confidence)} · Origin: {el.origin}
         {el.addedRound && ` · Added: Round ${el.addedRound}`}
       </div>
       {actions && (

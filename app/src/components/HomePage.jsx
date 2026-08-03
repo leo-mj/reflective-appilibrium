@@ -28,10 +28,13 @@ const CARD_STYLE = {
   minWidth: 0,
 };
 
+// Card titles are h2s under the page h1, so the browser's default heading
+// margins have to go — the cards space themselves.
 const TITLE_STYLE = {
   fontSize: 15,
   fontWeight: "bold",
   color: C.text,
+  margin: 0,
 };
 
 const DESC_STYLE = {
@@ -82,13 +85,16 @@ function NewProcessCard({ onStart }) {
 
   return (
     <div style={{ ...CARD_STYLE, minWidth: 300 }}>
-      <div style={TITLE_STYLE}>Start your own process</div>
+      <h2 style={TITLE_STYLE}>Start your own process</h2>
       <div style={DESC_STYLE}>
         Begin a new reflective equilibrium process from scratch. <br />
         Enter a topic and start adding your moral judgments and principles.
       </div>
+      {/* The placeholder is an example, not a label — it goes as soon as you
+          type, taking the only description of the field with it. */}
       <input
         style={INPUT_STYLE}
+        aria-label="Topic of your reflective equilibrium process"
         placeholder="e.g. obligations to future generations"
         value={topic}
         onChange={(e) => setTopic(e.target.value)}
@@ -120,7 +126,7 @@ function NewProcessCard({ onStart }) {
 function SampleProcessCard({ onLoad, onTour }) {
   return (
     <div style={{ ...CARD_STYLE, minWidth: 300 }}>
-      <div style={TITLE_STYLE}>Explore the demo</div>
+      <h2 style={TITLE_STYLE}>Explore the demo</h2>
       <div style={DESC_STYLE}>
         Browse a pre-built reflective equilibrium process on obligations to
         future generations. <br /> Explore the graph, review the element
@@ -176,7 +182,7 @@ function renderDescription(description) {
 function QuestionnaireCard({ spec, onLoad }) {
   return (
     <div style={{ ...CARD_STYLE, minWidth: 300 }}>
-      <div style={TITLE_STYLE}>{spec.card.title}</div>
+      <h2 style={TITLE_STYLE}>{spec.card.title}</h2>
       <div style={DESC_STYLE}>{renderDescription(spec.card.description)}</div>
       <button
         style={{ ...BTN_STYLE, background: C.theory.high, color: "#fff" }}
@@ -326,7 +332,7 @@ function SessionsCard({ onLoad }) {
           justifyContent: "space-between",
         }}
       >
-        <div style={TITLE_STYLE}>Saved sessions</div>
+        <h2 style={TITLE_STYLE}>Saved sessions</h2>
         {sessions !== null && (
           <button
             style={{
@@ -448,9 +454,9 @@ export function HomePage({
             style={{ width: 96, height: "auto" }}
           />
         </div>
-        <div style={{ fontSize: 28, fontWeight: "bold", marginBottom: 10 }}>
+        <h1 style={{ fontSize: 28, fontWeight: "bold", margin: "0 0 10px" }}>
           Reflective APPilibrium
-        </div>
+        </h1>
         <div
           style={{ fontSize: 13, color: C.dim, maxWidth: 480, lineHeight: 1.7 }}
         >
@@ -496,7 +502,11 @@ export function HomePage({
           margin: "5em 0 5em 0",
         }}
       >
-        <img src="ieit_logo.svg" style={{ width: "15em" }} />
+        <img
+          src="ieit_logo.svg"
+          alt="Institute for Ethics in IT, TU Hamburg"
+          style={{ width: "15em" }}
+        />
         <span>
           By the{" "}
           <a

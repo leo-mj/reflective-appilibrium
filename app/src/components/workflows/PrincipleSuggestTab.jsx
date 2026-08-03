@@ -32,6 +32,8 @@ import {
 } from "../../utils/workflowUtils.js";
 import { ProgressWorkflowBtn, ScoreDeltaBadge } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
+import { suggestionsUnavailable } from "../../utils/disabledReason.js";
+import { confidenceLabel } from "../../utils/confidenceLabel.js";
 
 /**
  * @param {Object}           props
@@ -55,6 +57,11 @@ function Toolbar({
   suggestionsDisabled,
 }) {
   const suggestDisabled = loading || jAndPCount < 1 || suggestionsDisabled;
+  const why = suggestionsUnavailable({
+    loading,
+    noBackend: suggestionsDisabled,
+    needs: jAndPCount < 1 ? "Add a judgment or principle first." : undefined,
+  });
   return (
     <div
       style={{
@@ -79,6 +86,7 @@ function Toolbar({
           <button
             onClick={onSuggest}
             disabled={suggestDisabled}
+            title={why}
             style={{
               background: "transparent",
               border: `1px solid ${suggestDisabled ? C.border : C.principle.high}`,
@@ -228,6 +236,7 @@ function SuggestionCard({
         }}
       >
         <span
+          title={confidenceLabel(suggestion.confidence).title}
           style={{
             fontSize: 10,
             lineHeight: 1,
@@ -237,9 +246,7 @@ function SuggestionCard({
             padding: "3px 6px",
           }}
         >
-          {typeof suggestion.confidence === "number"
-            ? suggestion.confidence.toFixed(2)
-            : suggestion.confidence}
+          {confidenceLabel(suggestion.confidence).text}
         </span>
         {suggestion.covers.length > 0 && (
           <span style={{ fontSize: 10, color: C.dim }}>

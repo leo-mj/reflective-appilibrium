@@ -13,6 +13,7 @@ import { fetchRelatednessMatrix } from "../utils/matrixClient.js";
 import { ErrorBanner, AiDisclosureBanner } from "./SuggestionActions.jsx";
 import { Tooltip } from "./Tooltip.jsx";
 import { sendsToLlmText } from "../utils/openaiClient.js";
+import { suggestionsUnavailable } from "../utils/disabledReason.js";
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 
@@ -87,6 +88,11 @@ function Toolbar({
   suggestionsDisabled,
 }) {
   const disabled = loading || elementCount < 2 || suggestionsDisabled;
+  const why = suggestionsUnavailable({
+    loading,
+    noBackend: suggestionsDisabled,
+    needs: elementCount < 2 ? "Add at least two elements first." : undefined,
+  });
   return (
     <div
       style={{
@@ -108,6 +114,7 @@ function Toolbar({
         <button
           onClick={onAnalyze}
           disabled={disabled}
+          title={why}
           style={{
             background: loading ? C.border : C.supports,
             border: "none",

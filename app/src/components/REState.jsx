@@ -18,14 +18,16 @@ import { GraphPanel } from "./GraphPanel.jsx";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
+  // Graph, not the Assist panel: assist controls are gated on a backend, so in
+  // a demo build the old default landed every visitor on dead buttons.
   const [tab, setTab] = useState(
-    initialState.model === "questionnaire"
-      ? "questionnaire"
-      : "elicitJudgments",
+    initialState.model === "questionnaire" ? "questionnaire" : "graph",
   );
   const [hiddenLegendKeys, setHiddenLegendKeys] = useState(new Set());
   const [showText, setShowText] = useState(true);
-  const [showTabNav, setShowTabNav] = useState(false);
+  // On by default: it carries the text panel's search, and hiding it behind a
+  // menu item meant most people never found it.
+  const [showTabNav, setShowTabNav] = useState(true);
   const [expandAllKey, setExpandAllKey] = useState(0);
   const [allExpanded, setAllExpanded] = useState(false);
   const [assistSidePanel, setAssistSidePanel] = useState("graph");

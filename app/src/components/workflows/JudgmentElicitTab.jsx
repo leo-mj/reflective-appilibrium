@@ -29,6 +29,8 @@ import {
 } from "../SuggestionActions.jsx";
 import { ProgressWorkflowBtn, ScoreDeltaBadge } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
+import { suggestionsUnavailable } from "../../utils/disabledReason.js";
+import { confidenceLabel } from "../../utils/confidenceLabel.js";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -52,6 +54,7 @@ function Toolbar({
   suggestionsDisabled,
 }) {
   const buttonDisabled = loading || suggestionsDisabled;
+  const why = suggestionsUnavailable({ loading, noBackend: suggestionsDisabled });
   return (
     <div
       style={{
@@ -76,6 +79,7 @@ function Toolbar({
           <button
             onClick={onElicit}
             disabled={buttonDisabled}
+            title={why}
             style={{
               background: "transparent",
               border: `1px solid ${buttonDisabled ? C.border : C.judgment.high}`,
@@ -196,6 +200,7 @@ function SuggestionCard({
               }}
             >
               <span
+                title={confidenceLabel(j.confidence).title}
                 style={{
                   fontSize: 10,
                   lineHeight: 1,
@@ -210,9 +215,7 @@ function SuggestionCard({
                   display: "inline-block",
                 }}
               >
-                {typeof j.confidence === "number"
-                  ? j.confidence.toFixed(2)
-                  : j.confidence}
+                {confidenceLabel(j.confidence).text}
               </span>
               {isEditing ? (
                 <ModifyTextarea

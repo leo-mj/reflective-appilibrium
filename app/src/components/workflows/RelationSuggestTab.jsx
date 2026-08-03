@@ -35,6 +35,7 @@ import {
 } from "../../utils/workflowUtils.js";
 import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
+import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 
 // ─── Colour helper ────────────────────────────────────────────────────────────
 
@@ -69,6 +70,11 @@ function Toolbar({
   suggestionsDisabled,
 }) {
   const suggestDisabled = loading || elementCount < 2 || suggestionsDisabled;
+  const why = suggestionsUnavailable({
+    loading,
+    noBackend: suggestionsDisabled,
+    needs: elementCount < 2 ? "Add at least two elements first." : undefined,
+  });
   return (
     <div
       style={{
@@ -93,6 +99,7 @@ function Toolbar({
           <button
             onClick={onSuggest}
             disabled={suggestDisabled}
+            title={why}
             style={{
               background: "transparent",
               border: `1px solid ${suggestDisabled ? C.border : C.supports}`,

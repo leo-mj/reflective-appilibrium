@@ -39,11 +39,15 @@ const DEFAULT_COLLAPSED_SECTIONS = {
   log: true,
 };
 
-/** Static nav config: keys and labels only. Counts/visibility computed at runtime. */
+/**
+ * Static nav config: keys and labels only. Counts/visibility computed at
+ * runtime. `name` spells out the abbreviated labels for the accessible name —
+ * "J" reads as the letter, which says nothing about where the pill goes.
+ */
 const NAV_SECTIONS = [
-  { key: "judgments", label: "J" },
-  { key: "principles", label: "P" },
-  { key: "theories", label: "T" },
+  { key: "judgments", label: "J", name: "judgments" },
+  { key: "principles", label: "P", name: "principles" },
+  { key: "theories", label: "T", name: "theories" },
   { key: "arguments", label: "Arguments" },
   { key: "relations", label: "Relations" },
   // { key: "coherence", label: "Coherence" },
@@ -281,9 +285,10 @@ export function TextTab({
     clusters: { count: clusterCount || null, show: clusterCount > 0 },
     log: { count: state.log.length || null, show: state.log.length > 0 },
   };
-  const navItems = NAV_SECTIONS.map(({ key, label }) => ({
+  const navItems = NAV_SECTIONS.map(({ key, label, name }) => ({
     key,
     label: key === "relations" && hideNonEntailsRels ? "Arguments" : label,
+    name,
     ...sectionMeta[key],
   })).filter((i) => i.show);
 

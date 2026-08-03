@@ -50,6 +50,10 @@ export function NavBar({
             <button
               key={item.key}
               onClick={() => onNavigate(item.key)}
+              aria-label={`Jump to ${item.name ?? item.label}${
+                item.count != null ? `, ${item.count}` : ""
+              }`}
+              aria-current={isActive ? "true" : undefined}
               style={{
                 minHeight: 36,
                 boxSizing: "border-box",

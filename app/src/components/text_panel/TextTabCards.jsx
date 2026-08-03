@@ -9,6 +9,7 @@ import { useContext } from "react";
 import { C } from "../../constants/colors.js";
 import { CARD_STYLE, META_LABEL_STYLE, CONTENT_FONT_SIZE } from "../../constants/textTabStyles.js";
 import { relationTypeLabel, statusTag } from "../../utils/stateUtils.js";
+import { confidenceLabel } from "../../utils/confidenceLabel.js";
 import { Ctx } from "./TextTabContext.js";
 import {
   MetaChip,
@@ -68,8 +69,8 @@ export function ElementCard({ e, dim }) {
           }}
         >
           <Badge id={e.id} />
-          <MetaChip>
-            Confidence: {typeof e.confidence === "number" ? e.confidence.toFixed(2) : e.confidence}
+          <MetaChip title={confidenceLabel(e.confidence).title}>
+            Confidence: {confidenceLabel(e.confidence).text}
           </MetaChip>
           {e.origin && <MetaChip>Origin: {e.origin}</MetaChip>}
           <AddedRound round={e.addedRound} />

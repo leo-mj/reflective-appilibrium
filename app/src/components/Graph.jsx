@@ -75,6 +75,8 @@ function AddButtonsOverlay({
         <button
           key={type}
           onClick={() => onAddEl(type)}
+          aria-label={`Add ${type}`}
+          title={`Add ${type}`}
           style={{
             background: TYPE_COLORS[type],
             border: "none",
@@ -91,6 +93,8 @@ function AddButtonsOverlay({
       {!hideNonEntailsRels && (
         <button
           onClick={onAddRel}
+          aria-label="Add relation"
+          title="Add relation"
           style={{
             background: C.border,
             border: "none",
@@ -106,6 +110,8 @@ function AddButtonsOverlay({
       )}
       <button
         onClick={onAddArg}
+        aria-label="Add argument"
+        title="Add argument"
         style={{
           background: C.jointly_entails + "33",
           border: `1px solid ${C.jointly_entails}`,

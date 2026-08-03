@@ -32,6 +32,7 @@ import { AddArgumentPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
+import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 
 const ACCENT = C.judgment.high;
 
@@ -469,6 +470,10 @@ export function DetectArgumentsTab({
   };
 
   const disabled = loading || activeCount < 3;
+  const why = suggestionsUnavailable({
+    loading,
+    needs: activeCount < 3 ? "Add at least three active elements first." : undefined,
+  });
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -503,6 +508,7 @@ export function DetectArgumentsTab({
               <button
                 onClick={detect}
                 disabled={disabled}
+                title={why}
                 style={{
                   background: "transparent",
                   border: `1px solid ${disabled ? C.border : ACCENT}`,

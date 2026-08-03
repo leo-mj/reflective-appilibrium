@@ -101,17 +101,18 @@ export function AppHeaderNarrow({
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <div
+          <h1
             style={{
               fontSize: 14,
               fontWeight: "bold",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              margin: 0,
             }}
           >
             Round {round}
-          </div>
+          </h1>
           <TopicLabel
             topic={topic}
             style={{ fontSize: 12, color: C.dim }}
@@ -121,6 +122,8 @@ export function AppHeaderNarrow({
         <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }}>
           <button
             onClick={() => setMenuOpen((m) => !m)}
+            aria-label="Menu"
+            aria-expanded={menuOpen}
             style={{ ...btn(menuOpen), border: `1px solid ${C.text}` }}
           >
             ☰

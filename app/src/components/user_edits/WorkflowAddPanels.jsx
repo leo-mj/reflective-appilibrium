@@ -71,14 +71,17 @@ export function AddElementPanel({ elementType, onAddElement }) {
           Add {elementType}
         </button>
         {[
-          { l: "L", v: 0.33 },
-          { l: "M", v: 0.67 },
-          { l: "H", v: 1.0 },
-        ].map(({ l, v }) => (
+          { l: "L", v: 0.33, name: "Low" },
+          { l: "M", v: 0.67, name: "Moderate" },
+          { l: "H", v: 1.0, name: "High" },
+        ].map(({ l, v, name }) => (
           <button
             key={l}
             type="button"
             onClick={() => set("confidence", v)}
+            aria-label={`${name} confidence`}
+            title={`${name} confidence`}
+            aria-pressed={Math.abs(form.confidence - v) < 0.01}
             style={{
               ...SELECT_STYLE,
               padding: "3px 7px",

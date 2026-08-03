@@ -320,10 +320,20 @@ export function GraphCanvas({
             gap: 3,
           }}
         >
-          <button style={ZOOM_BTN} onClick={zoomIn}>
+          <button
+            style={ZOOM_BTN}
+            onClick={zoomIn}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >
             +
           </button>
-          <button style={ZOOM_BTN} onClick={zoomOut}>
+          <button
+            style={ZOOM_BTN}
+            onClick={zoomOut}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >
             −
           </button>
         </div>
