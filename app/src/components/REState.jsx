@@ -109,6 +109,12 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const isAssistTab = ASSIST_TABS.includes(tab);
   const isSimulateTab = SIMULATE_TABS.includes(tab);
   const usesSidePanel = isAssistTab || isSimulateTab;
+  // "graphFull" is "graph" with the workflow panel folded away, so the graph
+  // takes the whole row. It is reached from the graph's own full-screen button
+  // rather than the header's Text/Graph/Focus switch, which still reads "Graph".
+  const sideGraphIsFull = usesSidePanel && assistSidePanel === "graphFull";
+  const showingSideGraph =
+    usesSidePanel && (assistSidePanel === "graph" || sideGraphIsFull);
   const hasSidePanel =
     isWide &&
     (usesSidePanel
@@ -118,9 +124,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   // simulation centres nodes in the visible area.
   // Focus mode keeps the same graphW as graph mode so switching between the two
   // doesn't restart the simulation and scramble node positions.
-  const graphW =
-    usesSidePanel &&
-    (assistSidePanel === "graph" || assistSidePanel === "focus")
+  const graphW = sideGraphIsFull
+    ? dims.w - 32
+    : usesSidePanel &&
+        (assistSidePanel === "graph" || assistSidePanel === "focus")
       ? (dims.w - 44) / 2
       : hasSidePanel
         ? (dims.w - 32) / 2 - 12
@@ -293,8 +300,6 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         model={state.model}
         tab={tab}
         setTab={handleSetTab}
-        showText={showText}
-        setShowText={setShowText}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         onDownload={() => downloadMarkdown(state, positions)}
@@ -335,13 +340,14 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           gap: 12,
         }}
       >
-        {isWide && usesSidePanel && assistSidePanel === "graph" && (
+        {isWide && showingSideGraph && (
           <div
             style={{
-              width: "50%",
+              width: sideGraphIsFull ? "100%" : "50%",
               flexShrink: 0,
-              borderRight: `1px solid ${C.border}`,
-              paddingRight: 12,
+              ...(sideGraphIsFull
+                ? {}
+                : { borderRight: `1px solid ${C.border}`, paddingRight: 12 }),
               minHeight: 0,
               display: "flex",
               flexDirection: "column",
@@ -354,17 +360,32 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
               onAdvanceWorkflow={null}
               nextPhaseIsEnabled={false}
               onCtrlSecondSelect={setAddBarCtrlTo}
+              isFullscreen={sideGraphIsFull}
+              onToggleFullscreen={() =>
+                setAssistSidePanel(sideGraphIsFull ? "graph" : "graphFull")
+              }
+              fullscreenHides={
+                isSimulateTab ? "simulation panel" : "assist panel"
+              }
             />
           </div>
         )}
         {showingTextPanel && <TextPanel {...textPanelProps} />}
-        {(isWide || tab !== "text") && (
+        {(isWide || tab !== "text") && !sideGraphIsFull && (
           <GraphPanel
             {...graphPanelCommonProps}
             tab={tab}
             workflowPhase={workflowPhase}
             onAdvanceWorkflow={advanceWorkflow}
             nextPhaseIsEnabled={workflowNextPhaseEnabled}
+            isFullscreen={!showText}
+            // The assist and simulate tabs hand their own graph the toggle
+            // above; here it is the text panel that folds away. When narrow the
+            // text is a tab of its own, with nothing beside it to reclaim.
+            onToggleFullscreen={
+              isWide && !usesSidePanel ? () => setShowText((s) => !s) : null
+            }
+            fullscreenHides="text panel"
           />
         )}
       </div>

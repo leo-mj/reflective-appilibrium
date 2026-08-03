@@ -34,8 +34,6 @@ const PROPS = {
   model: undefined,
   tab: "graph",
   setTab: noop,
-  showText: true,
-  setShowText: noop,
   assistSidePanel: "graph",
   setAssistSidePanel: noop,
   onDownload: noop,
@@ -141,22 +139,13 @@ describe("the narrow text button", () => {
   // changed nothing else.
   const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
 
-  it("switches to the text tab rather than toggling a side panel", () => {
+  it("switches to the text tab", () => {
     const setTab = vi.fn();
-    const setShowText = vi.fn();
-    render(
-      <AppHeader
-        {...PROPS}
-        isWide={false}
-        setTab={setTab}
-        setShowText={setShowText}
-      />,
-    );
+    render(<AppHeader {...PROPS} isWide={false} setTab={setTab} />);
     openMenu();
 
     fireEvent.click(screen.getByText("Text"));
     expect(setTab).toHaveBeenCalledWith("text");
-    expect(setShowText).not.toHaveBeenCalled();
   });
 
   it("reads the same whichever tab is open", () => {
@@ -164,7 +153,6 @@ describe("the narrow text button", () => {
       render(<AppHeader {...PROPS} isWide={false} tab={tab} />);
       openMenu();
       expect(screen.getByText("Text")).toBeTruthy();
-      expect(screen.queryByText(/Hide text|Show text/)).toBeNull();
       cleanup();
     }
   });

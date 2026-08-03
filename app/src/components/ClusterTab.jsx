@@ -30,7 +30,13 @@ import { useAutoFit } from "../hooks/useAutoFit.js";
  * Mini pannable graph showing only the elements of one cluster,
  * centred in whatever space the parent gives it.
  */
-function ClusterGraph({ cluster, color, state, positions, hideNonEntailsRels }) {
+function ClusterGraph({
+  cluster,
+  color,
+  state,
+  positions,
+  hideNonEntailsRels,
+}) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   const [tooltip, setTooltip] = useState(null);
@@ -195,7 +201,7 @@ export function ClusterTab({ state, positions, hideNonEntailsRels = false }) {
               flexShrink: 0,
             }}
           >
-            Cluster {i + 1} · {cluster.size} members
+            Coherent cluster {i + 1} · {cluster.size} members
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
             <ClusterGraph

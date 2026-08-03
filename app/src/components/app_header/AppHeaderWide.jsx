@@ -32,8 +32,6 @@ export function AppHeaderWide({
   topic,
   tab,
   setTab,
-  showText,
-  setShowText,
   assistSidePanel,
   setAssistSidePanel,
   handleImportClick,
@@ -168,7 +166,13 @@ export function AppHeaderWide({
                   key={value}
                   onClick={() => setAssistSidePanel(value)}
                   style={{
-                    ...btn(assistSidePanel === value),
+                    // "graphFull" is the graph's own full-screen state. It is
+                    // still the graph, so Graph stays lit — and clicking it is
+                    // a second way back out of full screen.
+                    ...btn(
+                      assistSidePanel === value ||
+                        (value === "graph" && assistSidePanel === "graphFull"),
+                    ),
                     borderRadius:
                       i === 0
                         ? "4px 0 0 4px"
@@ -280,16 +284,6 @@ export function AppHeaderWide({
                     </button>
                   </Tooltip>
                   <div style={menuDividerStyle} />
-
-                  {metaTab !== "assist" && (
-                    <button
-                      onClick={close(() => setShowText((s) => !s))}
-                      style={menuItem}
-                    >
-                      <span style={menuIconStyle}>≡</span>
-                      {showText ? "Hide text" : "Show text"}
-                    </button>
-                  )}
 
                   <button
                     onClick={close(() => setShowTabNav((s) => !s))}

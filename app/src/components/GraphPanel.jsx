@@ -10,7 +10,55 @@ import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { Legend } from "./graphs_shared/Legend.jsx";
+import { Tooltip } from "./Tooltip.jsx";
+import { ExpandIcon, CollapseIcon } from "./Icons.jsx";
 import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
+
+/**
+ * Hands the whole row to the graph by folding away whatever sits beside it,
+ * and back again.
+ *
+ * This used to be a "Hide text" / "Show text" entry buried in the burger menu,
+ * where nobody looking at a cramped graph would think to find it — and where
+ * the only way back was to remember the same menu.
+ *
+ * @param {string} hides - What folds away, named for the tooltip. Which panel
+ *   that is depends on the tab: the text beside an analyze graph, the workflow
+ *   panel beside the assist and simulate graphs.
+ */
+function FullscreenButton({ isFullscreen, onClick, hides }) {
+  return (
+    <Tooltip
+      text={
+        isFullscreen
+          ? `Shrink the graph and bring the ${hides} back`
+          : `Give the graph the full width by hiding the ${hides}`
+      }
+    >
+      <button
+        onClick={onClick}
+        aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+        aria-pressed={isFullscreen}
+        style={{
+          flexShrink: 0,
+          width: 44,
+          height: 44,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 4,
+          border: `1px solid ${C.border}`,
+          background: C.panel,
+          color: C.dim,
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        {isFullscreen ? <CollapseIcon size={16} /> : <ExpandIcon size={16} />}
+      </button>
+    </Tooltip>
+  );
+}
 
 const CoherenceMatrixTab = lazy(() =>
   import("./CoherenceMatrixTab.jsx").then((m) => ({
@@ -91,6 +139,9 @@ export function GraphPanel({
   recentlyAdded,
   weights,
   verifyArguments,
+  isFullscreen,
+  onToggleFullscreen,
+  fullscreenHides = "panel beside it",
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
@@ -114,11 +165,24 @@ export function GraphPanel({
       }}
     >
       {!isAssistPanel && (
-        <Legend
-          hiddenLegendKeys={hiddenLegendKeys}
-          setHiddenLegendKeys={setHiddenLegendKeys}
-          hideNonEntailsRels={hideNonEntailsRels}
-        />
+        // One row: the legend takes what it needs and wraps, the full-screen
+        // toggle stays pinned to the right edge above the graph.
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Legend
+              hiddenLegendKeys={hiddenLegendKeys}
+              setHiddenLegendKeys={setHiddenLegendKeys}
+              hideNonEntailsRels={hideNonEntailsRels}
+            />
+          </div>
+          {onToggleFullscreen && (
+            <FullscreenButton
+              isFullscreen={isFullscreen}
+              onClick={onToggleFullscreen}
+              hides={fullscreenHides}
+            />
+          )}
+        </div>
       )}
       {APP_ENV === "dev" &&
         isAssistPanel &&

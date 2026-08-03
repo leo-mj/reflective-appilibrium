@@ -44,8 +44,6 @@ import { BACKEND_ENABLED } from "../config.js";
  * @param {string}   props.topic
  * @param {string}   props.tab
  * @param {function} props.setTab
- * @param {boolean}  props.showText
- * @param {function} props.setShowText
  * @param {boolean}  props.showWithdrawn
  * @param {function} props.setShowWithdrawn
  * @param {boolean}  props.showRejected
@@ -71,8 +69,6 @@ export function AppHeader({
   model,
   tab,
   setTab,
-  showText,
-  setShowText,
   assistSidePanel,
   setAssistSidePanel,
   onDownload,
@@ -280,8 +276,6 @@ export function AppHeader({
       />
       <AppHeaderWide
         {...shared}
-        showText={showText}
-        setShowText={setShowText}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         visibleSubTabs={visibleSubTabs}
