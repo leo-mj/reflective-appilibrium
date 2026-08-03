@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useREActions } from "./useREActions.js";
-import { textAtRound } from "../utils/stateUtils.js";
+import { textAtRound, isWithdrawnNow } from "../utils/stateUtils.js";
 
 vi.mock("../utils/importMarkdown.js", () => ({
   importStateFromFile: vi.fn(),
@@ -466,6 +466,24 @@ describe("revision history", () => {
     expect(textAtRound(el, 1)).toBe("Original text");
     expect(textAtRound(el, 2)).toBe("Second wording");
     expect(textAtRound(el, 3)).toBe("Third wording");
+  });
+
+  it("brings a withdrawn element back when reworded on argument accept", () => {
+    // Withdrawn premises are selectable when reconstructing an argument, so a
+    // rewording can land on one; leaving the withdrawal open would contradict
+    // the "revised" status it gets.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawConfirm("J1", "Too broad"));
+    act(() => result.current.handleReviseElementText("J1", "Reworded"));
+
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("revised");
+    expect(el.history.map((h) => [h.round, h.type])).toEqual([
+      [2, "withdrawn"],
+      [3, "reinstated"],
+      [3, "revised"],
+    ]);
+    expect(isWithdrawnNow(el)).toBe(false);
   });
 
   it("records a relation's previous explanation", () => {

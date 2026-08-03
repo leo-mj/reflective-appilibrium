@@ -96,26 +96,31 @@ describe("HistoryRoundBanner", () => {
 });
 
 describe("StatusLabel", () => {
-  it("labels the statuses that differ from being in play", () => {
-    for (const status of ["withdrawn", "rejected", "revised"]) {
-      const { container } = render(<StatusLabel status={status} />);
-      expect(container.textContent).toBe(status);
+  it("labels every event type, including reinstatement", () => {
+    for (const type of ["withdrawn", "rejected", "revised", "reinstated"]) {
+      const { container } = render(<StatusLabel tag={{ type }} />);
+      expect(container.textContent).toBe(type);
       cleanup();
     }
   });
 
+  it("ignores an event type it has no colour for", () => {
+    const { container } = render(<StatusLabel tag={{ type: "teleported" }} />);
+    expect(container.textContent).toBe("");
+  });
+
   it("renders nothing for an active element", () => {
-    const { container } = render(<StatusLabel status="active" />);
+    const { container } = render(<StatusLabel tag={null} />);
     expect(container.textContent).toBe("");
   });
 
   it("dates the status when the round is known", () => {
-    const { container } = render(<StatusLabel status="withdrawn" round={5} />);
+    const { container } = render(<StatusLabel tag={{ type: "withdrawn", round: 5 }} />);
     expect(container.textContent).toBe("withdrawn · Round 5");
   });
 
   it("omits the round when nothing recorded it", () => {
-    const { container } = render(<StatusLabel status="revised" round={undefined} />);
+    const { container } = render(<StatusLabel tag={{ type: "revised" }} />);
     expect(container.textContent).toBe("revised");
   });
 });

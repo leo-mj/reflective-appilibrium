@@ -8,7 +8,7 @@
 import { useContext } from "react";
 import { C } from "../../constants/colors.js";
 import { CARD_STYLE, META_LABEL_STYLE, CONTENT_FONT_SIZE } from "../../constants/textTabStyles.js";
-import { relationTypeLabel, statusRound } from "../../utils/stateUtils.js";
+import { relationTypeLabel, statusTag } from "../../utils/stateUtils.js";
 import { Ctx } from "./TextTabContext.js";
 import {
   MetaChip,
@@ -73,7 +73,7 @@ export function ElementCard({ e, dim }) {
           </MetaChip>
           {e.origin && <MetaChip>Origin: {e.origin}</MetaChip>}
           <AddedRound round={e.addedRound} />
-          <StatusLabel status={e.status} round={statusRound(e, state.round)} />
+          <StatusLabel tag={statusTag(e, state.round)} />
           {pCovers[e.id]?.length > 0 && (
             <MetaChip>covers: {pCovers[e.id].join(", ")}</MetaChip>
           )}
@@ -197,7 +197,7 @@ export function ArgumentCard({ rels, dim }) {
                 : "→ jointly entails →"}
             </span>
             <Badge id={r.to} />
-            <StatusLabel status={r.status} round={statusRound(r, state.round)} />
+            <StatusLabel tag={statusTag(r, state.round)} />
           </div>
           <div onClick={(e) => e.stopPropagation()}>
             <ActionButtons
@@ -339,7 +339,7 @@ export function RelationCard({ r, dim }) {
           <Badge id={r.to} />
           {r.origin && <MetaChip>Origin: {r.origin}</MetaChip>}
           <AddedRound round={r.addedRound} />
-          <StatusLabel status={r.status} round={statusRound(r, state.round)} />
+          <StatusLabel tag={statusTag(r, state.round)} />
         </div>
         <div onClick={(e) => e.stopPropagation()}>
           <ActionButtons

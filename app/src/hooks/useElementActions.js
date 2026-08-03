@@ -119,11 +119,16 @@ export function useElementActions({
               status: "revised",
               previousText: e.text,
               revisedRound: newRound,
-              history: withEvent(e, {
-                round: newRound,
-                type: "revised",
-                previousText: e.text,
-              }),
+              // Withdrawn premises are selectable when reconstructing an
+              // argument, so this can land on one. Bring it back first, exactly
+              // as handleEditSave does, or the withdrawal stays open in history
+              // while the status says otherwise.
+              history: withEvent(
+                isWithdrawnNow(e)
+                  ? { ...e, history: withEvent(e, { round: newRound, type: "reinstated" }) }
+                  : e,
+                { round: newRound, type: "revised", previousText: e.text },
+              ),
             }
           : e,
       ),

@@ -165,28 +165,35 @@ export function textAtRound(item, round) {
   return pendingWording ?? current;
 }
 
-/** Statuses that come from an event, and so can be dated. */
+/** Statuses that name an event, and so can stand in as a tag on their own. */
 const DATED_STATUSES = new Set(["withdrawn", "rejected", "revised"]);
 
 /**
- * The round in which the item took on the status it is showing.
+ * The last thing that happened to the item, for labelling it in the UI.
  *
- * Bounded by `round` so history playback dates a status by the event in force
- * then, not by a later one: an item withdrawn in round 2, reinstated in 4 and
- * withdrawn again in 6 reads as withdrawn since 2 when viewing round 3.
+ * Read from history rather than from `status`, because `reinstated` is worth
+ * showing and is an event, not a status — an element back in play is plain
+ * `active`, which would otherwise leave no trace of its having returned.
+ *
+ * Bounded by `round` so history playback labels an item by the event in force
+ * then, not by a later one: withdrawn in round 2, reinstated in 4 and withdrawn
+ * again in 6 reads as withdrawn since 2 when viewing round 3.
  *
  * @param {REElement|RERelation} item
  * @param {number} [round] - The round being viewed. Defaults to the whole history.
- * @returns {number|undefined} Undefined for a status nothing recorded.
+ * @returns {{ type: string, round: number }|null} Null for an untouched item.
  */
-export function statusRound(item, round = Infinity) {
-  if (!DATED_STATUSES.has(item?.status)) return undefined;
-  let found;
+export function statusTag(item, round = Infinity) {
+  let last = null;
   for (const ev of historyOf(item)) {
     if (ev.round > round) break;
-    if (ev.type === item.status) found = ev.round;
+    last = ev;
   }
-  return found;
+  if (last) return { type: last.type, round: last.round };
+  // Nothing recorded. A hand-written state may still carry a status that names
+  // an event, so label it — just without a round to date it by. In playback the
+  // status has already been projected back, so this cannot report a future one.
+  return DATED_STATUSES.has(item?.status) ? { type: item.status } : null;
 }
 
 /**

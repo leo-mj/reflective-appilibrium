@@ -110,6 +110,25 @@ describe("ElementCard metadata order", () => {
     expect(container.textContent).toContain("withdrawn · Round 4");
   });
 
+  it("marks an element that came back, which its status alone cannot show", () => {
+    const { container } = renderIn(
+      <ElementCard
+        e={el({
+          status: "active",
+          history: [
+            { round: 3, type: "withdrawn", reason: "Too broad" },
+            { round: 7, type: "reinstated" },
+          ],
+        })}
+        dim={false}
+      />,
+      { state: { elements: [], relations: [], round: 9 } },
+    );
+    expect(container.textContent).toContain("reinstated · Round 7");
+    // Back in play, so it reads as live text rather than a withdrawal.
+    expect(container.textContent).not.toContain("Withdrawn: Too broad");
+  });
+
   it("does the same for a withdrawn element", () => {
     const { container } = renderIn(
       <ElementCard e={el({ status: "withdrawn", reason: "Too broad" })} dim={false} />,
