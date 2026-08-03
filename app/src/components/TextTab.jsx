@@ -32,7 +32,7 @@ import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 // ─── Module-level constants ───────────────────────────────────────────────────
 
 const DEFAULT_COLLAPSED_SECTIONS = {
-  judgments: true,
+  judgments: false,
   principles: true,
   theories: true,
   arguments: true,
