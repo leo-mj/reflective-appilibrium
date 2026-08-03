@@ -3,7 +3,7 @@
  * @module components/app_header/AppHeaderNarrow
  */
 
-import { useState } from "react";
+import { cloneElement, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { useTheme } from "../../hooks/useTheme.js";
 import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
@@ -28,9 +28,7 @@ export function AppHeaderNarrow({
   menuOpen,
   setMenuOpen,
   ANALYZE_TABS,
-  showText,
-  setShowText,
-  metaTab,
+  isTabVisible,
   handleImportClick,
   onDownload,
   onSave,
@@ -82,17 +80,25 @@ export function AppHeaderNarrow({
     fn();
     setMenuOpen(false);
   };
+  // Every row puts its symbol in the same box so the labels all start at the
+  // same x. Tab icons default to 2em, which is wider than that box, so they are
+  // asked for the box's size instead.
+  const tabIcon = (t) => (
+    <span style={menuIconStyle}>{cloneElement(TAB_ICONS[t], { size: 20 })}</span>
+  );
 
   return (
     <div style={{ position: "relative", marginBottom: 6 }}>
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          // Top, not centre: the topic wraps to as many lines as it needs, and
+          // the menu button should stay put rather than drift down beside it.
+          alignItems: "flex-start",
           justifyContent: "space-between",
         }}
       >
-        <div style={{ minWidth: 0, overflow: "hidden" }}>
+        <div style={{ minWidth: 0 }}>
           <div
             style={{
               fontSize: 14,
@@ -104,7 +110,11 @@ export function AppHeaderNarrow({
           >
             Round {round}
           </div>
-          <TopicLabel topic={topic} style={{ fontSize: 12, color: C.dim }} />
+          <TopicLabel
+            topic={topic}
+            style={{ fontSize: 12, color: C.dim }}
+            wrap
+          />
         </div>
         <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }}>
           <button
@@ -138,19 +148,126 @@ export function AppHeaderNarrow({
           <button onClick={close(onHome)} style={menuBtn()}>
             <span style={menuIconStyle}>←</span>Home
           </button>
-
+          <button
+            onClick={close(onUndo)}
+            disabled={!canUndo}
+            style={{ ...menuBtn(), opacity: canUndo ? 1 : 0.4 }}
+          >
+            <span style={menuIconStyle}>↩</span>Undo
+          </button>
           <div style={menuDividerStyle} />
-
-          {metaTab !== "assist" && (
+          <div
+            style={{
+              fontSize: 10,
+              color: C.dim,
+              fontWeight: "bold",
+              padding: "4px 4px 2px",
+              letterSpacing: "0.05em",
+            }}
+          >
+            Assist
+          </div>
+          {ASSIST_TABS.filter(isTabVisible).map((t) => (
             <button
-              onClick={close(() => setShowText((s) => !s))}
-              style={menuBtn()}
+              key={t}
+              onClick={close(() => setTab(t))}
+              style={menuBtn(tab === t)}
             >
-              <span style={menuIconStyle}>≡</span>
-              {showText ? "Hide text" : "Show text"}
+              {tabIcon(t)}
+              {TAB_LABELS[t]}
+            </button>
+          ))}
+          {workflowPhase ? (
+            <button
+              onClick={close(onStopWorkflow)}
+              style={{
+                ...menuBtn(),
+                color: C.conflicts,
+                borderColor: C.conflicts,
+              }}
+            >
+              <span style={menuIconStyle}>✕</span>Stop Workflow
+              <span style={{ marginLeft: 6, fontSize: 10, color: C.dim }}>
+                ({WORKFLOW_PHASE_LABELS[workflowPhase]}
+                {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""})
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={close(onStartWorkflow)}
+              style={{ ...menuBtn(), color: C.supports }}
+            >
+              <span style={menuIconStyle}>▶</span>Start Workflow
             </button>
           )}
-
+          <div style={menuDividerStyle} />
+          <div
+            style={{
+              fontSize: 10,
+              color: C.dim,
+              fontWeight: "bold",
+              padding: "4px 4px 2px",
+              letterSpacing: "0.05em",
+            }}
+          >
+            Analyze
+          </div>
+          {/* Text is a tab of its own at this width, not the side panel the
+              wide layout toggles, so it belongs beside the other views. */}
+          <button
+            onClick={close(() => setTab("text"))}
+            style={menuBtn(tab === "text")}
+          >
+            <span style={menuIconStyle}>≡</span>
+            Text
+          </button>
+          {ANALYZE_TABS.filter(isTabVisible).map((t) => (
+            <button
+              key={t}
+              onClick={close(() => setTab(t))}
+              style={menuBtn(tab === t)}
+            >
+              {tabIcon(t)}
+              {TAB_LABELS[t]}
+            </button>
+          ))}
+          {BACKEND_ENABLED && (
+            <>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: C.dim,
+                  fontWeight: "bold",
+                  padding: "4px 4px 2px",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Simulate
+              </div>
+              {SIMULATE_TABS.filter(isTabVisible).map((t) => (
+                <button
+                  key={t}
+                  onClick={close(() => setTab(t))}
+                  style={menuBtn(tab === t)}
+                >
+                  {tabIcon(t)}
+                  {TAB_LABELS[t]}
+                </button>
+              ))}
+            </>
+          )}
+          <div style={menuDividerStyle} />
+          <div
+            style={{
+              fontSize: 10,
+              color: C.dim,
+              fontWeight: "bold",
+              padding: "4px 4px 2px",
+              letterSpacing: "0.05em",
+            }}
+          >
+            Settings
+          </div>
           <button
             onClick={close(() => setShowTabNav((s) => !s))}
             style={menuBtn()}
@@ -173,12 +290,10 @@ export function AppHeaderNarrow({
             </span>
             {showTabNav ? "Hide nav bar" : "Show nav bar"}
           </button>
-
           <button onClick={close(onExpandAll)} style={menuBtn()}>
             <span style={menuIconStyle}>⇅</span>
             {allExpanded ? "Minimize all toggles" : "Expand all toggles"}
           </button>
-
           <button
             onClick={close(() => setHideNonEntailsRels((s) => !s))}
             style={menuBtn()}
@@ -186,7 +301,6 @@ export function AppHeaderNarrow({
             <span style={menuIconStyle}>→</span>
             {hideNonEntailsRels ? "All relations" : "Arguments only"}
           </button>
-
           {BACKEND_ENABLED && (
             <button
               onClick={close(() => setVerifyArguments((s) => !s))}
@@ -196,51 +310,52 @@ export function AppHeaderNarrow({
               Argument checker: {verifyArguments ? "on" : "off"}
             </button>
           )}
+          {BACKEND_ENABLED && (
+            <>
+              <div style={menuDividerStyle} />
 
-          <div style={menuDividerStyle} />
-
-          <button
-            onClick={() => setWeightsOpen((o) => !o)}
-            style={{
-              ...menuBtn(),
-              color: weightsChanged ? C.principle.high : undefined,
-            }}
-          >
-            <span style={menuIconStyle}>⚖</span>
-            Model weights{weightsChanged ? " *" : ""}
-            <span style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}>
-              {weightsOpen ? "▲" : "▼"}
-            </span>
-          </button>
-          {weightsOpen && (
-            <div style={{ padding: "4px 8px 8px 8px" }}>
-              <WeightTriangle
-                weights={weights}
-                onChange={onWeightsChange}
-                weightsChanged={weightsChanged}
-              />
-              {weightsChanged && (
-                <button
-                  onClick={onResetWeights}
-                  style={{
-                    marginTop: 4,
-                    background: "transparent",
-                    border: `1px solid ${C.border}`,
-                    color: C.dim,
-                    borderRadius: 4,
-                    padding: "2px 8px",
-                    fontSize: 11,
-                    cursor: "pointer",
-                  }}
-                >
-                  Reset
-                </button>
+              <button
+                onClick={() => setWeightsOpen((o) => !o)}
+                style={{
+                  ...menuBtn(),
+                  color: weightsChanged ? C.principle.high : undefined,
+                }}
+              >
+                <span style={menuIconStyle}>⚖</span>
+                Model weights{weightsChanged ? " *" : ""}
+                <span style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}>
+                  {weightsOpen ? "▲" : "▼"}
+                </span>
+              </button>
+              {weightsOpen && (
+                <div style={{ padding: "4px 8px 8px 8px" }}>
+                  <WeightTriangle
+                    weights={weights}
+                    onChange={onWeightsChange}
+                    weightsChanged={weightsChanged}
+                  />
+                  {weightsChanged && (
+                    <button
+                      onClick={onResetWeights}
+                      style={{
+                        marginTop: 4,
+                        background: "transparent",
+                        border: `1px solid ${C.border}`,
+                        color: C.dim,
+                        borderRadius: 4,
+                        padding: "2px 8px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
-
           <div style={menuDividerStyle} />
-
           <button
             onClick={() => {
               setMenuOpen(false);
@@ -250,7 +365,6 @@ export function AppHeaderNarrow({
           >
             <span style={menuIconStyle}>Aa</span>Select Font
           </button>
-
           <button
             onClick={() => {
               toggleTheme();
@@ -299,9 +413,7 @@ export function AppHeaderNarrow({
             </span>
             {isDark ? "Light mode" : "Dark mode"}
           </button>
-
           <div style={menuDividerStyle} />
-
           <button
             onClick={() => {
               handleImportClick();
@@ -317,7 +429,6 @@ export function AppHeaderNarrow({
           >
             <span style={menuIconStyle}>↓</span>Export
           </button>
-
           {BYOK_ENABLED && (
             <>
               <div style={menuDividerStyle} />
@@ -333,127 +444,23 @@ export function AppHeaderNarrow({
               </button>
             </>
           )}
-
-          <>
-            <div style={menuDividerStyle} />
-
-            <div
-              style={{
-                fontSize: 10,
-                color: C.dim,
-                fontWeight: "bold",
-                padding: "4px 4px 2px",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Assist
-            </div>
-            {ASSIST_TABS.map((t) => (
+          {BACKEND_ENABLED && (
+            <>
+              <div style={menuDividerStyle} />
               <button
-                key={t}
-                onClick={close(() => setTab(t))}
-                style={menuBtn(tab === t)}
-              >
-                {TAB_ICONS[t]}
-                {TAB_LABELS[t]}
-              </button>
-            ))}
-
-            <div
-              style={{
-                fontSize: 10,
-                color: C.dim,
-                fontWeight: "bold",
-                padding: "4px 4px 2px",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Analyze
-            </div>
-            {ANALYZE_TABS.map((t) => (
-              <button
-                key={t}
-                onClick={close(() => setTab(t))}
-                style={menuBtn(tab === t)}
-              >
-                {TAB_ICONS[t]}
-                {TAB_LABELS[t]}
-              </button>
-            ))}
-
-            {BACKEND_ENABLED && (
-              <>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: C.dim,
-                    fontWeight: "bold",
-                    padding: "4px 4px 2px",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  Simulate
-                </div>
-                {SIMULATE_TABS.map((t) => (
-                  <button
-                    key={t}
-                    onClick={close(() => setTab(t))}
-                    style={menuBtn(tab === t)}
-                  >
-                    {TAB_ICONS[t]}
-                    {TAB_LABELS[t]}
-                  </button>
-                ))}
-              </>
-            )}
-            {workflowPhase ? (
-              <button
-                onClick={close(onStopWorkflow)}
+                onClick={close(onSave)}
+                disabled={saveBusy}
+                title="Save session"
                 style={{
                   ...menuBtn(),
-                  color: C.conflicts,
-                  borderColor: C.conflicts,
+                  ...(saveColor
+                    ? { color: saveColor, borderColor: saveColor }
+                    : {}),
                 }}
               >
-                ✕ Stop Workflow
-                <span style={{ marginLeft: 6, fontSize: 10, color: C.dim }}>
-                  ({WORKFLOW_PHASE_LABELS[workflowPhase]}
-                  {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""})
-                </span>
+                {saveLabel}Save
               </button>
-            ) : (
-              <button
-                onClick={close(onStartWorkflow)}
-                style={{ ...menuBtn(), color: C.supports }}
-              >
-                ▶ Start Workflow
-              </button>
-            )}
-          </>
-
-          <div style={menuDividerStyle} />
-
-          <button
-            onClick={close(onUndo)}
-            disabled={!canUndo}
-            style={{ ...menuBtn(), opacity: canUndo ? 1 : 0.4 }}
-          >
-            ↩ Undo
-          </button>
-          {BACKEND_ENABLED && (
-            <button
-              onClick={close(onSave)}
-              disabled={saveBusy}
-              title="Save session"
-              style={{
-                ...menuBtn(),
-                ...(saveColor
-                  ? { color: saveColor, borderColor: saveColor }
-                  : {}),
-              }}
-            >
-              {saveLabel}Save
-            </button>
+            </>
           )}
         </div>
       )}

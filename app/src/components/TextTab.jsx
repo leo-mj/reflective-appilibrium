@@ -126,6 +126,7 @@ export function TextTab({
   );
 
   useEffect(() => {
+    if (!BACKEND_ENABLED) return;
     let cancelled = false;
     scoreChanges(state, true, weights).then((result) => {
       if (cancelled || !result) return;
@@ -323,6 +324,7 @@ export function TextTab({
             search={search}
             onSearch={setSearch}
             onNavigate={navigateTo}
+            isWide={isWide}
           />
         )}
 

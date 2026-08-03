@@ -28,11 +28,15 @@ const SaveIcon = () => (
   </svg>
 );
 import { ModalShell } from "./user_edits/ModalShell.jsx";
-import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
+import {
+  ASSIST_TABS,
+  SIMULATE_TABS,
+  tabVisibility,
+} from "../constants/tabConstants.jsx";
 import { AppHeaderNarrow } from "./app_header/AppHeaderNarrow.jsx";
 import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
 import { C } from "../constants/colors.js";
-import { BACKEND_ENABLED, LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
+import { BACKEND_ENABLED } from "../config.js";
 
 /**
  * @param {Object}   props
@@ -155,16 +159,16 @@ export function AppHeader({
     : SIMULATE_TABS.includes(tab)
       ? "simulate"
       : "analyze";
+  // The narrow menu lists all three groups at once, so it needs the predicate
+  // rather than the flat list the wide bar renders for the current group.
+  const isTabVisible = tabVisibility({ model, hideNonEntailsRels });
   const visibleSubTabs = (
     metaTab === "assist"
       ? ASSIST_TABS
       : metaTab === "simulate"
         ? SIMULATE_TABS
         : ANALYZE_TABS
-  )
-    .filter((t) => !hideNonEntailsRels || t !== "suggestRelations")
-    .filter((t) => model === "questionnaire" || t !== "questionnaire")
-    .filter((t) => (MATRIX_ENABLED && LLM_ENABLED) || t !== "matrix");
+  ).filter(isTabVisible);
 
   const importModals = (
     <>
@@ -218,8 +222,6 @@ export function AppHeader({
     topic,
     tab,
     setTab,
-    showText,
-    setShowText,
     showTabNav,
     setShowTabNav,
     allExpanded,
@@ -239,6 +241,7 @@ export function AppHeader({
     onStopWorkflow,
     metaTab,
     ANALYZE_TABS,
+    isTabVisible,
     hideNonEntailsRels,
     setHideNonEntailsRels,
     verifyArguments,

@@ -14,6 +14,7 @@ import { C } from "../../constants/colors.js";
  * @param {string}   props.search        - Current search query.
  * @param {function} props.onSearch      - Called with the new query string.
  * @param {function} props.onNavigate    - Called with the section key when a pill is clicked.
+ * @param {boolean}  [props.isWide=true] - Narrow drops the pills for a full-width search.
  */
 export function NavBar({
   navItems,
@@ -22,6 +23,7 @@ export function NavBar({
   search,
   onSearch,
   onNavigate,
+  isWide = true,
 }) {
   if (!navItems.length) return null;
   return (
@@ -38,38 +40,41 @@ export function NavBar({
         flexWrap: "wrap",
       }}
     >
-      {navItems.map((item) => {
-        const isActive = activeSection === item.key && !isCollapsed(item.key);
-        return (
-          <button
-            key={item.key}
-            onClick={() => onNavigate(item.key)}
-            style={{
-              minHeight: 36,
-              boxSizing: "border-box",
-              padding: "4px 8px",
-              borderRadius: 10,
-              fontSize: 11,
-              cursor: "pointer",
-              border: `1px solid ${isActive ? C.text : C.border}`,
-              background: isActive ? C.border : "transparent",
-              color: isActive ? C.text : C.dim,
-              fontWeight: isActive ? "bold" : "normal",
-              transition: "all 0.15s",
-            }}
-          >
-            {item.label}
-            {item.count != null ? ` ${item.count}` : ""}
-          </button>
-        );
-      })}
+      {/* On a phone the pills wrap onto two rows and squeeze the search into a
+          corner, so the search takes the bar to itself. The sections stay
+          reachable by scrolling. */}
+      {isWide &&
+        navItems.map((item) => {
+          const isActive = activeSection === item.key && !isCollapsed(item.key);
+          return (
+            <button
+              key={item.key}
+              onClick={() => onNavigate(item.key)}
+              style={{
+                minHeight: 36,
+                boxSizing: "border-box",
+                padding: "4px 8px",
+                borderRadius: 10,
+                fontSize: 11,
+                cursor: "pointer",
+                border: `1px solid ${isActive ? C.text : C.border}`,
+                background: isActive ? C.border : "transparent",
+                color: isActive ? C.text : C.dim,
+                fontWeight: isActive ? "bold" : "normal",
+                transition: "all 0.15s",
+              }}
+            >
+              {item.label}
+              {item.count != null ? ` ${item.count}` : ""}
+            </button>
+          );
+        })}
       <input
         type="search"
         value={search}
         onChange={(e) => onSearch(e.target.value)}
         placeholder="Search…"
         style={{
-          marginLeft: "auto",
           minHeight: 36,
           boxSizing: "border-box",
           padding: "4px 7px",
@@ -79,8 +84,8 @@ export function NavBar({
           background: "transparent",
           color: C.text,
           outline: "none",
-          width: "30%",
           minWidth: 70,
+          ...(isWide ? { marginLeft: "auto", width: "30%" } : { width: "100%" }),
         }}
       />
     </div>

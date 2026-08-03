@@ -13,6 +13,7 @@ import {
   JudgmentIcon,
   SimulateIcon,
 } from "../components/Icons.jsx";
+import { LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
 
 export const ASSIST_TABS = [
   "questionnaire",
@@ -23,6 +24,25 @@ export const ASSIST_TABS = [
 ];
 
 export const SIMULATE_TABS = ["simulateRethon"];
+
+/**
+ * Whether a sub-tab is on offer, given the current model and relation filter.
+ *
+ * Both header layouts must agree on this. The wide bar and the narrow menu are
+ * two views of one set, so a tab offered by only one of them drops the user on
+ * a panel that renders nothing — the panels are gated on the same flags.
+ *
+ * @param {Object} opts
+ * @param {string} [opts.model] — `"questionnaire"` in questionnaire mode.
+ * @param {boolean} [opts.hideNonEntailsRels]
+ * @returns {(tab: string) => boolean}
+ */
+export function tabVisibility({ model, hideNonEntailsRels } = {}) {
+  return (t) =>
+    (!hideNonEntailsRels || t !== "suggestRelations") &&
+    (model === "questionnaire" || t !== "questionnaire") &&
+    ((MATRIX_ENABLED && LLM_ENABLED) || t !== "matrix");
+}
 
 export const TAB_ICONS = {
   questionnaire: <JudgmentIcon />,

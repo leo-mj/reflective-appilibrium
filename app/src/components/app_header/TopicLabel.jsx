@@ -12,24 +12,32 @@ import { C } from "../../constants/colors.js";
  * @param {Object} props
  * @param {string} props.topic
  * @param {import('react').CSSProperties} [props.style]
+ * @param {boolean} [props.wrap] - Show the topic in full over several lines.
+ *   The tooltip is then redundant, so it is left off.
  */
-export function TopicLabel({ topic, style }) {
+export function TopicLabel({ topic, style, wrap = false }) {
   const [open, setOpen] = useState(false);
+  const hover = wrap
+    ? {}
+    : {
+        onMouseEnter: () => setOpen(true),
+        onMouseLeave: () => setOpen(false),
+        onPointerUp: (e) => {
+          if (e.pointerType === "touch") setOpen((s) => !s);
+        },
+      };
   return (
-    <div
-      style={{ position: "relative", minWidth: 0, ...style }}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onPointerUp={(e) => {
-        if (e.pointerType === "touch") setOpen((s) => !s);
-      }}
-    >
+    <div style={{ position: "relative", minWidth: 0, ...style }} {...hover}>
       <div
-        style={{
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
+        style={
+          wrap
+            ? { overflowWrap: "anywhere" }
+            : {
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }
+        }
       >
         {topic}
       </div>
