@@ -5,7 +5,7 @@
 // the same flags the header filters by, so a tab offered by only one layout
 // drops the user on a view that renders nothing and says nothing about why.
 // These tests hold the two layouts to the same set.
-import { vi, describe, it, expect, afterEach } from "vitest";
+import { vi, describe, it, expect, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 // Read through a getter so a test can flip the backend on without reloading the
@@ -131,6 +131,60 @@ describe("model weights", () => {
       expect(screen.queryByText(/Model weights/)).not.toBeNull();
     });
   }
+});
+
+describe("what closes the menu", () => {
+  // A setting that flips in place announces what it did in its own label —
+  // "Hide nav bar" becomes "Show nav bar", the theme row swaps. Closing the
+  // menu fired the change and then hid the only evidence of it.
+  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+  // Select Font lives inside the menu in both layouts and nowhere else.
+  const menuIsOpen = () => screen.queryByText("Select Font") !== null;
+
+  // The wide menu abbreviates two of these; the rows are otherwise the same.
+  const settings = (isWide) => [
+    "Hide nav bar",
+    isWide ? "Minimize toggles" : "Minimize all toggles",
+    isWide ? "Show all relations" : "All relations",
+    "Light mode",
+  ];
+
+  beforeEach(() => {
+    // useTheme reads this on mount, so the theme row's label is deterministic.
+    document.documentElement.removeAttribute("data-theme");
+  });
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+
+    for (const label of settings(isWide)) {
+      it(`stays open for "${label}" (${layout})`, () => {
+        // Both states are pinned, so each row's label is the one named above.
+        render(
+          <AppHeader {...PROPS} isWide={isWide} showTabNav hideNonEntailsRels />,
+        );
+        openMenu();
+        expect(menuIsOpen()).toBe(true);
+
+        fireEvent.click(screen.getByText(label));
+        expect(menuIsOpen()).toBe(true);
+      });
+    }
+
+    it(`still closes on the way somewhere else (${layout})`, () => {
+      render(<AppHeader {...PROPS} isWide={isWide} />);
+      openMenu();
+      fireEvent.click(screen.getByText("Home"));
+      expect(menuIsOpen()).toBe(false);
+    });
+  }
+
+  it("closes when the narrow menu is used to switch tabs", () => {
+    render(<AppHeader {...PROPS} isWide={false} />);
+    openMenu();
+    fireEvent.click(screen.getByText(TAB_LABELS.history));
+    expect(menuIsOpen()).toBe(false);
+  });
 });
 
 describe("the narrow text button", () => {

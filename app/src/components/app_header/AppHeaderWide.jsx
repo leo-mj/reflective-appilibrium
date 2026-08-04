@@ -285,8 +285,13 @@ export function AppHeaderWide({
                   </Tooltip>
                   <div style={menuDividerStyle} />
 
+                  {/* The settings from here down flip in place and say so in
+                      their own label — "Hide nav bar" becomes "Show nav bar".
+                      Closing the menu fired the change and then hid the only
+                      evidence of it, so these stay open; only the rows that
+                      navigate or open a modal close it. */}
                   <button
-                    onClick={close(() => setShowTabNav((s) => !s))}
+                    onClick={() => setShowTabNav((s) => !s)}
                     style={menuItem}
                   >
                     <span style={menuIconStyle}>
@@ -308,13 +313,13 @@ export function AppHeaderWide({
                     {showTabNav ? "Hide nav bar" : "Show nav bar"}
                   </button>
 
-                  <button onClick={close(onExpandAll)} style={menuItem}>
+                  <button onClick={onExpandAll} style={menuItem}>
                     <span style={menuIconStyle}>⇅</span>
                     {allExpanded ? "Minimize toggles" : "Expand toggles"}
                   </button>
 
                   <button
-                    onClick={close(() => setHideNonEntailsRels((s) => !s))}
+                    onClick={() => setHideNonEntailsRels((s) => !s)}
                     style={{ ...menuItem, textAlign: "left " }}
                   >
                     <span style={menuIconStyle}>→</span>
@@ -326,7 +331,7 @@ export function AppHeaderWide({
                   {BACKEND_ENABLED && (
                     <Tooltip text="When on, detected arguments are verified for formal validity, auto-trimmed, and stripped of meaning postulates. When off, the model's raw arguments are surfaced unchecked.">
                       <button
-                        onClick={close(() => setVerifyArguments((s) => !s))}
+                        onClick={() => setVerifyArguments((s) => !s)}
                         style={{ ...menuItem, textAlign: "left" }}
                       >
                         <span style={menuIconStyle}>
@@ -401,7 +406,7 @@ export function AppHeaderWide({
                     <span style={menuIconStyle}>Aa</span>Select Font
                   </button>
 
-                  <button onClick={close(toggleTheme)} style={menuItem}>
+                  <button onClick={toggleTheme} style={menuItem}>
                     <span style={menuIconStyle}>
                       {isDark ? (
                         <svg

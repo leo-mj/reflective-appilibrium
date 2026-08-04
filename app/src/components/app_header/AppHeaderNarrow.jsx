@@ -262,6 +262,10 @@ export function AppHeaderNarrow({
             )}
           </div>
           <div style={menuDividerStyle} />
+          {/* The settings below flip in place and say so in their own label —
+              "Hide nav bar" becomes "Show nav bar". Closing the menu fired the
+              change and then hid the only evidence of it, so these stay open;
+              only the rows that navigate or open a modal close it. */}
           <div data-tutorial="menu-settings" style={group}>
             <div style={groupHeading}>Settings</div>
             <button
@@ -277,7 +281,7 @@ export function AppHeaderNarrow({
             <div style={menuDividerStyle} />
 
             <button
-              onClick={close(() => setShowTabNav((s) => !s))}
+              onClick={() => setShowTabNav((s) => !s)}
               style={menuBtn()}
             >
               <span style={menuIconStyle}>
@@ -298,12 +302,12 @@ export function AppHeaderNarrow({
               </span>
               {showTabNav ? "Hide nav bar" : "Show nav bar"}
             </button>
-            <button onClick={close(onExpandAll)} style={menuBtn()}>
+            <button onClick={onExpandAll} style={menuBtn()}>
               <span style={menuIconStyle}>⇅</span>
               {allExpanded ? "Minimize all toggles" : "Expand all toggles"}
             </button>
             <button
-              onClick={close(() => setHideNonEntailsRels((s) => !s))}
+              onClick={() => setHideNonEntailsRels((s) => !s)}
               style={menuBtn()}
             >
               <span style={menuIconStyle}>→</span>
@@ -311,7 +315,7 @@ export function AppHeaderNarrow({
             </button>
             {BACKEND_ENABLED && (
               <button
-                onClick={close(() => setVerifyArguments((s) => !s))}
+                onClick={() => setVerifyArguments((s) => !s)}
                 style={menuBtn()}
               >
                 <span style={menuIconStyle}>{verifyArguments ? "✓" : "✗"}</span>
@@ -375,13 +379,7 @@ export function AppHeaderNarrow({
             >
               <span style={menuIconStyle}>Aa</span>Select Font
             </button>
-            <button
-              onClick={() => {
-                toggleTheme();
-                setMenuOpen(false);
-              }}
-              style={menuBtn()}
-            >
+            <button onClick={toggleTheme} style={menuBtn()}>
               <span style={menuIconStyle}>
                 {isDark ? (
                   <svg
