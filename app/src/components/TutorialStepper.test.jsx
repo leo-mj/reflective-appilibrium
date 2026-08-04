@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 //
-// The two layouts are different enough apps to need different tours. The wide
-// tour walks a tab bar that exists only in AppHeaderWide, so on a phone every
-// one of its steps ringed nothing and described controls that were not on
-// screen. The narrow tour instead introduces the graph and then opens the ☰
-// menu and walks its sections, which is where everything else lives.
+// The two layouts are different enough apps to need different tours, and this
+// component is the phone's: it introduces the graph, then opens the ☰ menu and
+// walks its sections, which at this width is where everything else lives. The
+// wide tour is `tour/GuidedTour.jsx`, covered in its own suite.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { useState } from "react";
@@ -66,7 +65,7 @@ const ringOnStep = (title) => {
 
 describe("the narrow tour", () => {
   it("opens on the welcome card, then the graph, then the menu", () => {
-    openTour({ isWide: false });
+    openTour();
     const order = [];
     walk(() => {
       const heading = document.body.textContent;
@@ -79,7 +78,7 @@ describe("the narrow tour", () => {
 
   it("opens the menu for the steps that walk it, and shuts it again", () => {
     const onSetMenuOpen = vi.fn();
-    openTour({ isWide: false, onSetMenuOpen });
+    openTour({ onSetMenuOpen });
 
     // The first three steps are about the screen behind the menu.
     expect(onSetMenuOpen).toHaveBeenLastCalledWith(false);
@@ -107,7 +106,6 @@ describe("the narrow tour", () => {
           onSetTab={() => {}}
           onSetMenuOpen={onSetMenuOpen}
           hideNonEntailsRels={false}
-          isWide={false}
         />
       );
     }
@@ -131,7 +129,7 @@ describe("the narrow tour", () => {
       <div data-tutorial="menu-settings"></div>
       <div data-tutorial="menu-files"></div>
       <button data-tutorial="menu-undo"></button>`;
-    openTour({ isWide: false });
+    openTour();
     for (const title of [
       "Assist — the RE cycle",
       "Analyze — see where you stand",
@@ -144,7 +142,7 @@ describe("the narrow tour", () => {
   });
 
   it("never names a control the wide layout alone renders", () => {
-    openTour({ isWide: false });
+    openTour();
     const all = walk();
     // These are the wide header's own labels; on a phone they name nothing.
     expect(all).not.toContain("? button");
@@ -158,25 +156,5 @@ describe("the narrow tour", () => {
     expect(TOUR_Z.ring).toBeGreaterThan(TOUR_Z.menu);
     expect(TOUR_Z.menu).toBeGreaterThan(TOUR_Z.dim);
     expect(TOUR_Z.card).toBeGreaterThan(TOUR_Z.ring);
-  });
-});
-
-describe("the wide tour", () => {
-  it("still walks the tab bar it can see", () => {
-    document.body.innerHTML = '<button data-tutorial="tab-history">y</button>';
-    openTour({ isWide: true });
-    expect(ringOnStep("History")).toBe(true);
-  });
-
-  it("never touches the menu", () => {
-    const onSetMenuOpen = vi.fn();
-    openTour({ isWide: true, onSetMenuOpen });
-    walk();
-    expect(onSetMenuOpen).not.toHaveBeenCalledWith(true);
-  });
-
-  it("does not offer the narrow tour's menu walkthrough", () => {
-    openTour({ isWide: true });
-    expect(walk()).not.toContain("Assist — the RE cycle");
   });
 });

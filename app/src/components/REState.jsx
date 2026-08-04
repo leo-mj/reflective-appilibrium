@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { C } from "../constants/colors.js";
 import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
@@ -15,6 +15,7 @@ import {
 import { AppHeader } from "./AppHeader.jsx";
 import { TextPanel } from "./TextPanel.jsx";
 import { GraphPanel } from "./GraphPanel.jsx";
+import { GuidedTour, TOUR_W } from "./tour/GuidedTour.jsx";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
@@ -37,6 +38,27 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [workflowLoops, setWorkflowLoops] = useState(0);
   const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
   const [verifyArguments, setVerifyArguments] = useState(true);
+  // The home page's "Tutorial" button sets this flag and then loads the demo,
+  // so the tour opens on the state it describes rather than on the landing page.
+  const [tourActive, setTourActive] = useState(() => {
+    if (sessionStorage.getItem("startTour") === "1") {
+      sessionStorage.removeItem("startTour");
+      return true;
+    }
+    return false;
+  });
+  // What the wide tour wants on screen: its opening chapters read against a
+  // bare graph, and bring the tab bar and text panel back once they are what
+  // the reader is being shown.
+  const [tourChrome, setTourChrome] = useState({ chrome: true, text: true });
+  const [graphFocus, setGraphFocus] = useState(null);
+  const focusSeq = useRef(0);
+  // A new key on every call, so scrolling back to a section re-frames it even
+  // though it names the same elements as last time.
+  const focusGraph = useCallback((ids) => {
+    focusSeq.current += 1;
+    setGraphFocus({ key: focusSeq.current, ids });
+  }, []);
   const [equilibriumPreviewWithdrawnIds, setEquilibriumPreviewWithdrawnIds] =
     useState(null);
   const DEFAULT_WEIGHTS = {
@@ -106,6 +128,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
   const dims = useWindowSize();
   const isWide = dims.w > 768 && dims.h > 500;
+  // The phone gets its own tour, run from the header; this is the wide one.
+  const wideTour = isWide && tourActive;
+  const tourHidesChrome = wideTour && !tourChrome.chrome;
   const isAssistTab = ASSIST_TABS.includes(tab);
   const isSimulateTab = SIMULATE_TABS.includes(tab);
   const usesSidePanel = isAssistTab || isSimulateTab;
@@ -191,10 +216,16 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     tab === "history" ? stateAtRound(state, historyRound) : state;
 
   // Props shared by both the assist-side and analyze-mode TextPanel instances.
+  // While the tour is running it says whether the text panel belongs on screen.
+  // It overrides what is rendered rather than `showText` itself: `showText`
+  // feeds `graphW`, and moving that would restart the force simulation — the
+  // graph would re-settle under the reader at every second section.
   const showingTextPanel = isWide
     ? usesSidePanel
       ? assistSidePanel === "text"
-      : showText
+      : wideTour
+        ? tourChrome.text
+        : showText
     : tab === "text";
   const textPanelProps = {
     isWide,
@@ -256,6 +287,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
       tab === "simulateRethon" ? equilibriumPreviewWithdrawnIds : null,
     onSetEquilibriumPreview: setEquilibriumPreviewWithdrawnIds,
     onRoundChange: setHistoryRound,
+    focus: graphFocus,
     isWide,
     onCtrlSecondSelect: setAddBarCtrlTo,
     ready,
@@ -273,8 +305,11 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         display: "flex",
         flexDirection: "column",
         padding: 16,
+        // The tour is a fixed column down the left edge. Padding the app by its
+        // width keeps everything it points at out from under it.
+        paddingLeft: wideTour ? TOUR_W + 16 : 16,
         opacity: ready ? 1 : 0,
-        transition: "opacity 0.6s ease",
+        transition: "opacity 0.6s ease, padding-left 0.35s ease",
       }}
     >
       {!LLM_ENABLED && (
@@ -329,6 +364,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         weightsChanged={weightsChanged}
         onWeightsChange={setWeights}
         onResetWeights={() => setWeights(DEFAULT_WEIGHTS)}
+        tourActive={tourActive}
+        onStartTour={() => setTourActive(true)}
+        onCloseTour={() => setTourActive(false)}
+        hideTabBar={tourHidesChrome}
       />
 
       <div
@@ -378,7 +417,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
             workflowPhase={workflowPhase}
             onAdvanceWorkflow={advanceWorkflow}
             nextPhaseIsEnabled={workflowNextPhaseEnabled}
-            isFullscreen={!showText}
+            isFullscreen={!showingTextPanel}
             // The assist and simulate tabs hand their own graph the toggle
             // above; here it is the text panel that folds away. When narrow the
             // text is a tab of its own, with nothing beside it to reclaim.
@@ -390,13 +429,30 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         )}
       </div>
 
-      {isWide && !isAssistTab && !isSimulateTab && (
+      {isWide && !isAssistTab && !isSimulateTab && !tourHidesChrome && (
         <AddBar
           elements={linkableElements(state.elements)}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
           selected={selected}
           ctrlTo={addBarCtrlTo}
+        />
+      )}
+
+      {/* After the header, so the tour's own headings never come before the
+          page's h1 in the reading order. */}
+      {isWide && (
+        <GuidedTour
+          active={tourActive}
+          state={state}
+          isSample={isSample}
+          hideNonEntailsRels={hideNonEntailsRels}
+          onClose={() => setTourActive(false)}
+          onSetTab={handleSetTab}
+          onSelectNode={handleSelectNode}
+          onSelectRel={handleSelectRel}
+          onSetChrome={setTourChrome}
+          onFocusGraph={focusGraph}
         />
       )}
 

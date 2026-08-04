@@ -26,7 +26,13 @@ import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
 
-/** Two-row desktop header: title row + tab bar. Props mirror AppHeader. */
+/**
+ * Two-row desktop header: title row + tab bar. Props mirror AppHeader.
+ *
+ * `hideTabBar` drops the second row: the guided tour opens on the graph alone,
+ * and a bar of tabs it has not introduced yet is noise on top of the one thing
+ * it is asking the reader to look at.
+ */
 export function AppHeaderWide({
   round,
   topic,
@@ -62,6 +68,7 @@ export function AppHeaderWide({
   weightsChanged,
   onWeightsChange,
   onResetWeights,
+  hideTabBar,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
@@ -133,10 +140,13 @@ export function AppHeaderWide({
             >
               Reflective Equilibrium — Round {round}
             </h1>
-            <TopicLabel
-              topic={topic}
-              style={{ fontSize: 14, color: C.dim, marginTop: 2 }}
-            />
+            {/* Ringed by the tour when it introduces the question. */}
+            <div data-tutorial="topic">
+              <TopicLabel
+                topic={topic}
+                style={{ fontSize: 14, color: C.dim, marginTop: 2 }}
+              />
+            </div>
           </div>
         </div>
 
@@ -497,101 +507,103 @@ export function AppHeaderWide({
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
 
       {/* Row 2: tab bar */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: 2,
-          borderBottom: `1px solid ${C.border}`,
-          marginBottom: 6,
-          paddingBottom: 2,
-        }}
-      >
-        <Tooltip text="AI-guided mode — elicit judgments, suggest principles and relations.">
-          <button
-            data-tutorial="meta-assist"
-            style={metaTabBtn(metaTab === "assist")}
-            onClick={() => {
-              if (metaTab !== "assist") setTab("elicitJudgments");
-            }}
-          >
-            Assist
-          </button>
-        </Tooltip>
-        <Tooltip text="View your RE state — switch between graph, text, coherence and history.">
-          <button
-            data-tutorial="meta-analyze"
-            style={metaTabBtn(metaTab === "analyze")}
-            onClick={() => {
-              if (metaTab !== "analyze") setTab("graph");
-            }}
-          >
-            Analyze
-          </button>
-        </Tooltip>
-        {BACKEND_ENABLED && (
-          <Tooltip text="Run the formal rethon RE simulation on your active elements.">
+      {!hideTabBar && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            gap: 2,
+            borderBottom: `1px solid ${C.border}`,
+            marginBottom: 6,
+            paddingBottom: 2,
+          }}
+        >
+          <Tooltip text="AI-guided mode — elicit judgments, suggest principles and relations.">
             <button
-              style={metaTabBtn(metaTab === "simulate")}
+              data-tutorial="meta-assist"
+              style={metaTabBtn(metaTab === "assist")}
               onClick={() => {
-                if (metaTab !== "simulate") setTab("simulateRethon");
+                if (metaTab !== "assist") setTab("elicitJudgments");
               }}
             >
-              Simulate
+              Assist
             </button>
           </Tooltip>
-        )}
-        <div style={inlineDividerStyle} />
-        {visibleSubTabs.map((t) => (
-          <Tooltip key={t} text={TAB_TOOLTIPS[t]}>
+          <Tooltip text="View your RE state — switch between graph, text, coherence and history.">
             <button
-              data-tutorial={`tab-${t}`}
-              onClick={() => setTab(t)}
-              style={btn(tab === t)}
+              data-tutorial="meta-analyze"
+              style={metaTabBtn(metaTab === "analyze")}
+              onClick={() => {
+                if (metaTab !== "analyze") setTab("graph");
+              }}
             >
-              {TAB_ICONS[t]}
-              {TAB_LABELS[t]}
+              Analyze
             </button>
           </Tooltip>
-        ))}
-        {metaTab === "assist" && (
-          <div
-            style={{
-              marginLeft: "auto",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {workflowPhase && (
-              <span style={{ fontSize: 11, color: C.dim }}>
-                {WORKFLOW_PHASE_LABELS[workflowPhase]}
-                {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""}
-              </span>
-            )}
-            {workflowPhase ? (
+          {BACKEND_ENABLED && (
+            <Tooltip text="Run the formal rethon RE simulation on your active elements.">
               <button
-                onClick={onStopWorkflow}
-                style={{
-                  ...btn(false),
-                  color: C.conflicts,
-                  borderColor: C.conflicts,
+                style={metaTabBtn(metaTab === "simulate")}
+                onClick={() => {
+                  if (metaTab !== "simulate") setTab("simulateRethon");
                 }}
               >
-                ✕ Stop Workflow
+                Simulate
               </button>
-            ) : (
+            </Tooltip>
+          )}
+          <div style={inlineDividerStyle} />
+          {visibleSubTabs.map((t) => (
+            <Tooltip key={t} text={TAB_TOOLTIPS[t]}>
               <button
-                data-tutorial="btn-workflow"
-                onClick={onStartWorkflow}
-                style={{ ...btn(false), color: C.supports }}
+                data-tutorial={`tab-${t}`}
+                onClick={() => setTab(t)}
+                style={btn(tab === t)}
               >
-                ▶ Start Workflow
+                {TAB_ICONS[t]}
+                {TAB_LABELS[t]}
               </button>
-            )}
-          </div>
-        )}
-      </div>
+            </Tooltip>
+          ))}
+          {metaTab === "assist" && (
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {workflowPhase && (
+                <span style={{ fontSize: 11, color: C.dim }}>
+                  {WORKFLOW_PHASE_LABELS[workflowPhase]}
+                  {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""}
+                </span>
+              )}
+              {workflowPhase ? (
+                <button
+                  onClick={onStopWorkflow}
+                  style={{
+                    ...btn(false),
+                    color: C.conflicts,
+                    borderColor: C.conflicts,
+                  }}
+                >
+                  ✕ Stop Workflow
+                </button>
+              ) : (
+                <button
+                  data-tutorial="btn-workflow"
+                  onClick={onStartWorkflow}
+                  style={{ ...btn(false), color: C.supports }}
+                >
+                  ▶ Start Workflow
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

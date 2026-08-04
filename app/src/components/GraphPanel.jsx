@@ -142,6 +142,7 @@ export function GraphPanel({
   isFullscreen,
   onToggleFullscreen,
   fullscreenHides = "panel beside it",
+  focus,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
@@ -229,6 +230,7 @@ export function GraphPanel({
             recentlyAdded={recentlyAdded}
             hideNonEntailsRels={hideNonEntailsRels}
             equilibriumPreviewWithdrawnIds={equilibriumPreviewWithdrawnIds}
+            focus={focus}
           />
         )}
         {tab === "history" && (

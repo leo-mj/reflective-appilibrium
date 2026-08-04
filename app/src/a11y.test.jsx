@@ -109,9 +109,8 @@ describe("the landing page", () => {
 });
 
 describe("the main app view", () => {
-  it("has no WCAG A/AA violations axe can see", async () => {
-    // The force simulation and the panel measuring schedule work a static
-    // audit does not need, and jsdom has no ResizeObserver to measure with.
+  /** jsdom has no layout, and this audit needs none of the work that wants it. */
+  const stubBrowserWork = () => {
     vi.stubGlobal("requestAnimationFrame", () => 0);
     const NoopObserver = class {
       observe() {}
@@ -120,7 +119,10 @@ describe("the main app view", () => {
     };
     vi.stubGlobal("ResizeObserver", NoopObserver);
     vi.stubGlobal("IntersectionObserver", NoopObserver);
-    const { container } = render(
+  };
+
+  const app = () =>
+    render(
       <REState
         initialState={SAMPLE_STATE}
         isSample
@@ -128,9 +130,26 @@ describe("the main app view", () => {
         onReady={() => {}}
       />,
     );
+
+  it("has no WCAG A/AA violations axe can see", async () => {
+    stubBrowserWork();
+    const { container } = app();
     await expectNoViolations(container);
     expect(unnamedButtons(container)).toBe("");
     expectSaneHeadings(container);
+    vi.unstubAllGlobals();
+  });
+
+  it("still has none with the guided tour open over it", async () => {
+    // The tour is a page of prose with its own heading tree, laid over a view
+    // that already has one — the reading order has to survive that.
+    stubBrowserWork();
+    sessionStorage.setItem("startTour", "1");
+    const { container } = app();
+    await expectNoViolations(container);
+    expect(unnamedButtons(container)).toBe("");
+    expectSaneHeadings(container);
+    sessionStorage.removeItem("startTour");
     vi.unstubAllGlobals();
   });
 });

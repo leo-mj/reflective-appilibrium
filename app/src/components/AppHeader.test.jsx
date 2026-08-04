@@ -61,6 +61,10 @@ const PROPS = {
   weightsChanged: false,
   onWeightsChange: noop,
   onResetWeights: noop,
+  tourActive: false,
+  onStartTour: noop,
+  onCloseTour: noop,
+  hideTabBar: false,
 };
 
 /** Tab labels offered by the narrow layout, with the menu opened. */
@@ -227,36 +231,44 @@ describe("the narrow text button", () => {
 });
 
 describe("the guided tour", () => {
-  // It was mounted by the wide branch alone. On a phone the home page's "Take
-  // the tour" card set its sessionStorage flag, the initialiser here consumed
-  // the flag on mount, and nothing rendered — with no second chance, since the
-  // flag was now gone.
+  // Which tour runs is a property of the width, and the header only owns one of
+  // them. The phone's card stack is mounted here, next to the ☰ menu it walks;
+  // the wide tour drives the graph's selection and framing, so REState mounts
+  // that one and both of them run off the `tourActive` it holds.
   const welcome = () => screen.queryByText(/Welcome to Reflective APPilibrium/);
 
-  it("runs when the home page asked for it, at either width", () => {
-    for (const isWide of [true, false]) {
-      sessionStorage.setItem("startTour", "1");
-      render(<AppHeader {...PROPS} isWide={isWide} />);
-      expect(welcome()).not.toBeNull();
-      cleanup();
-    }
+  it("asks the app to start the tour rather than starting one itself", () => {
+    const onStartTour = vi.fn();
+    render(<AppHeader {...PROPS} onStartTour={onStartTour} isWide />);
+
+    fireEvent.click(screen.getByLabelText("Start the step-by-step tour"));
+    expect(onStartTour).toHaveBeenCalled();
+    expect(welcome()).toBeNull();
   });
 
   it("can be started from the narrow menu", () => {
-    render(<AppHeader {...PROPS} isWide={false} />);
-    expect(welcome()).toBeNull();
+    const onStartTour = vi.fn();
+    render(<AppHeader {...PROPS} onStartTour={onStartTour} isWide={false} />);
 
     fireEvent.click(screen.getAllByText("☰")[0]);
     fireEvent.click(screen.getByText("Guided tour"));
-    expect(welcome()).not.toBeNull();
+    expect(onStartTour).toHaveBeenCalled();
   });
 
-  it("opens the narrow menu itself once it gets that far", () => {
-    render(<AppHeader {...PROPS} isWide={false} />);
-    fireEvent.click(screen.getAllByText("☰")[0]);
-    fireEvent.click(screen.getByText("Guided tour"));
-    // Starting the tour closes the menu again; the tour reopens it when it
-    // reaches the steps that walk it.
+  it("shows the phone's card stack while the tour runs, but never on a wide screen", () => {
+    render(<AppHeader {...PROPS} tourActive isWide={false} />);
+    expect(welcome()).not.toBeNull();
+    cleanup();
+
+    // The wide tour is a scrolling page mounted by REState. Rendering the phone
+    // cards here too would put two tours on screen at once.
+    render(<AppHeader {...PROPS} tourActive isWide />);
+    expect(welcome()).toBeNull();
+  });
+
+  it("opens the narrow menu itself once the tour gets that far", () => {
+    render(<AppHeader {...PROPS} tourActive isWide={false} />);
+    // The tour opens the menu when it reaches the steps that walk it, not before.
     expect(document.querySelector('[data-tutorial="menu-assist"]')).toBeNull();
 
     // welcome → the graph → the ☰ button → the first section inside it

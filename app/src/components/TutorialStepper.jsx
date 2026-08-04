@@ -1,43 +1,40 @@
 /**
- * @fileoverview Step-by-step guided tour for the main interface.
+ * @fileoverview The guided tour a phone gets: a stack of cards, one control at
+ * a time.
+ *
+ * Wide screens run {@link module:components/tour/GuidedTour} instead — a page
+ * the reader scrolls, which explains the method and walks the demo graph before
+ * it ever mentions a button. That tour is no use here: it needs a column beside
+ * the graph, and most of what it points at lives in a tab bar this width has no
+ * room for. At this width the app is the graph plus the ☰ menu, so the tour is
+ * the graph, then the menu, opened and walked section by section.
  *
  * Each step optionally targets a `data-tutorial="<id>"` element, which gets a
  * highlight ring. A card with title, description, and Prev/Next navigation
  * floats near the target (or centers on screen for untargeted steps).
  *
  * Steps that carry a `tab` value call `onSetTab` when entered so the right
- * sub-tab buttons are visible before the element is measured.
+ * sub-tab buttons are visible before the element is measured; steps carrying
+ * `menu: true` open the ☰ menu before they are measured.
  * @module components/TutorialStepper
  */
 
 import { useEffect, useState, useCallback } from "react";
 import { C } from "../constants/colors.js";
-import { LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
+import { TOUR_Z } from "./tour/tourZ.js";
 
 const CARD_W = 280;
 const RING_PAD = 5;
 const GAP = 14;
 
-/**
- * Stacking order for the tour: dim < the narrow ☰ menu it walks < ring < card.
- * Exported so the header can lift the menu into it rather than guess.
- */
-export const TOUR_Z = { dim: 910, menu: 916, ring: 917, card: 920 };
+// Re-exported: AppHeaderNarrow lifts its ☰ menu into this stack while the tour
+// walks it, and would otherwise have to guess the layer.
+export { TOUR_Z };
 
 /**
- * The tour a phone gets.
- *
- * The wide tour walks a tab bar that does not exist at this width — every one
- * of its targets lives in `AppHeaderWide`, so each step would ring nothing and
- * describe controls that are not on screen. Here the shape of the app is
- * different, so the tour is: the graph, then the ☰ menu opened and walked
- * section by section, which is where everything else actually is.
- *
- * Steps carrying `menu: true` open the menu before they are measured.
- *
  * @param {string} cycle - The RE cycle, named for whichever relation modes are on.
  */
-function buildNarrowSteps(cycle) {
+function buildSteps(cycle) {
   return [
     {
       id: "welcome",
@@ -110,148 +107,6 @@ function buildNarrowSteps(cycle) {
   ];
 }
 
-function buildWideSteps(hideNonEntailsRels) {
-  const withRels = !hideNonEntailsRels;
-  const cycle = withRels
-    ? "Judgments → Principles → Relations → Arguments"
-    : "Judgments → Principles → Arguments";
-
-  const steps = [
-    {
-      id: "welcome",
-      title: "Welcome to Reflective APPilibrium",
-      text: "This tour walks you through the main sections of the interface. \n Warning: Using the appilibrium does not guarantee finding moral truth!",
-      target: null,
-      tab: "graph",
-    },
-    {
-      id: "meta-analyze",
-      title: "Analyze your RE state",
-      text: "The Analyze section shows your current position. \n Switch between graph, history, and clusters.",
-      target: "meta-analyze",
-      tab: "graph",
-    },
-    {
-      id: "tab-graph",
-      title: "Graph view",
-      text: "A directed graph of all your elements. \n Click a node to select it; hold Ctrl and click a second node to create a relation between them.",
-      target: "tab-graph",
-      tab: "graph",
-    },
-    {
-      id: "graph-interaction",
-      title: "Interacting with the graph",
-      text: "Click a node to highlight it and its direct neighbours.\nClick a relation arrow to highlight the full argument it belongs to — premises, conclusion, and all connecting arrows.",
-      target: null,
-      tab: "graph",
-    },
-    {
-      id: "tab-history",
-      title: "History",
-      text: "Replay your RE process round by round. \n Drag the slider or press Play to animate each change and see how your position evolved.",
-      target: "tab-history",
-      tab: "history",
-    },
-    {
-      id: "tab-clusters",
-      title: "Coherence clusters",
-      text: "Here you find the largest sets of currently accepted connected elements with no internal conflicts.",
-      target: "tab-clusters",
-      tab: "clusters",
-    },
-    ...(MATRIX_ENABLED && LLM_ENABLED
-      ? [
-          {
-            id: "tab-matrix",
-            title: "Relation matrix",
-            text: "See the relation type between every pair of elements at a glance — a quick overview of the full argument structure.",
-            target: "tab-matrix",
-            tab: "matrix",
-          },
-        ]
-      : []),
-    {
-      id: "meta-assist",
-      title: "AI-guided assistance",
-      text: `The Assist tab drives the iterative RE process. \nCycle through ${cycle} repeatedly — each pass lets you refine your position until it is coherent.`,
-      target: "meta-assist",
-      tab: "elicitJudgments",
-    },
-    {
-      id: "tab-elicit",
-      title: "1 — Elicit Judgments",
-      text: "Start here. Articulate your initial moral judgments on the topic.\n If you use the LLM feature, the LLM will suggest thought-experiments and questions to prompt your judgments.",
-      target: "tab-elicitJudgments",
-      tab: "elicitJudgments",
-    },
-    {
-      id: "tab-principles",
-      title: "2 — Suggest Principles",
-      text: "With judgments in place, find general principles that systematize them.\n The LLM feature can help suggest candidate principles which you can accept, reject, or modify.",
-      target: "tab-suggestPrinciples",
-      tab: "elicitJudgments",
-    },
-    {
-      id: "tab-arguments",
-      title: `3 — Detect Arguments`,
-      text: "Find valid argument structures among your elements.\n New arguments may reveal missing premises or expose tensions. \n The LLM feature can help you identify them.",
-      target: "tab-detectArguments",
-      tab: "elicitJudgments",
-    },
-    ...(withRels
-      ? [
-          {
-            id: "tab-relations",
-            title: "4 — Suggest Relations",
-            text: "AI suggests missing relations besides logical (joint) entailment between existing elements. Helps build a denser network.",
-            target: "tab-suggestRelations",
-            tab: "elicitJudgments",
-          },
-        ]
-      : []),
-
-    {
-      id: "btn-workflow",
-      title: "Start Workflow",
-      text: `Runs the full ${cycle} cycle automatically and repeatedly, round by round.`,
-      target: "btn-workflow",
-      tab: "elicitJudgments",
-    },
-    {
-      id: "btn-undo",
-      title: "Undo",
-      text: "Undo the last change at any time with this button or Ctrl+Z. Changes are grouped by round.",
-      target: "btn-undo",
-      tab: null,
-    },
-    {
-      id: "btn-menu",
-      title: "Settings menu",
-      text: "The ☰ menu gives access to: the section nav bar, expand/collapse toggles, relations beyond logical entailment, font selection, dark/light theme, and import/export.",
-      target: "btn-menu",
-      tab: null,
-    },
-    {
-      id: "done",
-      title: "You're all set",
-      text: "Press the ? button in the header at any time to replay this tour. \n You can also hover over a button or tab to get some information on its function.",
-      target: null,
-      tab: null,
-    },
-  ];
-
-  return steps;
-}
-
-/** The two layouts are different enough apps to need different tours. */
-function buildSteps(hideNonEntailsRels, isWide) {
-  if (isWide) return buildWideSteps(hideNonEntailsRels);
-  const cycle = hideNonEntailsRels
-    ? "Judgments → Principles → Arguments"
-    : "Judgments → Principles → Relations → Arguments";
-  return buildNarrowSteps(cycle);
-}
-
 /**
  * @param {function} [props.onSetMenuOpen] - Opens or closes the narrow header's
  *   ☰ menu. The narrow tour walks the menu's own entries, so it has to be open
@@ -263,9 +118,12 @@ export function TutorialStepper({
   onSetTab,
   onSetMenuOpen,
   hideNonEntailsRels,
-  isWide = true,
 }) {
-  const steps = buildSteps(hideNonEntailsRels, isWide);
+  const steps = buildSteps(
+    hideNonEntailsRels
+      ? "Judgments → Principles → Arguments"
+      : "Judgments → Principles → Relations → Arguments",
+  );
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState(null);
 

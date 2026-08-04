@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { fitView } from "../utils/graphHelpers.js";
 
 /**
  * @param {Object}        options
@@ -52,28 +53,10 @@ export function useAutoFit({
       if (refitKey === p.refitKey && dims.w === p.w && dims.h === p.h) return;
     }
 
-    const keys = ids ?? Object.keys(positions);
-    const pts = keys.map((id) => positions[id]).filter(Boolean);
-    if (!pts.length || !dims.w || !dims.h) return;
+    const view = fitView(positions, ids ?? null, dims, { padding, maxZoom });
+    if (!view) return;
 
-    const minX = Math.min(...pts.map((p) => p.x));
-    const maxX = Math.max(...pts.map((p) => p.x));
-    const minY = Math.min(...pts.map((p) => p.y));
-    const maxY = Math.max(...pts.map((p) => p.y));
-
-    const boxW = maxX - minX || 1;
-    const boxH = maxY - minY || 1;
-
-    const zoom = Math.min(
-      (dims.w - padding) / boxW,
-      (dims.h - padding) / boxH,
-      maxZoom,
-    );
-
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-
-    resetView({ x: dims.w / 2 - cx * zoom, y: dims.h / 2 - cy * zoom }, zoom);
+    resetView(view.pan, view.zoom);
     prevFitRef.current = { refitKey, w: dims.w, h: dims.h };
     fittedRef.current = true;
   }, [positions, ids, dims, enabled, resetView, refitKey]); // eslint-disable-line react-hooks/exhaustive-deps

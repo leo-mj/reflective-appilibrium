@@ -62,6 +62,12 @@ import { BACKEND_ENABLED } from "../config.js";
  * @param {function} props.onSave
  * @param {function} props.onUndo
  * @param {boolean}  props.canUndo
+ * @param {boolean}  props.tourActive  - Whether the guided tour is running. Held
+ *   by REState because the wide tour drives the graph, not just the header.
+ * @param {function} props.onStartTour - Behind the header's ? button.
+ * @param {function} props.onCloseTour
+ * @param {boolean}  props.hideTabBar  - Set while the wide tour's opening
+ *   chapters read against a bare graph.
  */
 export function AppHeader({
   round,
@@ -95,17 +101,14 @@ export function AppHeader({
   weightsChanged,
   onWeightsChange,
   onResetWeights,
+  tourActive,
+  onStartTour,
+  onCloseTour,
+  hideTabBar,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [tutorialMode] = useState(false);
-  const [stepperActive, setStepperActive] = useState(() => {
-    if (sessionStorage.getItem("startTour") === "1") {
-      sessionStorage.removeItem("startTour");
-      return true;
-    }
-    return false;
-  });
   const [importConfirmPending, setImportConfirmPending] = useState(null);
   const [importError, setImportError] = useState(null);
   const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "error"
@@ -246,41 +249,32 @@ export function AppHeader({
     weightsChanged,
     onWeightsChange,
     onResetWeights,
-    onStartStepper: () => setStepperActive(true),
+    onStartStepper: onStartTour,
   };
 
-  // Mounted for both layouts. It used to hang off the wide branch alone, so on
-  // a phone the home page's "Take the tour" card set its sessionStorage flag,
-  // the initialiser above consumed the flag — and nothing ever appeared, with
-  // no second chance because the flag was gone.
-  const tutorial = (
-    <>
-      <TutorialOverlay active={tutorialMode} />
-      <TutorialStepper
-        active={stepperActive}
-        onClose={() => setStepperActive(false)}
-        onSetTab={setTab}
-        // The narrow tour walks the ☰ menu's own sections, so it drives the
-        // menu open and shut as it goes.
-        onSetMenuOpen={isWide ? undefined : setMenuOpen}
-        hideNonEntailsRels={hideNonEntailsRels}
-        isWide={isWide}
-      />
-    </>
-  );
-
   if (!isWide) {
+    // The phone's tour is a stack of cards that walks the ☰ menu, because on a
+    // screen this narrow the menu is where everything except the graph lives.
+    // The wide tour is a different thing entirely — a page the reader scrolls,
+    // mounted by REState, which is where the graph selection it drives lives.
     return (
       <>
         {hiddenInput}
         {importModals}
-        {tutorial}
+        <TutorialOverlay active={tutorialMode} />
+        <TutorialStepper
+          active={tourActive}
+          onClose={onCloseTour}
+          onSetTab={setTab}
+          onSetMenuOpen={setMenuOpen}
+          hideNonEntailsRels={hideNonEntailsRels}
+        />
         <AppHeaderNarrow
           {...shared}
           menuOpen={menuOpen}
           setMenuOpen={setMenuOpen}
           visibleSubTabs={visibleSubTabs}
-          tourActive={stepperActive}
+          tourActive={tourActive}
         />
       </>
     );
@@ -290,12 +284,13 @@ export function AppHeader({
     <>
       {hiddenInput}
       {importModals}
-      {tutorial}
+      <TutorialOverlay active={tutorialMode} />
       <AppHeaderWide
         {...shared}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         visibleSubTabs={visibleSubTabs}
+        hideTabBar={hideTabBar}
       />
     </>
   );

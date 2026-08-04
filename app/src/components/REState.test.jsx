@@ -106,6 +106,53 @@ describe("the graph's full-screen toggle", () => {
   });
 });
 
+describe("the guided tour", () => {
+  // The tour lives here rather than in the header because the wide one is not
+  // a walk round the header at all: it reads the demo graph, so it needs the
+  // selection and the framing that only this component holds.
+  const tourShown = () => screen.queryByLabelText("Guided tour") !== null;
+  /** The meta-tab buttons, which are the tab bar the tour hides at first. */
+  const tabBarShown = () => screen.queryByText("Analyze") !== null;
+
+  afterEach(() => sessionStorage.removeItem("startTour"));
+
+  it("opens on the demo the home page loaded for it", () => {
+    // The home page's Tutorial button sets this flag and then loads the sample,
+    // so the tour opens on the state it is about to describe.
+    sessionStorage.setItem("startTour", "1");
+    open();
+    expect(tourShown()).toBe(true);
+    expect(screen.getByText("Reflective equilibrium")).toBeTruthy();
+  });
+
+  it("holds the tab bar back until the tour introduces it, and the graph stays up", () => {
+    sessionStorage.setItem("startTour", "1");
+    open();
+    expect(tabBarShown()).toBe(false);
+    // The opening chapters are read against the graph, so it had better be there.
+    expect(graphShown()).toBe(true);
+
+    fireEvent.click(screen.getByText("Next ↓"));
+    fireEvent.click(screen.getByText("Next ↓"));
+    expect(tabBarShown()).toBe(false);
+  });
+
+  it("puts the tab bar back on the way out", () => {
+    sessionStorage.setItem("startTour", "1");
+    open();
+    fireEvent.click(screen.getByText("Skip tour"));
+    expect(tourShown()).toBe(false);
+    expect(tabBarShown()).toBe(true);
+  });
+
+  it("can be replayed from the header's ? button", () => {
+    open();
+    expect(tourShown()).toBe(false);
+    fireEvent.click(screen.getByLabelText("Start the step-by-step tour"));
+    expect(tourShown()).toBe(true);
+  });
+});
+
 describe("questionnaire mode", () => {
   it("still opens on its own tab, which is the whole point of that mode", () => {
     const spec = {

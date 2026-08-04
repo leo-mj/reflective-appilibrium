@@ -114,6 +114,56 @@ export function getNeighbours(selectedId, visRels) {
   return ids;
 }
 
+// ─── Viewport fitting ────────────────────────────────────────────────────────
+
+/**
+ * Computes the pan and zoom that centre a set of nodes in the viewport.
+ *
+ * Shared by {@link module:hooks/useAutoFit}, which fits the whole graph once it
+ * is laid out, and by the guided tour, which fits the handful of elements the
+ * section on screen is talking about.
+ *
+ * @param {PositionMap} positions - World-space positions keyed by element ID.
+ * @param {string[]|null} ids     - Subset to fit; null or omitted fits everything.
+ * @param {{ w: number, h: number }} dims - Container pixel dimensions.
+ * @param {Object} [options]
+ * @param {number} [options.padding=96] - Total px subtracted per axis before fitting.
+ * @param {number} [options.maxZoom=1]  - Upper zoom bound.
+ * @returns {{ pan: { x: number, y: number }, zoom: number } | null} Null when
+ *   nothing to fit, or the container has no size yet.
+ */
+export function fitView(positions, ids, dims, { padding = 96, maxZoom = 1 } = {}) {
+  if (!positions) return null;
+  const keys = ids ?? Object.keys(positions);
+  const pts = keys.map((id) => positions[id]).filter(Boolean);
+  if (!pts.length || !dims?.w || !dims?.h) return null;
+
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  // `|| 1`: a single node has no extent, so the ratio below would be Infinity
+  // and the zoom would land on maxZoom anyway — this just keeps it finite.
+  const boxW = maxX - minX || 1;
+  const boxH = maxY - minY || 1;
+
+  const zoom = Math.min(
+    (dims.w - padding) / boxW,
+    (dims.h - padding) / boxH,
+    maxZoom,
+  );
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+
+  return {
+    pan: { x: dims.w / 2 - cx * zoom, y: dims.h / 2 - cy * zoom },
+    zoom,
+  };
+}
+
 // ─── Joint argument geometry ─────────────────────────────────────────────────
 
 /**

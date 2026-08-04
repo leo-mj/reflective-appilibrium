@@ -5,7 +5,7 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
@@ -13,6 +13,7 @@ import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import { useGraphClick } from "../hooks/useGraphClick.js";
 import {
+  fitView,
   getNeighbours,
   parallelEdgeOffsets,
   groupJointArguments,
@@ -313,6 +314,9 @@ function GraphModals({
  *   happens while another node is already selected. Used to fill the AddBar "to" field.
  * @param {boolean}     [props.ready] - When false, suppresses auto-fit until the force
  *   simulation has settled. Prevents fitting against initial clustered positions.
+ * @param {{ key: number, ids: string[]|null }|null} [props.focus] - Frames a
+ *   subset of the graph, or all of it when `ids` is null. Driven by the guided
+ *   tour, which zooms to whatever its current section is talking about.
  * @returns {React.ReactElement}
  */
 export function Graph({
@@ -333,6 +337,7 @@ export function Graph({
   recentlyAdded,
   hideNonEntailsRels,
   equilibriumPreviewWithdrawnIds,
+  focus,
 }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
@@ -438,6 +443,22 @@ export function Graph({
   } = usePan();
 
   useAutoFit({ positions, dims, resetView, enabled: ready });
+
+  // The tour re-frames the graph on the elements the section being read names.
+  // Keyed on `focus.key` rather than on the ids, so the same section framed
+  // again — scrolled back to, or reached after the panel resized — still fits.
+  // `positions` is deliberately not a dependency: this fires when the tour
+  // moves on, not on every tick of the simulation.
+  const focusKey = focus?.key;
+  useEffect(() => {
+    if (!focusKey) return;
+    const view = fitView(positions, focus.ids ?? null, dims, {
+      padding: focus.ids ? 200 : 96,
+      maxZoom: focus.ids ? 1.5 : 1,
+    });
+    if (view) resetView(view.pan, view.zoom);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey, dims.w, dims.h, ready]);
 
   const { onPointerDown, onPointerUp } = useGraphClick({
     panDown,
