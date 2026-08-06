@@ -55,7 +55,7 @@ function openingSections(topic) {
       body: [
         "Reflective equilibrium is a view of how justification works for beliefs in ethics: you start from concrete moral judgments you are fairly confident about, look for general principles that would explain them, and adjust both sides until they fit together.",
         "Neither side is bedrock. A principle can fall to a case that tells against it, and a verdict you were sure of can fall to the principle that best explains everything else. What justifies a position, in the end, is that it hangs together.",
-        "IMPORTANT: Neither reflective equilibrium nor this app guarantee reaching ethical truth."
+        "IMPORTANT: Neither reflective equilibrium nor this app guarantee reaching ethical truth.",
       ],
       focus: [],
     },
@@ -86,12 +86,16 @@ function openingSections(topic) {
 }
 
 /**
- * Chapter 2 — reading the demo graph.
+ * Chapters 2 and 3 — reading the demo graph, then changing it.
  *
  * The graph's default view shows arguments only, so every section here walks
  * elements that an argument actually connects. Together they answer "what is a
- * judgment, what is a principle, and why do I need them" by pointing at three
- * of each rather than by defining the terms.
+ * judgment, what is a principle, what is a background theory, and why do I need
+ * them" by pointing at each in turn rather than by defining the terms.
+ *
+ * Still no tab bar: the second half is about writing the graph, not about the
+ * interface around it, and the text panel it ends on is asked for by that
+ * section alone.
  */
 function graphSections() {
   return [
@@ -121,7 +125,7 @@ function graphSections() {
     },
     {
       id: "argument",
-      title: "Arguments connect the two",
+      title: "Arguments",
       body: [
         "Arrows represent arguments, running from premises to a conclusion. Most need more than one premise: their lines converge on a dot and continue as a single arrow, because neither premise gets you there alone but together they do. Withdraw either one and the conclusion loses its support.",
         "Click any arrow and the whole argument it belongs to lights up. That is the unit the tool works in — not a loose association between two ideas, but a claim that these premises get you that conclusion.",
@@ -140,6 +144,19 @@ function graphSections() {
       quote: ["P6", "J7", "J10"],
       focus: ["P6", "J7", "J10"],
       argument: "arg-sample-5",
+    },
+        {
+      id: "theories",
+      title: "Background theories",
+      body: [
+        "Diamonds are background theories. Background theories are not immediate judgments about the ethical question at hand nor ethical rules that structure them.",
+        "Instead, they add further details that help inform arguments for and against judgments and principles. They can come from any domain of inquiry that is relevant for your ethical question, including metaphysics, epistemology, and social and natural sciences.",
+        "Invoking background theories on top of judgments and principles makes a reflective equilibrium 'wide' as opposed to 'narrow'",
+        "The two example theories below are the argument for P2 — the principle you just watched doing work above — and, being an argument, it can be attacked like one. Reaching down to this layer is what makes a reflective equilibrium wide.",
+      ],
+      quote: ["T1", "T2"],
+      focus: ["T1", "T2", "P2"],
+      argument: "arg-sample-1",
     },
     {
       id: "adding",
@@ -165,6 +182,17 @@ function graphSections() {
       ],
       quote: ["P4"],
       target: "btn-undo",
+    },
+    {
+      id: "text",
+      title: "The text panel",
+      body: [
+        "Reading the contents of your position is not limited to the graph. Every element and relation with its round, its confidence, its history, and the same buttons to revise, withdraw or reinstate it can be found in the text panel.",
+        "(You reach it via Assist → Text and Analyze → Graph in the tab bar. The tab bar is hidden while the tour is reading the graph — it comes back a few sections below.)",
+      ],
+      target: "text-panel",
+      tab: "graph",
+      text: true,
     },
     {
       id: "menu-files",
@@ -250,17 +278,6 @@ function chromeSections() {
       focus: [],
     },
     {
-      id: "text",
-      title: "The text panel",
-      body: [
-        "Beside the graph, the same position in full prose — every element and relation with its round, its confidence, its history, and the buttons to revise, withdraw or reinstate it.",
-        "The graph is for seeing shape; this is for reading and editing. Use the full-screen button above the graph to fold it away.",
-      ],
-      tab: "graph",
-      chrome: true,
-      text: true,
-    },
-    {
       id: "history",
       title: "History",
       body: [
@@ -284,8 +301,8 @@ function chromeSections() {
       id: "done",
       title: "That's the tour",
       body: [
-        "The demo is yours to explore — click nodes, drag the graph, withdraw something and see what it takes with it. Nothing you do here is saved.",
-        "Press ? in the header to read this again, and hover any button to find out what it does.",
+        "The demo is yours to explore — click nodes, drag the graph, withdraw something and see what it takes with it. Nothing you do here is saved by us.",
+        "Hover any button to find out what it does. Press ? in the header to read this guided tour again.",
       ],
       tab: "graph",
       chrome: true,

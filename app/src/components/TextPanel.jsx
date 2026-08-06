@@ -14,6 +14,7 @@ export function TextPanel({
 }) {
   return (
     <div
+      data-tutorial="text-panel"
       style={{
         width: isWide ? "50%" : "100%",
         flex: isWide ? undefined : 1,

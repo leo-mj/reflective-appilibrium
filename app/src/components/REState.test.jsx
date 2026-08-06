@@ -30,7 +30,12 @@ afterEach(() => {
 
 const open = (state = SAMPLE_STATE) =>
   render(
-    <REState initialState={state} isSample onHome={() => {}} onReady={() => {}} />,
+    <REState
+      initialState={state}
+      isSample
+      onHome={() => {}}
+      onReady={() => {}}
+    />,
   );
 
 /** The graph's own add-buttons overlay, present wherever the graph is drawn. */
@@ -183,6 +188,21 @@ describe("the guided tour", () => {
     expect(filesEntry()).toBeNull();
   });
 
+  it("brings the text panel back for the section that points at it", () => {
+    // It goes away with the rest of the chrome while the tour is reading the
+    // graph, and comes back on its own for the section saying you are not
+    // limited to the graph — the tab bar stays away for that one.
+    sessionStorage.setItem("startTour", "1");
+    open();
+    const textPanel = () =>
+      document.querySelector('[data-tutorial="text-panel"]');
+    expect(textPanel()).toBeNull();
+
+    walkTourTo(/The text panel/);
+    expect(textPanel()).not.toBeNull();
+    expect(tabBarShown()).toBe(false);
+  });
+
   it("points at both ways of adding when it gets to making a position", () => {
     // The two targets that are neither in the header nor in its menu: the
     // graph's own overlay, and the add bar — which is hidden with the rest of
@@ -193,10 +213,11 @@ describe("the guided tour", () => {
     expect(addBar()).toBeNull();
 
     walkTourTo(/Adding to the graph/);
-    expect(document.querySelector('[data-tutorial="graph-add"]')).not.toBeNull();
+    expect(
+      document.querySelector('[data-tutorial="graph-add"]'),
+    ).not.toBeNull();
     expect(addBar()).not.toBeNull();
   });
-
 });
 
 describe("questionnaire mode", () => {

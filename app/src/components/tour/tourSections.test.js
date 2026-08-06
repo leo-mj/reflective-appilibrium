@@ -65,6 +65,33 @@ describe("the tour's shape", () => {
     expect(principles.focus).toContain("P1");
   });
 
+  it("introduces the third element type off an argument it is a premise of", () => {
+    // Background theories are the layer that makes the equilibrium wide, and
+    // the demo has them arguing for a principle the reader has just been shown
+    // — so they land as part of the same web rather than as a fourth shape.
+    const sections = build();
+    const theories = sections.find((s) => s.id === "theories");
+    expect(theories.quote).toEqual(["T1", "T2"]);
+    expect(theories.argument).toBe("arg-sample-1");
+    // After the section that says what an argument is, or the argument it is
+    // shown through means nothing yet.
+    expect(ids(sections).indexOf("theories")).toBeGreaterThan(
+      ids(sections).indexOf("argument"),
+    );
+  });
+
+  it("shows the text panel while it is still about changing the position", () => {
+    // Its point is that none of the editing is limited to the graph, which only
+    // lands next to the sections about editing the graph.
+    const sections = build();
+    const order = ids(sections);
+    expect(order.indexOf("text")).toBeGreaterThan(order.indexOf("revising"));
+    expect(order.indexOf("text")).toBeLessThan(order.indexOf("assist"));
+    // Shown early, it is shown with the tab bar hidden — so it has to say where
+    // the panel is to be found once the tour has handed the app back.
+    expect(textOf(sections.find((s) => s.id === "text"))).toMatch(/analyze/i);
+  });
+
   it("shows arguments on the graph rather than describing them", () => {
     const withArguments = build().filter((s) => s.argument);
     expect(withArguments.length).toBeGreaterThanOrEqual(2);
@@ -125,7 +152,9 @@ describe("what the tour claims", () => {
     const armed = build({ hideNonEntailsRels: false }).find(
       (s) => s.id === "cycle",
     );
-    const off = build({ hideNonEntailsRels: true }).find((s) => s.id === "cycle");
+    const off = build({ hideNonEntailsRels: true }).find(
+      (s) => s.id === "cycle",
+    );
     expect(armed.title).toContain("relations");
     expect(off.title).not.toContain("relations");
   });
@@ -141,6 +170,15 @@ describe("what the app is doing while a section is read", () => {
     expect(firstWithChrome).toBeGreaterThan(lastWithout);
   });
 
+  it("asks for the panel it rings, where the ring is not on a control", () => {
+    // The text panel is hidden with the rest of the chrome, so the section that
+    // points at it has to bring it back first — there is nothing to measure
+    // otherwise.
+    const text = build().find((s) => s.id === "text");
+    expect(text.target).toBe("text-panel");
+    expect(text.text).toBe(true);
+  });
+
   it("only rings controls that are on screen when it rings them", () => {
     // These live in the tab bar, which the opening chapters hide — so a section
     // ringing one has to have asked for the bar first. The rest are drawn
@@ -149,7 +187,9 @@ describe("what the app is doing while a section is read", () => {
     build()
       .filter((s) => IN_THE_TAB_BAR.test(s.target ?? ""))
       .forEach((s) => {
-        expect(s.chrome, `${s.id} rings ${s.target} with no tab bar`).toBe(true);
+        expect(s.chrome, `${s.id} rings ${s.target} with no tab bar`).toBe(
+          true,
+        );
       });
   });
 
@@ -160,7 +200,9 @@ describe("what the app is doing while a section is read", () => {
     build()
       .filter((s) => INSIDE_THE_MENU.test(s.target ?? ""))
       .forEach((s) => {
-        expect(s.menu, `${s.id} rings ${s.target} with the menu shut`).toBe(true);
+        expect(s.menu, `${s.id} rings ${s.target} with the menu shut`).toBe(
+          true,
+        );
       });
   });
 

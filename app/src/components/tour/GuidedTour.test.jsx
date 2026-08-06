@@ -183,6 +183,20 @@ describe("the app follows the section being read", () => {
     expect(holes()).toBe(1);
   });
 
+  it("brings the text panel on and rings it, without the tab bar", () => {
+    document.body.innerHTML = '<div data-tutorial="text-panel">x</div>';
+    const spies = openTour();
+    walkTo("The text panel");
+
+    expect(spies.onSetChrome).toHaveBeenLastCalledWith({
+      chrome: false,
+      text: true,
+      menu: false,
+      addBar: false,
+    });
+    expect(holes()).toBe(1);
+  });
+
   it("takes the spotlight away as soon as the reader uses the app", () => {
     // Otherwise pressing the ringed button — Start Workflow, say — leaves what
     // it did behind a grey sheet, and the ring goes on floating over whatever
