@@ -2,9 +2,53 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- SVG first for anything that can take it; the PNG is the fallback for
+         Safari before 17, feed readers and link scrapers, which ignore an SVG
+         icon entirely. Both are rendered from branding/icon.html — see there. -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link
+      rel="alternate icon"
+      type="image/png"
+      sizes="32x32"
+      href="favicon.png"
+    />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Reflective APPilibrium</title>
+    <meta
+      name="description"
+      content="Map moral judgments, principles and the arguments between them, and revise until your position hangs together. A tool for reflective equilibrium."
+    />
+
+    <!-- Social previews. Scrapers do not run scripts and do not resolve
+         relative URLs, so og:image has to be absolute — and that URL is the
+         GitHub Pages project site, which is where `base` in vite.config.js
+         points the build. Anything in public/ is served from the dist root. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Reflective APPilibrium" />
+    <meta
+      property="og:url"
+      content="https://leo-mj.github.io/reflective-appilibrium/"
+    />
+    <meta
+      property="og:title"
+      content="Reflective APPilibrium — work through an ethical question"
+    />
+    <meta
+      property="og:description"
+      content="Map moral judgments, principles and the arguments between them, and revise until your position hangs together. A tool for reflective equilibrium."
+    />
+    <meta
+      property="og:image"
+      content="https://leo-mj.github.io/reflective-appilibrium/og-image.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="A graph of judgments, principles and background theories linked by arguments."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
     <script>
       (function () {
         var map = {
