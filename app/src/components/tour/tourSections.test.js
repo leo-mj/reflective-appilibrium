@@ -41,9 +41,11 @@ describe("the tour's shape", () => {
 
   it("says why the graph already has something in it", () => {
     const question = build().find((s) => s.id === "the-question");
-    // Otherwise the honest reading of a pre-filled graph is that the app has
-    // opinions of its own about the topic.
-    expect(textOf(question)).toMatch(/somebody's finished process/i);
+    // Left unsaid, the honest reading of a pre-filled graph is that the app has
+    // opinions of its own about the topic. It has to be marked as someone
+    // else's worked example.
+    expect(textOf(question)).toMatch(/graph/i);
+    expect(textOf(question)).toMatch(/fictional|example|someone|somebody/i);
   });
 
   it("quotes the topic it is pointing at", () => {
@@ -65,7 +67,7 @@ describe("the tour's shape", () => {
 
   it("shows arguments on the graph rather than describing them", () => {
     const withArguments = build().filter((s) => s.argument);
-    expect(withArguments.length).toBeGreaterThanOrEqual(3);
+    expect(withArguments.length).toBeGreaterThanOrEqual(2);
     // Every element an argument section names has to be framed with it, or the
     // premises are being discussed off-screen.
     withArguments.forEach((s) => {
@@ -102,6 +104,23 @@ describe("what the tour claims", () => {
     expect(textOf(assist)).toMatch(/accept and a reject/i);
   });
 
+  it("shows how a model would be connected, and says what that takes", () => {
+    const section = build().find((s) => s.id === "llm-settings");
+    // The entry lives in the ☰ menu, so the menu has to be open to ring it.
+    expect(section.target).toBe("btn-llm");
+    expect(section.menu).toBe(true);
+    // The dialog itself is no longer a stop of its own, so this section has to
+    // carry what it would have said.
+    expect(textOf(section)).toMatch(/provider/i);
+  });
+
+  it("does not promise a working connection where there is no backend", () => {
+    const find = (llmEnabled) =>
+      textOf(build({ llmEnabled }).find((s) => s.id === "llm-settings"));
+    expect(find(false)).not.toBe(find(true));
+    expect(find(false)).toMatch(/demo|not enabled|no backend/i);
+  });
+
   it("names the cycle after the relation modes that are switched on", () => {
     const armed = build({ hideNonEntailsRels: false }).find(
       (s) => s.id === "cycle",
@@ -123,13 +142,35 @@ describe("what the app is doing while a section is read", () => {
   });
 
   it("only rings controls that are on screen when it rings them", () => {
-    // The topic sits in the header's title row, which never goes away. Anything
-    // else lives in the tab bar, so its section has to have asked for the bar.
+    // These live in the tab bar, which the opening chapters hide — so a section
+    // ringing one has to have asked for the bar first. The rest are drawn
+    // whatever else is hidden: the title row, the graph, the ☰ menu.
+    const IN_THE_TAB_BAR = /^(meta-|tab-|btn-workflow)/;
     build()
-      .filter((s) => s.target && s.target !== "topic")
+      .filter((s) => IN_THE_TAB_BAR.test(s.target ?? ""))
       .forEach((s) => {
         expect(s.chrome, `${s.id} rings ${s.target} with no tab bar`).toBe(true);
       });
+  });
+
+  it("opens the ☰ menu for every entry it rings inside it", () => {
+    // These only exist in the DOM while the menu is open; ringing one without
+    // asking for the menu measures nothing and draws no ring.
+    const INSIDE_THE_MENU = /^(menu-|btn-llm|btn-home)/;
+    build()
+      .filter((s) => INSIDE_THE_MENU.test(s.target ?? ""))
+      .forEach((s) => {
+        expect(s.menu, `${s.id} rings ${s.target} with the menu shut`).toBe(true);
+      });
+  });
+
+  it("never points twice at the same control", () => {
+    // Two sections ringing one control is a section that could be folded into
+    // the other, which is how the tour got long enough to need cutting.
+    const targets = build()
+      .map((s) => s.target)
+      .filter(Boolean);
+    expect(new Set(targets).size).toBe(targets.length);
   });
 
   it("gives every section a title and something to read", () => {

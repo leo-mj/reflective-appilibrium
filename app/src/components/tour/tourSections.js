@@ -29,10 +29,16 @@
  *   neighbours.
  * @property {string}   [argument] - Argument ID to select, highlighting every
  *   premise, the conclusion, and the arrows between them.
- * @property {string}   [target] - `data-tutorial` id of a control to ring.
+ * @property {string|string[]} [target] - `data-tutorial` id of a control to
+ *   ring, or several to ring at once — two ways of doing the same thing want
+ *   showing together rather than a section each.
  * @property {string}   [tab]    - Tab to open before the section is shown.
  * @property {boolean}  [chrome] - True once the app's tab bar belongs on screen.
  * @property {boolean}  [text]   - True where the text panel belongs on screen.
+ * @property {boolean}  [addBar] - Brings the add bar back before the chapters
+ *   that would otherwise have earned it.
+ * @property {boolean}  [menu]   - Opens the header's ☰ menu, for the sections
+ *   that ring something inside it.
  */
 
 /**
@@ -47,14 +53,15 @@ function openingSections(topic) {
       chapter: "The method",
       title: "Reflective equilibrium",
       body: [
-        "Reflective equilibrium is a view of how justification works for beliefs in ethics. Roughly, you start from concrete moral judgments you are fairly confident about, look for general principles that would explain why they hold, and then adjust both sides until they fit together.",
-        "Neither side is bedrock. A principle you like can be given up because a case tells against it, and a verdict you were sure of can be given up because the principle that best explains everything else says otherwise. What justifies your position, in the end, is that it hangs together.",
+        "Reflective equilibrium is a view of how justification works for beliefs in ethics: you start from concrete moral judgments you are fairly confident about, look for general principles that would explain them, and adjust both sides until they fit together.",
+        "Neither side is bedrock. A principle can fall to a case that tells against it, and a verdict you were sure of can fall to the principle that best explains everything else. What justifies a position, in the end, is that it hangs together.",
+        "IMPORTANT: Neither reflective equilibrium nor this app guarantee reaching ethical truth."
       ],
       focus: [],
     },
     {
       id: "what-appilibrium-is",
-      chapter: "The method",
+      chapter: "The app",
       title: "Reflective APPilibrium",
       body: [
         "Reaching an equilibrium state - a position in which all your judgments fit together with each other and with the principles - can be difficult.",
@@ -65,7 +72,7 @@ function openingSections(topic) {
     },
     {
       id: "the-question",
-      title: "The example question",
+      title: "Demo example",
       body: [
         topic
           ? `This demo works through a standard question in ethics: “${topic}”`
@@ -116,19 +123,8 @@ function graphSections() {
       id: "argument",
       title: "Arguments connect the two",
       body: [
-        "Arrows represent arguments. An argument runs from premises to a conclusion: here the principle alone settles the case, so it entails the judgment on its own.",
-        "Click any arrow in the graph and the whole argument it belongs to lights up. That is the unit the tool works in — not a loose association between two ideas, but a claim that these premises get you that conclusion.",
-      ],
-      quote: ["P1", "J3"],
-      focus: ["P1", "J3"],
-      argument: "arg-sample-4",
-    },
-    {
-      id: "joint-argument",
-      title: "Two premises, one conclusion",
-      body: [
-        "Most arguments need more than one premise. Their lines converge on a dot and continue as a single arrow: neither premise gets you to the conclusion alone, but together they do.",
-        "That matters when something has to give. Withdraw either premise and the conclusion loses its support.",
+        "Arrows represent arguments, running from premises to a conclusion. Most need more than one premise: their lines converge on a dot and continue as a single arrow, because neither premise gets you there alone but together they do. Withdraw either one and the conclusion loses its support.",
+        "Click any arrow and the whole argument it belongs to lights up. That is the unit the tool works in — not a loose association between two ideas, but a claim that these premises get you that conclusion.",
       ],
       quote: ["P2", "P3", "J5"],
       focus: ["P2", "P3", "J5"],
@@ -146,15 +142,39 @@ function graphSections() {
       argument: "arg-sample-5",
     },
     {
-      id: "withdrawn",
-      title: "Nothing here is permanent",
+      id: "adding",
+      chapter: "Making changes",
+      title: "Adding to the graph",
       body: [
-        "Greyed, struck-through nodes were held earlier and given up later. This principle was adopted in round 2 and withdrawn in round 3, once it turned out to conflict with judgments its owner was far more sure of.",
-        "Withdrawing is not deleting: it stays in the record, with the reason and the round, and can be reinstated.",
+        "Of course, you not only want to read the graph, you want to write it.",
+        "+ J, + P and + T put a judgment, a principle or a background theory on the graph; + Arg opens a form for premises and a conclusion.",
+        "Or pick them out on the graph itself: select a node, Ctrl-click the others, and the bar that appears turns the selection into an argument.",
+        "The bar along the bottom does the same thing.",
+      ],
+      target: ["graph-add", "add-bar"],
+      addBar: true,
+      focus: [],
+    },
+    {
+      id: "revising",
+      title: "Revising the graph",
+      body: [
+        "Click any node to modify it: revise the wording or withdraw it entirely. Withdrawing is not deleting — the node greys out and keeps its place in the record, and can be reinstated.",
+        "The principle below went in round 3, once it turned out to conflict with judgments its owner was far more sure of.",
+        "And nothing is final either way: Undo, ringed in the header, steps back through the changes, as does Ctrl+Z. They are grouped by round rather than by keystroke, so it walks back through the thinking rather than through the typing.",
       ],
       quote: ["P4"],
-      focus: ["P4"],
-      select: "P4",
+      target: "btn-undo",
+    },
+    {
+      id: "menu-files",
+      title: "Saving your progress",
+      body: [
+        "Nothing you do here is stored on a server, so closing the tab is the end of the process. Export writes it out as a Markdown file instead — every element and relation, the round-by-round log, and the graph's layout — and Import reads one back, yours or one someone sent you.",
+        "Both are in the ☰ menu, open beside this card, along with the settings. Hover any entry to find out what it does.",
+      ],
+      target: "menu-files",
+      menu: true,
     },
   ];
 }
@@ -167,11 +187,12 @@ function assistSections(cycle, llmEnabled) {
       chapter: "Where AI comes in",
       title: "Assist proposes, you decide",
       body: [
-        "Everything so far was structure. The Assist section is the part that uses a language model: it reads your position and proposes candidates — questions to draw out judgments, principles that would systematise them, arguments hiding between elements you already hold.",
-        "Every suggestion arrives as a proposal with an accept and a reject button. Nothing enters your position until you put it there, and anything you accept you can edit first.",
+        "The Assist section is the part that uses a large language model: it reads your position and proposes candidates — questions to draw out judgments, principles that would systematise them, arguments hiding between elements you already hold.",
+        "PLEASE NOTE: AI-generated statements within this app do not necessarily express the views of the Institute for Ethics in Technology.",
+        "Each AI-suggestion arrives as a proposal with an accept and a reject button. Nothing enters your position until you put it there, and anything you accept you can edit first.",
         llmEnabled
           ? "Suggestions are generated live, so they follow whatever you have on screen."
-          : "This public build has no model connected, so the Assist tabs show pre-recorded example suggestions instead of live ones.",
+          : "This demo has no model connected, so the Assist tabs show pre-recorded example suggestions from Claude Fable instead of live ones.",
       ],
       target: "meta-assist",
       tab: "elicitJudgments",
@@ -185,10 +206,28 @@ function assistSections(cycle, llmEnabled) {
         "The three Assist tabs are one iteration of the process: draw out judgments, find principles that cover them, and detect the arguments between them.",
         "This helps you build out your views and spot both where they hangs together well and where the problems lie.",
         "Start Workflow runs the iteration for you, tab by tab, and loops. Each iteration is meant to leave your position a little more coherent than it found it.",
+        "Go ahead and click the workflow button.",
       ],
       target: "btn-workflow",
       tab: "elicitJudgments",
       chrome: true,
+    },
+    {
+      id: "llm-settings",
+      title: "Bringing your own AI model",
+      body: [
+        "The app comes with no AI model of its own. Whoever runs it points the app at a model via the ☰ menu — LLM settings.",
+        "It asks for three things: a provider, a model on it, and a key to authenticate with — and will test the three against the provider before you commit them.",
+        llmEnabled
+          ? "This build can reach a backend, so a provider you configure here is the one the Assist tabs will call."
+          : "In this public demo, the AI features are not enabled, but you can still see what selecting your model of choice would look like.",
+      ],
+      target: "btn-llm",
+      // Still on the Assist tab: this chapter is about the model, and the
+      // entry it rings is in the header either way.
+      tab: "elicitJudgments",
+      chrome: true,
+      menu: true,
     },
   ];
 }
@@ -201,7 +240,7 @@ function chromeSections() {
       chapter: "The rest of the interface",
       title: "Analyze — where you stand",
       body: [
-        "The other half of the app is for looking at the position rather than growing it. Graph is what you have been reading. History replays the process round by round. Clusters finds the largest sets of your accepted elements that hold no conflict.",
+        "The Analyze part of the app is for looking at the position rather than growing it. Graph is what you have been reading. History replays the process round by round. Clusters finds the largest sets of your accepted elements that hold no conflict.",
       ],
       target: "meta-analyze",
       tab: "graph",
@@ -242,21 +281,10 @@ function chromeSections() {
       chrome: true,
     },
     {
-      id: "menu",
-      title: "Undo, settings, import and export",
-      body: [
-        "Undo steps back through the process; changes are grouped by round rather than by keystroke. Ctrl+Z does the same.",
-        "The ☰ menu holds the rest: show relations beyond argument — support, conflict, undermining, dependence — pick a font or a light theme, and import or export the whole process as a Markdown file you can keep or send on.",
-      ],
-      target: "btn-menu",
-      tab: "graph",
-      chrome: true,
-    },
-    {
       id: "done",
       title: "That's the tour",
       body: [
-        "The demo is yours to break — click nodes, drag the graph, withdraw something and see what it takes with it. Nothing you do here is saved.",
+        "The demo is yours to explore — click nodes, drag the graph, withdraw something and see what it takes with it. Nothing you do here is saved.",
         "Press ? in the header to read this again, and hover any button to find out what it does.",
       ],
       tab: "graph",

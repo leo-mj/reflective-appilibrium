@@ -177,6 +177,7 @@ export function LLMSettingsModal({ open, onClose }) {
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
+          maxWidth: "calc(100vw - 32px)",
           zIndex: 201,
           background: C.panel,
           border: `1px solid ${C.border}`,

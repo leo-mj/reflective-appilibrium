@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
+import { TOUR_Z } from "../tour/tourZ.js";
 import { useTheme } from "../../hooks/useTheme.js";
 import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
@@ -69,12 +70,25 @@ export function AppHeaderWide({
   onWeightsChange,
   onResetWeights,
   hideTabBar,
+  tourMenuOpen,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
   const { isDark, toggle: toggleTheme } = useTheme();
+
+  // The tour walks the menu, so it opens and shuts it as it goes. It drives the
+  // header's own state rather than overriding it, so a reader who closes the
+  // menu gets it closed — until the tour moves to a section that wants it open
+  // again. Adjusted during render rather than in an effect: an effect would
+  // open the menu one paint after the section it belongs to, which is one paint
+  // after the tour measured where to ring.
+  const [tourWantedMenu, setTourWantedMenu] = useState(!!tourMenuOpen);
+  if (tourWantedMenu !== !!tourMenuOpen) {
+    setTourWantedMenu(!!tourMenuOpen);
+    setMenuOpen(!!tourMenuOpen);
+  }
 
   const llmSaved = (() => {
     if (!BYOK_ENABLED) return null;
@@ -95,6 +109,9 @@ export function AppHeaderWide({
     borderRadius: 4,
     border: "none",
   };
+  // Wrapper for the import/export pair, which the tour rings as one. Reproduces
+  // the column the menu lays its buttons out in, so wrapping changes nothing.
+  const menuGroup = { display: "flex", flexDirection: "column", gap: 2 };
   const close = (fn) => () => {
     fn();
     setMenuOpen(false);
@@ -247,16 +264,24 @@ export function AppHeaderWide({
 
             {menuOpen && (
               <>
-                <div
-                  style={{ position: "fixed", inset: 0, zIndex: 99 }}
-                  onClick={() => setMenuOpen(false)}
-                />
+                {/* Click-away, but not while the tour is walking the menu: it
+                    would swallow every click meant for the app behind it. */}
+                {!tourMenuOpen && (
+                  <div
+                    style={{ position: "fixed", inset: 0, zIndex: 99 }}
+                    onClick={() => setMenuOpen(false)}
+                  />
+                )}
                 <div
                   style={{
                     position: "absolute",
                     top: "calc(100% + 4px)",
                     right: 0,
-                    zIndex: 100,
+                    // Lifted over the tour's spotlight, which otherwise paints
+                    // the menu as dark as the app behind it. The ring sits one
+                    // layer up and its shadow leaves a hole, so the entry being
+                    // described stays bright while the rest of the menu dims.
+                    zIndex: tourMenuOpen ? TOUR_Z.menu : 100,
                     background: C.panel,
                     border: `1px solid ${C.border}`,
                     borderRadius: 6,
@@ -300,43 +325,51 @@ export function AppHeaderWide({
                       Closing the menu fired the change and then hid the only
                       evidence of it, so these stay open; only the rows that
                       navigate or open a modal close it. */}
-                  <button
-                    onClick={() => setShowTabNav((s) => !s)}
-                    style={menuItem}
-                  >
-                    <span style={menuIconStyle}>
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        style={{ display: "block" }}
-                      >
-                        <circle cx="11" cy="11" r="7" />
-                        <line x1="16.5" y1="16.5" x2="22" y2="22" />
-                      </svg>
-                    </span>
-                    {showTabNav ? "Hide nav bar" : "Show nav bar"}
-                  </button>
+                  <Tooltip text="Hide the text panel's section nav bar, which also carries its search box.">
+                    <button
+                      onClick={() => setShowTabNav((s) => !s)}
+                      style={menuItem}
+                    >
+                      <span style={menuIconStyle}>
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ display: "block" }}
+                        >
+                          <circle cx="11" cy="11" r="7" />
+                          <line x1="16.5" y1="16.5" x2="22" y2="22" />
+                        </svg>
+                      </span>
+                      {showTabNav ? "Hide nav bar" : "Show nav bar"}
+                    </button>
+                  </Tooltip>
 
-                  <button onClick={onExpandAll} style={menuItem}>
-                    <span style={menuIconStyle}>⇅</span>
-                    {allExpanded ? "Minimize toggles" : "Expand toggles"}
-                  </button>
+                  <Tooltip text="Expand or collapse every card in the text panel at once.">
+                    <button onClick={onExpandAll} style={menuItem}>
+                      <span style={menuIconStyle}>⇅</span>
+                      {allExpanded ? "Minimize toggles" : "Expand toggles"}
+                    </button>
+                  </Tooltip>
 
-                  <button
-                    onClick={() => setHideNonEntailsRels((s) => !s)}
-                    style={{ ...menuItem, textAlign: "left " }}
-                  >
-                    <span style={menuIconStyle}>→</span>
-                    {hideNonEntailsRels
-                      ? "Show all relations"
-                      : "Arguments only"}
-                  </button>
+                  {/* The tour used to stop and explain this one. It says so
+                      itself now, so the tour can stay short. */}
+                  <Tooltip text="The graph shows arguments by default — the entailments and preclusions that carry the weight. Switch this on and the softer links appear too: one element supporting, conflicting with, undermining, or presupposing another. It also adds a step to the Assist cycle, where the model proposes them.">
+                    <button
+                      onClick={() => setHideNonEntailsRels((s) => !s)}
+                      style={{ ...menuItem, textAlign: "left " }}
+                    >
+                      <span style={menuIconStyle}>→</span>
+                      {hideNonEntailsRels
+                        ? "Show all relations"
+                        : "Arguments only"}
+                    </button>
+                  </Tooltip>
 
                   {BACKEND_ENABLED && (
                     <Tooltip text="When on, detected arguments are verified for formal validity, auto-trimmed, and stripped of meaning postulates. When off, the model's raw arguments are surfaced unchecked.">
@@ -406,96 +439,102 @@ export function AppHeaderWide({
 
                   <div style={menuDividerStyle} />
 
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setFontOpen(true);
-                    }}
-                    style={menuItem}
-                  >
-                    <span style={menuIconStyle}>Aa</span>Select Font
-                  </button>
-
-                  <button onClick={toggleTheme} style={menuItem}>
-                    <span style={menuIconStyle}>
-                      {isDark ? (
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{ display: "block" }}
-                        >
-                          <circle cx="12" cy="12" r="5" />
-                          <line x1="12" y1="1" x2="12" y2="3" />
-                          <line x1="12" y1="21" x2="12" y2="23" />
-                          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                          <line x1="1" y1="12" x2="3" y2="12" />
-                          <line x1="21" y1="12" x2="23" y2="12" />
-                          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                        </svg>
-                      ) : (
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{ display: "block" }}
-                        >
-                          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                        </svg>
-                      )}
-                    </span>
-                    {isDark ? "Light mode" : "Dark mode"}
-                  </button>
-
-                  <div style={menuDividerStyle} />
-
-                  <Tooltip text="Import a previously exported JSON file to restore an RE state.">
+                  <Tooltip text="Pick a font, including one drawn for dyslexic readers.">
                     <button
                       onClick={() => {
-                        handleImportClick();
                         setMenuOpen(false);
+                        setFontOpen(true);
                       }}
                       style={menuItem}
                     >
-                      <span style={menuIconStyle}>↑</span>Import
+                      <span style={menuIconStyle}>Aa</span>Select Font
                     </button>
                   </Tooltip>
-                  <Tooltip text="Export the current RE state as a JSON file you can re-import later.">
-                    <button
-                      onClick={close(onDownload)}
-                      style={{ ...menuItem, color: C.theory.high }}
-                    >
-                      <span style={menuIconStyle}>↓</span>Export
+
+                  <Tooltip text="Switch between the dark and light themes.">
+                    <button onClick={toggleTheme} style={menuItem}>
+                      <span style={menuIconStyle}>
+                        {isDark ? (
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ display: "block" }}
+                          >
+                            <circle cx="12" cy="12" r="5" />
+                            <line x1="12" y1="1" x2="12" y2="3" />
+                            <line x1="12" y1="21" x2="12" y2="23" />
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            <line x1="1" y1="12" x2="3" y2="12" />
+                            <line x1="21" y1="12" x2="23" y2="12" />
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                          </svg>
+                        ) : (
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ display: "block" }}
+                          >
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                          </svg>
+                        )}
+                      </span>
+                      {isDark ? "Light mode" : "Dark mode"}
                     </button>
                   </Tooltip>
-                  {BACKEND_ENABLED && (
-                    <Tooltip text="Save session to the backend server. Reload it from the home screen.">
+
+                  <div style={menuDividerStyle} />
+
+                  <div style={menuGroup} data-tutorial="menu-files">
+                    <Tooltip text="Import a previously exported JSON file to restore an RE state.">
                       <button
-                        onClick={close(onSave)}
-                        disabled={saveBusy}
-                        style={{
-                          ...menuItem,
-                          ...(saveColor
-                            ? { color: saveColor, borderColor: saveColor }
-                            : {}),
+                        onClick={() => {
+                          handleImportClick();
+                          setMenuOpen(false);
                         }}
+                        style={menuItem}
                       >
-                        <span style={menuIconStyle}>{saveLabel}</span>Save
+                        <span style={menuIconStyle}>↑</span>Import
                       </button>
                     </Tooltip>
-                  )}
+                    <Tooltip text="Export the current RE state as a JSON file you can re-import later.">
+                      <button
+                        onClick={close(onDownload)}
+                        style={{ ...menuItem, color: C.theory.high }}
+                      >
+                        <span style={menuIconStyle}>↓</span>Export
+                      </button>
+                    </Tooltip>
+                    {BACKEND_ENABLED && (
+                      <Tooltip text="Save session to the backend server. Reload it from the home screen.">
+                        <button
+                          onClick={close(onSave)}
+                          disabled={saveBusy}
+                          style={{
+                            ...menuItem,
+                            ...(saveColor
+                              ? { color: saveColor, borderColor: saveColor }
+                              : {}),
+                          }}
+                        >
+                          <span style={menuIconStyle}>{saveLabel}</span>Save
+                        </button>
+                      </Tooltip>
+                    )}
+                  </div>
                 </div>
               </>
             )}

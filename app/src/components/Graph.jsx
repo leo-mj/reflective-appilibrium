@@ -59,6 +59,8 @@ function AddButtonsOverlay({
 }) {
   return (
     <div
+      // Ringed by the tour when it gets to making your own position.
+      data-tutorial="graph-add"
       style={{
         position: "absolute",
         top: 12,

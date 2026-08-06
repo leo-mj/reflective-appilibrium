@@ -68,6 +68,8 @@ import { BACKEND_ENABLED } from "../config.js";
  * @param {function} props.onCloseTour
  * @param {boolean}  props.hideTabBar  - Set while the wide tour's opening
  *   chapters read against a bare graph.
+ * @param {boolean}  props.tourMenuOpen - The wide tour walks the ☰ menu's own
+ *   entries, so it opens and shuts the menu as it goes.
  */
 export function AppHeader({
   round,
@@ -105,6 +107,7 @@ export function AppHeader({
   onStartTour,
   onCloseTour,
   hideTabBar,
+  tourMenuOpen,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -291,6 +294,7 @@ export function AppHeader({
         setAssistSidePanel={setAssistSidePanel}
         visibleSubTabs={visibleSubTabs}
         hideTabBar={hideTabBar}
+        tourMenuOpen={tourMenuOpen}
       />
     </>
   );

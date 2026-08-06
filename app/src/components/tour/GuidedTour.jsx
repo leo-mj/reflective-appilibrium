@@ -21,10 +21,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { LLM_ENABLED } from "../../config.js";
 import { buildTourSections } from "./tourSections.js";
-import { TOUR_Z } from "./tourZ.js";
+import { TOUR_W, TOUR_Z } from "./tourZ.js";
 
-/** Width of the tour column. The app is padded by this much while it is open. */
-export const TOUR_W = 400;
+// Re-exported for the app around it, which pads itself by the column's width.
+export { TOUR_W };
 
 const RING_PAD = 5;
 
@@ -38,6 +38,15 @@ const READING_LINE = 0.25;
 
 /** Scroll events are ignored for this long after Back or Next scrolls for you. */
 const PROGRAMMATIC_MS = 700;
+
+/** Gap above a section scrolled to by Back or Next. */
+const SCROLL_PAD = 12;
+
+/** Shared empty array, so "nothing ringed" is a stable value between renders. */
+const EMPTY = [];
+
+/** Ties the spotlight's holes to the sheet they are cut out of. */
+const SPOTLIGHT_MASK = "tour-spotlight-mask";
 
 const TYPE_COLOR = {
   judgment: C.judgment.high,
@@ -73,18 +82,18 @@ function QuoteCard({ element }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11, fontWeight: "bold", color }}>
+        <span style={{ fontSize: 12, fontWeight: "bold", color }}>
           {element.id}
         </span>
-        <span style={{ fontSize: 10, color: C.dim }}>
+        <span style={{ fontSize: 11, color: C.dim }}>
           {TYPE_LABEL[element.type] ?? element.type}
           {gone ? ` · ${element.status}` : ""}
         </span>
       </div>
       <div
         style={{
-          fontSize: 12,
-          lineHeight: 1.6,
+          fontSize: 13.5,
+          lineHeight: 1.65,
           color: C.text,
           textDecoration: gone ? "line-through" : "none",
         }}
@@ -122,8 +131,8 @@ const navBtn = (enabled) => ({
   border: `1px solid ${C.border}`,
   borderRadius: 4,
   color: enabled ? C.text : C.dim,
-  fontSize: 11,
-  padding: "5px 12px",
+  fontSize: 12,
+  padding: "6px 14px",
   cursor: enabled ? "pointer" : "not-allowed",
   opacity: enabled ? 1 : 0.45,
 });
@@ -161,8 +170,8 @@ function applicableSections(sections, state) {
  * @param {Function} props.onSetTab
  * @param {Function} props.onSelectNode   - Takes an updater, like the graph's own handler.
  * @param {Function} props.onSelectRel
- * @param {Function} props.onSetChrome    - `{ chrome, text }` — whether the app's tab
- *   bar and text panel belong on screen for the section being read.
+ * @param {Function} props.onSetChrome    - `{ chrome, text, menu, addBar }` —
+ *   what the app should have on screen for the section being read.
  * @param {Function} props.onFocusGraph   - Element IDs to frame, or null for all of them.
  */
 export function GuidedTour({
@@ -195,11 +204,25 @@ export function GuidedTour({
   );
 
   const [idx, setIdx] = useState(0);
-  const [rect, setRect] = useState(null);
+  const [rects, setRects] = useState(EMPTY);
+  const panelRef = useRef(null);
   const scrollRef = useRef(null);
   const sectionRefs = useRef([]);
   const quietUntil = useRef(0);
   const section = sections[idx];
+
+  // The spotlight points at a control and dims everything else, which is right
+  // while the reader is being shown where it is and wrong the moment they use
+  // it: pressing Start Workflow would leave what it started behind a grey
+  // sheet, and a ring drawn over the graph goes on covering whatever the reader
+  // opens on top of it. So the first touch of the app anywhere takes the whole
+  // highlight away; the next section arms it again.
+  const [ringArmedFor, setRingArmedFor] = useState(0);
+  const [ringShown, setRingShown] = useState(true);
+  if (ringArmedFor !== idx) {
+    setRingArmedFor(idx);
+    setRingShown(true);
+  }
 
   // ── Scroll drives the active section ──────────────────────────────────────
   const measureActive = useCallback(() => {
@@ -213,6 +236,11 @@ export function GuidedTour({
     sectionRefs.current.forEach((el, i) => {
       if (el && el.getBoundingClientRect().top <= line) next = i;
     });
+    // Scrolled as far as it goes. The last section can be shorter than the
+    // space below the reading line, in which case its top never reaches the
+    // line and it could not be read at all.
+    if (root.scrollTop + root.clientHeight >= root.scrollHeight - 2)
+      next = sectionRefs.current.length - 1;
     setIdx((prev) => (prev === next ? prev : next));
   }, []);
 
@@ -252,7 +280,12 @@ export function GuidedTour({
     }
     if (!section) return;
     if (section.tab) onSetTab(section.tab);
-    onSetChrome({ chrome: !!section.chrome, text: !!section.text });
+    onSetChrome({
+      chrome: !!section.chrome,
+      text: !!section.text,
+      menu: !!section.menu,
+      addBar: !!section.addBar,
+    });
 
     if (section.argument) {
       const rel = state.relations.find(
@@ -270,24 +303,37 @@ export function GuidedTour({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, idx, section?.id]);
 
-  // ── Ring whatever control the section is about ────────────────────────────
+  // ── Ring whatever controls the section is about ───────────────────────────
+  // A section may name more than one: two routes to the same thing are worth
+  // showing together, and the spotlight below cuts a hole for each.
+  const targets = section?.target ? [section.target].flat() : EMPTY;
+  const targetKey = targets.join(" ");
   const measureRing = useCallback(() => {
-    if (!section?.target) {
-      setRect(null);
-      return;
-    }
-    const el = document.querySelector(`[data-tutorial="${section.target}"]`);
-    setRect(el ? el.getBoundingClientRect() : null);
-  }, [section?.target]);
+    setRects(
+      targets
+        .map((t) => document.querySelector(`[data-tutorial="${t}"]`))
+        .filter(Boolean)
+        .map((el) => el.getBoundingClientRect()),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey]);
 
   useEffect(() => {
     if (!active) return;
     // Two frames: the first lets the tab switch and the chrome above render,
-    // the second measures where the target actually landed.
-    const outer = requestAnimationFrame(() =>
-      requestAnimationFrame(measureRing),
-    );
-    return () => cancelAnimationFrame(outer);
+    // the second measures where the target actually landed. The later pass is
+    // for targets that are not in the DOM yet at that point — an entry in a
+    // menu this section is also asking the header to open.
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(measureRing);
+    });
+    const settled = setTimeout(measureRing, 180);
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+      clearTimeout(settled);
+    };
   }, [active, idx, measureRing]);
 
   useEffect(() => {
@@ -296,10 +342,33 @@ export function GuidedTour({
     return () => window.removeEventListener("resize", measureRing);
   }, [active, measureRing]);
 
+  // Using the app takes the highlight away. Capture phase, so it lands whether
+  // or not the control stops the event, and pointerdown rather than click so
+  // the sheet is gone before whatever was pressed redraws underneath it.
+  useEffect(() => {
+    if (!active) return;
+    const used = () => setRingShown(false);
+    const onPointerDown = (e) => {
+      if (!panelRef.current?.contains(e.target)) used();
+    };
+    // The keyboard equivalent: driving the app from the keyboard is using it
+    // just as much, and Enter on a focused button never fires a pointer event.
+    const onKeyDown = (e) => {
+      if (e.key === "Escape" || e.key === "Tab") return;
+      if (!panelRef.current?.contains(document.activeElement)) used();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [active]);
+
   // ── Leaving ───────────────────────────────────────────────────────────────
   const handleClose = useCallback(() => {
     onSelectNode(() => null);
-    onSetChrome({ chrome: true, text: true });
+    onSetChrome({ chrome: true, text: true, menu: false, addBar: false });
     onFocusGraph(null);
     onClose();
   }, [onClose, onSelectNode, onSetChrome, onFocusGraph]);
@@ -319,10 +388,13 @@ export function GuidedTour({
     // firing every section it passes over on the way.
     quietUntil.current = Date.now() + PROGRAMMATIC_MS;
     setIdx(clamped);
-    sectionRefs.current[clamped]?.scrollIntoView?.({
-      behavior: "smooth",
-      block: "start",
-    });
+    const root = scrollRef.current;
+    const el = sectionRefs.current[clamped];
+    // scrollIntoView would do this, but it scrolls the nearest scrollable
+    // ancestor by its own reckoning and lands a section short or long. The
+    // column's offsets are known exactly, so use them.
+    if (root && el)
+      root.scrollTo({ top: el.offsetTop - SCROLL_PAD, behavior: "smooth" });
   };
 
   if (!active || !section) return null;
@@ -332,25 +404,66 @@ export function GuidedTour({
 
   return (
     <>
-      {/* Spotlight. Only sections about a control dim the app; the ones about
-          the graph leave it lit, because the graph is what they are pointing at. */}
-      {rect && (
-        <div
+      {/* Spotlight: one grey sheet over the app with a hole cut for each thing
+          the section points at, and a ring drawn round each hole. A mask rather
+          than a box-shadow, which can only ever leave one control lit.
+
+          Only sections about a control raise one; the ones about the graph
+          leave the app lit, because the graph is what they are pointing at —
+          and so does any section whose reader has started using the app. */}
+      {rects.length > 0 && ringShown && (
+        <svg
           style={{
             position: "fixed",
-            top: rect.top - RING_PAD,
-            left: rect.left - RING_PAD,
-            width: rect.width + RING_PAD * 2,
-            height: rect.height + RING_PAD * 2,
-            borderRadius: 7,
-            boxShadow: `0 0 0 2px ${C.supports}, 0 0 0 2000px rgba(0,0,0,0.45)`,
+            inset: 0,
+            width: "100vw",
+            height: "100vh",
             zIndex: TOUR_Z.ring,
             pointerEvents: "none",
           }}
-        />
+        >
+          <defs>
+            <mask id={SPOTLIGHT_MASK}>
+              <rect x="0" y="0" width="100%" height="100%" fill="#fff" />
+              {rects.map((r, i) => (
+                <rect
+                  key={i}
+                  x={r.left - RING_PAD}
+                  y={r.top - RING_PAD}
+                  width={r.width + RING_PAD * 2}
+                  height={r.height + RING_PAD * 2}
+                  rx={7}
+                  fill="#000"
+                />
+              ))}
+            </mask>
+          </defs>
+          <rect
+            x="0"
+            y="0"
+            width="100%"
+            height="100%"
+            fill="rgba(0,0,0,0.45)"
+            mask={`url(#${SPOTLIGHT_MASK})`}
+          />
+          {rects.map((r, i) => (
+            <rect
+              key={i}
+              x={r.left - RING_PAD}
+              y={r.top - RING_PAD}
+              width={r.width + RING_PAD * 2}
+              height={r.height + RING_PAD * 2}
+              rx={7}
+              fill="none"
+              stroke={C.supports}
+              strokeWidth={2}
+            />
+          ))}
+        </svg>
       )}
 
       <aside
+        ref={panelRef}
         aria-label="Guided tour"
         style={{
           position: "fixed",
@@ -368,7 +481,7 @@ export function GuidedTour({
       >
         <div
           style={{
-            padding: "12px 20px 10px",
+            padding: "14px 24px 10px",
             borderBottom: `1px solid ${C.border}`,
             display: "flex",
             flexDirection: "column",
@@ -386,7 +499,7 @@ export function GuidedTour({
           >
             <span
               style={{
-                fontSize: 11,
+                fontSize: 12,
                 letterSpacing: 0.6,
                 textTransform: "uppercase",
                 color: C.dim,
@@ -400,7 +513,7 @@ export function GuidedTour({
                 background: "transparent",
                 border: "none",
                 color: C.dim,
-                fontSize: 11,
+                fontSize: 12,
                 cursor: "pointer",
                 padding: 0,
               }}
@@ -416,8 +529,13 @@ export function GuidedTour({
           style={{
             flex: 1,
             overflowY: "auto",
-            scrollSnapType: "y proximity",
-            padding: "0 20px",
+            // `position: relative` makes each section's offsetTop relative to
+            // this box, which is what Back and Next scroll to. No scroll
+            // snapping: with sections of wildly different heights it fought
+            // both the reader and those scrolls, landing a section past the
+            // one that was asked for.
+            position: "relative",
+            padding: "0 24px",
           }}
         >
           {sections.map((s, i) => {
@@ -437,9 +555,7 @@ export function GuidedTour({
                 aria-labelledby={`tour-title-${s.id}`}
                 aria-current={isActive ? "step" : undefined}
                 style={{
-                  scrollSnapAlign: "start",
-                  scrollMarginTop: 16,
-                  padding: "22px 0",
+                  padding: "24px 0",
                   borderBottom:
                     i === sections.length - 1
                       ? "none"
@@ -451,7 +567,7 @@ export function GuidedTour({
                 {s.chapter && (
                   <h2
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       letterSpacing: 1,
                       textTransform: "uppercase",
                       color: C.supports,
@@ -464,10 +580,10 @@ export function GuidedTour({
                 <h3
                   id={`tour-title-${s.id}`}
                   style={{
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: "bold",
                     color: C.text,
-                    margin: "0 0 8px",
+                    margin: "0 0 10px",
                   }}
                 >
                   {s.title}
@@ -476,10 +592,10 @@ export function GuidedTour({
                   <p
                     key={p}
                     style={{
-                      fontSize: 12.5,
-                      lineHeight: 1.75,
+                      fontSize: 13.5,
+                      lineHeight: 1.8,
                       color: C.dim,
-                      margin: "0 0 10px",
+                      margin: "0 0 12px",
                     }}
                   >
                     {paragraph}
@@ -505,11 +621,11 @@ export function GuidedTour({
                 {argRel?.explanation && (
                   <p
                     style={{
-                      fontSize: 11.5,
-                      lineHeight: 1.7,
+                      fontSize: 12.5,
+                      lineHeight: 1.75,
                       color: C.dim,
                       fontStyle: "italic",
-                      margin: "10px 0 0",
+                      margin: "12px 0 0",
                     }}
                   >
                     {argRel.explanation}
@@ -518,13 +634,16 @@ export function GuidedTour({
               </section>
             );
           })}
-          {/* Lets the last section reach the reading line. */}
-          <div style={{ height: "45vh" }} aria-hidden="true" />
+          {/* Lets the last section climb to the reading line rather than
+              stopping at the bottom edge. It cannot reach it on a tall screen,
+              which is why `measureActive` also treats "scrolled to the end" as
+              the last section. */}
+          <div style={{ height: "40vh" }} aria-hidden="true" />
         </div>
 
         <div
           style={{
-            padding: "10px 20px",
+            padding: "10px 24px",
             borderTop: `1px solid ${C.border}`,
             display: "flex",
             alignItems: "center",
@@ -533,7 +652,7 @@ export function GuidedTour({
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 10, color: C.dim }}>
+          <span style={{ fontSize: 11, color: C.dim }}>
             {idx + 1} / {sections.length}
           </span>
           <div style={{ display: "flex", gap: 6 }}>

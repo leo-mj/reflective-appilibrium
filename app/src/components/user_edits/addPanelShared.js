@@ -30,3 +30,19 @@ export function makeRelationDefaults(elements) {
     explanation: "",
   };
 }
+
+/**
+ * An argument opens with one premise. More are added a row at a time, since
+ * most arguments need two and no form can guess how many.
+ *
+ * @param {import('../../types.js').REElement[]} elements
+ */
+export function makeArgumentDefaults(elements) {
+  const ids = defaultPickerIds(elements);
+  return {
+    premises: [ids[0] ?? ""],
+    conclusion: ids[1] ?? "",
+    negated: false,
+    explanation: "",
+  };
+}

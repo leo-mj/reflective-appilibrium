@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import { GuidedTour } from "./GuidedTour.jsx";
+import { TOUR_Z } from "./tourZ.js";
 import { SAMPLE_STATE } from "../../state.js";
 
 beforeEach(() => {
@@ -21,7 +22,8 @@ beforeEach(() => {
     return 1;
   });
   vi.stubGlobal("cancelAnimationFrame", () => {});
-  Element.prototype.scrollIntoView = () => {};
+  // jsdom has no scrolling to do, and does not implement the call.
+  Element.prototype.scrollTo = () => {};
 });
 
 afterEach(() => {
@@ -52,20 +54,28 @@ const openTour = (overrides = {}) => {
   return spies;
 };
 
+/** The spotlight: one grey sheet with a hole cut for each ringed control. */
+const ring = () => document.querySelector(`[style*="z-index: ${TOUR_Z.ring}"]`);
+/** How many controls it is pointing at — one ring drawn per hole. */
+const holes = () => ring()?.querySelectorAll("mask rect").length - 1;
+
 const next = () => fireEvent.click(screen.getByText("Next ↓"));
 const back = () => fireEvent.click(screen.getByText("← Back"));
+
+/** The heading of the section being read. Matched on rather than the whole
+ *  section, whose prose mentions other sections by name. */
+const currentTitle = () =>
+  document.querySelector('[aria-current="step"] h3')?.textContent ?? "";
 
 /** Advances until the tour is showing the section titled `title`. */
 const walkTo = (title) => {
   for (let i = 0; i < 40; i++) {
-    const current = document.querySelector('[aria-current="step"]');
-    if (current?.textContent.includes(title)) return;
+    if (currentTitle().includes(title)) return;
     // The last section's button ends the tour rather than advancing it.
     if (screen.queryByText("Finish")) break;
     next();
   }
-  const current = document.querySelector('[aria-current="step"]')?.textContent;
-  throw new Error(`never reached "${title}" — stopped on "${current}"`);
+  throw new Error(`never reached "${title}" — stopped on "${currentTitle()}"`);
 };
 
 /** The argument ids of the last relation handed to onSelectRel. */
@@ -86,6 +96,8 @@ describe("what the reader lands on", () => {
     expect(spies.onSetChrome).toHaveBeenLastCalledWith({
       chrome: false,
       text: false,
+      menu: false,
+      addBar: false,
     });
   });
 
@@ -117,10 +129,10 @@ describe("the app follows the section being read", () => {
     walkTo("Arguments connect the two");
 
     const rel = lastSelectedRel(spies);
-    expect(rel.argumentId).toBe("arg-sample-4");
+    expect(rel.argumentId).toBe("arg-sample-3");
     // Premises and conclusion framed together, or the arrow being described
     // runs off the edge of the panel.
-    expect(spies.onFocusGraph).toHaveBeenLastCalledWith(["P1", "J3"]);
+    expect(spies.onFocusGraph).toHaveBeenLastCalledWith(["P2", "P3", "J5"]);
   });
 
   it("quotes the elements' own text rather than a copy of it", () => {
@@ -137,6 +149,8 @@ describe("the app follows the section being read", () => {
     expect(spies.onSetChrome).toHaveBeenLastCalledWith({
       chrome: true,
       text: false,
+      menu: false,
+      addBar: false,
     });
     expect(spies.onSetTab).toHaveBeenLastCalledWith("elicitJudgments");
   });
@@ -145,9 +159,78 @@ describe("the app follows the section being read", () => {
     document.body.innerHTML = '<button data-tutorial="tab-history">x</button>';
     openTour();
     walkTo("History");
-    expect(
-      document.querySelector('[style*="box-shadow"][style*="position: fixed"]'),
-    ).toBeTruthy();
+    expect(ring()).toBeTruthy();
+    expect(holes()).toBe(1);
+  });
+
+  it("rings both of them when a section names two", () => {
+    // Adding to the graph has two routes — the + buttons and the add bar — and
+    // showing one at a time would make them look like alternatives to choose
+    // between rather than the same thing twice.
+    document.body.innerHTML =
+      '<div data-tutorial="graph-add">x</div><div data-tutorial="add-bar">y</div>';
+    openTour();
+    walkTo("Adding to the graph");
+    expect(holes()).toBe(2);
+  });
+
+  it("cuts a hole for a target that is missing, rather than ringing nothing", () => {
+    // Only one of the two is on screen here; the section still points at what
+    // it can find.
+    document.body.innerHTML = '<div data-tutorial="graph-add">x</div>';
+    openTour();
+    walkTo("Adding to the graph");
+    expect(holes()).toBe(1);
+  });
+
+  it("takes the spotlight away as soon as the reader uses the app", () => {
+    // Otherwise pressing the ringed button — Start Workflow, say — leaves what
+    // it did behind a grey sheet, and the ring goes on floating over whatever
+    // the reader opens on top of it.
+    document.body.innerHTML =
+      '<button data-tutorial="tab-history">x</button><div id="app">app</div>';
+    openTour();
+    walkTo("History");
+    expect(ring()).toBeTruthy();
+
+    fireEvent.pointerDown(document.getElementById("app"));
+    expect(ring()).toBeNull();
+  });
+
+  it("keeps the tour's own controls from dropping the spotlight", () => {
+    document.body.innerHTML = '<button data-tutorial="tab-clusters">x</button>';
+    openTour();
+    walkTo("Coherence clusters");
+    fireEvent.pointerDown(screen.getByText("← Back"));
+    expect(ring()).toBeTruthy();
+  });
+
+  it("drops it for the keyboard too", () => {
+    // Enter on a focused button fires no pointer event, and driving the app
+    // from the keyboard is using it just as much.
+    document.body.innerHTML =
+      '<button data-tutorial="tab-history">x</button>' +
+      '<button id="app-button">app</button>';
+    openTour();
+    walkTo("History");
+
+    document.getElementById("app-button").focus();
+    fireEvent.keyDown(document.getElementById("app-button"), { key: "Enter" });
+    expect(ring()).toBeNull();
+  });
+
+  it("arms the spotlight again for the next section", () => {
+    document.body.innerHTML =
+      '<button data-tutorial="tab-history">x</button>' +
+      '<button data-tutorial="tab-clusters">y</button>' +
+      '<div id="app">app</div>';
+    openTour();
+    walkTo("History");
+    fireEvent.pointerDown(document.getElementById("app"));
+    expect(ring()).toBeNull();
+
+    walkTo("Coherence clusters");
+    expect(ring()).toBeTruthy();
   });
 
   it("can be read backwards", () => {
@@ -167,6 +250,8 @@ describe("leaving", () => {
     expect(spies.onSetChrome).toHaveBeenLastCalledWith({
       chrome: true,
       text: true,
+      menu: false,
+      addBar: false,
     });
     expect(spies.onFocusGraph).toHaveBeenLastCalledWith(null);
     expect(lastSelectedNode(spies)).toBe(null);
@@ -206,7 +291,7 @@ describe("leaving", () => {
     expect(screen.getByText("Reflective equilibrium")).toBeTruthy();
     // The tab bar the last section had asked for must not flash back on.
     expect(spies.onSetChrome.mock.calls).toEqual([
-      [{ chrome: false, text: false }],
+      [{ chrome: false, text: false, menu: false, addBar: false }],
     ]);
   });
 
@@ -236,7 +321,7 @@ describe("sections the state cannot support", () => {
     const withoutArg = {
       ...SAMPLE_STATE,
       relations: SAMPLE_STATE.relations.filter(
-        (r) => r.argumentId !== "arg-sample-4",
+        (r) => r.argumentId !== "arg-sample-3",
       ),
     };
     openTour({ state: withoutArg });

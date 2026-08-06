@@ -48,8 +48,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     return false;
   });
   // What the wide tour wants on screen: its opening chapters read against a
-  // bare graph, and bring the tab bar and text panel back once they are what
-  // the reader is being shown.
+  // bare graph, and bring the tab bar, the text panel and the ☰ menu back as
+  // each becomes what the reader is being shown.
   const [tourChrome, setTourChrome] = useState({ chrome: true, text: true });
   const [graphFocus, setGraphFocus] = useState(null);
   const focusSeq = useRef(0);
@@ -131,6 +131,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   // The phone gets its own tour, run from the header; this is the wide one.
   const wideTour = isWide && tourActive;
   const tourHidesChrome = wideTour && !tourChrome.chrome;
+  // The add bar goes away with the rest of the chrome for the chapters that are
+  // about reading the graph — except for the one section that is about adding
+  // to it, which asks for it back and rings it.
+  const showAddBar = !tourHidesChrome || tourChrome.addBar;
   const isAssistTab = ASSIST_TABS.includes(tab);
   const isSimulateTab = SIMULATE_TABS.includes(tab);
   const usesSidePanel = isAssistTab || isSimulateTab;
@@ -368,6 +372,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onStartTour={() => setTourActive(true)}
         onCloseTour={() => setTourActive(false)}
         hideTabBar={tourHidesChrome}
+        tourMenuOpen={wideTour && tourChrome.menu}
       />
 
       <div
@@ -429,13 +434,14 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         )}
       </div>
 
-      {isWide && !isAssistTab && !isSimulateTab && !tourHidesChrome && (
+      {isWide && !isAssistTab && !isSimulateTab && showAddBar && (
         <AddBar
           elements={linkableElements(state.elements)}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
           selected={selected}
           ctrlTo={addBarCtrlTo}
+          hideNonEntailsRels={hideNonEntailsRels}
         />
       )}
 

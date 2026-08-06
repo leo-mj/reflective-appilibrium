@@ -18,6 +18,9 @@ beforeEach(() => {
   vi.stubGlobal("ResizeObserver", NoopObserver);
   vi.stubGlobal("IntersectionObserver", NoopObserver);
   vi.stubGlobal("requestAnimationFrame", () => 0);
+  // jsdom has no scrolling to do, and does not implement the call the tour's
+  // Back and Next make.
+  Element.prototype.scrollTo = () => {};
 });
 
 afterEach(() => {
@@ -151,6 +154,49 @@ describe("the guided tour", () => {
     fireEvent.click(screen.getByLabelText("Start the step-by-step tour"));
     expect(tourShown()).toBe(true);
   });
+
+  /** Presses Next until the tour is reading the section matching `title`. */
+  const walkTourTo = (title) => {
+    for (let i = 0; i < 40; i++) {
+      const current = document.querySelector('[aria-current="step"]');
+      if (title.test(current?.textContent ?? "")) return;
+      const button = screen.queryByText("Next ↓");
+      if (!button) break;
+      fireEvent.click(button);
+    }
+    throw new Error(`the tour never reached ${title}`);
+  };
+
+  it("opens the ☰ menu for the sections that walk it, and shuts it after", () => {
+    // Those sections ring entries that are not in the DOM until the menu is
+    // open, so the tour drives the header's own menu as it goes.
+    sessionStorage.setItem("startTour", "1");
+    open();
+    const filesEntry = () =>
+      document.querySelector('[data-tutorial="menu-files"]');
+    expect(filesEntry()).toBeNull();
+
+    walkTourTo(/Saving your progress/);
+    expect(filesEntry()).not.toBeNull();
+
+    fireEvent.click(screen.getByText("Skip tour"));
+    expect(filesEntry()).toBeNull();
+  });
+
+  it("points at both ways of adding when it gets to making a position", () => {
+    // The two targets that are neither in the header nor in its menu: the
+    // graph's own overlay, and the add bar — which is hidden with the rest of
+    // the chrome until this section asks for it back.
+    sessionStorage.setItem("startTour", "1");
+    open();
+    const addBar = () => document.querySelector('[data-tutorial="add-bar"]');
+    expect(addBar()).toBeNull();
+
+    walkTourTo(/Adding to the graph/);
+    expect(document.querySelector('[data-tutorial="graph-add"]')).not.toBeNull();
+    expect(addBar()).not.toBeNull();
+  });
+
 });
 
 describe("questionnaire mode", () => {
