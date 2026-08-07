@@ -417,7 +417,10 @@ export function GuidedTour({
             position: "fixed",
             inset: 0,
             width: "100vw",
-            height: "100vh",
+            // dvh for the same reason as the overlay: the holes in the mask are
+            // placed from getBoundingClientRect, so the sheet they are cut out
+            // of has to be the viewport those rects were measured in.
+            height: "100dvh",
             zIndex: TOUR_Z.ring,
             pointerEvents: "none",
           }}

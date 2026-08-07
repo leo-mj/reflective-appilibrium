@@ -376,7 +376,10 @@ export function HomePage({
   return (
     <div
       style={{
-        minHeight: "100vh",
+        // svh, not vh: the floor has to be the viewport at its smallest, with
+        // the phone's URL bar showing, or the page is born taller than the
+        // screen and scrolls when there is nothing below the fold to reach.
+        minHeight: "100svh",
         background: C.bg,
         color: C.text,
         display: "flex",

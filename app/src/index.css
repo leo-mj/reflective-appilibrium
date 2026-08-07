@@ -63,3 +63,29 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* Tap targets.
+
+   A thumb needs more room than a mouse pointer, so the panel's small inline
+   controls are grown — but only where they are actually thumbed. Keyed on the
+   input device rather than the viewport width, for two reasons: a phone held in
+   landscape is wider than 768px and still driven by a thumb, and a narrow
+   window on a desktop is still driven by a mouse and gains nothing from the
+   extra height. WCAG 2.2 asks 24px at AA, which these clear either way; this is
+   about comfort, not the floor. */
+@media (hover: none) and (pointer: coarse) {
+  .tap-target {
+    min-height: 36px;
+  }
+  /* Icon-only, so it needs the width more than the height: a "+" is about eight
+     pixels of glyph, and height alone would leave a tall thin sliver to aim at. */
+  .tap-target-square {
+    min-height: 36px;
+    min-width: 36px;
+  }
+  /* Element id badges sit in dense rows of metadata chips, so they take the
+     smallest height anything here is deliberately given rather than the full 36. */
+  .tap-target-sm {
+    min-height: 30px;
+  }
+}

@@ -6,7 +6,10 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { scoreChanges, scorePerRound } from "../utils/simulateRethonClient.js";
 import { RoundScoresChart } from "./graphs_shared/RoundScoresChart.jsx";
-import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
+import {
+  ARGUMENT_RELATION_TYPES,
+  linkableElements,
+} from "../utils/stateUtils.js";
 import { BACKEND_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { useTextTabData } from "../hooks/useTextTabData.js";
@@ -319,6 +322,9 @@ export function TextTab({
         pCovers,
         search,
         withdrawalDeltas,
+        // Cards lay their headers out differently once there is no room to put
+        // the chips and the action buttons on the same line.
+        isWide,
       }}
     >
       <div
@@ -457,8 +463,8 @@ export function TextTab({
           <MobileAddButton
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
-            elements={state.elements}
-            round={state.round}
+            elements={linkableElements(state.elements)}
+            hideNonEntailsRels={hideNonEntailsRels}
           />
         )}
 

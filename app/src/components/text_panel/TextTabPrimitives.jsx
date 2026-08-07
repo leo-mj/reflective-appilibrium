@@ -109,6 +109,7 @@ export function SectionHeader({ title, onAdd, collapsed, onToggle }) {
             e.stopPropagation();
             onAdd();
           }}
+          className="tap-target-square"
           style={{
             ...GHOST_BTN_STYLE,
             fontSize: 13,
@@ -127,13 +128,30 @@ export function SectionHeader({ title, onAdd, collapsed, onToggle }) {
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
+/**
+ * The clickable element id — J1, P2 — that selects an element and highlights it
+ * in the graph.
+ *
+ * A button rather than the span it used to be: it is the only way to select an
+ * element from the text, and as a span it had no focus, answered no keypress,
+ * and announced itself to a screen reader as a piece of text. `aria-pressed`
+ * carries the selection, which was previously visible only as a colour.
+ */
 export function Badge({ id }) {
   const { badgeColor, selected, onSelect } = useContext(Ctx);
   const color = badgeColor(id);
   const isSelected = selected === id;
   return (
-    <span
+    <button
+      type="button"
       onClick={() => onSelect((prev) => (prev === id ? null : id))}
+      // "J1" alone is an accessible name with no word in it — it tells a screen
+      // reader nothing about what pressing it would do. The visible text is
+      // kept inside the label, as WCAG 2.5.3 requires of any control that has
+      // one, so voice control still reaches it by the name on screen.
+      aria-label={`Select ${id}`}
+      aria-pressed={isSelected}
+      className="tap-target-sm"
       style={{
         fontSize: 12,
         fontWeight: "bold",
@@ -151,7 +169,7 @@ export function Badge({ id }) {
       }}
     >
       {id}
-    </span>
+    </button>
   );
 }
 
@@ -235,18 +253,29 @@ export function HistoryRoundBanner({ historyView }) {
 
 export function ActionButtons({ onRevise, onWithdraw, onReinstate }) {
   return (
-    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-      <button onClick={onRevise} style={GHOST_BTN_STYLE}>
+    // Grouped and named: a card holds several buttons — the id badge among them
+    // — and "Revise" on its own says nothing about what it revises.
+    <div
+      role="group"
+      aria-label="Item actions"
+      style={{ display: "flex", gap: 4, flexShrink: 0 }}
+    >
+      <button onClick={onRevise} className="tap-target" style={GHOST_BTN_STYLE}>
         Revise
       </button>
       {onWithdraw && (
-        <button onClick={onWithdraw} style={WITHDRAW_BTN_STYLE}>
+        <button
+          onClick={onWithdraw}
+          className="tap-target"
+          style={WITHDRAW_BTN_STYLE}
+        >
           Withdraw
         </button>
       )}
       {onReinstate && (
         <button
           onClick={onReinstate}
+          className="tap-target"
           style={{ ...GHOST_BTN_STYLE, color: C.supports }}
         >
           Reinstate

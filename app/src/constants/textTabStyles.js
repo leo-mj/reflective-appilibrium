@@ -16,6 +16,9 @@ export const GHOST_BTN_STYLE = {
   fontSize: 12,
   padding: "4px 9px",
   lineHeight: 1.6,
+  // Height is left to the text and padding, which come to about 29. Touchscreens
+  // grow it to 36 through the .tap-target class in index.css — a mouse does not
+  // need the room, and taking it there made the panel loud.
 };
 
 export const WITHDRAW_BTN_STYLE = {
@@ -29,6 +32,52 @@ export const CARD_STYLE = {
   borderBottom: `1px solid ${C.border}`,
   marginBottom: 14,
 };
+
+/**
+ * The row at the top of a card. Holds three things: what the item is (its id,
+ * or for a relation its two ends), the metadata chips, and the action buttons.
+ *
+ * Wide, all three share a line with the buttons at the trailing edge. Narrow,
+ * there is not room, so the chips drop to a line of their own — see
+ * {@link cardChips}. What keeps the first line is the id and the buttons: the
+ * two things you are looking for when scanning down a list of cards.
+ */
+export const cardHeader = {
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+/**
+ * What the card is about — the id badge, or a relation's from/type/to. Grouped
+ * so it wraps as a unit rather than scattering its parts across the lines that
+ * the chips and the buttons are using.
+ */
+export const cardIdentity = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+  flexWrap: "wrap",
+  minWidth: 0,
+};
+
+/**
+ * A card's metadata chips: confidence, origin, round, status.
+ *
+ * @param {boolean} isWide - Narrow gives them a line of their own. `order` puts
+ *   them after the buttons in the visual flow, and a full-width basis makes
+ *   them start that line rather than squeeze onto the end of the first.
+ */
+export const cardChips = (isWide) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  flexWrap: "wrap",
+  ...(isWide ? null : { order: 1, flexBasis: "100%" }),
+});
+
+/** A card's action buttons, held against the trailing edge of the first line. */
+export const cardActions = { marginLeft: "auto" };
 
 export const META_LABEL_STYLE = {
   fontSize: 12,

@@ -3,6 +3,7 @@ import { C } from "../constants/colors.js";
 import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
+import { useCoarseDims } from "../hooks/useCoarseDims.js";
 import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
@@ -161,10 +162,12 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
       : hasSidePanel
         ? (dims.w - 32) / 2 - 12
         : dims.w - 32;
-  const { positions, ready } = useStablePositions(state, {
-    w: graphW,
-    h: dims.h * 0.8,
-  });
+  // Coarsened first: a phone's viewport height changes on its own, when the URL
+  // bar collapses on a scroll or the keyboard comes up, and every one of those
+  // would otherwise restart the simulation and drift the nodes under a view
+  // that stays put. Rotations and panel toggles are far bigger and still land.
+  const simDims = useCoarseDims({ w: graphW, h: dims.h * 0.8 });
+  const { positions, ready } = useStablePositions(state, simDims);
   useEffect(() => {
     if (ready) onReady?.();
   }, [ready, onReady]);
@@ -305,7 +308,11 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
       style={{
         background: C.bg,
         color: C.text,
-        height: "100vh",
+        // dvh, not vh: on a phone `100vh` means the viewport with the URL bar
+        // hidden, so the app is drawn 60–90px taller than the screen and its
+        // bottom edge — the add bar, the foot of the graph — sits underneath
+        // the browser's own chrome. dvh is whatever is actually visible.
+        height: "100dvh",
         display: "flex",
         flexDirection: "column",
         padding: 16,

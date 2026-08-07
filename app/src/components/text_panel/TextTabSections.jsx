@@ -27,6 +27,7 @@ function SortToggle({ value, onChange }) {
         <button
           key={opt}
           onClick={() => onChange(opt)}
+          className="tap-target"
           style={{
             ...GHOST_BTN_STYLE,
             fontSize: 10,

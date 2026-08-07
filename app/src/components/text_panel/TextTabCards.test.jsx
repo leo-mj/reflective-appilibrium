@@ -169,7 +169,10 @@ describe("ElementCard metadata order", () => {
       <ElementCard e={el({ status: "rejected" })} dim={false} />,
       { onReinstate },
     );
-    const labels = [...container.querySelectorAll("button")].map((b) =>
+    // Scoped to the action group: the card's id badge is a button too, and it
+    // is not one of the actions this is about.
+    const actions = container.querySelector('[role="group"]');
+    const labels = [...actions.querySelectorAll("button")].map((b) =>
       b.textContent.trim(),
     );
     expect(labels).toEqual(["Revise", "Reinstate"]);

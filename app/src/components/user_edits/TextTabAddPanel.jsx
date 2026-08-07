@@ -229,7 +229,12 @@ export function AddBar({
             display: "flex",
             alignItems: "center",
             gap: 8,
-            flexShrink: 0,
+            // Allowed to shrink, so its own flexWrap has a width to wrap at.
+            // Held at max-content it could not, and on a phone — where this bar
+            // runs inside a sheet the width of the screen — the row ran off the
+            // right edge instead of breaking. There is room to spare on a wide
+            // screen, where nothing shrinks and nothing changes.
+            minWidth: 0,
             flexWrap: "wrap",
           }}
         >
@@ -285,7 +290,10 @@ export function AddBar({
             display: "flex",
             alignItems: "center",
             gap: 8,
-            flexShrink: 0,
+            // Shrinkable for the same reason as the tab row above. This is the
+            // group that overflowed worst: an argument's premises, arrow, type
+            // and conclusion are half a dozen controls on one line.
+            minWidth: 0,
             flexWrap: "wrap",
           }}
         >

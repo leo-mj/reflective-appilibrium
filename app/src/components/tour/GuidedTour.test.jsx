@@ -126,7 +126,7 @@ describe("the app follows the section being read", () => {
 
   it("selects the whole argument when the section is about one", () => {
     const spies = openTour();
-    walkTo("Arguments connect the two");
+    walkTo("Arguments");
 
     const rel = lastSelectedRel(spies);
     expect(rel.argumentId).toBe("arg-sample-3");
@@ -339,7 +339,7 @@ describe("sections the state cannot support", () => {
       ),
     };
     openTour({ state: withoutArg });
-    expect(screen.queryByText(/Arguments connect the two/)).toBeNull();
+    expect(screen.queryByText("Arguments")).toBeNull();
   });
 
   it("skips the demo chapter entirely on someone's own process", () => {

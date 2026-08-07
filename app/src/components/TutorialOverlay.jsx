@@ -210,7 +210,10 @@ export function TutorialOverlay({ active }) {
           position: "fixed",
           inset: 0,
           width: "100vw",
-          height: "100vh",
+          // The connectors are drawn in viewport coordinates, from rects read
+          // off the page. `100vh` on a phone is the viewport with the URL bar
+          // hidden, which is not the one those rects were measured in.
+          height: "100dvh",
           pointerEvents: "none",
           zIndex: 900,
           overflow: "visible",

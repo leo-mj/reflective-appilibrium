@@ -1,71 +1,50 @@
 /**
- * @fileoverview Floating action button (mobile) for adding elements and relations.
+ * @fileoverview The narrow screen's way in to adding: a floating + that opens
+ * the same add bar the wide layout keeps permanently at the foot of the panel.
+ *
+ * It hosts {@link module:components/TextTabAddPanel} rather than dialogs of its
+ * own, so the two layouts cannot drift. The element, relation and argument
+ * tabs, the multi-premise argument builder, the validation, and the rule that
+ * withholds the relation tab while the graph is showing arguments only all come
+ * from there and are the same on both. What differs is only the container: a
+ * sheet over the list rather than a bar beneath it, because at this width there
+ * is no room to show both the position and the form for adding to it.
  * @module components/text_panel/MobileAddButton
  */
 
+/** @import { REElement } from '../../types.js' */
+
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
-import { AddElementModal } from "../user_edits/AddElementModal.jsx";
-import { AddRelationModal } from "../user_edits/AddRelationModal.jsx";
+import { AddBar } from "../user_edits/TextTabAddPanel.jsx";
 
 /**
- * @param {Object}   props
- * @param {function} props.onAddElement
- * @param {function} props.onAddRelation
- * @param {Array}    props.elements    - Full element list (filtering applied internally).
- * @param {number}   props.round       - Current round number.
+ * @param {Object}      props
+ * @param {REElement[]} props.elements - Elements that may be referenced; see linkableElements.
+ * @param {function}    props.onAddElement
+ * @param {function}    props.onAddRelation
+ * @param {boolean}     [props.hideNonEntailsRels] - Passed through: with plain
+ *   relations hidden the bar offers arguments in their place.
  */
-export function MobileAddButton({ onAddElement, onAddRelation, elements, round }) {
-  const [addMenu, setAddMenu] = useState(false);
-  const [adding, setAdding] = useState(null); // 'element' | 'relation' | null
+export function MobileAddButton({
+  elements,
+  onAddElement,
+  onAddRelation,
+  hideNonEntailsRels,
+}) {
+  const [open, setOpen] = useState(false);
 
   return (
-    <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 99 }}>
-      {addMenu && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 44,
-            right: 0,
-            background: C.panel,
-            border: `1px solid ${C.border}`,
-            borderRadius: 6,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          {[
-            ["element", "Element"],
-            ["relation", "Relation"],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => {
-                setAdding(key);
-                setAddMenu(false);
-              }}
-              style={{
-                background: "transparent",
-                border: "none",
-                borderBottom:
-                  key === "element" ? `1px solid ${C.border}` : "none",
-                color: C.text,
-                cursor: "pointer",
-                fontSize: 13,
-                padding: "10px 18px",
-                textAlign: "left",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+    <>
       <button
-        onClick={() => setAddMenu((m) => !m)}
+        onClick={() => setOpen(true)}
+        aria-label="Add to your position"
+        aria-expanded={open}
         style={{
+          position: "absolute",
+          bottom: 10,
+          right: 10,
+          zIndex: 99,
           background: C.supports,
           border: "none",
           borderRadius: 6,
@@ -73,8 +52,8 @@ export function MobileAddButton({ onAddElement, onAddRelation, elements, round }
           cursor: "pointer",
           fontSize: 20,
           lineHeight: 1,
-          width: 36,
-          height: 36,
+          width: 44,
+          height: 44,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -83,30 +62,84 @@ export function MobileAddButton({ onAddElement, onAddRelation, elements, round }
         +
       </button>
 
-      {adding === "element" && (
-        <AddElementModal
-          initialType="judgment"
-          currentRound={round}
-          onSave={(formData) => {
-            onAddElement(formData);
-            setAdding(null);
-          }}
-          onCancel={() => setAdding(null)}
-        />
+      {open && (
+        <>
+          {/* The sheet covers the list it is adding to, so there has to be a way
+              out that is not a hunt for a button. */}
+          <div
+            onClick={() => setOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.5)",
+              zIndex: 200,
+            }}
+          />
+          <div
+            role="dialog"
+            aria-label="Add to your position"
+            style={{
+              position: "fixed",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 201,
+              maxHeight: "85dvh",
+              display: "flex",
+              flexDirection: "column",
+              background: C.panel,
+              borderTop: `1px solid ${C.border}`,
+              borderRadius: "10px 10px 0 0",
+              overflow: "hidden",
+              boxShadow: "0 -8px 32px rgba(0,0,0,0.45)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "6px 8px 0 16px",
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: 11, fontWeight: "bold", color: C.dim }}>
+                Add
+              </span>
+              <button
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                className="tap-target-square"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: C.dim,
+                  cursor: "pointer",
+                  fontSize: 16,
+                  lineHeight: 1,
+                  padding: "4px 8px",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            {/* The bar sizes itself from its own content and can outgrow a
+                phone once an argument has several premises; the sheet is capped
+                above, so what overflows scrolls rather than reaching past the
+                bottom of the screen. */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+              <AddBar
+                elements={elements}
+                onAddElement={onAddElement}
+                onAddRelation={onAddRelation}
+                selected={null}
+                ctrlTo={null}
+                hideNonEntailsRels={hideNonEntailsRels}
+              />
+            </div>
+          </div>
+        </>
       )}
-      {adding === "relation" && (
-        <AddRelationModal
-          elements={elements.filter(
-            (e) => e.status !== "withdrawn" && e.status !== "rejected",
-          )}
-          currentRound={round}
-          onSave={(formData) => {
-            onAddRelation(formData);
-            setAdding(null);
-          }}
-          onCancel={() => setAdding(null)}
-        />
-      )}
-    </div>
+    </>
   );
 }

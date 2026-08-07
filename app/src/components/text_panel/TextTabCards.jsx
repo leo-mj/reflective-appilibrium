@@ -7,7 +7,15 @@
 
 import { useContext } from "react";
 import { C } from "../../constants/colors.js";
-import { CARD_STYLE, META_LABEL_STYLE, CONTENT_FONT_SIZE } from "../../constants/textTabStyles.js";
+import {
+  CARD_STYLE,
+  META_LABEL_STYLE,
+  CONTENT_FONT_SIZE,
+  cardHeader,
+  cardIdentity,
+  cardChips,
+  cardActions,
+} from "../../constants/textTabStyles.js";
 import { relationTypeLabel, statusTag } from "../../utils/stateUtils.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
 import { Ctx } from "./TextTabContext.js";
@@ -35,6 +43,7 @@ export function ElementCard({ e, dim }) {
     badgeColor,
     search,
     withdrawalDeltas,
+    isWide,
   } = useContext(Ctx);
   const isW = e.status === "withdrawn";
   const isR = e.status === "rejected";
@@ -51,24 +60,9 @@ export function ElementCard({ e, dim }) {
         paddingLeft: 10,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 6,
-          marginBottom: 5,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            flexWrap: "wrap",
-          }}
-        >
-          <Badge id={e.id} />
+      <div style={{ ...cardHeader, gap: 6, marginBottom: 5 }}>
+        <Badge id={e.id} />
+        <div style={cardChips(isWide)}>
           <MetaChip title={confidenceLabel(e.confidence).title}>
             Confidence: {confidenceLabel(e.confidence).text}
           </MetaChip>
@@ -102,11 +96,13 @@ export function ElementCard({ e, dim }) {
               );
             })()}
         </div>
-        <ActionButtons
-          onRevise={() => onEditRequest(e.id)}
-          onWithdraw={!isW && !isR ? () => onWithdrawRequest(e.id) : null}
-          onReinstate={isW || isR ? () => onReinstate(e.id) : null}
-        />
+        <div style={cardActions}>
+          <ActionButtons
+            onRevise={() => onEditRequest(e.id)}
+            onWithdraw={!isW && !isR ? () => onWithdrawRequest(e.id) : null}
+            onReinstate={isW || isR ? () => onReinstate(e.id) : null}
+          />
+        </div>
       </div>
       <div
         style={{
@@ -147,6 +143,7 @@ export function ArgumentCard({ rels, dim }) {
     onReinstateRel,
     badgeColor,
     search,
+    isWide,
   } = useContext(Ctx);
   const isSel = rels.some((r) => r === selectedRel);
   const conclusionId = rels[0].to;
@@ -157,14 +154,16 @@ export function ArgumentCard({ rels, dim }) {
       {rels.map((r) => (
         <div
           key={r.from}
+          // Deliberately swallows the badges inside it: the click bubbles up
+          // here and clears the element selection they just made, so pressing
+          // one in a relation row does nothing. The row is about the relation,
+          // and selecting one of its ends from here would say the wrong thing.
           onClick={() => {
             onSelectRel((prev) => (rels.includes(prev) ? null : r));
             onSelect(() => null);
           }}
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...cardHeader,
             gap: 5,
             cursor: "pointer",
             borderRadius: 4,
@@ -173,14 +172,7 @@ export function ArgumentCard({ rels, dim }) {
             background: isSel ? `${C.border}44` : "transparent",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              flexWrap: "wrap",
-            }}
-          >
+          <div style={cardIdentity}>
             <Badge id={r.from} />
             <span
               style={{
@@ -198,9 +190,11 @@ export function ArgumentCard({ rels, dim }) {
                 : "→ jointly entails →"}
             </span>
             <Badge id={r.to} />
+          </div>
+          <div style={cardChips(isWide)}>
             <StatusLabel tag={statusTag(r, state.round)} />
           </div>
-          <div onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()} style={cardActions}>
             <ActionButtons
               onRevise={() => onEditRelRequest(r)}
               onWithdraw={
@@ -302,6 +296,7 @@ export function RelationCard({ r, dim }) {
     onReinstateRel,
     badgeColor,
     search,
+    isWide,
   } = useContext(Ctx);
   const fromEl = state.elements.find((e) => e.id === r.from);
   const toEl = state.elements.find((e) => e.id === r.to);
@@ -309,14 +304,13 @@ export function RelationCard({ r, dim }) {
   return (
     <div style={{ ...CARD_STYLE, opacity: dim ? 0.4 : 1 }}>
       <div
+        // As in ArgumentCard above: the badges inside are inert here on purpose.
         onClick={() => {
           onSelectRel((prev) => (prev === r ? null : r));
           onSelect(() => null);
         }}
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          ...cardHeader,
           gap: 5,
           cursor: "pointer",
           borderRadius: 4,
@@ -325,24 +319,19 @@ export function RelationCard({ r, dim }) {
           background: isSel ? `${C.border}44` : "transparent",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            flexWrap: "wrap",
-          }}
-        >
+        <div style={cardIdentity}>
           <Badge id={r.from} />
           <span style={{ color: C[r.type], fontSize: 11, fontWeight: "bold" }}>
             → {relationTypeLabel(r.type)} →
           </span>
           <Badge id={r.to} />
+        </div>
+        <div style={cardChips(isWide)}>
           {r.origin && <MetaChip>Origin: {r.origin}</MetaChip>}
           <AddedRound round={r.addedRound} />
           <StatusLabel tag={statusTag(r, state.round)} />
         </div>
-        <div onClick={(e) => e.stopPropagation()}>
+        <div onClick={(e) => e.stopPropagation()} style={cardActions}>
           <ActionButtons
             onRevise={() => onEditRelRequest(r)}
             onWithdraw={

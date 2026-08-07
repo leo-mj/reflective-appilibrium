@@ -64,7 +64,7 @@ export default {
       origin: "user",
       text: "We have no obligations to people who do not yet exist because they cannot hold rights.",
       reason:
-        "Withdrawn after user accepted that obligations need not depend on current rights-holders.",
+        "The user accepted that obligations need not depend on current rights-holders.",
       addedRound: 1,
       withdrawnRound: 3,
     },
@@ -112,7 +112,7 @@ export default {
       origin: "claude-fable-5",
       text: "Obligations to future generations are entirely reducible to obligations to currently existing people.",
       reason:
-        "Withdrawn: reducing all duties to future people to duties among contemporaries proved too restrictive given J1 and J2.",
+        "Reducing all duties to future people to duties among contemporaries proved too restrictive given J1 and J2.",
       addedRound: 3,
       withdrawnRound: 4,
     },

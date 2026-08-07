@@ -5,8 +5,10 @@
 import { vi, describe, it, expect, afterEach } from "vitest";
 import { render, fireEvent, cleanup } from "@testing-library/react";
 
+import { Ctx } from "./TextTabContext.js";
 import {
   ActionButtons,
+  Badge,
   StatusLabel,
   AddedRound,
   HistoryRoundBanner,
@@ -48,6 +50,61 @@ describe("ActionButtons", () => {
       ),
     );
     expect(onReinstate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Badge", () => {
+  const renderBadge = (id, ctx = {}) =>
+    render(
+      <Ctx.Provider
+        value={{
+          badgeColor: () => "#888",
+          selected: null,
+          onSelect: () => {},
+          ...ctx,
+        }}
+      >
+        <Badge id={id} />
+      </Ctx.Provider>,
+    );
+
+  it("is a button, not a span with a click handler", () => {
+    // Selecting an element from the text is only possible here, so it has to be
+    // reachable by keyboard and announce itself as something that can be
+    // pressed.
+    const { container } = renderBadge("J1");
+    const badge = container.querySelector("button");
+    expect(badge).toBeTruthy();
+    expect(badge.textContent).toBe("J1");
+    // A name with a word in it, per the audit in a11y.test.jsx — and one that
+    // still contains the visible "J1", so voice control can ask for it by what
+    // it says on screen.
+    expect(badge.getAttribute("aria-label")).toBe("Select J1");
+  });
+
+  it("carries its selected state where a screen reader can find it", () => {
+    // Until now selection was visible only as a change of colour.
+    const { container } = renderBadge("J1", { selected: "J1" });
+    expect(container.querySelector("button").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+
+    cleanup();
+    const other = renderBadge("J1", { selected: "P2" });
+    expect(
+      other.container.querySelector("button").getAttribute("aria-pressed"),
+    ).toBe("false");
+  });
+
+  it("toggles the selection off when it is already selected", () => {
+    const onSelect = vi.fn();
+    const { container } = renderBadge("J1", { selected: "J1", onSelect });
+    fireEvent.click(container.querySelector("button"));
+
+    // Called with an updater, so the assertion is on what the updater does.
+    const update = onSelect.mock.calls[0][0];
+    expect(update("J1")).toBeNull();
+    expect(update("P2")).toBe("J1");
   });
 });
 
