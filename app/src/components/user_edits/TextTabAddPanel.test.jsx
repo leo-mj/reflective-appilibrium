@@ -224,11 +224,12 @@ describe("origin and confidence", () => {
     const details = detailsToggle();
 
     expect(details.style.minHeight).toBe(type.style.minHeight);
-    // Both grow, so the pair comes out to the width of the row.
-    expect(details.style.flex).toBe(type.style.flex);
+    // Laying out the picker is the wrapper's job now, the arrow being drawn
+    // over it — so that is where its share of the row is set.
+    expect(details.style.flex).toBe(type.parentElement.style.flex);
     // From their content widths, not from zero: a basis of 0 splits the row
     // evenly and cuts "Judgment" off partway through.
-    expect(type.style.flexBasis).toBe("auto");
+    expect(type.parentElement.style.flexBasis).toBe("auto");
   });
 
   it("draws the picker's own box, since WebKit will not size a native one", () => {
@@ -238,8 +239,12 @@ describe("origin and confidence", () => {
     // With the native appearance left on, min-height and vertical padding are
     // ignored and the picker comes out shorter than everything beside it.
     expect(type.style.appearance).toBe("none");
-    // Taking the box means taking the arrow it drew with it.
-    expect(type.style.backgroundImage).toContain("svg");
+    // Taking the box means taking the arrow it drew with it. Ours is laid over
+    // the picker rather than painted behind it, so that it can read the
+    // picker's colour instead of naming one of its own.
+    const chevron = type.parentElement.querySelector('[aria-hidden="true"]');
+    expect(chevron.textContent).toBe("▾");
+    expect(chevron.style.pointerEvents).toBe("none");
   });
 
   it("keeps the picker's width when the details open below it", () => {
@@ -258,22 +263,31 @@ describe("origin and confidence", () => {
   });
 
   it("gives the chevron to the pickers and to nothing else", () => {
-    // Everything here shares one box style; only a select should wear the arrow
-    // drawn for it, or an L looks like a dropdown and a number field loses the
-    // width its value needs.
+    // Everything here shares one box style; only a select should get the arrow,
+    // or an L looks like a dropdown and a number field loses the width its
+    // value needs.
     renderBar({ roomy: true });
     fireEvent.click(detailsToggle());
 
-    expect(
-      screen.getByLabelText("Element type").style.backgroundImage,
-    ).toContain("svg");
+    const chevronBy = (label) =>
+      screen
+        .getByLabelText(label)
+        .parentElement.querySelector('[aria-hidden="true"]');
+    expect(chevronBy("Element type")).toBeTruthy();
     for (const label of ["Low confidence", "Confidence, 0 to 1", "Origin"]) {
-      // "none" rather than empty: the shared box sets the background shorthand,
-      // which spells the image out as none.
-      expect(screen.getByLabelText(label).style.backgroundImage).not.toContain(
-        "svg",
-      );
+      expect(chevronBy(label)).toBeNull();
     }
+  });
+
+  it("colours the chevron with the picker it belongs to", () => {
+    // The relation-type picker draws its text in the relation's colour; a
+    // background image would have stayed grey beside it.
+    renderBar();
+    fireEvent.click(screen.getByText("Relation"));
+    const picker = screen.getByLabelText("Relation type");
+
+    expect(picker.parentElement.style.color).toBe(picker.style.color);
+    expect(picker.style.color).not.toBe("");
   });
 
   it("is folded away on a phone until the toggle is pressed", () => {
@@ -321,6 +335,65 @@ describe("origin and confidence", () => {
   });
 });
 
+describe("where Clear sits", () => {
+  const clearBtn = () => screen.getByRole("button", { name: /^Clear / });
+
+  it("is put past the fields in the strip, away from Add", () => {
+    // Beside Add it read as a second way to submit.
+    renderBar();
+    const add = screen.getByRole("button", { name: /^Add / });
+    expect(clearBtn().parentElement).not.toBe(add.parentElement);
+  });
+
+  it("shares the tab row on a phone, at the far end of it", () => {
+    // A row of its own for one button is a waste of a screen with none spare;
+    // opposite ends of a row is distance enough.
+    renderBar({ roomy: true });
+    const add = screen.getByRole("button", { name: /^Add / });
+    expect(clearBtn().parentElement).toBe(add.parentElement);
+    expect(clearBtn().style.marginLeft).toBe("auto");
+    // …and the tabs are pushed off that row rather than left to break wherever
+    // their labels happen to measure.
+    expect(screen.getByText("Element").parentElement.style.flexBasis).toBe(
+      "100%",
+    );
+  });
+});
+
+describe("submitting from the keyboard", () => {
+  const type = (text) =>
+    fireEvent.change(screen.getByPlaceholderText(/Enter statement/), {
+      target: { value: text },
+    });
+
+  it("takes cmd-enter as well as ctrl-enter", () => {
+    // The app's own undo answers to both; on a Mac, cmd is the one reached for.
+    for (const key of ["ctrlKey", "metaKey"]) {
+      const onAddElement = vi.fn();
+      renderBar({ onAddElement });
+      type("Torturing is wrong.");
+      fireEvent.keyDown(screen.getByPlaceholderText(/Enter statement/), {
+        key: "Enter",
+        [key]: true,
+      });
+
+      expect(onAddElement, key).toHaveBeenCalledTimes(1);
+      cleanup();
+    }
+  });
+
+  it("does nothing on a plain enter", () => {
+    const onAddElement = vi.fn();
+    renderBar({ onAddElement });
+    type("Torturing is wrong.");
+    fireEvent.keyDown(screen.getByPlaceholderText(/Enter statement/), {
+      key: "Enter",
+    });
+
+    expect(onAddElement).not.toHaveBeenCalled();
+  });
+});
+
 describe("clearing a tab", () => {
   const clear = () => screen.getByText("Clear");
 
@@ -345,6 +418,18 @@ describe("clearing a tab", () => {
     // Re-queried, not held: clearing replaces the field rather than emptying
     // it, so that the browser's undo stack goes with the text.
     expect(screen.getByPlaceholderText(/Enter statement/).value).toBe("");
+  });
+
+  it("leaves the field alone when an add empties it", () => {
+    // A ctrl-enter submit happens from inside the field. Replacing it there
+    // would take the focus with it, mid-flow.
+    renderBar({ onAddElement: () => {} });
+    const before = screen.getByPlaceholderText(/Enter statement/);
+    fireEvent.change(before, { target: { value: "Torturing is wrong." } });
+    fireEvent.click(screen.getByRole("button", { name: "Add element" }));
+
+    expect(screen.getByPlaceholderText(/Enter statement/)).toBe(before);
+    expect(before.value).toBe("");
   });
 
   it("replaces the field rather than emptying it", () => {
@@ -408,19 +493,24 @@ describe("how wide the pickers are", () => {
     // A select sizes itself to what it is showing, so without a floor the
     // picker changed width every time it was used.
     renderBar();
-    const type = screen.getByLabelText("Element type");
-    expect(type.style.minWidth).toContain("ch");
+    // On the wrapper, which is what the row lays out now.
+    const width = () =>
+      screen.getByLabelText("Element type").parentElement.style.minWidth;
+    expect(width()).toContain("ch");
 
-    const before = type.style.minWidth;
-    fireEvent.change(type, { target: { value: "theory" } });
-    expect(type.style.minWidth).toBe(before);
+    const before = width();
+    fireEvent.change(screen.getByLabelText("Element type"), {
+      target: { value: "theory" },
+    });
+    expect(width()).toBe(before);
   });
 
   it("counts the status suffix an element picker can carry", () => {
     // "J1 (withdrawn)" is a good deal longer than "J1".
     renderBar();
     fireEvent.click(screen.getByText("Relation"));
-    const plain = screen.getByLabelText("Relation from").style.minWidth;
+    const plain =
+      screen.getByLabelText("Relation from").parentElement.style.minWidth;
 
     cleanup();
     render(
@@ -436,7 +526,8 @@ describe("how wide the pickers are", () => {
       />,
     );
     fireEvent.click(screen.getByText("Relation"));
-    const withStatus = screen.getByLabelText("Relation from").style.minWidth;
+    const withStatus =
+      screen.getByLabelText("Relation from").parentElement.style.minWidth;
 
     const chars = (w) => parseInt(w.match(/(\d+)ch/)[1], 10);
     expect(chars(withStatus)).toBeGreaterThan(chars(plain));

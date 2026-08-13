@@ -28,11 +28,40 @@ const STATE = {
   phase: 2,
   round: 4,
   elements: [
-    { id: "J1", type: "judgment", status: "active", confidence: 1, text: "J1.", addedRound: 1 },
+    {
+      id: "J1",
+      type: "judgment",
+      status: "active",
+      confidence: 1,
+      text: "J1.",
+      addedRound: 1,
+    },
     // Withdrawn in round 3, so withdrawn as of the current round.
-    { id: "J2", type: "judgment", status: "withdrawn", confidence: 1, text: "J2.", addedRound: 1, withdrawnRound: 3 },
-    { id: "P1", type: "principle", status: "active", confidence: 1, text: "P1.", addedRound: 1 },
-    { id: "P2", type: "principle", status: "rejected", confidence: 1, text: "P2.", addedRound: 1 },
+    {
+      id: "J2",
+      type: "judgment",
+      status: "withdrawn",
+      confidence: 1,
+      text: "J2.",
+      addedRound: 1,
+      withdrawnRound: 3,
+    },
+    {
+      id: "P1",
+      type: "principle",
+      status: "active",
+      confidence: 1,
+      text: "P1.",
+      addedRound: 1,
+    },
+    {
+      id: "P2",
+      type: "principle",
+      status: "rejected",
+      confidence: 1,
+      text: "P2.",
+      addedRound: 1,
+    },
   ],
   relations: [],
   coherence: { tensions: [], orphans: [], clusters: [] },
@@ -104,6 +133,83 @@ function modalSelects(container) {
   return [...container.querySelectorAll("select")];
 }
 
+describe("half-written forms", () => {
+  /** Opens a dialog from the graph's own toolbar. */
+  const open = (container, label) =>
+    fireEvent.click(container.querySelector(`[aria-label="${label}"]`));
+  const statement = (container) => container.querySelector("textarea");
+
+  it("keeps what was typed when the dialog is dismissed and reopened", () => {
+    // A modal is easy to close by accident, and half-written text is worth
+    // more than a clean slate.
+    const { container } = setup();
+    open(container, "Add judgment");
+    fireEvent.change(statement(container), {
+      target: { value: "Torturing is wrong." },
+    });
+    fireEvent.click(button(container, "Cancel"));
+    expect(statement(container)).toBeNull();
+
+    open(container, "Add judgment");
+    expect(statement(container).value).toBe("Torturing is wrong.");
+  });
+
+  it("does not carry a submitted form into the next one", () => {
+    // Committed work is not a draft.
+    const { container } = setup();
+    open(container, "Add judgment");
+    fireEvent.change(statement(container), {
+      target: { value: "Torturing is wrong." },
+    });
+    fireEvent.click(button(container, "Save"));
+
+    open(container, "Add judgment");
+    expect(statement(container).value).toBe("");
+  });
+
+  it("empties the form on Clear, without closing it", () => {
+    const { container } = setup();
+    open(container, "Add judgment");
+    fireEvent.change(statement(container), {
+      target: { value: "Torturing is wrong." },
+    });
+
+    fireEvent.click(button(container, "Clear"));
+    expect(statement(container)).not.toBeNull();
+    expect(statement(container).value).toBe("");
+  });
+
+  it("keeps a part-built argument across a dismissal", () => {
+    const { container } = setup();
+    open(container, "Add argument");
+    fireEvent.click(button(container, "+ Add premise"));
+    expect(modalSelects(container).length).toBe(3); // two premises, conclusion
+
+    fireEvent.click(button(container, "Cancel"));
+    open(container, "Add argument");
+    expect(modalSelects(container).length).toBe(3);
+
+    // …and Clear takes it back to one premise.
+    fireEvent.click(button(container, "Clear"));
+    expect(modalSelects(container).length).toBe(2);
+  });
+
+  it("lets a graph selection override the draft it reopens on", () => {
+    // Ctrl-clicking two nodes is a fresh instruction, not a resumption.
+    const { container, svg } = setup();
+    open(container, "Add relation");
+    fireEvent.change(modalSelects(container)[0], { target: { value: "P1" } });
+    fireEvent.click(button(container, "Cancel"));
+
+    // Picking the ends on the canvas, then confirming, reopens the dialog.
+    clickNode(svg, "J1");
+    clickNode(svg, "P1", { ctrl: true });
+    fireEvent.click(button(container, "Add relation"));
+
+    expect(modalSelects(container)[0].value).toBe("J1");
+  });
+});
+
 describe("ctrl+click argument building", () => {
   it("keeps a withdrawn node as a premise", () => {
     const { container, svg } = setup();
@@ -143,7 +249,9 @@ describe("ctrl+click argument building", () => {
       expect(rel.type).toBe("jointly_entails");
     }
     // One argument, so one shared id.
-    const ids = new Set(onAddRelation.mock.calls.map(([rel]) => rel.argumentId));
+    const ids = new Set(
+      onAddRelation.mock.calls.map(([rel]) => rel.argumentId),
+    );
     expect(ids.size).toBe(1);
   });
 
@@ -270,7 +378,8 @@ describe("clicking a node pins its tooltip", () => {
   /** Any fixed-position portal card, with or without actions. */
   const anyTooltip = () =>
     [...document.body.querySelectorAll("div")].find(
-      (d) => d.style.position === "fixed" && d.textContent.includes("Confidence"),
+      (d) =>
+        d.style.position === "fixed" && d.textContent.includes("Confidence"),
     );
 
   it("shows a tooltip on hover, but without actions", () => {
@@ -294,17 +403,17 @@ describe("clicking a node pins its tooltip", () => {
     const pinned = card();
     expect(pinned).toBeDefined();
     expect(pinned.textContent).toContain("J1");
-    expect([...pinned.querySelectorAll("button")].map((b) => b.textContent)).toEqual(
-      ["Revise", "Withdraw"],
-    );
+    expect(
+      [...pinned.querySelectorAll("button")].map((b) => b.textContent),
+    ).toEqual(["Revise", "Withdraw"]);
   });
 
   it("offers reinstate instead for an element out of play", () => {
     const { svg } = setup();
     clickNode(svg, "J2"); // withdrawn
-    expect([...card().querySelectorAll("button")].map((b) => b.textContent)).toEqual(
-      ["Revise", "Reinstate"],
-    );
+    expect(
+      [...card().querySelectorAll("button")].map((b) => b.textContent),
+    ).toEqual(["Revise", "Reinstate"]);
   });
 
   it("closes when the same node is clicked again", () => {
@@ -318,8 +427,18 @@ describe("clicking a node pins its tooltip", () => {
   it("closes when the background is clicked", () => {
     const { svg } = setup();
     clickNode(svg, "J1");
-    fireEvent.pointerDown(svg, { clientX: 20, clientY: 400, pointerId: 1, pointerType: "mouse" });
-    fireEvent.pointerUp(svg, { clientX: 20, clientY: 400, pointerId: 1, pointerType: "mouse" });
+    fireEvent.pointerDown(svg, {
+      clientX: 20,
+      clientY: 400,
+      pointerId: 1,
+      pointerType: "mouse",
+    });
+    fireEvent.pointerUp(svg, {
+      clientX: 20,
+      clientY: 400,
+      pointerId: 1,
+      pointerType: "mouse",
+    });
     expect(card()).toBeUndefined();
   });
 

@@ -5,7 +5,13 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useMemo,
+  useEffect,
+  useCallback,
+} from "react";
 
 import { C } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
@@ -231,14 +237,45 @@ function GraphModals({
   onAddElement,
   onAddRelation,
 }) {
+  // Half-written forms, kept for as long as the graph is on screen. The dialogs
+  // themselves unmount when dismissed, so their own state cannot survive it —
+  // and a modal is easy to close by accident. This component is never
+  // unmounted, and it is below the graph, so keeping them here costs a render
+  // of the open dialog per keystroke and nothing above it.
+  const [drafts, setDrafts] = useState({
+    element: null,
+    relation: null,
+    argument: null,
+  });
+  // Stable per kind: the dialogs report their form from an effect keyed on this
+  // callback, and a fresh function each render would set it running in a loop.
+  const keepElement = useCallback(
+    (v) => setDrafts((d) => ({ ...d, element: v })),
+    [],
+  );
+  const keepRelation = useCallback(
+    (v) => setDrafts((d) => ({ ...d, relation: v })),
+    [],
+  );
+  const keepArgument = useCallback(
+    (v) => setDrafts((d) => ({ ...d, argument: v })),
+    [],
+  );
+  // Committed work is not a draft. Without this the next dialog would open on
+  // the form that was just submitted.
+  const forget = (which) => setDrafts((d) => ({ ...d, [which]: null }));
+
   return (
     <>
       {addingElType && (
         <AddElementModal
           initialType={addingElType}
           currentRound={round}
+          draft={drafts.element}
+          onDraftChange={keepElement}
           onSave={(formData) => {
             onAddElement(formData);
+            forget("element");
             setAddingElType(null);
           }}
           onCancel={() => setAddingElType(null)}
@@ -250,8 +287,11 @@ function GraphModals({
           currentRound={round}
           initialFrom={addingRelPrefill?.from}
           initialTo={addingRelPrefill?.to}
+          draft={drafts.relation}
+          onDraftChange={keepRelation}
           onSave={(formData) => {
             onAddRelation(formData);
+            forget("relation");
             setAddingRel(false);
           }}
           onCancel={() => setAddingRel(false)}
@@ -263,15 +303,24 @@ function GraphModals({
           currentRound={round}
           initialPremises={addingArgPrefill?.premises}
           initialConclusion={addingArgPrefill?.conclusion}
+          draft={drafts.argument}
+          onDraftChange={keepArgument}
           onSave={({ premises, conclusion, negated, explanation }) => {
             const argumentId = newArgumentId();
             const type = argumentRelationType(premises.length, negated);
             premises.forEach((premise, i) => {
               onAddRelation(
-                { from: premise, to: conclusion, type, argumentId, explanation },
+                {
+                  from: premise,
+                  to: conclusion,
+                  type,
+                  argumentId,
+                  explanation,
+                },
                 { select: false, pinRecent: i === premises.length - 1 },
               );
             });
+            forget("argument");
             setAddingArg(false);
           }}
           onCancel={() => setAddingArg(false)}
@@ -600,7 +649,7 @@ export function Graph({
             edgeOffsets.get(r) ?? 0,
           ),
         )}
-        {jointGroups.map((rels) =>
+        {jointGroups.map((rels) => (
           <React.Fragment key={rels[0].argumentId}>
             {renderJointArgument(
               rels,
@@ -609,7 +658,7 @@ export function Graph({
               graphEdgeVisuals(rels[0], wIds, dimEdge, selectedArgRelSet, rels),
             )}
           </React.Fragment>
-        )}
+        ))}
 
         {/* ── Nodes ── */}
         {visibleEls.map((el) =>

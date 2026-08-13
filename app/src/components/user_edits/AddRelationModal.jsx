@@ -5,7 +5,7 @@
 
 /** @import { REElement } from '../../types.js' */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
@@ -97,16 +97,29 @@ export function AddRelationModal({
   onCancel,
   initialFrom,
   initialTo,
+  draft,
+  onDraftChange,
 }) {
   const ids = elements.map((e) => e.id);
-  const [form, setForm] = useState(
+  const defaults = () =>
     /** @type {AddRelationFormData} */ ({
       from: initialFrom ?? ids[0] ?? "",
       to: initialTo ?? ids[1] ?? "",
       type: "supports",
       explanation: "",
-    }),
-  );
+    });
+  const [form, setForm] = useState(() => ({
+    ...defaults(),
+    ...draft,
+    // A graph selection is a fresh instruction and outranks the draft's ends;
+    // where nothing was selected, the draft keeps whatever it was left on.
+    ...(initialFrom ? { from: initialFrom } : null),
+    ...(initialTo ? { to: initialTo } : null),
+  }));
+  useEffect(() => {
+    onDraftChange?.(form);
+  }, [form, onDraftChange]);
+
   const selfLoop = form.from === form.to;
   return (
     <ModalShell
@@ -114,6 +127,7 @@ export function AddRelationModal({
       subtitle={`Will be added in Round ${currentRound + 1}`}
       onCancel={onCancel}
       onSave={() => onSave(form)}
+      onClear={() => setForm(defaults())}
       saveDisabled={!form.from || !form.to || selfLoop}
     >
       <AddRelationForm form={form} setForm={setForm} elements={elements} />

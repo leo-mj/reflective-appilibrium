@@ -84,12 +84,27 @@ const arrowStyle = (size) => ({
 });
 
 /**
- * The chevron a select draws for itself, drawn by us instead — see below for
- * why we take it over. Slate 400: one grey that reads on either theme, since a
- * data URI cannot see the CSS variables the rest of the bar is coloured from.
+ * The chevron a select draws for itself, drawn by us instead — see
+ * {@link selectStyle} for why we take it over.
+ *
+ * Laid over the picker rather than painted into its background, so that it
+ * inherits the picker's own colour: a background image would have to name one,
+ * and a data URI cannot see the CSS variables the rest of the bar is coloured
+ * from — it would be a fixed grey in both themes, and grey on the relation-type
+ * picker, which colours its text by the relation.
  */
-const CHEVRON =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none' stroke='%2394a3b8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E\")";
+const chevronStyle = {
+  position: "absolute",
+  right: 10,
+  top: "50%",
+  transform: "translateY(-50%)",
+  fontSize: 10,
+  lineHeight: 1,
+  // Colour comes from the picker; the arrow is not meant to shout as loudly.
+  opacity: 0.6,
+  // The picker is what should answer a click anywhere in its box.
+  pointerEvents: "none",
+};
 
 /**
  * The box every field in the bar sits in — pickers, text inputs and the letter
@@ -111,6 +126,16 @@ const fieldStyle = (size) => ({ ...SELECT_STYLE, ...SIZES[size] });
  * @param {number} chars - Length of the longest option label.
  */
 const pickerWidth = (chars) => ({ minWidth: `calc(${chars}ch + 46px)` });
+
+/**
+ * Why the submit button is refusing. It is the only thing that says so, and a
+ * disabled button explains nothing on its own, so it is announced as well as
+ * shown — and set at a size someone is meant to read rather than notice.
+ */
+const complaintStyle = (size) => ({
+  fontSize: size === "compact" ? 12 : 14,
+  color: C.conflicts,
+});
 
 /** The longest option an element picker holds, counting the status suffixes. */
 const idOptionChars = (elements) =>
@@ -138,12 +163,41 @@ const selectStyle = (size) => ({
   // painted on the right.
   appearance: "none",
   WebkitAppearance: "none",
-  backgroundImage: CHEVRON,
-  backgroundRepeat: "no-repeat",
-  backgroundPosition: "right 10px center",
-  backgroundSize: "10px 6px",
+  // Room on the right for the chevron {@link Picker} lays over it.
   paddingRight: 28,
 });
+
+/**
+ * A picker: a `<select>` with the chevron over it. Anything that positions the
+ * picker — a width, a share of a row — goes on the wrapper, since the wrapper
+ * is what the surrounding layout now sees; the select fills it.
+ *
+ * @param {Object} props
+ * @param {Object} props.style - The select's own box, from {@link selectStyle}.
+ * @param {Object} [props.layout] - Passed to the wrapper: flex, width, and the
+ *   like. The select is stretched to whatever it settles at.
+ */
+function Picker({ style, layout, children, ...props }) {
+  return (
+    <span
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        // The chevron reads `currentColor`, so the colour the select is drawn
+        // in has to reach it — and it is the wrapper the arrow sits in.
+        color: style.color,
+        ...layout,
+      }}
+    >
+      <select {...props} style={{ ...style, width: "100%" }}>
+        {children}
+      </select>
+      <span aria-hidden="true" style={chevronStyle}>
+        ▾
+      </span>
+    </span>
+  );
+}
 
 /**
  * A control with its caption — above it where the bar is roomy, beside it in
@@ -200,8 +254,8 @@ export function AddBar({
   const linkSel = selectStyle(linkSize);
   /** For the fields that are not selects, and so must not wear its chevron. */
   const box = fieldStyle(size);
-  /** An element picker, held at the width of the longest id it can offer. */
-  const idSel = { ...linkSel, ...pickerWidth(idOptionChars(elements)) };
+  /** Width for an element picker: the longest id it can offer, suffix and all. */
+  const idLayout = pickerWidth(idOptionChars(elements));
   const showRelations = !hideNonEntailsRels;
   // Origin and confidence, folded away on a phone. Kept across submissions
   // rather than reset with the form: someone who opened them once is filling
@@ -318,6 +372,15 @@ export function AddBar({
     else if (tab === "relation")
       setRelationForm(makeRelationDefaults(elements));
     else setArgumentForm(makeArgumentDefaults(elements));
+  };
+
+  /**
+   * Clear is a reset plus a new field. Submitting is not: it leaves the reader
+   * where they were, and after a ctrl-enter that is inside the field they are
+   * still typing in — replacing it there would take the focus with it.
+   */
+  const handleClear = () => {
+    resetTab();
     setGeneration((n) => n + 1);
   };
 
@@ -369,6 +432,41 @@ export function AddBar({
     };
   };
 
+  /**
+   * One button, put in one of two places: the far end of the tab row on a
+   * phone, or past the fields on a wide screen. Either way it ends up as far
+   * from Add as the layout allows, which is the point of it.
+   */
+  /**
+   * A link needs two ends. Until the graph has two elements the pickers stand
+   * empty and Add is dead, and a disabled button gives no reason — so the space
+   * the other complaints use says what is missing instead of staying blank.
+   */
+  const tooFewElements = ids.length < 2;
+  const needsTwo = (
+    <span role="status" style={complaintStyle(linkSize)}>
+      Add two elements first
+    </span>
+  );
+
+  const clearButton = (
+    <button
+      onClick={handleClear}
+      // Named for what it clears, as the submit button is: which tab is lit is
+      // the only thing saying what either of them acts on.
+      aria-label={`Clear ${tab}`}
+      title="Start this tab over"
+      style={{
+        ...ghostBtn(size),
+        marginLeft: "auto",
+        flexShrink: 0,
+        ...(roomy ? { minHeight: 44 } : null),
+      }}
+    >
+      Clear
+    </button>
+  );
+
   return (
     <div
       // Ringed by the tour alongside the graph's + buttons: this is the other
@@ -418,7 +516,11 @@ export function AddBar({
             // screen there is room, and holding them at their full width is
             // what keeps them the same width on every tab: a tab whose fields
             // outgrew the row would otherwise squeeze the buttons above them.
-            ...(roomy ? null : { flexShrink: 0 }),
+            //
+            // The phone's copy takes the whole row as well, so that Clear's
+            // auto margin has the row's far edge to reach for. Sized to its
+            // contents it stopped at the end of the buttons, short of the edge.
+            ...(roomy ? { flexBasis: "100%" } : { flexShrink: 0 }),
           }}
         >
           <button
@@ -428,6 +530,7 @@ export function AddBar({
             // visible "Add" is inside it, as WCAG 2.5.3 asks of any control
             // whose label is shorter than its accessible name.
             aria-label={`Add ${tab}`}
+            title={`Add ${tab} — ⌘/Ctrl + Enter`}
             style={{
               // The auto margin is what holds it to the right of the strip. It
               // leads the row here, so it starts at the left edge everything
@@ -449,6 +552,11 @@ export function AddBar({
                 repeating it here only costs the tabs room on the line. */}
             Add
           </button>
+          {/* On the phone it shares this line, at the far end of it — a row of
+              its own for one button was a waste of a screen that has none to
+              spare, and opposite ends of a row is distance enough. On a wide
+              screen it goes past the fields instead; see below. */}
+          {roomy && clearButton}
           {/* Grouped so the three stay together: as loose items they were free
               to wrap apart from one another, which split the set across two
               rows. Grouped, a row too narrow for all four breaks after the
@@ -460,6 +568,10 @@ export function AddBar({
               gap: roomy ? 6 : 8,
               minWidth: 0,
               flexWrap: "wrap",
+              // A line of its own on the phone, which puts Add and Clear
+              // together on the one above rather than leaving where the row
+              // breaks to whatever the labels happen to measure.
+              ...(roomy ? { flexBasis: "100%" } : null),
             }}
           >
             <button
@@ -521,17 +633,17 @@ export function AddBar({
         >
           {tab === "element" ? (
             <>
-              <select
+              <Picker
                 aria-label="Element type"
                 value={elementForm.type}
                 onChange={(e) => setEl("type", e.target.value)}
-                // Roomy shares the line with Details, the pair filling the row.
-                // Growing from their content widths rather than from nothing:
-                // `flex: 1` would start both at zero and split the row evenly,
-                // which cut "Judgment" off halfway.
-                // 9 for "Principle", the longest of the three.
-                style={{
-                  ...sel,
+                style={sel}
+                // 9 for "Principle", the longest of the three. Roomy shares the
+                // line with Details, the pair filling the row — growing from
+                // their content widths rather than from nothing, since `flex: 1`
+                // would start both at zero and split the row evenly, which cut
+                // "Judgment" off halfway.
+                layout={{
                   ...pickerWidth(9),
                   ...(roomy ? { flex: "1 1 auto" } : null),
                 }}
@@ -539,7 +651,7 @@ export function AddBar({
                 <option value="judgment">Judgment</option>
                 <option value="principle">Principle</option>
                 <option value="theory">Theory</option>
-              </select>
+              </Picker>
               {/* Both of these carry a working default, so on a phone they are
                   detail rather than something to fill in: the statement is what
                   the reader came to type. Folded away by default there, and
@@ -653,42 +765,44 @@ export function AddBar({
             </>
           ) : tab === "relation" ? (
             <>
-              <select
+              <Picker
                 aria-label="Relation from"
                 value={relationForm.from}
                 onChange={(e) => setRel("from", e.target.value)}
-                style={idSel}
+                style={linkSel}
+                layout={idLayout}
               >
                 <ElementOptions elements={elements} />
-              </select>
+              </Picker>
               <span style={arrow}>→</span>
-              <select
+              <Picker
                 aria-label="Relation type"
                 value={relationForm.type}
                 onChange={(e) => setRel("type", e.target.value)}
+                // The colour goes on the select, so the chevron takes it too.
+                style={{ ...linkSel, color: C[relationForm.type] }}
                 // 10 for "undermines" and "depends on", the longest offered.
-                style={{
-                  ...linkSel,
-                  ...pickerWidth(10),
-                  color: C[relationForm.type],
-                }}
+                layout={pickerWidth(10)}
               >
                 <RelationTypeOptions />
-              </select>
+              </Picker>
               <span style={arrow}>→</span>
-              <select
+              <Picker
                 aria-label="Relation to"
                 value={relationForm.to}
                 onChange={(e) => setRel("to", e.target.value)}
-                style={idSel}
+                style={linkSel}
+                layout={idLayout}
               >
                 <ElementOptions elements={elements} />
-              </select>
-              {relationForm.from === relationForm.to && ids.length >= 2 && (
-                <span style={{ fontSize: 10, color: C.conflicts }}>
+              </Picker>
+              {tooFewElements ? (
+                needsTwo
+              ) : relationForm.from === relationForm.to ? (
+                <span role="status" style={complaintStyle(linkSize)}>
                   From ≠ To
                 </span>
-              )}
+              ) : null}
             </>
           ) : (
             <>
@@ -699,14 +813,15 @@ export function AddBar({
                   key={i}
                   style={{ display: "flex", alignItems: "center", gap: 4 }}
                 >
-                  <select
+                  <Picker
                     aria-label={`Premise ${i + 1}`}
                     value={premise}
                     onChange={(e) => setPremise(i, e.target.value)}
-                    style={idSel}
+                    style={linkSel}
+                    layout={idLayout}
                   >
                     <ElementOptions elements={elements} />
-                  </select>
+                  </Picker>
                   {premises.length > 1 && (
                     <button
                       onClick={() => removePremise(i)}
@@ -732,61 +847,50 @@ export function AddBar({
               >
                 + premise
               </button>
-              <select
+              <Picker
                 aria-label="Argument type"
                 value={negated ? "precludes" : "entails"}
                 onChange={(e) =>
                   setArg("negated", e.target.value === "precludes")
                 }
-                // 9 for "precludes".
+                // The colour goes on the select, so the chevron takes it too.
                 style={{
                   ...linkSel,
-                  ...pickerWidth(9),
                   color: negated ? C.precludes : C.entails,
                 }}
+                // 9 for "precludes".
+                layout={pickerWidth(9)}
               >
                 <option value="entails">entails</option>
                 <option value="precludes">precludes</option>
-              </select>
+              </Picker>
               <span style={arrow}>→</span>
-              <select
+              <Picker
                 aria-label="Conclusion"
                 value={conclusion}
                 onChange={(e) => setArg("conclusion", e.target.value)}
-                style={idSel}
+                style={linkSel}
+                layout={idLayout}
               >
                 <ElementOptions elements={elements} />
-              </select>
-              {(duplicatePremises || conclusionIsPremise) &&
-                ids.length >= 2 && (
-                  <span style={{ fontSize: 10, color: C.conflicts }}>
-                    {duplicatePremises
-                      ? "Premises must differ"
-                      : "Premise ≠ conclusion"}
-                  </span>
-                )}
+              </Picker>
+              {tooFewElements ? (
+                needsTwo
+              ) : duplicatePremises || conclusionIsPremise ? (
+                <span role="status" style={complaintStyle(linkSize)}>
+                  {duplicatePremises
+                    ? "Premises must differ"
+                    : "Premise ≠ conclusion"}
+                </span>
+              ) : null}
             </>
           )}
         </div>
-        {/* Last of all, and held against the far edge. It undoes the work the
-            rest of the row is for, so it wants to be nowhere near the button
-            that commits it — beside Add it read as a second way to submit. The
-            fields between them grow, which is what carries it out there. */}
-        <button
-          onClick={resetTab}
-          // Named for what it clears, as the submit button is: which tab is lit
-          // is the only thing saying what either of them acts on.
-          aria-label={`Clear ${tab}`}
-          title="Start this tab over"
-          style={{
-            ...ghostBtn(size),
-            marginLeft: "auto",
-            flexShrink: 0,
-            ...(roomy ? { minHeight: 44 } : null),
-          }}
-        >
-          Clear
-        </button>
+        {/* Past all the fields and against the far edge, which the growing
+            fields group is what carries it out to. It undoes the work the rest
+            of the row is for, so it wants to be nowhere near the button that
+            commits it — beside Add it read as a second way to submit. */}
+        {!roomy && clearButton}
       </div>
 
       {/* ── Text / explanation ── */}
@@ -811,7 +915,9 @@ export function AddBar({
               : setArg("explanation", e.target.value)
         }
         onKeyDown={(e) => {
-          if (e.key === "Enter" && e.ctrlKey && canSubmit) {
+          // metaKey too: on a Mac the shortcut people reach for is cmd-enter,
+          // and the app's own undo already answers to both.
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && canSubmit) {
             e.preventDefault();
             handleSubmit();
           }

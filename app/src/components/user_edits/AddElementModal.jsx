@@ -3,10 +3,18 @@
  * @module components/AddElementModal
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
 import { ConfidenceInput } from "./ConfidenceInput.jsx";
+
+/** @param {'judgment'|'principle'|'theory'} type */
+const defaults = (type) => ({
+  type,
+  confidence: 0.67,
+  origin: "user",
+  text: "",
+});
 
 /**
  * @typedef {Object} AddElementFormData
@@ -72,6 +80,11 @@ export function AddElementForm({ form, setForm }) {
  * @param {number}   props.currentRound
  * @param {function(AddElementFormData): void} props.onSave
  * @param {function(): void} props.onCancel
+ * @param {AddElementFormData} [props.draft] - What was in the form when it was
+ *   last closed. Closing is not discarding: a modal is easy to dismiss by
+ *   accident, and half-written text is worth more than a clean slate.
+ * @param {function(AddElementFormData): void} [props.onDraftChange] - Reports
+ *   the form outward so it survives this component being unmounted.
  * @returns {React.ReactElement}
  */
 export function AddElementModal({
@@ -79,21 +92,29 @@ export function AddElementModal({
   currentRound,
   onSave,
   onCancel,
+  draft,
+  onDraftChange,
 }) {
   const [form, setForm] = useState(
+    // The type comes from the button that opened this — that is a fresh choice,
+    // so it wins over whatever type the draft was left on.
     /** @type {AddElementFormData} */ ({
+      ...defaults(initialType),
+      ...draft,
       type: initialType,
-      confidence: 0.67,
-      origin: "user",
-      text: "",
     }),
   );
+  useEffect(() => {
+    onDraftChange?.(form);
+  }, [form, onDraftChange]);
+
   return (
     <ModalShell
       title="Add element"
       subtitle={`Will be added in Round ${currentRound + 1}`}
       onCancel={onCancel}
       onSave={() => onSave(form)}
+      onClear={() => setForm(defaults(initialType))}
       saveDisabled={!form.text.trim()}
     >
       <AddElementForm form={form} setForm={setForm} />
