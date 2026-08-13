@@ -28,7 +28,6 @@ import {
 import { ClusterSection } from "./text_panel/TextTabClusterSection.jsx";
 import { NavBar } from "./text_panel/TextTabNavBar.jsx";
 import { HistoryRoundBanner } from "./text_panel/TextTabPrimitives.jsx";
-import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
 import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 

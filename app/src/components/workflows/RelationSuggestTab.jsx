@@ -9,16 +9,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
-import { SpinnerIcon } from "../Icons.jsx";
 import { fetchRelationSuggestions } from "../../utils/relationsClient.js";
 import { AddRelationPanel } from "../user_edits/WorkflowAddPanels.jsx";
-import { Tooltip } from "../Tooltip.jsx";
-import { sendsToLlmText } from "../../utils/openaiClient.js";
 import {
   llmOrigin,
   relationTypeLabel,
   linkableElements,
 } from "../../utils/stateUtils.js";
+import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
 import {
   AcceptButton,
   RejectButton,
@@ -29,13 +27,9 @@ import {
   ErrorBanner,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
-import {
-  nextPhaseEnabled,
-  WORKFLOW_NEXT_PHASE,
-} from "../../utils/workflowUtils.js";
-import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
+import { nextPhaseEnabled } from "../../utils/workflowUtils.js";
+import { SuggestionToolbar } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
-import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 
 // ─── Colour helper ────────────────────────────────────────────────────────────
 
@@ -47,98 +41,6 @@ const REL_COLOR = {
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-/**
- * @param {Object}           props
- * @param {number}           props.elementCount   Used to disable the button; not shown in label.
- * @param {number|null}      props.suggestionCount  Remaining suggestions, or null if not yet fetched.
- * @param {boolean}          props.loading
- * @param {boolean}          props.hasResult
- * @param {Function}         props.onSuggest
- * @param {string|undefined} props.model
- */
-function Toolbar({
-  elementCount,
-  suggestionCount,
-  loading,
-  hasResult,
-  onSuggest,
-  model,
-  workflowPhase,
-  advanceWorkflow,
-  nextPhaseIsEnabled,
-  suggestionsDisabled,
-}) {
-  const suggestDisabled = loading || elementCount < 2 || suggestionsDisabled;
-  const why = suggestionsUnavailable({
-    loading,
-    noBackend: suggestionsDisabled,
-    needs: elementCount < 2 ? "Add at least two elements first." : undefined,
-  });
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "10px 0 14px",
-        gap: 12,
-      }}
-    >
-      <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-        <span style={{ color: C.supports, fontWeight: "bold" }}>
-          Suggest Relations
-        </span>
-        {suggestionCount !== null && (
-          <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
-        )}
-        {model && <span style={{ color: C.dim }}> · {model}</span>}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <Tooltip text={sendsToLlmText()}>
-          <button
-            onClick={onSuggest}
-            disabled={suggestDisabled}
-            title={why}
-            style={{
-              background: "transparent",
-              border: `1px solid ${suggestDisabled ? C.border : C.supports}`,
-              color: suggestDisabled ? C.dim : C.supports,
-              borderRadius: 6,
-              padding: "5px 12px",
-              fontSize: 12,
-              fontWeight: "bold",
-              cursor: suggestDisabled ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            {loading ? <SpinnerIcon /> : <span>↺</span>}
-            {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
-          </button>
-        </Tooltip>
-        {workflowPhase && (
-          <>
-            <div
-              style={{
-                width: 1,
-                height: 18,
-                background: C.border,
-                margin: "0 8px",
-              }}
-            />
-            <ProgressWorkflowBtn
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-              workflowPhase={workflowPhase}
-              advanceWorkflow={advanceWorkflow}
-            />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /**
  * A single relation suggestion card. The explanation can be modified inline
@@ -263,32 +165,23 @@ export function RelationSuggestTab({
   suggestionsAreSample = false,
   suggestionsDisabled = false,
 }) {
-  /** @type {[Array<{from: string, to: string, type: string, explanation: string}>|null, Function]} */
-  const [suggestions, setSuggestions] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [model, setModel] = useState(null);
-  /** @type {[{suggestion: Object, draft: string}|null, Function]} */
-  const [editing, setEditing] = useState(null);
+  const {
+    suggestions,
+    setSuggestions,
+    loading,
+    error,
+    model,
+    editing,
+    setEditing,
+    hasResult,
+    run,
+  } = useSuggestionWorkflow(fetchRelationSuggestions);
 
   const activeElements = state.elements.filter((e) => e.status !== "withdrawn");
 
-  const suggest = async ({ scroll = true } = {}) => {
+  const suggest = ({ scroll = true } = {}) => {
     if (scroll) onScrollToRelations?.();
-    setLoading(true);
-    setError(null);
-    try {
-      const { suggestions: s, model: m } = await fetchRelationSuggestions(
-        state,
-        useDummy,
-      );
-      setSuggestions(s);
-      setModel(m);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    return run(state, useDummy);
   };
 
   const autoFetchRef = useRef(autoFetch);
@@ -336,21 +229,29 @@ export function RelationSuggestTab({
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
-        <Toolbar
-          elementCount={activeElements.length}
-          suggestionCount={suggestions !== null ? suggestions.length : null}
+        <SuggestionToolbar
+          accent={C.supports}
+          title="Suggest Relations"
+          actionLabel="Suggest"
+          rerunLabel="Re-suggest"
+          suggestionCount={hasResult ? suggestions.length : null}
           loading={loading}
-          hasResult={suggestions !== null}
-          onSuggest={suggest}
+          hasResult={hasResult}
+          onRun={suggest}
           model={model}
+          disabled={suggestionsDisabled}
+          needs={
+            activeElements.length < 2
+              ? "Add at least two elements first."
+              : undefined
+          }
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
-          suggestionsDisabled={suggestionsDisabled}
         />
 
         {error && <ErrorBanner message={error} />}
-        {suggestions !== null && suggestions.length > 0 && (
+        {hasResult && suggestions.length > 0 && (
           <AiDisclosureBanner model={model} />
         )}
 
@@ -360,7 +261,7 @@ export function RelationSuggestTab({
           </div>
         )}
 
-        {suggestions !== null && suggestions.length === 0 && (
+        {hasResult && suggestions.length === 0 && (
           <div style={{ fontSize: 12, color: C.dim }}>
             No suggestions remaining.
           </div>

@@ -10,13 +10,11 @@
 
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
-import { quickScore } from "../../utils/simulateRethonClient.js";
-import { SpinnerIcon } from "../Icons.jsx";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
 import { AddElementPanel } from "../user_edits/WorkflowAddPanels.jsx";
-import { Tooltip } from "../Tooltip.jsx";
-import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { llmOrigin } from "../../utils/stateUtils.js";
+import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
+import { useScoreBaseline } from "../../hooks/useScoreBaseline.js";
 import {
   AcceptButton,
   RejectButton,
@@ -27,98 +25,14 @@ import {
   ErrorBanner,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
-import { ProgressWorkflowBtn, ScoreDeltaBadge } from "./workflowComponents.jsx";
+import {
+  ScoreDeltaBadge,
+  SuggestionToolbar,
+} from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
-import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-/**
- * @param {Object}           props
- * @param {number|null}      props.suggestionCount  Remaining suggestions, or null if not yet fetched.
- * @param {boolean}          props.loading
- * @param {boolean}          props.hasResult
- * @param {Function}         props.onElicit
- * @param {string|undefined} props.model
- */
-function Toolbar({
-  suggestionCount,
-  loading,
-  hasResult,
-  onElicit,
-  model,
-  workflowPhase,
-  advanceWorkflow,
-  nextPhaseIsEnabled,
-  suggestionsDisabled,
-}) {
-  const buttonDisabled = loading || suggestionsDisabled;
-  const why = suggestionsUnavailable({ loading, noBackend: suggestionsDisabled });
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "10px 0 14px",
-        gap: 12,
-      }}
-    >
-      <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-        <span style={{ color: C.judgment.high, fontWeight: "bold" }}>
-          Elicit Judgments
-        </span>
-        {suggestionCount !== null && (
-          <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
-        )}
-        {model && <span style={{ color: C.dim }}> · {model}</span>}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <Tooltip text={sendsToLlmText()}>
-          <button
-            onClick={onElicit}
-            disabled={buttonDisabled}
-            title={why}
-            style={{
-              background: "transparent",
-              border: `1px solid ${buttonDisabled ? C.border : C.judgment.high}`,
-              color: buttonDisabled ? C.dim : C.judgment.high,
-              borderRadius: 6,
-              padding: "5px 12px",
-              fontSize: 12,
-              fontWeight: "bold",
-              cursor: buttonDisabled ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            {loading ? <SpinnerIcon /> : <span>↺</span>}
-            {loading ? "Thinking…" : hasResult ? "Re-elicit" : "Elicit"}
-          </button>
-        </Tooltip>
-        {workflowPhase && (
-          <>
-            <div
-              style={{
-                width: 1,
-                height: 18,
-                background: C.border,
-                margin: "0 8px",
-              }}
-            />
-            <ProgressWorkflowBtn
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-              workflowPhase={workflowPhase}
-              advanceWorkflow={advanceWorkflow}
-            />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /**
  * A single suggestion card showing a thought experiment and its multiple
@@ -314,43 +228,21 @@ export function JudgmentElicitTab({
   suggestionsDisabled = false,
   weights = null,
 }) {
-  /** @type {[Array<{question: string, judgments: Array<{text: string, confidence: string}>}>|null, Function]} */
-  const [suggestions, setSuggestions] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [model, setModel] = useState(null);
-  /** @type {[{suggestion: Object, judgment: Object, draft: string}|null, Function]} */
-  const [editing, setEditing] = useState(null);
+  const {
+    suggestions,
+    setSuggestions,
+    loading,
+    error,
+    model,
+    /** @type {{suggestion: Object, judgment: Object, draft: string}|null} */
+    editing,
+    setEditing,
+    hasResult,
+    run,
+  } = useSuggestionWorkflow(fetchJudgmentElicitations);
+  const baseline = useScoreBaseline(state, weights);
 
-  // Baseline account + systematicity for the current state — used by
-  // ScoreDeltaBadge to compute per-suggestion acceptance deltas.
-  const [baseline, setBaseline] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    quickScore(state.elements, state.relations, weights).then((scores) => {
-      if (!cancelled) setBaseline(scores ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [state.elements, state.relations, weights]);  
-
-  const elicit = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { suggestions: s, model: m } = await fetchJudgmentElicitations(
-        state,
-        useDummy,
-      );
-      setSuggestions(s);
-      setModel(m);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const elicit = () => run(state, useDummy);
 
   useEffect(() => {
     if (autoFetch && !suggestionsDisabled) elicit();
@@ -386,31 +278,36 @@ export function JudgmentElicitTab({
     setSuggestions((prev) => removeJudgment(prev, suggestion, judgment));
   };
 
-  const remainingJudgments =
-    suggestions !== null
-      ? suggestions.reduce((n, s) => n + s.judgments.length, 0)
-      : null;
+  // Counted across questions, not per question: what is left to decide is the
+  // number of options, and one question may hold several.
+  const remainingJudgments = hasResult
+    ? suggestions.reduce((n, s) => n + s.judgments.length, 0)
+    : null;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
-        <Toolbar
+        <SuggestionToolbar
+          accent={C.judgment.high}
+          title="Elicit Judgments"
+          actionLabel="Elicit"
+          rerunLabel="Re-elicit"
           suggestionCount={remainingJudgments}
           loading={loading}
-          hasResult={suggestions !== null}
-          onElicit={elicit}
+          hasResult={hasResult}
+          onRun={elicit}
           model={model}
+          disabled={suggestionsDisabled}
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
-          suggestionsDisabled={suggestionsDisabled}
         />
         {error && <ErrorBanner message={error} />}
-        {suggestions !== null && suggestions.length > 0 && (
+        {hasResult && suggestions.length > 0 && (
           <AiDisclosureBanner model={model} />
         )}
 
-        {suggestions !== null && suggestions.length === 0 && (
+        {hasResult && suggestions.length === 0 && (
           <div style={{ fontSize: 12, color: C.dim }}>
             No suggestions remaining.
           </div>

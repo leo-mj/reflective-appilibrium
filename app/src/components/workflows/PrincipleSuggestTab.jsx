@@ -9,13 +9,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
-import { quickScore } from "../../utils/simulateRethonClient.js";
-import { SpinnerIcon } from "../Icons.jsx";
 import { fetchPrincipleSuggestions } from "../../utils/principlesClient.js";
 import { AddElementPanel } from "../user_edits/WorkflowAddPanels.jsx";
-import { Tooltip } from "../Tooltip.jsx";
-import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { llmOrigin } from "../../utils/stateUtils.js";
+import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
+import { useScoreBaseline } from "../../hooks/useScoreBaseline.js";
 import {
   AcceptButton,
   RejectButton,
@@ -26,106 +24,13 @@ import {
   ErrorBanner,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
+import { nextPhaseEnabled } from "../../utils/workflowUtils.js";
 import {
-  nextPhaseEnabled,
-  WORKFLOW_NEXT_PHASE,
-} from "../../utils/workflowUtils.js";
-import { ProgressWorkflowBtn, ScoreDeltaBadge } from "./workflowComponents.jsx";
+  ScoreDeltaBadge,
+  SuggestionToolbar,
+} from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
-import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
-
-/**
- * @param {Object}           props
- * @param {number}           props.jAndPCount   Used to disable the button; not shown in label.
- * @param {number|null}      props.suggestionCount  Remaining suggestions, or null if not yet fetched.
- * @param {boolean}          props.loading
- * @param {boolean}          props.hasResult
- * @param {Function}         props.onSuggest
- * @param {string|undefined} props.model
- */
-function Toolbar({
-  jAndPCount,
-  suggestionCount,
-  loading,
-  hasResult,
-  onSuggest,
-  model,
-  workflowPhase,
-  advanceWorkflow,
-  nextPhaseIsEnabled,
-  suggestionsDisabled,
-}) {
-  const suggestDisabled = loading || jAndPCount < 1 || suggestionsDisabled;
-  const why = suggestionsUnavailable({
-    loading,
-    noBackend: suggestionsDisabled,
-    needs: jAndPCount < 1 ? "Add a judgment or principle first." : undefined,
-  });
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "10px 0 14px",
-        gap: 12,
-      }}
-    >
-      <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-        <span style={{ color: C.principle.high, fontWeight: "bold" }}>
-          Suggest Principles
-        </span>
-        {suggestionCount !== null && (
-          <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
-        )}
-        {model && <span style={{ color: C.dim }}> · {model}</span>}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <Tooltip text={sendsToLlmText()}>
-          <button
-            onClick={onSuggest}
-            disabled={suggestDisabled}
-            title={why}
-            style={{
-              background: "transparent",
-              border: `1px solid ${suggestDisabled ? C.border : C.principle.high}`,
-              color: suggestDisabled ? C.dim : C.principle.high,
-              borderRadius: 6,
-              padding: "5px 12px",
-              fontSize: 12,
-              fontWeight: "bold",
-              cursor: suggestDisabled ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            {loading ? <SpinnerIcon /> : <span>↺</span>}
-            {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
-          </button>
-        </Tooltip>
-        {workflowPhase && (
-          <>
-            <div
-              style={{
-                width: 1,
-                height: 18,
-                background: C.border,
-                margin: "0 8px",
-              }}
-            />
-            <ProgressWorkflowBtn
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-              workflowPhase={workflowPhase}
-              advanceWorkflow={advanceWorkflow}
-            />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /**
  * A single principle suggestion card. The principle text can be modified inline
@@ -284,25 +189,18 @@ export function PrincipleSuggestTab({
   suggestionsDisabled = false,
   weights = null,
 }) {
-  /** @type {[Array<{text: string, confidence: string, covers: string[], explanation: string}>|null, Function]} */
-  const [suggestions, setSuggestions] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [model, setModel] = useState(null);
-  /** @type {[{suggestion: Object, draft: string}|null, Function]} */
-  const [editing, setEditing] = useState(null);
-
-  // Baseline account + systematicity for the current state.
-  const [baseline, setBaseline] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    quickScore(state.elements, state.relations, weights).then((scores) => {
-      if (!cancelled) setBaseline(scores ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [state.elements, state.relations, weights]);  
+  const {
+    suggestions,
+    setSuggestions,
+    loading,
+    error,
+    model,
+    editing,
+    setEditing,
+    hasResult,
+    run,
+  } = useSuggestionWorkflow(fetchPrincipleSuggestions);
+  const baseline = useScoreBaseline(state, weights);
 
   const judgments = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.type === "judgment",
@@ -310,23 +208,9 @@ export function PrincipleSuggestTab({
   const principles = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.type === "principle",
   );
+  const jAndPCount = judgments.length + principles.length;
 
-  const suggest = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { suggestions: s, model: m } = await fetchPrincipleSuggestions(
-        state,
-        useDummy,
-      );
-      setSuggestions(s);
-      setModel(m);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const suggest = () => run(state, useDummy);
 
   const autoFetchRef = useRef(autoFetch);
   useEffect(() => {
@@ -367,31 +251,37 @@ export function PrincipleSuggestTab({
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
-        <Toolbar
-          jAndPCount={judgments.length + principles.length}
-          suggestionCount={suggestions !== null ? suggestions.length : null}
+        <SuggestionToolbar
+          accent={C.principle.high}
+          title="Suggest Principles"
+          actionLabel="Suggest"
+          rerunLabel="Re-suggest"
+          suggestionCount={hasResult ? suggestions.length : null}
           loading={loading}
-          hasResult={suggestions !== null}
-          onSuggest={suggest}
+          hasResult={hasResult}
+          onRun={suggest}
           model={model}
+          disabled={suggestionsDisabled}
+          needs={
+            jAndPCount < 1 ? "Add a judgment or principle first." : undefined
+          }
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
-          suggestionsDisabled={suggestionsDisabled}
         />
         {error && <ErrorBanner message={error} />}
-        {suggestions !== null && suggestions.length > 0 && (
+        {hasResult && suggestions.length > 0 && (
           <AiDisclosureBanner model={model} />
         )}
 
-        {judgments.length + principles.length <= 1 && (
+        {jAndPCount <= 1 && (
           <div style={{ fontSize: 12, color: C.dim }}>
             Add at least one non-withdrawn judgment or principle to suggest
             principles.
           </div>
         )}
 
-        {suggestions !== null && suggestions.length === 0 && (
+        {hasResult && suggestions.length === 0 && (
           <div style={{ fontSize: 12, color: C.dim }}>
             No suggestions remaining.
           </div>

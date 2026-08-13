@@ -16,7 +16,7 @@ from ..dependencies import get_llm_service
 from ..models.re_state import REElement
 from ..services.llm import LLMService
 from ..services.prompts import build_matrix_prompt
-from .shared import parse_json_object
+from .shared import LLMTaskResponse, parse_json_object
 
 router = APIRouter(prefix="/api/matrix", tags=["matrix"])
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class MatrixRequest(BaseModel):
     elements: list[REElement] = Field(min_length=2, max_length=200)
 
 
-class MatrixResponse(BaseModel):
+class MatrixResponse(LLMTaskResponse):
     """Response from ``POST /api/matrix/analyze``.
 
     ``matrix`` is a square dict-of-dicts keyed by element ID with float
@@ -44,9 +44,6 @@ class MatrixResponse(BaseModel):
     overview: str
     matrix: dict[str, dict[str, float]]
     pair_descriptions: dict[str, str] = Field(alias="pairDescriptions")
-    model: str
-    input_tokens: int = 0
-    output_tokens: int = 0
 
     model_config = {"populate_by_name": True}
 

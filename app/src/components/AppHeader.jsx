@@ -36,7 +36,6 @@ import {
 import { AppHeaderNarrow } from "./app_header/AppHeaderNarrow.jsx";
 import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
 import { C } from "../constants/colors.js";
-import { BACKEND_ENABLED } from "../config.js";
 
 /**
  * @param {Object}   props

@@ -16,7 +16,7 @@ from ..models.re_state import REElement, RERelation, RelationType
 from ..services.llm import LLMService
 from ..services.prompts import build_relations_prompt
 from ..services.response_schemas import RELATIONS_SCHEMA
-from .shared import parse_json_object
+from .shared import LLMTaskResponse, active_elements, parse_json_object
 
 router = APIRouter(prefix="/api/relations", tags=["relations"])
 logger = logging.getLogger(__name__)
@@ -48,13 +48,10 @@ class RelationSuggestion(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class SuggestResponse(BaseModel):
+class SuggestResponse(LLMTaskResponse):
     """Response from ``POST /api/relations/suggest``."""
 
     suggestions: list[RelationSuggestion]
-    model: str
-    input_tokens: int = 0
-    output_tokens: int = 0
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
@@ -66,7 +63,7 @@ async def suggest_relations(
     llm: Annotated[LLMService, Depends(get_llm_service)],
 ) -> SuggestResponse:
     """Ask the LLM to identify relations between the provided RE elements."""
-    active = [e for e in request.elements if e.status not in {"withdrawn", "rejected"}]
+    active = active_elements(request.elements)
     prompt = build_relations_prompt(request.topic, active, request.existing_relations)
     logger.info(
         f"Requesting relation suggestions from model '{llm.model}' between {len(active)} active elements."

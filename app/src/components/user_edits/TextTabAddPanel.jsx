@@ -25,10 +25,17 @@ import {
 import { ElementOptions } from "./ElementOptions.jsx";
 import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
 import {
-  SELECT_STYLE,
+  arrowStyle,
+  complaintStyle,
+  fieldStyle,
+  ghostBtn,
+  idOptionChars,
   makeArgumentDefaults,
   makeRelationDefaults,
+  pickerWidth,
+  selectStyle,
 } from "./addPanelShared.js";
+import { Field, Picker } from "./addPanelPrimitives.jsx";
 
 const ELEMENT_DEFAULTS = {
   type: "judgment",
@@ -36,192 +43,6 @@ const ELEMENT_DEFAULTS = {
   origin: "user",
   text: "",
 };
-
-/**
- * The three sizes anything in the bar is drawn at.
- *
- * `roomy` is the phone's version. There the bar is not a strip along the foot
- * of a working screen but a sheet with most of the screen to itself, and
- * everything in it is pressed with a thumb rather than clicked. It is a prop
- * rather than a media query because it follows the container, not the device:
- * the wide layout keeps its strip on a touchscreen, where there is still a
- * graph above it with a better claim on the height.
- *
- * - `compact` — the strip's default, for the element tab, where the statement
- *   below the controls is the thing being written and they are its trimmings.
- * - `prominent` — the link tabs on a wide screen. There the pickers *are* the
- *   content: an argument is its premises and its conclusion, and the box under
- *   them holds an optional note. At the compact size they were dwarfed by it.
- * - `roomy` — the phone sheet, where everything is worked with a thumb.
- */
-const SIZES = {
-  compact: { padding: "3px 6px", fontSize: 14 },
-  prominent: { padding: "7px 12px", fontSize: 17, minHeight: 40 },
-  roomy: { padding: "8px 12px", fontSize: 16, minHeight: 44 },
-};
-
-const GHOST_SIZES = {
-  compact: { padding: "3px 7px", fontSize: 11 },
-  prominent: { padding: "7px 12px", fontSize: 14, minHeight: 40 },
-  roomy: { padding: "8px 12px", fontSize: 13, minHeight: 40 },
-};
-
-const ARROW_SIZES = { compact: 11, prominent: 15, roomy: 14 };
-
-const ghostBtn = (size) => ({
-  background: "transparent",
-  border: `1px solid ${C.border}`,
-  borderRadius: 4,
-  color: C.dim,
-  cursor: "pointer",
-  ...GHOST_SIZES[size],
-});
-
-const arrowStyle = (size) => ({
-  color: C.dim,
-  fontSize: ARROW_SIZES[size],
-  fontWeight: "bold",
-});
-
-/**
- * The chevron a select draws for itself, drawn by us instead — see
- * {@link selectStyle} for why we take it over.
- *
- * Laid over the picker rather than painted into its background, so that it
- * inherits the picker's own colour: a background image would have to name one,
- * and a data URI cannot see the CSS variables the rest of the bar is coloured
- * from — it would be a fixed grey in both themes, and grey on the relation-type
- * picker, which colours its text by the relation.
- */
-const chevronStyle = {
-  position: "absolute",
-  right: 10,
-  top: "50%",
-  transform: "translateY(-50%)",
-  fontSize: 10,
-  lineHeight: 1,
-  // Colour comes from the picker; the arrow is not meant to shout as loudly.
-  opacity: 0.6,
-  // The picker is what should answer a click anywhere in its box.
-  pointerEvents: "none",
-};
-
-/**
- * The box every field in the bar sits in — pickers, text inputs and the letter
- * buttons alike.
- *
- * @param {keyof SIZES} size
- */
-const fieldStyle = (size) => ({ ...SELECT_STYLE, ...SIZES[size] });
-
-/**
- * Width enough for the longest thing a picker can hold, rather than for the one
- * it happens to hold now. A select sizes itself to its selected option, so
- * without this the picker changed width every time it was used — and the widest
- * options were left crowding the chevron.
- *
- * In `ch` so it tracks whichever of the reader's fonts is in use, plus a fixed
- * allowance for the padding and the chevron's reserved strip.
- *
- * @param {number} chars - Length of the longest option label.
- */
-const pickerWidth = (chars) => ({ minWidth: `calc(${chars}ch + 46px)` });
-
-/**
- * Why the submit button is refusing. It is the only thing that says so, and a
- * disabled button explains nothing on its own, so it is announced as well as
- * shown — and set at a size someone is meant to read rather than notice.
- */
-const complaintStyle = (size) => ({
-  fontSize: size === "compact" ? 12 : 14,
-  color: C.conflicts,
-});
-
-/** The longest option an element picker holds, counting the status suffixes. */
-const idOptionChars = (elements) =>
-  Math.max(
-    4,
-    ...elements.map(
-      (e) =>
-        e.id.length +
-        (e.status === "withdrawn" ? 12 : e.status === "rejected" ? 11 : 0),
-    ),
-  );
-
-/**
- * The shared box for an actual `<select>`, which needs two things the others
- * must not borrow: the chevron, and the room on the right to draw it in.
- *
- * @param {keyof SIZES} size
- */
-const selectStyle = (size) => ({
-  ...fieldStyle(size),
-  // WebKit renders a select at whatever height its own control wants and
-  // ignores min-height and vertical padding on it, so a picker asked to match
-  // the things beside it simply did not. Dropping the native appearance is what
-  // gives the box back — at the cost of the arrow it drew, hence the one
-  // painted on the right.
-  appearance: "none",
-  WebkitAppearance: "none",
-  // Room on the right for the chevron {@link Picker} lays over it.
-  paddingRight: 28,
-});
-
-/**
- * A picker: a `<select>` with the chevron over it. Anything that positions the
- * picker — a width, a share of a row — goes on the wrapper, since the wrapper
- * is what the surrounding layout now sees; the select fills it.
- *
- * @param {Object} props
- * @param {Object} props.style - The select's own box, from {@link selectStyle}.
- * @param {Object} [props.layout] - Passed to the wrapper: flex, width, and the
- *   like. The select is stretched to whatever it settles at.
- */
-function Picker({ style, layout, children, ...props }) {
-  return (
-    <span
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        // The chevron reads `currentColor`, so the colour the select is drawn
-        // in has to reach it — and it is the wrapper the arrow sits in.
-        color: style.color,
-        ...layout,
-      }}
-    >
-      <select {...props} style={{ ...style, width: "100%" }}>
-        {children}
-      </select>
-      <span aria-hidden="true" style={chevronStyle}>
-        ▾
-      </span>
-    </span>
-  );
-}
-
-/**
- * A control with its caption — above it where the bar is roomy, beside it in
- * the strip. Roomy lays several of these out side by side, and a caption of a
- * fixed height above each one is what makes their controls line up rather than
- * sit at whatever height their own label happened to leave them.
- */
-function Field({ label, roomy, children }) {
-  return (
-    <span
-      style={{
-        display: "flex",
-        flexDirection: roomy ? "column" : "row",
-        alignItems: roomy ? "flex-start" : "center",
-        gap: roomy ? 3 : 6,
-      }}
-    >
-      <span style={{ fontSize: 11, color: C.dim, lineHeight: 1.2 }}>
-        {label}
-      </span>
-      {children}
-    </span>
-  );
-}
 
 /**
  * @param {Object}      props

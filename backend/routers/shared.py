@@ -12,11 +12,38 @@ re-implemented per router.
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, Iterable
 
 from fastapi import HTTPException
+from pydantic import BaseModel
+
+from ..models.re_state import REElement
 
 logger = logging.getLogger(__name__)
+
+# Statuses that take an element out of play. Withdrawn and rejected elements are
+# still carried in the state — history playback needs them — but they are not
+# part of what the user currently holds, so they are not what the model is asked
+# about.
+_INACTIVE = {"withdrawn", "rejected"}
+
+
+def active_elements(elements: Iterable[REElement]) -> list[REElement]:
+    """The elements currently in play, in their original order."""
+    return [e for e in elements if e.status not in _INACTIVE]
+
+
+class LLMTaskResponse(BaseModel):
+    """Fields every assist endpoint returns alongside its suggestions.
+
+    ``model`` is disclosed so the UI can name what produced a suggestion, and
+    the token counts feed the session usage meter in the header.
+    """
+
+    model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+
 
 # Provider keys as they appear in error text. OpenAI and Anthropic 401s quote
 # the key back — usually partly masked, but the masking is theirs, not ours, and

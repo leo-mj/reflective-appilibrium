@@ -166,6 +166,41 @@ export {};
  * @property {RERelation[]}  relations - All relations across all rounds.
  * @property {RECoherence}   coherence - Most recent coherence analysis.
  * @property {RELogEntry[]}  log       - Ordered list of round log entries.
+ * @property {'questionnaire'} [model] - Present only in questionnaire mode, where the
+ *   elements and argument relations are pre-populated and the user works through
+ *   questions rather than building the graph themselves.
+ * @property {QuestionnaireSpec} [questionnaireSpec] - The questionnaire being worked
+ *   through. Present exactly when `model` is `"questionnaire"`.
+ */
+
+/**
+ * A pre-built argument graph a participant works through by answering questions.
+ *
+ * Specs live in `src/questionnaires/*.js` and are auto-discovered by
+ * {@link module:components/HomePage}. The arrays index a sentence pool: each inner
+ * array is one argument, its last entry the conclusion and the rest premises, with
+ * a negative number meaning the negation of that sentence.
+ *
+ * @typedef {Object} QuestionnaireSpec
+ * @property {string}   id    - Short identifier, used as the `origin` on generated elements.
+ * @property {string}   name
+ * @property {QuestionnaireCard} card
+ * @property {Array<{question: string, judgments: Array<{index: number, id: string, confidence: ConfidenceLevel, answer: string, text: string}>}>} suggestions
+ *   The questions and the answers offered for each. Questions whose text starts
+ *   with `"Q"` are the ones put to the participant.
+ * @property {number[][]} participantArguments - Arguments the participant's own answers activate.
+ * @property {number[][]} furtherArguments     - Arguments in the background graph.
+ */
+
+/**
+ * The home-page card that offers a questionnaire.
+ *
+ * @typedef {Object} QuestionnaireCard
+ * @property {string} title
+ * @property {string|Array<string|{link: string, href: string}>} description
+ *   Plain text, or a mixed list where objects render as inline links. Hrefs are
+ *   restricted to http(s) on import — see {@link module:utils/importMarkdown}.
+ * @property {string} buttonLabel
  */
 
 // ─── Utility / rendering types ────────────────────────────────────────────────
