@@ -44,6 +44,7 @@ export function AppHeaderWide({
   handleImportClick,
   onDownload,
   onSave,
+  canSaveToServer,
   saveLabel,
   saveColor,
   saveBusy,
@@ -134,7 +135,7 @@ export function AppHeaderWide({
           <a
             href="https://www.tuhh.de/ethics/welcome"
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
           >
             <img
               src="ieit_logo.svg"
@@ -518,7 +519,7 @@ export function AppHeaderWide({
                         <span style={menuIconStyle}>↓</span>Export
                       </button>
                     </Tooltip>
-                    {BACKEND_ENABLED && (
+                    {BACKEND_ENABLED && canSaveToServer && (
                       <Tooltip text="Save session to the backend server. Reload it from the home screen.">
                         <button
                           onClick={close(onSave)}

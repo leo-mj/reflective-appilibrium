@@ -6,6 +6,8 @@ import { useWindowSize } from "../hooks/useWindowSize.js";
 import { useCoarseDims } from "../hooks/useCoarseDims.js";
 import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
+import { useAutosaveDraft } from "../hooks/useAutosaveDraft.js";
+import { useBackendCapabilities } from "../hooks/useBackendCapabilities.js";
 import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
 import { saveSession } from "../utils/sessionsClient.js";
@@ -109,6 +111,13 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleUndo,
     canUndo,
   } = useREActions(initialState);
+
+  // What this backend actually allows, which build-time flags cannot say.
+  const capabilities = useBackendCapabilities();
+
+  // Not the sample: it is a fixed demonstration anyone can reload from the home
+  // page, and autosaving it would bury the visitor's own work under it.
+  useAutosaveDraft(state, !isSample);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -350,6 +359,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         setAssistSidePanel={setAssistSidePanel}
         onDownload={() => downloadMarkdown(state, positions)}
         onSave={() => saveSession(state)}
+        canSaveToServer={capabilities.sessions}
         onImportFile={handleImportFile}
         hasExistingState={state.elements.length > 0}
         onHome={onHome}

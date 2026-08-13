@@ -11,11 +11,31 @@ re-implemented per router.
 
 import json
 import logging
+import re
 from typing import Any
 
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
+
+# Provider keys as they appear in error text. OpenAI and Anthropic 401s quote
+# the key back — usually partly masked, but the masking is theirs, not ours, and
+# it varies by endpoint and by proxy.
+_KEY_PATTERN = re.compile(r"\b(sk|pk|api)[-_][A-Za-z0-9\-_]{8,}", re.IGNORECASE)
+
+_MAX_PROVIDER_ERROR = 400
+
+
+def scrub_provider_error(message: str) -> str:
+    """Make a provider's error safe to hand back to the caller.
+
+    The connection-test endpoint reports provider failures verbatim so the
+    settings modal can say what actually went wrong rather than "500". That is
+    worth keeping, but the raw text is written by a third party and can quote
+    the credential it just rejected, so redact anything key-shaped and cap the
+    length rather than relaying an arbitrary payload.
+    """
+    return _KEY_PATTERN.sub("[redacted]", message)[:_MAX_PROVIDER_ERROR]
 
 
 def parse_json_object(text: str, model: str) -> dict[str, Any]:

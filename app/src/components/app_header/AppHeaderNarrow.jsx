@@ -33,6 +33,7 @@ export function AppHeaderNarrow({
   handleImportClick,
   onDownload,
   onSave,
+  canSaveToServer,
   saveLabel,
   saveColor,
   saveBusy,
@@ -439,7 +440,7 @@ export function AppHeaderNarrow({
             >
               <span style={menuIconStyle}>↓</span>Export
             </button>
-            {BACKEND_ENABLED && (
+            {BACKEND_ENABLED && canSaveToServer && (
               <>
                 <div style={menuDividerStyle} />
                 <button

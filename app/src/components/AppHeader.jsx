@@ -60,6 +60,9 @@ import { BACKEND_ENABLED } from "../config.js";
  * @param {function} props.onStartWorkflow
  * @param {function} props.onStopWorkflow
  * @param {function} props.onSave
+ * @param {boolean}  props.canSaveToServer - Whether this backend actually stores
+ *   sessions. Off for a hosted instance, where the browser keeps the state
+ *   instead; the Save control is hidden rather than offered and refused.
  * @param {function} props.onUndo
  * @param {boolean}  props.canUndo
  * @param {boolean}  props.tourActive  - Whether the guided tour is running. Held
@@ -81,6 +84,7 @@ export function AppHeader({
   setAssistSidePanel,
   onDownload,
   onSave,
+  canSaveToServer = false,
   onImportFile,
   hasExistingState,
   onHome,
@@ -231,6 +235,7 @@ export function AppHeader({
     handleImportClick,
     onDownload,
     onSave: handleSave,
+    canSaveToServer,
     saveLabel: SAVE_LABEL[saveStatus],
     saveColor: SAVE_COLOR[saveStatus],
     saveBusy: saveStatus === "saving",

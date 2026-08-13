@@ -1,0 +1,25 @@
+version: 2
+
+# Monthly rather than weekly: this is a research project, and a PR per
+# dependency per week is noise that gets ignored, which is worse than none.
+# Security updates are exempt from the schedule and open as soon as they exist.
+updates:
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: monthly
+    groups:
+      # One PR for the build/test toolchain instead of a dozen. These do not
+      # ship, so they are reviewed together and merged on a green CI run.
+      dev-tooling:
+        dependency-type: development
+
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

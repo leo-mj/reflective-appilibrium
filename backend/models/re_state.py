@@ -8,8 +8,8 @@ these models; the import security logic mirrors importMarkdown.js.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Optional
-from pydantic import BaseModel, Field
+from typing import Annotated, List, Literal, Optional, Union
+from pydantic import BaseModel, Field, field_validator
 
 
 # ── Element ────────────────────────────────────────────────────────────────────
@@ -173,6 +173,107 @@ class RECoherence(BaseModel):
     clusters: list[str] = Field(default_factory=list, max_length=200)
 
 
+# ── Questionnaire spec ─────────────────────────────────────────────────────────
+#
+# Mirrors validateQuestionnaireSpec in app/src/utils/importMarkdown.js, bound for
+# bound. This used to be typed ``Any``: every other field on REState is
+# size-capped, so an unvalidated one was the way to make the session store write
+# a file of arbitrary size, and the only part of a saved session that reached
+# disk without having been checked at all.
+
+
+class QuestionnaireLink(BaseModel):
+    """An inline link in a questionnaire card's description."""
+
+    link: str = Field(default="", max_length=200)
+    href: str = Field(default="", max_length=500)
+
+    model_config = {"extra": "forbid"}
+
+    @field_validator("href")
+    @classmethod
+    def _web_schemes_only(cls, v: str) -> str:
+        """Reject anything that is not an ordinary web link.
+
+        A spec can arrive in an imported file, and its description is rendered
+        into an anchor. Without this the href is an arbitrary 500-character
+        string, which is the shape a ``javascript:`` or ``data:`` URL takes.
+        """
+        if v and not v.startswith(("http://", "https://")):
+            raise ValueError("href must be an http(s) URL")
+        return v
+
+
+class QuestionnaireCard(BaseModel):
+    """The home-page card that offers a questionnaire."""
+
+    title: str = Field(default="", max_length=500)
+    description: Union[
+        str,
+        List[Union[Annotated[str, Field(max_length=2_000)], QuestionnaireLink]],
+    ] = ""
+    button_label: str = Field(default="", alias="buttonLabel", max_length=200)
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("description")
+    @classmethod
+    def _bounded(cls, v):
+        if isinstance(v, str) and len(v) > 5_000:
+            raise ValueError("description exceeds 5000 characters")
+        if isinstance(v, list) and len(v) > 50:
+            raise ValueError("description exceeds 50 items")
+        return v
+
+
+class QuestionnaireJudgment(BaseModel):
+    """One selectable answer to a questionnaire question."""
+
+    index: int
+    id: str = Field(max_length=10)
+    confidence: Confidence
+    answer: str = Field(max_length=200)
+    text: str = Field(max_length=10_000)
+
+    model_config = {"extra": "forbid"}
+
+
+class QuestionnaireSuggestion(BaseModel):
+    """A question and the answers a participant may pick from."""
+
+    question: str = Field(max_length=1_000)
+    # Matches the bound in importMarkdown.js — see the note there on why it is
+    # 100 rather than 20.
+    judgments: list[QuestionnaireJudgment] = Field(default_factory=list, max_length=100)
+
+    model_config = {"extra": "forbid"}
+
+
+# An argument as indices into the questionnaire's sentence pool; the last entry
+# is the conclusion, negative values mean negation.
+ArgumentIndices = Annotated[list[int], Field(max_length=50)]
+
+
+class QuestionnaireSpec(BaseModel):
+    """A pre-populated argument graph the participant works through."""
+
+    id: str = Field(default="", max_length=100)
+    name: str = Field(default="", max_length=500)
+    model: str = Field(default="", max_length=100)
+    card: QuestionnaireCard = Field(default_factory=QuestionnaireCard)
+    suggestions: list[QuestionnaireSuggestion] = Field(
+        default_factory=list, max_length=100
+    )
+    participant_arguments: list[ArgumentIndices] = Field(
+        default_factory=list, alias="participantArguments", max_length=100
+    )
+    further_arguments: list[ArgumentIndices] = Field(
+        default_factory=list, alias="furtherArguments", max_length=100
+    )
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
 # ── State ──────────────────────────────────────────────────────────────────────
 
 
@@ -193,4 +294,6 @@ class REState(BaseModel):
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
     coherence: RECoherence = Field(default_factory=RECoherence)
     log: list[RELogEntry] = Field(default_factory=list, max_length=1_000)
-    questionnaire_spec: Optional[Any] = Field(None, alias="questionnaireSpec")
+    questionnaire_spec: Optional[QuestionnaireSpec] = Field(
+        None, alias="questionnaireSpec"
+    )

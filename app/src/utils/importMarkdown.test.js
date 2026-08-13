@@ -732,6 +732,47 @@ describe("importStateFromFile — questionnaire: questionnaireSpec round-trip", 
     expect(spec.furtherArguments).toEqual([[2, 4]]);
   });
 
+  it("accepts a question with more answers than the old 20 cap", async () => {
+    // The shipped DARCA questionnaire has a question with 31 answers. The cap
+    // used to be 20, which made that questionnaire's own exports refuse to
+    // re-import — and in the demo build, export/import is the only way to keep
+    // a session at all.
+    const judgments = Array.from({ length: 31 }, (_, i) => ({
+      index: i + 1,
+      id: `J${i + 1}`,
+      confidence: 0.67,
+      answer: "answer",
+      text: "some judgment text",
+    }));
+    const spec = {
+      ...MINIMAL_SPEC,
+      suggestions: [{ question: "Q?", judgments }],
+    };
+    const result = await importStateFromFile(
+      makeFile(wrapInMarkdown({ ...MINIMAL_STATE, questionnaireSpec: spec })),
+    );
+    expect(result.questionnaireSpec.suggestions[0].judgments).toHaveLength(31);
+  });
+
+  it("still bounds the answer list", async () => {
+    const judgments = Array.from({ length: 101 }, (_, i) => ({
+      index: i + 1,
+      id: `J${i + 1}`,
+      confidence: 0.67,
+      answer: "a",
+      text: "t",
+    }));
+    const spec = {
+      ...MINIMAL_SPEC,
+      suggestions: [{ question: "Q?", judgments }],
+    };
+    await expect(
+      importStateFromFile(
+        makeFile(wrapInMarkdown({ ...MINIMAL_STATE, questionnaireSpec: spec })),
+      ),
+    ).rejects.toThrow(/exceeds 100 items/);
+  });
+
   it("accepts card.description as an array mixing strings and link objects", async () => {
     const spec = {
       ...MINIMAL_SPEC,
@@ -755,6 +796,44 @@ describe("importStateFromFile — questionnaire: questionnaireSpec round-trip", 
     expect(desc[0]).toBe("Some text. ");
     expect(desc[1]).toEqual({ link: "a link", href: "https://example.com" });
     expect(desc[2]).toBe(" more text.");
+  });
+
+  // A description link is rendered into an anchor, so its href is a live
+  // navigation target and an imported file is not a trusted source.
+  describe("card.description link hrefs", () => {
+    const withHref = (href) => ({
+      ...MINIMAL_STATE,
+      questionnaireSpec: {
+        ...MINIMAL_SPEC,
+        card: {
+          ...MINIMAL_SPEC.card,
+          description: [{ link: "click me", href }],
+        },
+      },
+    });
+
+    it.each([
+      "javascript:alert(1)",
+      "JavaScript:alert(1)",
+      "  javascript:alert(1)",
+      "data:text/html;base64,PHNjcmlwdD4=",
+      "vbscript:msgbox(1)",
+      "file:///etc/passwd",
+    ])("rejects %s", async (href) => {
+      await expect(
+        importStateFromFile(makeFile(wrapInMarkdown(withHref(href)))),
+      ).rejects.toThrow(/must be an http\(s\) URL/);
+    });
+
+    it.each(["http://example.com", "https://example.com/a?b=c", ""])(
+      "accepts %s",
+      async (href) => {
+        const result = await importStateFromFile(
+          makeFile(wrapInMarkdown(withHref(href))),
+        );
+        expect(result.questionnaireSpec.card.description[0].href).toBe(href);
+      },
+    );
   });
 
   it("accepts empty participantArguments and furtherArguments", async () => {

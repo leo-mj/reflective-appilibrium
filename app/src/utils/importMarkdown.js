@@ -65,6 +65,20 @@ function bool(v, field) {
   return v;
 }
 
+/**
+ * Validates a link target from an imported file.
+ *
+ * A questionnaire card's description is rendered into an anchor, so an
+ * unrestricted string here is the shape a `javascript:` or `data:` URL takes.
+ * Only ordinary web links get through.
+ */
+function href(v, field) {
+  const s = str(v, field, 500);
+  if (s && !/^https?:\/\//i.test(s))
+    throw new Error(`"${field}" must be an http(s) URL`);
+  return s;
+}
+
 /** Validates a per-item `history` list of round-stamped events. */
 function history(v, field) {
   let prevRound = -Infinity;
@@ -119,7 +133,10 @@ function validateQuestionnaireSuggestion(s, i) {
   const ctx = `questionnaireSpec.suggestions[${i}]`;
   return {
     question: str(s.question, `${ctx}.question`, 1_000),
-    judgments: arr(s.judgments, `${ctx}.judgments`, 20).map((j, ji) =>
+    // 100, not 20: the shipped DARCA questionnaire has a question with 31
+    // answers, so the old bound made its own sessions un-importable — and in
+    // the demo build, export/import is the only way to keep one.
+    judgments: arr(s.judgments, `${ctx}.judgments`, 100).map((j, ji) =>
       validateQuestionnaireJudgment(j, `${ctx}.judgments[${ji}]`),
     ),
   };
@@ -160,7 +177,7 @@ function validateQuestionnaireSpec(spec) {
       if (typeof item === "object" && item !== null && !Array.isArray(item))
         return {
           link: str(item.link ?? "", `questionnaireSpec.card.description[${i}].link`, 200),
-          href: str(item.href ?? "", `questionnaireSpec.card.description[${i}].href`, 500),
+          href: href(item.href ?? "", `questionnaireSpec.card.description[${i}].href`),
         };
       throw new Error(
         `questionnaireSpec.card.description[${i}] must be a string or link object`,
@@ -302,10 +319,14 @@ function validateLogEntry(l, i) {
  * Validates and whitelists a raw parsed object as a complete REState.
  * Throws a descriptive Error for any structural or type violation.
  *
+ * Exported for the localStorage draft store, which needs the same guarantee for
+ * the same reason: a draft written by an older version of the app is untrusted
+ * input by the time a newer one reads it back.
+ *
  * @param {unknown} raw
  * @returns {REState}
  */
-function validateState(raw) {
+export function validateState(raw) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw))
     throw new Error("State must be a JSON object");
 

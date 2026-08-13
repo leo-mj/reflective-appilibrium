@@ -130,6 +130,39 @@ The app runs at `http://localhost:5173` with all backend features enabled.
 
 ### Deploying the backend version
 
+Set `DEPLOYMENT=hosted` in `backend/.env`. Whether anyone but you can reach the
+server cannot be detected at runtime — behind a reverse proxy `request.client` is
+the proxy, not the caller — so it is declared, and three protections follow:
+
+| | `local` (default) | `hosted` |
+| --- | --- | --- |
+| Server-side API keys | lent to callers on localhost | never; every user brings their own |
+| Rate limit | none | 60/min per caller, separately for LLM calls and simulations |
+| Session storage | on, to disk under `SESSIONS_DIR` | off; the browser keeps the working state |
+
+"Local" means uvicorn and the browser on the same machine. A LAN, a tunnel, a VPS
+or a container behind nginx is `hosted`. Each protection can still be set
+individually to depart from the mode — see `backend/.env.example`.
+
+On a hosted instance you should also set **`APP_ACCESS_TOKENS`**, a
+comma-separated list. Without it the API is open to anyone who can reach the
+port. Issue **one token per participant** for a class or study: the rate limiter
+buckets by whichever token matched, so distinct tokens give each person their own
+allowance, whereas a single shared token puts a whole seminar room into one.
+
+The rate limiter, the session store and the discussion sessions all live in one
+process, so run **one** uvicorn worker unless you replace them with a shared store.
+
+### Where a session lives
+
+The working state is written to the browser's `localStorage` as you go, and the
+home page offers it back under "Continue where you left off". That is the only
+persistence a `hosted` instance provides — nothing of a participant's reasoning
+is written to the server — so encourage exporting to Markdown for anything that
+needs to outlive a browser profile.
+
+Then build the frontend:
+
 ```bash
 cd app
 npm run build:backend

@@ -12,6 +12,8 @@ import {
   loadSession,
   deleteSession,
 } from "../utils/sessionsClient.js";
+import { clearDraft, isWorthResuming, loadDraft } from "../utils/draftStorage.js";
+import { useBackendCapabilities } from "../hooks/useBackendCapabilities.js";
 import { BACKEND_ENABLED } from "../config.js";
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -118,6 +120,64 @@ function NewProcessCard({ onStart }) {
 }
 
 /**
+ * Offers back the work in progress this browser last held.
+ *
+ * The state otherwise lives only in React, so a refresh or a closed tab ends
+ * the session — which is the whole story on a hosted instance and on the demo,
+ * where there is no server-side store to fall back on.
+ *
+ * @param {Object}   props
+ * @param {Object}   props.draft   From draftStorage.loadDraft().
+ * @param {Function} props.onResume
+ * @param {Function} props.onDiscard
+ */
+function ResumeCard({ draft, onResume, onDiscard }) {
+  const { state, savedAt } = draft;
+  const when = savedAt
+    ? new Date(savedAt).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+  return (
+    <div style={{ ...CARD_STYLE, minWidth: 300, borderColor: C.supports }}>
+      <h2 style={TITLE_STYLE}>Continue where you left off</h2>
+      <div style={DESC_STYLE}>
+        <strong style={{ color: C.text }}>{state.topic || "Untitled"}</strong>
+        <br />
+        Round {state.round} · {state.elements.length} element
+        {state.elements.length === 1 ? "" : "s"}
+        {when ? ` · saved ${when}` : ""}
+        <br />
+        Kept in this browser only. Export it to keep a copy elsewhere.
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          style={{ ...BTN_STYLE, background: C.supports, color: "#fff" }}
+          onClick={onResume}
+        >
+          Resume
+        </button>
+        <button
+          style={{
+            ...BTN_STYLE,
+            background: "transparent",
+            border: `1px solid ${C.border}`,
+            color: C.dim,
+          }}
+          onClick={onDiscard}
+        >
+          Discard
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Card for loading the built-in sample RE process.
  *
  * @param {Object}   props
@@ -172,7 +232,13 @@ function renderDescription(description) {
     typeof part === "string" ? (
       part
     ) : (
-      <a key={i} href={part.href} target="_blank" style={{ color: C.dim }}>
+      <a
+        key={i}
+        href={part.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: C.dim }}
+      >
         {part.link}
       </a>
     ),
@@ -373,6 +439,14 @@ export function HomePage({
   onLoadSession,
 }) {
   const { isDark, toggle: toggleTheme } = useTheme();
+  const capabilities = useBackendCapabilities();
+  // Read once on mount: the draft is written by the editor, so it cannot change
+  // while this page is on screen, and re-reading would fight the Discard button.
+  const [draft, setDraft] = useState(() => loadDraft());
+  const discardDraft = () => {
+    clearDraft();
+    setDraft(null);
+  };
   return (
     <div
       style={{
@@ -479,6 +553,14 @@ export function HomePage({
           flexWrap: "wrap",
         }}
       >
+        {/* First, so returning to unfinished work is the first thing offered. */}
+        {isWorthResuming(draft) && (
+          <ResumeCard
+            draft={draft}
+            onResume={() => onLoadSession(draft.state)}
+            onDiscard={discardDraft}
+          />
+        )}
         <SampleProcessCard
           onLoad={onLoadSample}
           onTour={() => {
@@ -494,7 +576,11 @@ export function HomePage({
             onLoad={() => onLoadQuestionnaire(spec)}
           />
         ))}
-        {BACKEND_ENABLED && <SessionsCard onLoad={onLoadSession} />}
+        {/* Only when this backend actually stores sessions — a hosted instance
+            keeps nothing, so the card would list an empty 403. */}
+        {BACKEND_ENABLED && capabilities.sessions && (
+          <SessionsCard onLoad={onLoadSession} />
+        )}
       </div>
       <div
         style={{
@@ -515,6 +601,7 @@ export function HomePage({
           <a
             href="https://www.tuhh.de/ethics/welcome"
             target="_blank"
+            rel="noopener noreferrer"
             style={{ color: C.dim }}
           >
             Institute for Ethics in Technology (TUHH)

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from ..config import Settings, get_settings
 from ..dependencies import get_llm_service
 from ..services.llm import LLMService
+from .shared import scrub_provider_error
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])
 logger = logging.getLogger(__name__)
@@ -80,7 +81,7 @@ async def test_connection(
     except Exception as exc:  # noqa: BLE001 — this endpoint's job is to report why
         message = getattr(exc, "message", None) or str(exc)
         logger.info(f"Connection test failed for model '{llm.model}': {message}")
-        raise HTTPException(status_code=400, detail=message)
+        raise HTTPException(status_code=400, detail=scrub_provider_error(message))
     return {"status": "ok", "model": llm.model}
 
 
