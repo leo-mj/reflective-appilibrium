@@ -5,10 +5,9 @@ Asks the configured LLM to produce a symmetric relatedness matrix for the
 judgments and principles in the RE state.
 """
 
-import json
 import logging
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -17,6 +16,7 @@ from ..dependencies import get_llm_service
 from ..models.re_state import REElement
 from ..services.llm import LLMService
 from ..services.prompts import build_matrix_prompt
+from .shared import parse_json_object
 
 router = APIRouter(prefix="/api/matrix", tags=["matrix"])
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ async def analyze(
         temperature=0.3,
         json_mode=True,
     )
-    data: dict[str, Any] = json.loads(result.text)
+    data = parse_json_object(result.text, llm.model)
     logger.info("Received relatedness matrix from LLM.")
     return MatrixResponse(
         overview=data.get("overview", ""),

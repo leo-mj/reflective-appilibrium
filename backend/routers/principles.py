@@ -6,7 +6,6 @@ existing judgments in the RE state.
 """
 
 import logging
-import json
 
 from typing import Annotated
 
@@ -18,6 +17,7 @@ from ..models.re_state import DEFAULT_CONFIDENCE, REElement
 from ..services.llm import LLMService
 from ..services.prompts import build_principles_prompt
 from ..services.response_schemas import PRINCIPLES_SCHEMA
+from .shared import parse_json_object
 
 router = APIRouter(prefix="/api/principles", tags=["principles"])
 logger = logging.getLogger(__name__)
@@ -84,7 +84,7 @@ async def suggest_principles(
         json_mode=True,
         json_schema=PRINCIPLES_SCHEMA,
     )
-    data = json.loads(result.text)
+    data = parse_json_object(result.text, llm.model)
     # Overwrite rather than trust — see the judgments router for the rationale.
     suggestions = [
         PrincipleSuggestion.model_validate({**s, "confidence": DEFAULT_CONFIDENCE})

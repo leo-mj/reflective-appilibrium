@@ -81,9 +81,9 @@ function history(v, field) {
     prevRound = round;
 
     const result = { round, type };
-    if (ev.reason !== undefined)
+    if (ev.reason != null)
       result.reason = str(ev.reason, `${field}[${i}].reason`, 2_000);
-    if (ev.previousText !== undefined)
+    if (ev.previousText != null)
       result.previousText = str(
         ev.previousText,
         `${field}[${i}].previousText`,
@@ -236,21 +236,20 @@ function validateElement(e, i) {
     addedRound: num(e.addedRound, `${ctx}.addedRound`),
   };
 
-  if (e.previousText !== undefined)
+  // `!= null`, not `!== undefined`: an optional field the writer chose to emit
+  // as explicit null means "absent", and must not be type-checked as present.
+  if (e.previousText != null)
     result.previousText = str(e.previousText, `${ctx}.previousText`, 10_000);
-  if (e.revisedRound !== undefined)
+  if (e.revisedRound != null)
     result.revisedRound = num(e.revisedRound, `${ctx}.revisedRound`);
-  if (e.reason !== undefined)
-    result.reason = str(e.reason, `${ctx}.reason`, 2_000);
-  if (e.withdrawnRound !== undefined)
+  if (e.reason != null) result.reason = str(e.reason, `${ctx}.reason`, 2_000);
+  if (e.withdrawnRound != null)
     result.withdrawnRound = num(e.withdrawnRound, `${ctx}.withdrawnRound`);
-  if (e.history !== undefined)
-    result.history = history(e.history, `${ctx}.history`);
-  if (e.rejectedRound !== undefined)
+  if (e.history != null) result.history = history(e.history, `${ctx}.history`);
+  if (e.rejectedRound != null)
     result.rejectedRound = num(e.rejectedRound, `${ctx}.rejectedRound`);
-  if (e.negated !== undefined)
-    result.negated = bool(e.negated, `${ctx}.negated`);
-  if (e.questionnaireIndex !== undefined)
+  if (e.negated != null) result.negated = bool(e.negated, `${ctx}.negated`);
+  if (e.questionnaireIndex != null)
     result.questionnaireIndex = num(e.questionnaireIndex, `${ctx}.questionnaireIndex`);
 
   return result;
@@ -270,20 +269,19 @@ function validateRelation(r, i) {
     addedRound: num(r.addedRound, `${ctx}.addedRound`),
   };
 
-  if (r.status !== undefined) {
+  if (r.status != null) {
     const s = str(r.status, `${ctx}.status`, 20);
     if (!STATUSES.has(s)) throw new Error(`${ctx}.status "${s}" is not valid`);
     result.status = s;
   }
-  if (r.revisedRound !== undefined)
+  if (r.revisedRound != null)
     result.revisedRound = num(r.revisedRound, `${ctx}.revisedRound`);
-  if (r.withdrawnRound !== undefined)
+  if (r.withdrawnRound != null)
     result.withdrawnRound = num(r.withdrawnRound, `${ctx}.withdrawnRound`);
-  if (r.history !== undefined)
-    result.history = history(r.history, `${ctx}.history`);
-  if (r.rejectedRound !== undefined)
+  if (r.history != null) result.history = history(r.history, `${ctx}.history`);
+  if (r.rejectedRound != null)
     result.rejectedRound = num(r.rejectedRound, `${ctx}.rejectedRound`);
-  if (r.argumentId !== undefined)
+  if (r.argumentId != null)
     result.argumentId = str(r.argumentId, `${ctx}.argumentId`, 200);
 
   return result;

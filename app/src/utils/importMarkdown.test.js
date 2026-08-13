@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, it, expect } from "vitest";
 import { importStateFromFile } from "./importMarkdown.js";
 
@@ -990,5 +992,79 @@ describe("importStateFromFile — element: history", () => {
       ),
     );
     expect(result.relations[0].history).toEqual(history);
+  });
+});
+
+// ─── The backend boundary ─────────────────────────────────────────────────────
+
+// storage.py promises that any session it saves can be re-imported here. That
+// promise spans two languages and two validators, and it was broken in both
+// directions: the backend model had no `history` field, so the round-by-round
+// record was dropped on save, and it serialised unset optional fields as
+// explicit `null`, which this validator rejects outright.
+//
+// The fixture is real backend output. backend/tests/test_storage.py asserts that
+// `_render_markdown` still reproduces it byte for byte, so if the backend's
+// serialisation moves, that test fails and points here.
+describe("importing a session file written by the backend", () => {
+  const fixture = readFileSync(
+    new URL("./__fixtures__/backend-session.md", import.meta.url),
+    "utf8",
+  );
+
+  it("imports without error", async () => {
+    const state = await importStateFromFile(makeFile(fixture, "session.md"));
+    expect(state.topic).toBe("Autonomy and paternalism");
+    expect(state.round).toBe(4);
+  });
+
+  it("keeps every event of a withdraw/reinstate/withdraw history", async () => {
+    const state = await importStateFromFile(makeFile(fixture, "session.md"));
+    expect(state.elements.find((e) => e.id === "J1").history).toEqual([
+      { round: 2, type: "withdrawn", reason: "Too broad." },
+      { round: 3, type: "reinstated" },
+      { round: 4, type: "withdrawn", reason: "Still too broad." },
+    ]);
+  });
+
+  it("keeps history on relations", async () => {
+    const state = await importStateFromFile(makeFile(fixture, "session.md"));
+    expect(state.relations[0].history).toEqual([
+      { round: 2, type: "withdrawn" },
+      { round: 3, type: "reinstated" },
+    ]);
+  });
+
+  it("keeps a revision's previousText", async () => {
+    const state = await importStateFromFile(makeFile(fixture, "session.md"));
+    const p1 = state.elements.find((e) => e.id === "P1");
+    expect(p1.previousText).toBe("Respect refusal of treatment.");
+    expect(p1.revisedRound).toBe(3);
+  });
+
+  it("treats an optional field emitted as null as absent, not as a bad string", async () => {
+    // Belt and braces for the same seam from the reader's side: even if a writer
+    // does emit nulls, they must read as "not set" rather than fail the import.
+    const withNulls = wrapInMarkdown({
+      ...MINIMAL_STATE,
+      elements: [
+        {
+          id: "J1",
+          type: "judgment",
+          status: "active",
+          confidence: 0.67,
+          text: "x",
+          addedRound: 1,
+          previousText: null,
+          revisedRound: null,
+          reason: null,
+          history: null,
+          questionnaireIndex: null,
+        },
+      ],
+    });
+    const state = await importStateFromFile(makeFile(withNulls));
+    expect(state.elements[0]).not.toHaveProperty("previousText");
+    expect(state.elements[0]).not.toHaveProperty("history");
   });
 });

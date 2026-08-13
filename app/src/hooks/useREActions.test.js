@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useREActions } from "./useREActions.js";
@@ -1036,6 +1037,67 @@ describe("handleUndo / canUndo", () => {
     }
     expect(result.current.state.elements).toHaveLength(1);
     // 21st undo is a no-op (stack is empty)
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
+  });
+});
+
+// ─── handleUndo under updater re-invocation ──────────────────────────────────
+
+// main.jsx renders the app inside StrictMode, which deliberately runs state
+// updaters twice; concurrent React may also re-run one when it discards an
+// in-progress render. Anything the update does besides computing the next state
+// therefore happens more often than the edit did. The undo stack used to be a
+// ref pushed to from inside the updater, so each edit recorded two entries while
+// the counter recorded one, and an edit could survive being undone.
+//
+// The rest of this file renders without a wrapper, which is exactly the
+// condition under which that bug is invisible — hence a StrictMode pass here.
+describe("handleUndo / canUndo under StrictMode", () => {
+  const addN = (result, n) => {
+    for (let i = 0; i < n; i++) {
+      act(() =>
+        result.current.handleAddElement({
+          type: "judgment",
+          text: `x${i}`,
+          confidence: 1.0,
+          origin: "user",
+        }),
+      );
+    }
+  };
+
+  it("records one undo step per edit, not one per updater call", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })), {
+      wrapper: StrictMode,
+    });
+    addN(result, 3);
+    expect(result.current.state.elements).toHaveLength(3);
+
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleUndo());
+
+    expect(result.current.state.elements).toHaveLength(0);
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("still reverts exactly one edit per undo", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })), {
+      wrapper: StrictMode,
+    });
+    addN(result, 2);
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
+  });
+
+  it("still caps the stack at MAX_UNDO (20)", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })), {
+      wrapper: StrictMode,
+    });
+    addN(result, 21);
+    for (let i = 0; i < 20; i++) act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
     act(() => result.current.handleUndo());
     expect(result.current.state.elements).toHaveLength(1);
   });

@@ -18,6 +18,28 @@ ElementType = Literal["judgment", "principle", "theory"]
 Status = Literal["active", "revised", "withdrawn", "rejected", "possible"]
 Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
+HistoryEventType = Literal["withdrawn", "reinstated", "revised", "rejected"]
+
+
+class REHistoryEvent(BaseModel):
+    """One thing that happened to an element or relation, in a given round.
+
+    Mirrors the ``REHistoryEvent`` typedef in app/src/types.js and the ``history``
+    validator in app/src/utils/importMarkdown.js.  ``status`` and ``text`` are the
+    projection of this list onto "now"; the list itself is the record of how the
+    item got there, and an item may be withdrawn and reinstated any number of
+    times.  It must therefore survive a round-trip through the session store —
+    the legacy scalar fields below can express only a single withdrawal.
+    """
+
+    round: int
+    type: HistoryEventType
+    reason: Optional[str] = Field(None, max_length=2_000)
+    previous_text: Optional[str] = Field(None, alias="previousText", max_length=10_000)
+
+    model_config = {"populate_by_name": True}
+
+
 # Confidence records how strongly *the user* holds an element, so it is not the
 # LLM's to assign: suggestions are surfaced at the middle of the frontend's
 # three-point scale (low 0.33 / moderate 0.67 / high 1.0 — see
@@ -33,6 +55,11 @@ class REElement(BaseModel):
     Revised elements carry ``previous_text`` and ``revised_round``;
     withdrawn or rejected elements carry ``reason`` / ``withdrawn_round`` /
     ``rejected_round`` as appropriate.
+
+    ``extra="forbid"``: the frontend is the source of this schema, so a field
+    added to types.js that is missing here should fail loudly on the way in
+    rather than be dropped on the way out — which is how ``history`` went
+    missing from saved sessions.
     """
 
     id: str = Field(pattern=r"^[JPT]\d+$")
@@ -58,7 +85,11 @@ class REElement(BaseModel):
     # Questionnaire fields
     questionnaire_index: Optional[int] = Field(None, alias="questionnaireIndex", ge=0)
 
-    model_config = {"populate_by_name": True}
+    # The round-by-round record. The scalar *_round fields above are the older
+    # single-event shape, still read from saved states; new writes use this.
+    history: Optional[list[REHistoryEvent]] = Field(None, max_length=1_000)
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
 
 
 # ── Relation ───────────────────────────────────────────────────────────────────
@@ -100,7 +131,10 @@ class RERelation(BaseModel):
     withdrawn_round: Optional[int] = Field(None, alias="withdrawnRound", ge=1)
     rejected_round: Optional[int] = Field(None, alias="rejectedRound", ge=1)
 
-    model_config = {"populate_by_name": True}
+    # Tracked exactly as for elements — see REElement.history.
+    history: Optional[list[REHistoryEvent]] = Field(None, max_length=1_000)
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
 
 
 # ── Log ────────────────────────────────────────────────────────────────────────

@@ -4,3 +4,12 @@ repos:
     hooks:
       - id: black
         language_version: python3
+
+  # backend/.env holds real provider keys and is gitignored — this is the guard
+  # for the day that gitignore entry is edited, a key is pasted into an example
+  # file, or a session export carries one. Scans staged changes only, so it costs
+  # nothing on an ordinary commit.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
