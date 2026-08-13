@@ -4,7 +4,7 @@
  */
 
 import { lazy, Suspense, useState } from "react";
-import { APP_ENV, LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
+import { APP_ENV, LLM_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
@@ -59,12 +59,6 @@ function FullscreenButton({ isFullscreen, onClick, hides }) {
     </Tooltip>
   );
 }
-
-const CoherenceMatrixTab = lazy(() =>
-  import("./CoherenceMatrixTab.jsx").then((m) => ({
-    default: m.CoherenceMatrixTab,
-  })),
-);
 
 const JudgmentElicitTab = lazy(() =>
   import("./workflows/JudgmentElicitTab.jsx").then((m) => ({
@@ -248,14 +242,6 @@ export function GraphPanel({
             positions={positions}
             hideNonEntailsRels={hideNonEntailsRels}
           />
-        )}
-        {MATRIX_ENABLED && tab === "matrix" && (
-          <Suspense fallback={null}>
-            <CoherenceMatrixTab
-              state={state}
-              suggestionsDisabled={suggestionsDisabled}
-            />
-          </Suspense>
         )}
         {tab === "suggestRelations" && (
           <Suspense fallback={null}>

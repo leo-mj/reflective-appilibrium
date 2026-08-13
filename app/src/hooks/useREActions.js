@@ -14,7 +14,7 @@ import { useRelationActions } from "./useRelationActions.js";
 const MAX_UNDO = 20;
 
 /**
- * The RE state together with the states undo can return to.
+ * The RE state, the states undo can return to, and the ones redo can return to.
  *
  * These are one value rather than a `useState` plus a `useRef` stack because
  * React may run a reducer — or a `setState` updater — more than once for a
@@ -27,29 +27,45 @@ const MAX_UNDO = 20;
  *
  * @typedef {Object} REHistory
  * @property {import('../types.js').REState}   present
- * @property {import('../types.js').REState[]} past  Newest first, capped at MAX_UNDO.
+ * @property {import('../types.js').REState[]} past    Newest first, capped at MAX_UNDO.
+ * @property {import('../types.js').REState[]} future  Nearest first; what undo took away.
  */
 
 /**
  * @param {REHistory} hist
- * @param {{type: 'mutate', updater: Function} | {type: 'undo'} | {type: 'replace', state: Object}} action
+ * @param {{type: 'mutate', updater: Function} | {type: 'undo'} | {type: 'redo'} | {type: 'replace', state: Object}} action
  * @returns {REHistory}
  */
 function historyReducer(hist, action) {
   switch (action.type) {
+    // A new edit abandons the redo branch: the states it led to describe a
+    // future that no longer follows from where the process now is.
     case "mutate":
       return {
         present: action.updater(hist.present),
         past: [hist.present, ...hist.past].slice(0, MAX_UNDO),
+        future: [],
       };
     case "undo": {
       const [prev, ...rest] = hist.past;
-      return prev ? { present: prev, past: rest } : hist;
+      return prev
+        ? { present: prev, past: rest, future: [hist.present, ...hist.future] }
+        : hist;
+    }
+    case "redo": {
+      const [next, ...rest] = hist.future;
+      return next
+        ? {
+            present: next,
+            past: [hist.present, ...hist.past].slice(0, MAX_UNDO),
+            future: rest,
+          }
+        : hist;
     }
     // A freshly imported state is a new process, not a step in this one, so
-    // undo must not be able to reach back across it.
+    // neither undo nor redo may reach back across it.
     case "replace":
-      return { present: action.state, past: [] };
+      return { present: action.state, past: [], future: [] };
     default:
       return hist;
   }
@@ -66,6 +82,7 @@ export function useREActions(initialState) {
   const [hist, dispatch] = useReducer(historyReducer, {
     present: initialState,
     past: [],
+    future: [],
   });
   const state = hist.present;
 
@@ -93,16 +110,29 @@ export function useREActions(initialState) {
     setRecentlyAddedRel(null);
   };
 
+  /** Drop a selection that the state being moved to no longer contains. */
+  const reconcileSelection = (target) => {
+    if (selected && !target.elements.some((e) => e.id === selected))
+      setSelected(null);
+    if (selectedRel && !target.relations.some((r) => r === selectedRel))
+      setSelectedRel(null);
+  };
+
   const handleUndo = () => {
     const prev = hist.past[0];
     if (!prev) return;
     dispatch({ type: "undo" });
-    // Reading the state being restored to decide what to deselect: a selection
-    // pointing at something the undo removes has to be cleared alongside it.
-    if (selected && !prev.elements.some((e) => e.id === selected)) setSelected(null);
-    if (selectedRel && !prev.relations.some((r) => r === selectedRel)) setSelectedRel(null);
+    reconcileSelection(prev);
   };
   const canUndo = hist.past.length > 0;
+
+  const handleRedo = () => {
+    const next = hist.future[0];
+    if (!next) return;
+    dispatch({ type: "redo" });
+    reconcileSelection(next);
+  };
+  const canRedo = hist.future.length > 0;
 
   const elementActions = useElementActions({
     state,
@@ -196,6 +226,8 @@ export function useREActions(initialState) {
     handleSelectRel,
     handleUndo,
     canUndo,
+    handleRedo,
+    canRedo,
     ...elementActions,
     ...relationActions,
     handleImportFile,

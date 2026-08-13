@@ -1,6 +1,6 @@
 """
 Helpers shared by the LLM-backed assist routers (judgments, principles,
-relations, matrix).
+relations).
 
 These endpoints all have the same shape: build a prompt, call the model, parse
 the reply as JSON, and read named keys off it.  The parsing step is the one that

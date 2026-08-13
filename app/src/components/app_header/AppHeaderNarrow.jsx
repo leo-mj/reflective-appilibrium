@@ -40,6 +40,8 @@ export function AppHeaderNarrow({
   onHome,
   onUndo,
   canUndo,
+  onRedo,
+  canRedo,
   workflowPhase,
   workflowLoops,
   onStartWorkflow,
@@ -181,6 +183,13 @@ export function AppHeaderNarrow({
             style={{ ...menuBtn(), opacity: canUndo ? 1 : 0.4 }}
           >
             <span style={menuIconStyle}>↩</span>Undo
+          </button>
+          <button
+            onClick={close(onRedo)}
+            disabled={!canRedo}
+            style={{ ...menuBtn(), opacity: canRedo ? 1 : 0.4 }}
+          >
+            <span style={menuIconStyle}>↪</span>Redo
           </button>
           {/* Same place the wide layout keeps its ? button — right after Undo.
               Without it the tour had no entry point at this width at all. */}

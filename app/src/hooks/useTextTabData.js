@@ -9,6 +9,7 @@ import { useMemo } from "react";
 import { C, getColors } from "../constants/colors.js";
 import { getNeighbours } from "../utils/graphHelpers.js";
 import { findCoherentClusters } from "../utils/clusterUtils.js";
+import { computeCoherence } from "../utils/coherence.js";
 import {
   buildPrincipleCovers,
   matchesSearch,
@@ -24,6 +25,8 @@ import {
  * @param {string|null}     opts.selected
  * @param {RERelation|null} opts.selectedRel
  * @param {string}          opts.search
+ * @param {boolean}         [opts.hideNonEntailsRels] - The graph is showing
+ *   arguments only; coherence follows the same visibility.
  */
 export function useTextTabData({
   state,
@@ -33,6 +36,7 @@ export function useTextTabData({
   recentlyAdded,
   recentlyAddedRel,
   search,
+  hideNonEntailsRels,
 }) {
   const isElVisible = (el) => {
     if (el.status === "possible") return false;
@@ -114,10 +118,20 @@ export function useTextTabData({
       (r) => r.from !== selected && r.to !== selected,
     );
 
+  // Read off the graph rather than taken from `state.coherence`, which nothing
+  // in Phase 2 ever writes — see utils/coherence.js. Given the same relation
+  // visibility the graph uses, so the two cannot disagree.
+  const coherence = useMemo(
+    () =>
+      computeCoherence(state.elements, state.relations, {
+        showRelations: !hideNonEntailsRels,
+      }),
+    [state.elements, state.relations, hideNonEntailsRels],
+  );
   const hasCoherence =
-    state.coherence.tensions.length > 0 ||
-    state.coherence.orphans.length > 0 ||
-    state.coherence.clusters.length > 0;
+    coherence.tensions.length > 0 ||
+    coherence.orphans.length > 0 ||
+    coherence.possibleSupport.length > 0;
   const clusters = useMemo(() => findCoherentClusters(state), [state]);
   const clusterCount = clusters.length;
 
@@ -144,6 +158,7 @@ export function useTextTabData({
     restEls,
     hlRels,
     restRels,
+    coherence,
     hasCoherence,
     clusters,
     clusterCount,

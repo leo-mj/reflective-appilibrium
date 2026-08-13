@@ -6,14 +6,12 @@
 import {
   NetworkIcon,
   HistoryIcon,
-  MatrixIcon,
   ClusterIcon,
   SuggestIcon,
   PrincipleIcon,
   JudgmentIcon,
   SimulateIcon,
 } from "../components/Icons.jsx";
-import { LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
 
 export const ASSIST_TABS = [
   "questionnaire",
@@ -40,15 +38,13 @@ export const SIMULATE_TABS = ["simulateRethon"];
 export function tabVisibility({ model, hideNonEntailsRels } = {}) {
   return (t) =>
     (!hideNonEntailsRels || t !== "suggestRelations") &&
-    (model === "questionnaire" || t !== "questionnaire") &&
-    ((MATRIX_ENABLED && LLM_ENABLED) || t !== "matrix");
+    (model === "questionnaire" || t !== "questionnaire");
 }
 
 export const TAB_ICONS = {
   questionnaire: <JudgmentIcon />,
   graph: <NetworkIcon />,
   history: <HistoryIcon />,
-  matrix: <MatrixIcon />,
   clusters: <ClusterIcon />,
   suggestRelations: <SuggestIcon />,
   suggestPrinciples: <PrincipleIcon />,
@@ -61,7 +57,6 @@ export const TAB_LABELS = {
   questionnaire: "Questions",
   graph: "Graph",
   history: "History",
-  matrix: "Matrix",
   clusters: "Clusters",
   elicitJudgments: "Judgments",
   suggestPrinciples: "Principles",
@@ -78,7 +73,6 @@ export const TAB_TOOLTIPS = {
   history: "Replay your RE process round by round using the history slider.",
   clusters:
     "Coherence clusters — the largest possible groups of connected elements with no conflicts.",
-  matrix: "LLM-based relation matrix between every pair of elements.",
   elicitJudgments: "AI helps you surface and refine your moral judgments.",
   suggestPrinciples:
     "AI proposes general principles that systematize your judgments.",

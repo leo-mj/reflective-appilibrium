@@ -45,51 +45,6 @@ A single pair can have multiple relations (e.g. P supports J in one respect but 
 When in doubt whether a relation exists, include it — the user can reject it. Missing connections degrade coherence evaluation."""
 
 
-def build_matrix_prompt(topic: str, elements: list[REElement]) -> str:
-    """Build the LLM prompt for relatedness matrix computation.
-
-    The prompt instructs the model to produce a symmetric matrix with
-    diagonal 1.0 entries and a ``pairDescriptions`` dict keyed by
-    ``"A→B"`` with one entry per unordered pair (the frontend looks up
-    both directions, so key order does not matter).
-
-    Raises ``ValueError`` for fewer than two elements: a relatedness matrix
-    needs a pair to relate, and the example block below needs two IDs to
-    render.  Callers should reject such requests before reaching this point.
-    """
-    ids = [e.id for e in elements]
-    if len(ids) < 2:
-        raise ValueError(
-            f"A relatedness matrix needs at least 2 elements, got {len(ids)}."
-        )
-
-    element_list = "\n".join(f"{e.id} [{e.type}]: {e.text}" for e in elements)
-    example_ids = ids[:3]
-
-    return f"""\
-You are assisting a reflective equilibrium (RE) analysis in ethics.
-Topic: "{topic}"
-
-{DATA_RULE}
-
-Elements (judgments and principles):
-{fence(element_list)}
-
-Task: compute a symmetric relatedness matrix.
-- Score each ordered pair (including diagonal) from 0.0 (completely unrelated) to 1.0 (identical or directly equivalent).
-- Diagonal entries must be 1.0.
-- For each unordered pair of distinct elements, provide a one-sentence description \
-under the key "A→B". Exactly one entry per pair; either direction is fine.
-- Write a 2–3 sentence overview of the overall element landscape.
-
-Respond with valid JSON only, in exactly this format:
-{{
-  "overview": "...",
-  "matrix": {{ {", ".join(f'"{i}": {{...}}' for i in example_ids)} }},
-  "pairDescriptions": {{ "{example_ids[0]}→{example_ids[1]}": "Brief description." }}
-}}"""
-
-
 def build_relations_prompt(
     topic: str,
     elements: list[REElement],

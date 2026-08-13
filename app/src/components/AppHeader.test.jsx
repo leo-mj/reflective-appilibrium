@@ -89,12 +89,6 @@ const offered = () => {
 };
 
 describe("narrow menu tab filtering", () => {
-  // MATRIX_ENABLED is false, and GraphPanel gates the matrix panel on the same
-  // flag, so offering the tab here led straight to an empty view.
-  it("omits matrix while the feature is off", () => {
-    expect(narrowTabs()).not.toContain(TAB_LABELS.matrix);
-  });
-
   it("omits the questionnaire outside questionnaire mode", () => {
     expect(narrowTabs()).not.toContain(TAB_LABELS.questionnaire);
   });
@@ -359,7 +353,7 @@ describe("the two layouts agree", () => {
   const groupOf = {
     analyze: {
       tab: "graph",
-      labels: ["graph", "history", "clusters", "matrix"],
+      labels: ["graph", "history", "clusters"],
     },
     assist: {
       tab: "elicitJudgments",

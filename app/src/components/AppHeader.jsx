@@ -64,6 +64,8 @@ import { C } from "../constants/colors.js";
  *   instead; the Save control is hidden rather than offered and refused.
  * @param {function} props.onUndo
  * @param {boolean}  props.canUndo
+ * @param {function} props.onRedo
+ * @param {boolean}  props.canRedo
  * @param {boolean}  props.tourActive  - Whether the guided tour is running. Held
  *   by REState because the wide tour drives the graph, not just the header.
  * @param {function} props.onStartTour - Behind the header's ? button.
@@ -94,6 +96,8 @@ export function AppHeader({
   onStopWorkflow,
   onUndo,
   canUndo,
+  onRedo,
+  canRedo,
   showTabNav,
   setShowTabNav,
   allExpanded,
@@ -153,12 +157,7 @@ export function AppHeader({
   };
   const handleImportClick = () => fileInputRef.current.click();
 
-  const ANALYZE_TABS = [
-    "graph",
-    "history",
-    "clusters",
-    "matrix",
-  ];
+  const ANALYZE_TABS = ["graph", "history", "clusters"];
   const metaTab = ASSIST_TABS.includes(tab)
     ? "assist"
     : SIMULATE_TABS.includes(tab)
@@ -241,6 +240,8 @@ export function AppHeader({
     onHome,
     onUndo,
     canUndo,
+    onRedo,
+    canRedo,
     workflowPhase,
     workflowLoops,
     onStartWorkflow,

@@ -26,8 +26,6 @@ The app ships in two configurations. Both are the same React SPA — the demo is
 ¹ In the demo, the Assist tabs return pre-set example suggestions when you are working on the sample process, and are disabled on a process of your own. A banner at the top of the app says so.
 ² The demo can still export the full state to Markdown and re-import it later.
 
-The relatedness-matrix tab is currently switched off in both versions (`MATRIX_ENABLED` in [app/src/config.js](app/src/config.js)).
-
 ## Demo version
 
 Nothing to install — open <https://leo-mj.github.io/reflective-appilibrium/>.

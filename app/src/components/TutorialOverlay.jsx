@@ -43,10 +43,6 @@ const ANNOTATIONS = {
     text: "Coherence clusters — the largest possible groups of connected elements with no conflicts.",
     row: 1,
   },
-  "tab-matrix": {
-    text: "LLM-based relation matrix between every pair of elements.",
-    row: 2,
-  },
   // ── Assist sub-tabs ────────────────────────────────────────────────────────
   "tab-elicitJudgments": {
     text: "AI helps you surface and refine your moral judgments.",

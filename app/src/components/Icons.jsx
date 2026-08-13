@@ -96,45 +96,6 @@ export function HistoryIcon({ size = "2em" }) {
   );
 }
 
-export function MatrixIcon({ size = "2em" }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 512 512">
-      <defs>
-        <linearGradient id="bgGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#2ec4b6" />
-          <stop offset="100%" stopColor="#7b2cbf" />
-        </linearGradient>
-      </defs>
-
-      {/* <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#bgGradient)" /> */}
-
-      <g
-        stroke="currentColor"
-        strokeWidth="8"
-        strokeLinecap="round"
-        fill="none"
-      >
-        <path d="M180 160 L150 160 L150 352 L180 352" />
-        <path d="M332 160 L362 160 L362 352 L332 352" />
-      </g>
-
-      <g fill="currentColor">
-        <circle cx="210" cy="200" r="14" />
-        <circle cx="256" cy="200" r="14" />
-        <circle cx="302" cy="200" r="14" />
-
-        <circle cx="210" cy="256" r="14" />
-        <circle cx="256" cy="256" r="14" />
-        <circle cx="302" cy="256" r="14" />
-
-        <circle cx="210" cy="312" r="14" />
-        <circle cx="256" cy="312" r="14" />
-        <circle cx="302" cy="312" r="14" />
-      </g>
-    </svg>
-  );
-}
-
 export function ClusterIcon({ size = "2em" }) {
   return (
     <svg

@@ -51,6 +51,8 @@ export function AppHeaderWide({
   onHome,
   onUndo,
   canUndo,
+  onRedo,
+  canRedo,
   metaTab,
   visibleSubTabs,
   workflowPhase,
@@ -227,6 +229,20 @@ export function AppHeaderWide({
               style={{ ...btn(false), opacity: canUndo ? 1 : 0.4 }}
             >
               ↩ Undo
+            </button>
+          </Tooltip>
+
+          {/* Icon-only: the pair is read together, and spelling out "Redo"
+              beside "Undo" costs more of the bar than it earns. The label the
+              screen reader gets is on aria-label. */}
+          <Tooltip text="Redo the change you just undid. Keyboard shortcut: Ctrl+Shift+Z.">
+            <button
+              onClick={onRedo}
+              disabled={!canRedo}
+              aria-label="Redo"
+              style={{ ...btn(false), opacity: canRedo ? 1 : 0.4 }}
+            >
+              ↪
             </button>
           </Tooltip>
 

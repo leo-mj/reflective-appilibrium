@@ -23,7 +23,6 @@ from .routers import (
     conversations,
     judgments,
     llm,
-    matrix,
     principles,
     relations,
     sessions,
@@ -68,7 +67,6 @@ app.include_router(arguments.router, dependencies=_gated)
 app.include_router(conversations.router, dependencies=_gated)
 app.include_router(judgments.router, dependencies=_gated)
 app.include_router(llm.router, dependencies=_gated)
-app.include_router(matrix.router, dependencies=_gated)
 app.include_router(principles.router, dependencies=_gated)
 app.include_router(relations.router, dependencies=_gated)
 app.include_router(

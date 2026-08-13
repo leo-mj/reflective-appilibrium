@@ -1042,6 +1042,128 @@ describe("handleUndo / canUndo", () => {
   });
 });
 
+// ─── handleRedo / canRedo ────────────────────────────────────────────────────
+
+describe("handleRedo / canRedo", () => {
+  const addEl = (result, text) =>
+    act(() =>
+      result.current.handleAddElement({
+        type: "judgment",
+        text,
+        confidence: 1.0,
+        origin: "user",
+      }),
+    );
+
+  it("canRedo is false until something has been undone", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    expect(result.current.canRedo).toBe(false);
+    addEl(result, "a");
+    expect(result.current.canRedo).toBe(false);
+  });
+
+  it("canRedo is true after an undo", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    expect(result.current.canRedo).toBe(true);
+  });
+
+  it("restores the state the undo took away", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(0);
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements).toHaveLength(1);
+    expect(result.current.state.elements[0].text).toBe("a");
+  });
+
+  it("walks back and forth over several edits", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    addEl(result, "b");
+    addEl(result, "c");
+
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
+
+    act(() => result.current.handleRedo());
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements).toHaveLength(3);
+    expect(result.current.canRedo).toBe(false);
+  });
+
+  it("does nothing when there is nothing to redo", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements).toHaveLength(1);
+  });
+
+  it("a new edit abandons the redo branch", () => {
+    // The undone states describe a future that no longer follows from here.
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    addEl(result, "b");
+    act(() => result.current.handleUndo());
+    expect(result.current.canRedo).toBe(true);
+
+    addEl(result, "c");
+    expect(result.current.canRedo).toBe(false);
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements.map((e) => e.text)).toEqual(["a", "c"]);
+  });
+
+  it("redo is still available after an undo that followed a redo", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleRedo());
+    act(() => result.current.handleUndo());
+    expect(result.current.canRedo).toBe(true);
+    expect(result.current.state.elements).toHaveLength(0);
+  });
+
+  it("importing a file clears both directions", () => {
+    // A new process is not a step in this one.
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    expect(result.current.canRedo).toBe(true);
+
+    importStateFromFile.mockResolvedValue(baseState({ elements: [] }));
+    return act(() => result.current.handleImportFile(new Blob())).then(() => {
+      expect(result.current.canRedo).toBe(false);
+      expect(result.current.canUndo).toBe(false);
+    });
+  });
+
+  it("clears a selection the redone state does not contain", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleSelectNode("J1"));
+    // J1 exists again after the redo, so the selection should survive it.
+    act(() => result.current.handleRedo());
+    expect(result.current.selected).toBe("J1");
+  });
+
+  it("works under StrictMode", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })), {
+      wrapper: StrictMode,
+    });
+    addEl(result, "a");
+    addEl(result, "b");
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleRedo());
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements).toHaveLength(2);
+  });
+});
+
 // ─── handleUndo under updater re-invocation ──────────────────────────────────
 
 // main.jsx renders the app inside StrictMode, which deliberately runs state

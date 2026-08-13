@@ -4,7 +4,7 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
 
 ## Key files
 - `main.py` — FastAPI entry point
-- `routers/` — judgments, principles, relations, matrix, llm
+- `routers/` — judgments, principles, relations, arguments, conversations, sessions, simulate_rethon, llm
 - `services/llm.py` — LLM service layer
 - `models/re_state.py` — Pydantic state schema
 

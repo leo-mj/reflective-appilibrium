@@ -110,6 +110,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleImportFile,
     handleUndo,
     canUndo,
+    handleRedo,
+    canRedo,
   } = useREActions(initialState);
 
   // What this backend actually allows, which build-time flags cannot say.
@@ -121,20 +123,26 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (
-        e.key === "z" &&
-        (e.ctrlKey || e.metaKey) &&
-        !e.shiftKey &&
-        e.target.tagName !== "TEXTAREA" &&
-        e.target.tagName !== "INPUT"
-      ) {
+      // Never while typing: in a textarea these are the editor's own undo.
+      if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+
+      // Ctrl/Cmd+Shift+Z, and Ctrl+Y for the Windows habit.
+      const isRedo =
+        (e.key === "z" && e.shiftKey) || (e.key === "y" && !e.shiftKey);
+      const isUndo = e.key === "z" && !e.shiftKey;
+
+      if (isRedo) {
+        e.preventDefault();
+        handleRedo();
+      } else if (isUndo) {
         e.preventDefault();
         handleUndo();
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [handleUndo]);
+  }, [handleUndo, handleRedo]);
 
   const dims = useWindowSize();
   const isWide = dims.w > 768 && dims.h > 500;
@@ -370,6 +378,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onStopWorkflow={stopWorkflow}
         onUndo={handleUndo}
         canUndo={canUndo}
+        onRedo={handleRedo}
+        canRedo={canRedo}
         showTabNav={showTabNav}
         setShowTabNav={setShowTabNav}
         allExpanded={allExpanded}

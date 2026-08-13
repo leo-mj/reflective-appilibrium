@@ -28,6 +28,7 @@ import {
 import { ClusterSection } from "./text_panel/TextTabClusterSection.jsx";
 import { NavBar } from "./text_panel/TextTabNavBar.jsx";
 import { HistoryRoundBanner } from "./text_panel/TextTabPrimitives.jsx";
+import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
 import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 
@@ -55,7 +56,9 @@ const NAV_SECTIONS = [
   { key: "theories", label: "T", name: "theories" },
   { key: "arguments", label: "A", name: "arguments" },
   { key: "relations", label: "R", name: "relations" },
-  // { key: "coherence", label: "Coherence" },
+  // "!" rather than a letter: C is the clusters pill, and what this section
+  // lists is the things wanting attention. The accessible name spells it out.
+  { key: "coherence", label: "!", name: "coherence" },
   { key: "clusters", label: "C", name: "clusters" },
   { key: "log", label: "L", name: "log" },
 ];
@@ -200,6 +203,7 @@ export function TextTab({
     restEls,
     hlRels,
     restRels,
+    coherence,
     hasCoherence,
     clusters,
     clusterCount,
@@ -214,6 +218,7 @@ export function TextTab({
     recentlyAdded,
     recentlyAddedRel,
     search,
+    hideNonEntailsRels,
   });
 
   // ── Navigation ───────────────────────────────────────────────────────────
@@ -408,14 +413,14 @@ export function TextTab({
               />
             )}
 
-            {/* {hasCoherence && (
-            <CoherenceSection
-              state={state}
-              sectionRef={refCoherence}
-              isCollapsed={isCollapsed("coherence")}
-              onToggle={() => toggle("coherence")}
-            />
-          )} */}
+            {hasCoherence && (
+              <CoherenceSection
+                coherence={coherence}
+                sectionRef={refCoherence}
+                isCollapsed={isCollapsed("coherence")}
+                onToggle={() => toggle("coherence")}
+              />
+            )}
 
             <ClusterSection
               state={state}
