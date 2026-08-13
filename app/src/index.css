@@ -64,6 +64,20 @@ body {
   }
 }
 
+/* A number field with its stepper arrows taken off. They cost more width than
+   they are worth on a control only a few characters wide — enough, at phone
+   sizes, to push the value they step out of the field. Needs a rule rather than
+   an inline style: the arrows are pseudo-elements. */
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* Tap targets.
 
    A thumb needs more room than a mouse pointer, so the panel's small inline

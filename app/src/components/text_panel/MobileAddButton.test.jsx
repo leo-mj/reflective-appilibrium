@@ -74,13 +74,25 @@ describe("MobileAddButton", () => {
     fireEvent.change(screen.getByLabelText("Conclusion"), {
       target: { value: "P1" },
     });
-    fireEvent.click(screen.getByText(/^Add argument$/));
+    // The button reads "Add" and names its target in its accessible name.
+    fireEvent.click(screen.getByRole("button", { name: "Add argument" }));
 
     expect(onAddRelation).toHaveBeenCalledTimes(2);
     const [first, second] = onAddRelation.mock.calls.map(([rel]) => rel);
     expect(first.argumentId).toBe(second.argumentId);
     expect([first.from, second.from]).toEqual(["J1", "J2"]);
     expect(first.type).toBe("jointly_entails");
+  });
+
+  it("opens the bar in its roomy layout", () => {
+    // The sheet has the screen to itself and is worked with a thumb, so the bar
+    // it hosts is not the compact strip the wide layout uses.
+    const { container } = renderButton();
+    openSheet();
+
+    expect(
+      parseInt(container.querySelector("textarea").style.minHeight, 10),
+    ).toBeGreaterThan(0);
   });
 
   it("closes on the backdrop as well as the ✕", () => {

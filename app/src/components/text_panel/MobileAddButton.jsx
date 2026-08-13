@@ -129,6 +129,7 @@ export function MobileAddButton({
                 bottom of the screen. */}
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
               <AddBar
+                roomy
                 elements={elements}
                 onAddElement={onAddElement}
                 onAddRelation={onAddRelation}

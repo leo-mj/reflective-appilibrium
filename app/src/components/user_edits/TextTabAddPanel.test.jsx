@@ -163,6 +163,339 @@ describe("what the bar offers", () => {
   });
 });
 
+describe("the roomy layout", () => {
+  /** Inline min-height in px, or 0 when the style leaves it to the content. */
+  const minHeight = (el) => parseInt(el.style.minHeight, 10) || 0;
+
+  it("gives the controls and the text field more room than the strip does", () => {
+    // Compared rather than pinned to pixel values: what matters is that the
+    // phone's copy is the larger of the two, not what either measures.
+    const compact = renderBar().container;
+    const compactTab = compact.querySelector("textarea");
+    const compactBtn = screen.getByText("Element");
+    const compactSize = {
+      textarea: minHeight(compactTab),
+      button: minHeight(compactBtn),
+      fontSize: parseInt(compactBtn.style.fontSize, 10),
+    };
+
+    cleanup();
+    const roomy = renderBar({ roomy: true }).container;
+    const roomyTab = roomy.querySelector("textarea");
+    const roomyBtn = screen.getByText("Element");
+
+    expect(minHeight(roomyTab)).toBeGreaterThan(compactSize.textarea);
+    expect(minHeight(roomyBtn)).toBeGreaterThan(compactSize.button);
+    expect(parseInt(roomyBtn.style.fontSize, 10)).toBeGreaterThan(
+      compactSize.fontSize,
+    );
+  });
+
+  it("is off unless asked for, so the wide bar keeps its sizes", () => {
+    renderBar();
+    expect(minHeight(screen.getByText("Element"))).toBe(0);
+    expect(minHeight(screen.getByText(/^Add$/))).toBe(0);
+  });
+});
+
+describe("origin and confidence", () => {
+  const originField = () => screen.queryByLabelText("Origin");
+  const confidenceField = () => screen.queryByLabelText("Confidence, 0 to 1");
+  const detailsToggle = () => screen.getByText(/^Details/);
+
+  it("stays on show in the strip, which has the width for it", () => {
+    renderBar();
+    expect(originField()).toBeTruthy();
+    expect(confidenceField()).toBeTruthy();
+    expect(screen.queryByText(/^Details/)).toBeNull();
+  });
+
+  it("sits in the far corner of the strip, apart from the controls", () => {
+    // What the element is filed under, rather than part of writing it.
+    renderBar();
+    expect(originField().parentElement.parentElement.style.marginLeft).toBe(
+      "auto",
+    );
+  });
+
+  it("stands the toggle level with the type picker, sharing the row", () => {
+    renderBar({ roomy: true });
+    const type = screen.getByLabelText("Element type");
+    const details = detailsToggle();
+
+    expect(details.style.minHeight).toBe(type.style.minHeight);
+    // Both grow, so the pair comes out to the width of the row.
+    expect(details.style.flex).toBe(type.style.flex);
+    // From their content widths, not from zero: a basis of 0 splits the row
+    // evenly and cuts "Judgment" off partway through.
+    expect(type.style.flexBasis).toBe("auto");
+  });
+
+  it("draws the picker's own box, since WebKit will not size a native one", () => {
+    renderBar({ roomy: true });
+    const type = screen.getByLabelText("Element type");
+
+    // With the native appearance left on, min-height and vertical padding are
+    // ignored and the picker comes out shorter than everything beside it.
+    expect(type.style.appearance).toBe("none");
+    // Taking the box means taking the arrow it drew with it.
+    expect(type.style.backgroundImage).toContain("svg");
+  });
+
+  it("keeps the picker's width when the details open below it", () => {
+    // The group used to size to its contents, so revealing a wider row beneath
+    // widened the picker along with it.
+    renderBar({ roomy: true });
+    const width = () => screen.getByLabelText("Element type").style.flexBasis;
+    const before = width();
+
+    fireEvent.click(detailsToggle());
+    expect(width()).toBe(before);
+    expect(
+      screen.getByLabelText("Origin").parentElement.parentElement.style
+        .flexBasis,
+    ).toBe("100%");
+  });
+
+  it("gives the chevron to the pickers and to nothing else", () => {
+    // Everything here shares one box style; only a select should wear the arrow
+    // drawn for it, or an L looks like a dropdown and a number field loses the
+    // width its value needs.
+    renderBar({ roomy: true });
+    fireEvent.click(detailsToggle());
+
+    expect(
+      screen.getByLabelText("Element type").style.backgroundImage,
+    ).toContain("svg");
+    for (const label of ["Low confidence", "Confidence, 0 to 1", "Origin"]) {
+      // "none" rather than empty: the shared box sets the background shorthand,
+      // which spells the image out as none.
+      expect(screen.getByLabelText(label).style.backgroundImage).not.toContain(
+        "svg",
+      );
+    }
+  });
+
+  it("is folded away on a phone until the toggle is pressed", () => {
+    // Both carry a working default, so on a narrow screen they are detail —
+    // the statement is what the reader opened the sheet to type.
+    renderBar({ roomy: true });
+    expect(originField()).toBeNull();
+    expect(confidenceField()).toBeNull();
+    expect(detailsToggle().getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(detailsToggle());
+    expect(originField()).toBeTruthy();
+    expect(confidenceField()).toBeTruthy();
+    expect(detailsToggle().getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(detailsToggle());
+    expect(originField()).toBeNull();
+  });
+
+  it("submits its defaults while folded away", () => {
+    // Hiding them must not mean leaving them out.
+    const onAddElement = vi.fn();
+    renderBar({ roomy: true, onAddElement });
+    fireEvent.change(screen.getByPlaceholderText(/Enter statement/), {
+      target: { value: "Torturing is wrong." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add element" }));
+
+    expect(onAddElement).toHaveBeenCalledTimes(1);
+    expect(onAddElement.mock.calls[0][0]).toMatchObject({
+      origin: "user",
+      confidence: 0.67,
+    });
+  });
+
+  it("keeps the details open across an add", () => {
+    renderBar({ roomy: true, onAddElement: () => {} });
+    fireEvent.click(detailsToggle());
+    fireEvent.change(screen.getByPlaceholderText(/Enter statement/), {
+      target: { value: "Torturing is wrong." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add element" }));
+
+    expect(originField()).toBeTruthy();
+  });
+});
+
+describe("clearing a tab", () => {
+  const clear = () => screen.getByText("Clear");
+
+  it("puts an argument back to a single premise", () => {
+    renderBar({ hideNonEntailsRels: true });
+    fireEvent.click(screen.getByText("Argument"));
+    fireEvent.click(screen.getByText("+ premise"));
+    expect(screen.getByLabelText("Premise 2")).toBeTruthy();
+
+    fireEvent.click(clear());
+    expect(screen.queryByLabelText("Premise 2")).toBeNull();
+    expect(screen.getByLabelText("Premise 1")).toBeTruthy();
+  });
+
+  it("empties the statement on the element tab", () => {
+    renderBar();
+    fireEvent.change(screen.getByPlaceholderText(/Enter statement/), {
+      target: { value: "Torturing is wrong." },
+    });
+
+    fireEvent.click(clear());
+    // Re-queried, not held: clearing replaces the field rather than emptying
+    // it, so that the browser's undo stack goes with the text.
+    expect(screen.getByPlaceholderText(/Enter statement/).value).toBe("");
+  });
+
+  it("replaces the field rather than emptying it", () => {
+    renderBar();
+    const before = screen.getByPlaceholderText(/Enter statement/);
+    fireEvent.change(before, { target: { value: "Torturing is wrong." } });
+
+    fireEvent.click(clear());
+    expect(screen.getByPlaceholderText(/Enter statement/)).not.toBe(before);
+  });
+
+  it("adds nothing on its way", () => {
+    const onAddElement = vi.fn();
+    const onAddRelation = vi.fn();
+    renderBar({ onAddElement, onAddRelation });
+    fireEvent.change(screen.getByPlaceholderText(/Enter statement/), {
+      target: { value: "Torturing is wrong." },
+    });
+    fireEvent.click(clear());
+
+    expect(onAddElement).not.toHaveBeenCalled();
+    expect(onAddRelation).not.toHaveBeenCalled();
+  });
+
+  it("names the tab it would clear", () => {
+    renderBar();
+    expect(screen.getByRole("button", { name: "Clear element" })).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Argument"));
+    expect(screen.getByRole("button", { name: "Clear argument" })).toBeTruthy();
+  });
+});
+
+describe("the buttons every tab shares", () => {
+  const tabsGroup = () =>
+    screen.getByRole("button", { name: /^Add / }).parentElement;
+
+  it("does not drift down as the fields beside it grow taller", () => {
+    // An argument taking on premises wraps its row onto a second line. Centred
+    // against that, the submit button and the tabs moved down with it.
+    renderBar();
+    expect(tabsGroup().parentElement.style.alignItems).toBe("flex-start");
+  });
+
+  it("is not squeezed by a tab whose fields outgrow the row", () => {
+    // Otherwise they would sit at a different width on every tab.
+    renderBar();
+    expect(tabsGroup().style.flexShrink).toBe("0");
+  });
+
+  it("still gives way on the phone, where it is the only way they fit", () => {
+    // Held at full width there, the row runs off the side of the sheet instead
+    // of breaking — see the group's own flexWrap.
+    renderBar({ roomy: true });
+    expect(tabsGroup().style.flexShrink).not.toBe("0");
+  });
+});
+
+describe("how wide the pickers are", () => {
+  it("holds each at the width of its longest option, not its chosen one", () => {
+    // A select sizes itself to what it is showing, so without a floor the
+    // picker changed width every time it was used.
+    renderBar();
+    const type = screen.getByLabelText("Element type");
+    expect(type.style.minWidth).toContain("ch");
+
+    const before = type.style.minWidth;
+    fireEvent.change(type, { target: { value: "theory" } });
+    expect(type.style.minWidth).toBe(before);
+  });
+
+  it("counts the status suffix an element picker can carry", () => {
+    // "J1 (withdrawn)" is a good deal longer than "J1".
+    renderBar();
+    fireEvent.click(screen.getByText("Relation"));
+    const plain = screen.getByLabelText("Relation from").style.minWidth;
+
+    cleanup();
+    render(
+      <AddBar
+        elements={[
+          { id: "J1", type: "judgment", status: "active" },
+          { id: "J2", type: "judgment", status: "withdrawn" },
+        ]}
+        onAddElement={() => {}}
+        onAddRelation={() => {}}
+        selected={null}
+        ctrlTo={null}
+      />,
+    );
+    fireEvent.click(screen.getByText("Relation"));
+    const withStatus = screen.getByLabelText("Relation from").style.minWidth;
+
+    const chars = (w) => parseInt(w.match(/(\d+)ch/)[1], 10);
+    expect(chars(withStatus)).toBeGreaterThan(chars(plain));
+  });
+});
+
+describe("how prominent the pickers are", () => {
+  const fontOf = (label) =>
+    parseInt(screen.getByLabelText(label).style.fontSize, 10);
+
+  it("draws the link tabs' pickers larger than the element tab's in the strip", () => {
+    // On a link tab the pickers are the content — an argument is its premises
+    // and its conclusion — and the optional note below them was dwarfing them.
+    renderBar();
+    const element = fontOf("Element type");
+
+    fireEvent.click(screen.getByText("Relation"));
+    expect(fontOf("Relation from")).toBeGreaterThan(element);
+
+    fireEvent.click(screen.getByText("Argument"));
+    expect(fontOf("Premise 1")).toBeGreaterThan(element);
+    expect(fontOf("Conclusion")).toBeGreaterThan(element);
+  });
+
+  it("draws them all alike on a phone, which has room for one size", () => {
+    renderBar({ roomy: true });
+    const element = fontOf("Element type");
+
+    fireEvent.click(screen.getByText("Argument"));
+    expect(fontOf("Premise 1")).toBe(element);
+  });
+});
+
+describe("what says which thing is being added", () => {
+  // The button reads "Add" at both widths, so the lit tab is the only thing on
+  // screen naming its target. These cover the two ways that is carried.
+  it("names the target in the button's accessible name, not its label", () => {
+    renderBar();
+    fireEvent.click(screen.getByText("Argument"));
+
+    const add = screen.getByRole("button", { name: "Add argument" });
+    // WCAG 2.5.3: the visible label has to be inside the accessible name, or
+    // voice control cannot reach the button by what it says.
+    expect(add.textContent).toBe("Add");
+  });
+
+  it("marks the lit tab in weight and border, not colour alone", () => {
+    renderBar();
+    const element = screen.getByText("Element");
+    const argument = screen.getByText("Argument");
+
+    expect(element.style.fontWeight).toBe("bold");
+    expect(argument.style.fontWeight).toBe("normal");
+    expect(element.style.border).not.toBe(argument.style.border);
+    expect(element.getAttribute("aria-pressed")).toBe("true");
+    expect(argument.getAttribute("aria-pressed")).toBe("false");
+  });
+});
+
 describe("adding an argument", () => {
   const addArgument = (onAddRelation, premiseIds) => {
     renderBar({ hideNonEntailsRels: true, onAddRelation });
@@ -178,7 +511,8 @@ describe("adding an argument", () => {
     fireEvent.change(screen.getByLabelText("Conclusion"), {
       target: { value: "P1" },
     });
-    fireEvent.click(screen.getByText(/^Add argument$/));
+    // By role: the button reads "Add" and carries its target in the name.
+    fireEvent.click(screen.getByRole("button", { name: "Add argument" }));
   };
 
   it("writes one relation per premise, grouped as a single argument", () => {
@@ -212,7 +546,9 @@ describe("adding an argument", () => {
     fireEvent.change(screen.getByLabelText("Conclusion"), {
       target: { value: "P1" },
     });
-    expect(screen.getByText(/^Add argument$/).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Add argument" }).disabled).toBe(
+      true,
+    );
     expect(screen.queryByText("Premise ≠ conclusion")).toBeTruthy();
   });
 });
