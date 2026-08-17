@@ -76,7 +76,7 @@ function buildSteps(cycle) {
     {
       id: "menu-settings",
       title: "Settings",
-      text: "Show or hide the section nav bar, expand or collapse the text toggles, bring in relations beyond logical entailment, and choose a font or a light theme.",
+      text: "Four blocks, in order of what they reach: what counts as a relation, which model assists you, how the app looks, and two details of the text panel.\nEach switch shows whether that setting is on.",
       target: "menu-settings",
       menu: true,
       tab: "graph",

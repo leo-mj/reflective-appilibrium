@@ -115,9 +115,9 @@ test.describe("Accessibility", () => {
 
       if (theme === "dark") {
         await openMenu(page);
-        // The item names itself for the theme it switches *to*, so it reads
-        // "Light mode" while the dark theme is on.
-        await page.locator('button:has-text("Light mode")').click();
+        // The row names the setting, not the change: "Dark mode" with its
+        // switch on is what the dark theme looks like from here.
+        await page.locator('button:has-text("Dark mode")').click();
         await expect
           .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
           .toBe("light");

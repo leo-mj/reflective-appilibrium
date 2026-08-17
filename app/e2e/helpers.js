@@ -330,7 +330,9 @@ export async function labelInks(page) {
  * landed, not just that the click did.
  *
  * @param {import('@playwright/test').Page} page
- * @param {string} label     - Menu item text, e.g. "Light mode".
+ * @param {string} label     - Menu item text, e.g. "Dark mode". The rows name
+ *   the setting rather than the change, so the same label switches it either
+ *   way — what tells them apart is the attribute below.
  * @param {string} attribute - e.g. "data-theme".
  * @param {string|null} value
  */

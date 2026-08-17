@@ -58,7 +58,7 @@ test.describe("Viewing modes", () => {
     await park(page);
     const underDark = await nodeFills(page);
 
-    await switchMode(page, "Light mode", "data-theme", "light");
+    await switchMode(page, "Dark mode", "data-theme", "light");
     expect(await nodeFills(page)).toEqual(underDark);
     expect(await labelInks(page)).toEqual([WHITE]);
   });
@@ -71,7 +71,7 @@ test.describe("Viewing modes", () => {
     await switchMode(page, "High-contrast", "data-contrast", "high");
 
     const underDark = await nodeFills(page);
-    await switchMode(page, "Light mode", "data-theme", "light");
+    await switchMode(page, "Dark mode", "data-theme", "light");
     expect(await nodeFills(page)).toEqual(underDark);
   });
 

@@ -16,7 +16,16 @@ import {
   TAB_ICONS,
   TAB_LABELS,
 } from "../../constants/tabConstants.jsx";
-import { btn, menuIconStyle, menuDividerStyle } from "./appHeaderStyles.js";
+import {
+  btn,
+  menuIconStyle,
+  menuDividerStyle,
+  menuGroupStyle,
+  menuHeadingStyle,
+} from "./appHeaderStyles.js";
+import { MENU_HEADINGS, MENU_LABELS, MENU_TOOLTIPS } from "./menuText.js";
+import { MoonIcon, SearchIcon } from "./menuIcons.jsx";
+import { MenuToggle } from "./MenuToggle.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
 import { TOUR_Z } from "../TutorialStepper.jsx";
@@ -87,16 +96,6 @@ export function AppHeaderNarrow({
     justifyContent: "flex-start",
     gap: 8,
   });
-  // Each labelled block of the menu is one element, so the tour can ring a
-  // whole section rather than pick out single rows.
-  const group = { display: "flex", flexDirection: "column", gap: 2 };
-  const groupHeading = {
-    fontSize: 10,
-    color: C.dim,
-    fontWeight: "bold",
-    padding: "4px 4px 2px",
-    letterSpacing: "0.05em",
-  };
   const close = (fn) => () => {
     fn();
     setMenuOpen(false);
@@ -179,7 +178,8 @@ export function AppHeaderNarrow({
           }}
         >
           <button onClick={close(onHome)} style={menuBtn()}>
-            <span style={menuIconStyle}>←</span>Home
+            <span style={menuIconStyle}>←</span>
+            {MENU_LABELS.home}
           </button>
           <button
             data-tutorial="menu-undo"
@@ -202,8 +202,8 @@ export function AppHeaderNarrow({
             <span style={menuIconStyle}>?</span>Guided tour
           </button>
           <div style={menuDividerStyle} />
-          <div data-tutorial="menu-assist" style={group}>
-            <div style={groupHeading}>Assist</div>
+          <div data-tutorial="menu-assist" style={menuGroupStyle}>
+            <div style={menuHeadingStyle}>Assist</div>
             {ASSIST_TABS.filter(isTabVisible).map((t) => (
               <button
                 key={t}
@@ -239,8 +239,8 @@ export function AppHeaderNarrow({
             )}
           </div>
           <div style={menuDividerStyle} />
-          <div data-tutorial="menu-analyze" style={group}>
-            <div style={groupHeading}>Analyze</div>
+          <div data-tutorial="menu-analyze" style={menuGroupStyle}>
+            <div style={menuHeadingStyle}>Analyze</div>
             {/* Text is a tab of its own at this width, not the side panel the
                 wide layout toggles, so it belongs beside the other views. */}
             <button
@@ -262,7 +262,7 @@ export function AppHeaderNarrow({
             ))}
             {BACKEND_ENABLED && (
               <>
-                <div style={groupHeading}>Simulate</div>
+                <div style={menuHeadingStyle}>Simulate</div>
                 {SIMULATE_TABS.filter(isTabVisible).map((t) => (
                   <button
                     key={t}
@@ -277,12 +277,34 @@ export function AppHeaderNarrow({
             )}
           </div>
           <div style={menuDividerStyle} />
-          {/* The settings below flip in place and say so in their own label —
-              "Hide nav bar" becomes "Show nav bar". Closing the menu fired the
-              change and then hid the only evidence of it, so these stay open;
-              only the rows that navigate or open a modal close it. */}
-          <div data-tutorial="menu-settings" style={group}>
-            <div style={groupHeading}>Settings</div>
+          {/* One wrapper, four blocks: the tour rings the settings as a whole,
+              and the headings inside it are the same ones, in the same order,
+              as the wide menu's — content first, the panel-deep rows last.
+              Nothing here closes the menu except the two rows that open a
+              modal: a toggle's switch is the only evidence it fired. */}
+          <div data-tutorial="menu-settings" style={menuGroupStyle}>
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.content}</div>
+            <MenuToggle
+              icon="→"
+              label={MENU_LABELS.relations}
+              tooltip={MENU_TOOLTIPS.relations}
+              on={!hideNonEntailsRels}
+              onToggle={() => setHideNonEntailsRels((s) => !s)}
+              style={menuBtn()}
+            />
+            {BACKEND_ENABLED && (
+              <MenuToggle
+                icon="⊨"
+                label={MENU_LABELS.checker}
+                tooltip={MENU_TOOLTIPS.checker}
+                on={verifyArguments}
+                onToggle={() => setVerifyArguments((s) => !s)}
+                style={menuBtn()}
+              />
+            )}
+
+            <div style={menuDividerStyle} />
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.model}</div>
             <button
               onClick={() => {
                 setMenuOpen(false);
@@ -291,62 +313,21 @@ export function AppHeaderNarrow({
               style={menuBtn()}
             >
               <span style={menuIconStyle}>⚙</span>
-              {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
+              {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
             </button>
-            <div style={menuDividerStyle} />
-
-            <button onClick={() => setShowTabNav((s) => !s)} style={menuBtn()}>
-              <span style={menuIconStyle}>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ display: "block" }}
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <line x1="16.5" y1="16.5" x2="22" y2="22" />
-                </svg>
-              </span>
-              {showTabNav ? "Hide nav bar" : "Show nav bar"}
-            </button>
-            <button onClick={onExpandAll} style={menuBtn()}>
-              <span style={menuIconStyle}>⇅</span>
-              {allExpanded ? "Minimize all toggles" : "Expand all toggles"}
-            </button>
-            <button
-              onClick={() => setHideNonEntailsRels((s) => !s)}
-              style={menuBtn()}
-            >
-              <span style={menuIconStyle}>→</span>
-              {hideNonEntailsRels ? "All relations" : "Arguments only"}
-            </button>
-            {BACKEND_ENABLED && (
-              <button
-                onClick={() => setVerifyArguments((s) => !s)}
-                style={menuBtn()}
-              >
-                <span style={menuIconStyle}>{verifyArguments ? "✓" : "✗"}</span>
-                Argument checker: {verifyArguments ? "on" : "off"}
-              </button>
-            )}
             {BACKEND_ENABLED && (
               <>
-                <div style={menuDividerStyle} />
-
                 <button
                   onClick={() => setWeightsOpen((o) => !o)}
+                  aria-expanded={weightsOpen}
                   style={{
                     ...menuBtn(),
                     color: weightsChanged ? C.principle.accent : undefined,
                   }}
                 >
                   <span style={menuIconStyle}>⚖</span>
-                  Model weights{weightsChanged ? " *" : ""}
+                  {MENU_LABELS.weights}
+                  {weightsChanged ? " *" : ""}
                   <span
                     style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}
                   >
@@ -381,7 +362,25 @@ export function AppHeaderNarrow({
                 )}
               </>
             )}
+
             <div style={menuDividerStyle} />
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.appearance}</div>
+            <MenuToggle
+              icon={<MoonIcon />}
+              label={MENU_LABELS.theme}
+              tooltip={MENU_TOOLTIPS.theme}
+              on={isDark}
+              onToggle={toggleTheme}
+              style={menuBtn()}
+            />
+            <MenuToggle
+              icon="◐"
+              label={MENU_LABELS.contrast}
+              tooltip={MENU_TOOLTIPS.contrast}
+              on={accessible}
+              onToggle={toggleAccessible}
+              style={menuBtn()}
+            />
             <button
               onClick={() => {
                 setMenuOpen(false);
@@ -389,61 +388,32 @@ export function AppHeaderNarrow({
               }}
               style={menuBtn()}
             >
-              <span style={menuIconStyle}>Aa</span>Select Font
+              <span style={menuIconStyle}>Aa</span>
+              {MENU_LABELS.font}
             </button>
-            <button onClick={toggleTheme} style={menuBtn()}>
-              <span style={menuIconStyle}>
-                {isDark ? (
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ display: "block" }}
-                  >
-                    <circle cx="12" cy="12" r="5" />
-                    <line x1="12" y1="1" x2="12" y2="3" />
-                    <line x1="12" y1="21" x2="12" y2="23" />
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                    <line x1="1" y1="12" x2="3" y2="12" />
-                    <line x1="21" y1="12" x2="23" y2="12" />
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                  </svg>
-                ) : (
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ display: "block" }}
-                  >
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                  </svg>
-                )}
-              </span>
-              {isDark ? "Light mode" : "Dark mode"}
-            </button>
-            <button
-              onClick={toggleAccessible}
+
+            <div style={menuDividerStyle} />
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.text}</div>
+            <MenuToggle
+              icon={<SearchIcon />}
+              label={MENU_LABELS.navBar}
+              tooltip={MENU_TOOLTIPS.navBar}
+              on={showTabNav}
+              onToggle={() => setShowTabNav((s) => !s)}
               style={menuBtn()}
-              aria-pressed={accessible}
-            >
-              <span style={menuIconStyle}>{accessible ? "◉" : "◎"}</span>
-              High-contrast
-            </button>
+            />
+            <MenuToggle
+              icon="⇅"
+              label={MENU_LABELS.cards}
+              tooltip={MENU_TOOLTIPS.cards}
+              on={allExpanded}
+              onToggle={onExpandAll}
+              style={menuBtn()}
+            />
           </div>
           <div style={menuDividerStyle} />
-          <div data-tutorial="menu-files" style={group}>
+          <div data-tutorial="menu-files" style={menuGroupStyle}>
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.session}</div>
             <button
               onClick={() => {
                 handleImportClick();
@@ -451,31 +421,30 @@ export function AppHeaderNarrow({
               }}
               style={menuBtn()}
             >
-              <span style={menuIconStyle}>↑</span>Import
+              <span style={menuIconStyle}>↑</span>
+              {MENU_LABELS.import}
             </button>
             <button
               onClick={close(onDownload)}
               style={{ ...menuBtn(), color: C.theory.text }}
             >
-              <span style={menuIconStyle}>↓</span>Export
+              <span style={menuIconStyle}>↓</span>
+              {MENU_LABELS.export}
             </button>
             {BACKEND_ENABLED && canSaveToServer && (
-              <>
-                <div style={menuDividerStyle} />
-                <button
-                  onClick={close(onSave)}
-                  disabled={saveBusy}
-                  title="Save session"
-                  style={{
-                    ...menuBtn(),
-                    ...(saveColor
-                      ? { color: saveColor, borderColor: saveColor }
-                      : {}),
-                  }}
-                >
-                  {saveLabel}Save
-                </button>
-              </>
+              <button
+                onClick={close(onSave)}
+                disabled={saveBusy}
+                style={{
+                  ...menuBtn(),
+                  ...(saveColor
+                    ? { color: saveColor, borderColor: saveColor }
+                    : {}),
+                }}
+              >
+                <span style={menuIconStyle}>{saveLabel}</span>
+                {MENU_LABELS.save}
+              </button>
             )}
           </div>
         </div>

@@ -11,6 +11,10 @@ import { C } from "../constants/colors.js";
 /** How long a finger rests on the trigger before the tooltip opens. */
 const LONG_PRESS_MS = 500;
 
+/** Widest the box may get before its text wraps. Also sets how far from either
+ * edge of the window it is allowed to sit, so it never overflows one. */
+const MAX_W = 260;
+
 /**
  * A tap emits a mouseenter of its own a moment after the finger has already
  * left, for the sake of pages written before touch existed. A hover this soon
@@ -86,6 +90,15 @@ export function Tooltip({ text, children, delay = 400 }) {
 
   if (!text) return child;
 
+  // Whether the trigger says what it is on screen. A label and an icon arrive
+  // as an array, so a bare `typeof children === "string"` missed every row of
+  // the ☰ menu and named them all after their tooltip instead — which is both
+  // the wrong name and, once the tooltips were cut to a line, one that no
+  // longer contained the word on the button.
+  const hasVisibleText = Children.toArray(child.props.children).some(
+    (c) => typeof c === "string" && c.trim(),
+  );
+
   // react-hooks/refs flags any ref-touching function handed to a call during
   // render, and show/hide touch the timer ref. cloneElement does not invoke
   // them: React attaches them as DOM handlers and calls them on hover, which is
@@ -101,8 +114,7 @@ export function Tooltip({ text, children, delay = 400 }) {
     // and one with visible text, where an aria-label would override what is on
     // screen with wording that may not match it.
     "aria-label":
-      child.props["aria-label"] ??
-      (typeof child.props.children === "string" ? undefined : text),
+      child.props["aria-label"] ?? (hasVisibleText ? undefined : text),
     onMouseEnter(e) {
       child.props.onMouseEnter?.(e);
       if (touching.current) return;
@@ -148,8 +160,11 @@ export function Tooltip({ text, children, delay = 400 }) {
     },
   });
 
+  // Half the widest the box may get, plus a margin, so a tooltip opened at the
+  // edge of the window ends just short of it rather than flush against it.
+  const half = MAX_W / 2 + 8;
   const cx = pos
-    ? Math.max(110, Math.min(window.innerWidth - 110, pos.cx))
+    ? Math.max(half, Math.min(window.innerWidth - half, pos.cx))
     : 0;
 
   return (
@@ -160,15 +175,22 @@ export function Tooltip({ text, children, delay = 400 }) {
           style={{
             position: "fixed",
             top: pos.top,
-            left: cx,
-            transform: "translateX(-50%)",
+            // Placed by transform from the left edge rather than by `left: cx`.
+            // A fixed box with `left` set is laid out in what remains of the
+            // window to its right, so a trigger near the right edge — the ☰
+            // menu, every time — was squeezed to a column of one-word lines
+            // however much room `maxWidth` gave it. From 0 the whole window is
+            // available, and `max-content` keeps short text on one line.
+            left: 0,
+            transform: `translateX(${cx}px) translateX(-50%)`,
+            width: "max-content",
             background: C.panel,
             border: `1px solid ${C.border}`,
             borderRadius: 6,
             padding: "5px 9px",
             fontSize: 11,
             color: C.text,
-            maxWidth: 220,
+            maxWidth: MAX_W,
             pointerEvents: "none",
             zIndex: 1000,
             boxShadow: "0 2px 8px rgba(0,0,0,0.25)",

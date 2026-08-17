@@ -132,39 +132,32 @@ describe("model weights", () => {
 });
 
 describe("what closes the menu", () => {
-  // A setting that flips in place announces what it did in its own label —
-  // "Hide nav bar" becomes "Show nav bar", the theme row swaps. Closing the
-  // menu fired the change and then hid the only evidence of it.
+  // A setting flips in place, and its switch is the only evidence of it.
+  // Closing the menu fired the change and then hid that evidence.
   const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
   // Select Font lives inside the menu in both layouts and nowhere else.
   const menuIsOpen = () => screen.queryByText("Select Font") !== null;
 
-  const settings = [
-    "Hide nav bar",
-    "Minimize toggles",
+  // Named the same in both layouts: the labels come from one module.
+  const SETTINGS = [
+    "Section nav bar",
+    "Expanded cards",
     "All relations",
-    "Light mode",
+    "Dark mode",
+    "High-contrast",
   ];
 
   beforeEach(() => {
-    // useTheme reads this on mount, so the theme row's label is deterministic.
+    // useTheme reads this on mount, so the theme row starts from a known state.
     document.documentElement.removeAttribute("data-theme");
   });
 
   for (const isWide of [true, false]) {
     const layout = isWide ? "wide" : "narrow";
 
-    for (const label of settings(isWide)) {
+    for (const label of SETTINGS) {
       it(`stays open for "${label}" (${layout})`, () => {
-        // Both states are pinned, so each row's label is the one named above.
-        render(
-          <AppHeader
-            {...PROPS}
-            isWide={isWide}
-            showTabNav
-            hideNonEntailsRels
-          />,
-        );
+        render(<AppHeader {...PROPS} isWide={isWide} />);
         openMenu();
         expect(menuIsOpen()).toBe(true);
 
@@ -187,6 +180,44 @@ describe("what closes the menu", () => {
     fireEvent.click(screen.getByText(TAB_LABELS.history));
     expect(menuIsOpen()).toBe(false);
   });
+});
+
+describe("how a setting reports its state", () => {
+  // The rows used to flip their own wording, which left it ambiguous whether a
+  // row named the state in force or the change on offer — and the two menus did
+  // not even agree with each other. The label is fixed now and the state is on
+  // aria-pressed, drawn as the switch beside it.
+  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+
+  /** Label → the props that put the setting on, and those that put it off. */
+  const TOGGLES = {
+    "All relations": [
+      { hideNonEntailsRels: false },
+      { hideNonEntailsRels: true },
+    ],
+    "Section nav bar": [{ showTabNav: true }, { showTabNav: false }],
+    "Expanded cards": [{ allExpanded: true }, { allExpanded: false }],
+  };
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+
+    for (const [label, [on, off]] of Object.entries(TOGGLES)) {
+      it(`keeps "${label}" named the same either way (${layout})`, () => {
+        for (const [props, pressed] of [
+          [on, "true"],
+          [off, "false"],
+        ]) {
+          render(<AppHeader {...PROPS} {...props} isWide={isWide} />);
+          openMenu();
+          expect(screen.getByText(label).getAttribute("aria-pressed")).toBe(
+            pressed,
+          );
+          cleanup();
+        }
+      });
+    }
+  }
 });
 
 describe("the narrow text button", () => {
@@ -316,8 +347,8 @@ describe("narrow menu order", () => {
       expect(idx(TAB_LABELS[t])).toBeGreaterThan(idx("Home"));
     }
     for (const later of [
-      "nav bar",
-      "toggles",
+      "Section nav bar",
+      "Expanded cards",
       "Select Font",
       "Import",
       "Export",

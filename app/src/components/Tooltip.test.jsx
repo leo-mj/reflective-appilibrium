@@ -44,6 +44,33 @@ describe("Tooltip", () => {
     expect(tooltipNode("")).toBeUndefined();
   });
 
+  describe("what it names the trigger", () => {
+    // The tooltip is the name an icon-only button is missing, and the wrong
+    // name for one that already says what it is. A row of the ☰ menu is the
+    // second kind even though its label arrives beside an icon.
+    const nameOf = (children, props = {}) => {
+      const { container } = render(
+        <Tooltip text="Write the process out to a file.">
+          <button {...props}>{children}</button>
+        </Tooltip>,
+      );
+      return container.querySelector("button").getAttribute("aria-label");
+    };
+
+    it("names a button that shows only an icon", () => {
+      expect(nameOf(<svg />)).toBe("Write the process out to a file.");
+    });
+
+    it("leaves a button with a visible label alone", () => {
+      expect(nameOf("Export")).toBeNull();
+      expect(nameOf([<span key="i">↓</span>, "Export"])).toBeNull();
+    });
+
+    it("never overrides a name the trigger brought itself", () => {
+      expect(nameOf(<svg />, { "aria-label": "Export" })).toBe("Export");
+    });
+  });
+
   it("shows nothing until the delay has elapsed", () => {
     vi.useFakeTimers();
     const { container } = render(
@@ -80,7 +107,37 @@ describe("Tooltip", () => {
 
     const tip = tooltipNode("Accept");
     expect(tip.style.top).toBe("106px"); // bottom + 6
-    expect(tip.style.left).toBe("220px"); // left + width / 2
+    // Centred by transform, and laid out from the left edge of the window: a
+    // fixed box positioned with `left` gets only what is left of the window to
+    // its right, which squeezed every tooltip opened near the right edge into a
+    // column one word wide.
+    expect(tip.style.left).toBe("0px");
+    expect(tip.style.transform).toBe("translateX(220px) translateX(-50%)");
+  });
+
+  it("keeps clear of either edge of the window", () => {
+    vi.useFakeTimers();
+    const { container } = render(
+      <Tooltip text="Accept">
+        <button>Go</button>
+      </Tooltip>,
+    );
+    const btn = container.querySelector("button");
+    // A trigger hard against the right edge — the ☰ menu's rows, every time.
+    btn.getBoundingClientRect = () => ({
+      bottom: 100,
+      left: window.innerWidth - 20,
+      width: 20,
+    });
+
+    fireEvent.mouseOver(btn);
+    waitOutDelay();
+
+    // Half the widest the box may get, and a margin: it ends just short of the
+    // edge rather than past it.
+    expect(tooltipNode("Accept").style.transform).toBe(
+      `translateX(${window.innerWidth - 138}px) translateX(-50%)`,
+    );
   });
 
   it("hides again on mouse leave", () => {

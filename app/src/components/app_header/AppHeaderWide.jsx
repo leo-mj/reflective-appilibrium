@@ -20,7 +20,12 @@ import {
   menuIconStyle,
   menuDividerStyle,
   inlineDividerStyle,
+  menuGroupStyle,
+  menuHeadingStyle,
 } from "./appHeaderStyles.js";
+import { MENU_HEADINGS, MENU_LABELS, MENU_TOOLTIPS } from "./menuText.js";
+import { MoonIcon, SearchIcon } from "./menuIcons.jsx";
+import { MenuToggle } from "./MenuToggle.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
@@ -117,9 +122,6 @@ export function AppHeaderWide({
     borderRadius: 4,
     border: "none",
   };
-  // Wrapper for the import/export pair, which the tour rings as one. Reproduces
-  // the column the menu lays its buttons out in, so wrapping changes nothing.
-  const menuGroup = { display: "flex", flexDirection: "column", gap: 2 };
   const close = (fn) => () => {
     fn();
     setMenuOpen(false);
@@ -226,7 +228,7 @@ export function AppHeaderWide({
             </div>
           )}
 
-          <Tooltip text="Undo the last change. Keyboard shortcut: Ctrl+Z.">
+          <Tooltip text="Undo the last change. Ctrl+Z.">
             <button
               data-tutorial="btn-undo"
               onClick={onUndo}
@@ -240,7 +242,7 @@ export function AppHeaderWide({
           {/* Icon-only: the pair is read together, and spelling out "Redo"
               beside "Undo" costs more of the bar than it earns. The label the
               screen reader gets is on aria-label. */}
-          <Tooltip text="Redo the change you just undid. Keyboard shortcut: Ctrl+Shift+Z.">
+          <Tooltip text="Redo the undone change. Ctrl+Shift+Z.">
             <button
               onClick={onRedo}
               disabled={!canRedo}
@@ -253,7 +255,7 @@ export function AppHeaderWide({
 
           <div style={inlineDividerStyle} />
 
-          <Tooltip text="Start the step-by-step tour.">
+          <Tooltip text="Start the guided tour.">
             <button
               onClick={onStartStepper}
               aria-label="Start the step-by-step tour"
@@ -272,7 +274,7 @@ export function AppHeaderWide({
 
           {/* Burger menu */}
           <div style={{ position: "relative" }}>
-            <Tooltip text="Settings — theme, font, import, export, and LLM configuration.">
+            <Tooltip text="Settings, import and export.">
               <button
                 data-tutorial="btn-menu"
                 onClick={() => setMenuOpen((o) => !o)}
@@ -311,230 +313,193 @@ export function AppHeaderWide({
                     display: "flex",
                     flexDirection: "column",
                     gap: 2,
-                    minWidth: weightsOpen ? 248 : 180,
+                    minWidth: weightsOpen ? 248 : 200,
                     boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
                   }}
                 >
-                  <Tooltip text="Return to the home screen. Unsaved changes will be lost.">
+                  <Tooltip text={MENU_TOOLTIPS.home}>
                     <button
                       data-tutorial="btn-home"
                       onClick={close(onHome)}
                       style={menuItem}
                     >
-                      <span style={menuIconStyle}>←</span>Home
+                      <span style={menuIconStyle}>←</span>
+                      {MENU_LABELS.home}
                     </button>
                   </Tooltip>
 
                   <div style={menuDividerStyle} />
 
-                  <Tooltip text="Configure your LLM provider, model name, and API key.">
-                    <button
-                      data-tutorial="btn-llm"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setLlmOpen(true);
-                      }}
+                  {/* Content first: these two decide what the app works with —
+                      which relations exist at all, and whether an argument has
+                      to pass the checker to become one. The rows that dress a
+                      single panel are three blocks further down. */}
+                  <div style={menuGroupStyle}>
+                    <div style={menuHeadingStyle}>{MENU_HEADINGS.content}</div>
+                    {/* The tour used to stop and explain this one. It says so
+                        itself now, so the tour can stay short. */}
+                    <MenuToggle
+                      icon="→"
+                      label={MENU_LABELS.relations}
+                      tooltip={MENU_TOOLTIPS.relations}
+                      on={!hideNonEntailsRels}
+                      onToggle={() => setHideNonEntailsRels((s) => !s)}
                       style={menuItem}
-                    >
-                      <span style={menuIconStyle}>⚙</span>
-                      {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
-                    </button>
-                  </Tooltip>
+                    />
+                    {BACKEND_ENABLED && (
+                      <MenuToggle
+                        icon="⊨"
+                        label={MENU_LABELS.checker}
+                        tooltip={MENU_TOOLTIPS.checker}
+                        on={verifyArguments}
+                        onToggle={() => setVerifyArguments((s) => !s)}
+                        style={menuItem}
+                      />
+                    )}
+                  </div>
+
                   <div style={menuDividerStyle} />
 
-                  {/* The settings from here down flip in place and say so in
-                      their own label — "Hide nav bar" becomes "Show nav bar".
-                      Closing the menu fired the change and then hid the only
-                      evidence of it, so these stay open; only the rows that
-                      navigate or open a modal close it. */}
-                  <Tooltip text="Hide the text panel's section nav bar, which also carries its search box.">
-                    <button
-                      onClick={() => setShowTabNav((s) => !s)}
-                      style={menuItem}
-                    >
-                      <span style={menuIconStyle}>
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{ display: "block" }}
-                        >
-                          <circle cx="11" cy="11" r="7" />
-                          <line x1="16.5" y1="16.5" x2="22" y2="22" />
-                        </svg>
-                      </span>
-                      {showTabNav ? "Hide nav bar" : "Show nav bar"}
-                    </button>
-                  </Tooltip>
-
-                  <Tooltip text="Expand or collapse every card in the text panel at once.">
-                    <button onClick={onExpandAll} style={menuItem}>
-                      <span style={menuIconStyle}>⇅</span>
-                      {allExpanded ? "Minimize toggles" : "Expand toggles"}
-                    </button>
-                  </Tooltip>
-
-                  {/* The tour used to stop and explain this one. It says so
-                      itself now, so the tour can stay short. */}
-                  <Tooltip text="The graph shows arguments by default — the entailments and preclusions that carry the weight. Switch this on and the softer links appear too: one element supporting, conflicting with, undermining, or presupposing another. It also adds a step to the Assist cycle, where the model proposes them.">
-                    <button
-                      onClick={() => setHideNonEntailsRels((s) => !s)}
-                      style={{ ...menuItem, textAlign: "left " }}
-                    >
-                      <span style={menuIconStyle}>→</span>
-                      {hideNonEntailsRels ? "All relations" : "Arguments only"}
-                    </button>
-                  </Tooltip>
-
-                  {BACKEND_ENABLED && (
-                    <Tooltip text="When on, detected arguments are verified for formal validity, auto-trimmed, and stripped of meaning postulates. When off, the model's raw arguments are surfaced unchecked.">
+                  <div style={menuGroupStyle}>
+                    <div style={menuHeadingStyle}>{MENU_HEADINGS.model}</div>
+                    <Tooltip text={MENU_TOOLTIPS.llm}>
                       <button
-                        onClick={() => setVerifyArguments((s) => !s)}
-                        style={{ ...menuItem, textAlign: "left" }}
+                        data-tutorial="btn-llm"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setLlmOpen(true);
+                        }}
+                        style={menuItem}
                       >
-                        <span style={menuIconStyle}>
-                          {verifyArguments ? "✓" : "✗"}
-                        </span>
-                        Argument checker: {verifyArguments ? "on" : "off"}
+                        <span style={menuIconStyle}>⚙</span>
+                        {llmSaved
+                          ? `LLM: ${llmSaved.model}`
+                          : MENU_LABELS.llm}
                       </button>
                     </Tooltip>
-                  )}
 
-                  {BACKEND_ENABLED && (
-                    <>
-                      <div style={menuDividerStyle} />
-
-                      <button
-                        onClick={() => setWeightsOpen((o) => !o)}
-                        style={{
-                          ...menuItem,
-                          color: weightsChanged
-                            ? C.principle.accent
-                            : undefined,
-                        }}
-                      >
-                        <span style={menuIconStyle}>⚖</span>
-                        Model weights{weightsChanged ? " *" : ""}
-                        <span
-                          style={{
-                            marginLeft: "auto",
-                            fontSize: 9,
-                            color: C.dim,
-                          }}
-                        >
-                          {weightsOpen ? "▲" : "▼"}
-                        </span>
-                      </button>
-                      {weightsOpen && (
-                        <div style={{ padding: "4px 8px 8px 8px" }}>
-                          <WeightTriangle
-                            weights={weights}
-                            onChange={onWeightsChange}
-                            weightsChanged={weightsChanged}
-                          />
-                          {weightsChanged && (
-                            <button
-                              onClick={onResetWeights}
+                    {BACKEND_ENABLED && (
+                      <>
+                        <Tooltip text={MENU_TOOLTIPS.weights}>
+                          <button
+                            onClick={() => setWeightsOpen((o) => !o)}
+                            aria-expanded={weightsOpen}
+                            style={{
+                              ...menuItem,
+                              color: weightsChanged
+                                ? C.principle.accent
+                                : undefined,
+                            }}
+                          >
+                            <span style={menuIconStyle}>⚖</span>
+                            {MENU_LABELS.weights}
+                            {weightsChanged ? " *" : ""}
+                            <span
                               style={{
-                                marginTop: 4,
-                                background: "transparent",
-                                border: `1px solid ${C.border}`,
+                                marginLeft: "auto",
+                                fontSize: 9,
                                 color: C.dim,
-                                borderRadius: 4,
-                                padding: "2px 8px",
-                                fontSize: 11,
-                                cursor: "pointer",
                               }}
                             >
-                              Reset
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  <div style={menuDividerStyle} />
-
-                  <Tooltip text="Pick a font, including one drawn for dyslexic readers.">
-                    <button
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setFontOpen(true);
-                      }}
-                      style={menuItem}
-                    >
-                      <span style={menuIconStyle}>Aa</span>Select Font
-                    </button>
-                  </Tooltip>
-
-                  <Tooltip text="Switch between the dark and light themes.">
-                    <button onClick={toggleTheme} style={menuItem}>
-                      <span style={menuIconStyle}>
-                        {isDark ? (
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ display: "block" }}
-                          >
-                            <circle cx="12" cy="12" r="5" />
-                            <line x1="12" y1="1" x2="12" y2="3" />
-                            <line x1="12" y1="21" x2="12" y2="23" />
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                            <line x1="1" y1="12" x2="3" y2="12" />
-                            <line x1="21" y1="12" x2="23" y2="12" />
-                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                          </svg>
-                        ) : (
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ display: "block" }}
-                          >
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                          </svg>
+                              {weightsOpen ? "▲" : "▼"}
+                            </span>
+                          </button>
+                        </Tooltip>
+                        {weightsOpen && (
+                          <div style={{ padding: "4px 8px 8px 8px" }}>
+                            <WeightTriangle
+                              weights={weights}
+                              onChange={onWeightsChange}
+                              weightsChanged={weightsChanged}
+                            />
+                            {weightsChanged && (
+                              <button
+                                onClick={onResetWeights}
+                                style={{
+                                  marginTop: 4,
+                                  background: "transparent",
+                                  border: `1px solid ${C.border}`,
+                                  color: C.dim,
+                                  borderRadius: 4,
+                                  padding: "2px 8px",
+                                  fontSize: 11,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Reset
+                              </button>
+                            )}
+                          </div>
                         )}
-                      </span>
-                      {isDark ? "Light mode" : "Dark mode"}
-                    </button>
-                  </Tooltip>
-
-                  <Tooltip text="Node colours picked for maximum contrast and for colour-vision deficiency. Overrides the theme's own palette.">
-                    <button
-                      onClick={toggleAccessible}
-                      style={menuItem}
-                      aria-pressed={accessible}
-                    >
-                      <span style={menuIconStyle}>
-                        {accessible ? "◉" : "◎"}
-                      </span>
-                      High-contrast
-                    </button>
-                  </Tooltip>
+                      </>
+                    )}
+                  </div>
 
                   <div style={menuDividerStyle} />
 
-                  <div style={menuGroup} data-tutorial="menu-files">
-                    <Tooltip text="Import a previously exported JSON file to restore an RE state.">
+                  <div style={menuGroupStyle}>
+                    <div style={menuHeadingStyle}>
+                      {MENU_HEADINGS.appearance}
+                    </div>
+                    <MenuToggle
+                      icon={<MoonIcon />}
+                      label={MENU_LABELS.theme}
+                      tooltip={MENU_TOOLTIPS.theme}
+                      on={isDark}
+                      onToggle={toggleTheme}
+                      style={menuItem}
+                    />
+                    <MenuToggle
+                      icon="◐"
+                      label={MENU_LABELS.contrast}
+                      tooltip={MENU_TOOLTIPS.contrast}
+                      on={accessible}
+                      onToggle={toggleAccessible}
+                      style={menuItem}
+                    />
+                    <Tooltip text={MENU_TOOLTIPS.font}>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setFontOpen(true);
+                        }}
+                        style={menuItem}
+                      >
+                        <span style={menuIconStyle}>Aa</span>
+                        {MENU_LABELS.font}
+                      </button>
+                    </Tooltip>
+                  </div>
+
+                  <div style={menuDividerStyle} />
+
+                  {/* Both of these reach one panel and nothing else, which is
+                      why they sit below everything that reaches the whole app. */}
+                  <div style={menuGroupStyle}>
+                    <div style={menuHeadingStyle}>{MENU_HEADINGS.text}</div>
+                    <MenuToggle
+                      icon={<SearchIcon />}
+                      label={MENU_LABELS.navBar}
+                      tooltip={MENU_TOOLTIPS.navBar}
+                      on={showTabNav}
+                      onToggle={() => setShowTabNav((s) => !s)}
+                      style={menuItem}
+                    />
+                    <MenuToggle
+                      icon="⇅"
+                      label={MENU_LABELS.cards}
+                      tooltip={MENU_TOOLTIPS.cards}
+                      on={allExpanded}
+                      onToggle={onExpandAll}
+                      style={menuItem}
+                    />
+                  </div>
+
+                  <div style={menuDividerStyle} />
+
+                  <div style={menuGroupStyle} data-tutorial="menu-files">
+                    <div style={menuHeadingStyle}>{MENU_HEADINGS.session}</div>
+                    <Tooltip text={MENU_TOOLTIPS.import}>
                       <button
                         onClick={() => {
                           handleImportClick();
@@ -542,19 +507,21 @@ export function AppHeaderWide({
                         }}
                         style={menuItem}
                       >
-                        <span style={menuIconStyle}>↑</span>Import
+                        <span style={menuIconStyle}>↑</span>
+                        {MENU_LABELS.import}
                       </button>
                     </Tooltip>
-                    <Tooltip text="Export the current RE state as a JSON file you can re-import later.">
+                    <Tooltip text={MENU_TOOLTIPS.export}>
                       <button
                         onClick={close(onDownload)}
                         style={{ ...menuItem, color: C.theory.text }}
                       >
-                        <span style={menuIconStyle}>↓</span>Export
+                        <span style={menuIconStyle}>↓</span>
+                        {MENU_LABELS.export}
                       </button>
                     </Tooltip>
                     {BACKEND_ENABLED && canSaveToServer && (
-                      <Tooltip text="Save session to the backend server. Reload it from the home screen.">
+                      <Tooltip text={MENU_TOOLTIPS.save}>
                         <button
                           onClick={close(onSave)}
                           disabled={saveBusy}
@@ -565,7 +532,8 @@ export function AppHeaderWide({
                               : {}),
                           }}
                         >
-                          <span style={menuIconStyle}>{saveLabel}</span>Save
+                          <span style={menuIconStyle}>{saveLabel}</span>
+                          {MENU_LABELS.save}
                         </button>
                       </Tooltip>
                     )}
@@ -592,7 +560,7 @@ export function AppHeaderWide({
             paddingBottom: 2,
           }}
         >
-          <Tooltip text="AI-guided mode — elicit judgments, suggest principles and relations.">
+          <Tooltip text="AI proposes judgments, principles and arguments.">
             <button
               data-tutorial="meta-assist"
               style={metaTabBtn(metaTab === "assist")}
@@ -603,7 +571,7 @@ export function AppHeaderWide({
               Assist
             </button>
           </Tooltip>
-          <Tooltip text="View your RE state — switch between graph, text, coherence and history.">
+          <Tooltip text="Your position as graph, text, clusters or history.">
             <button
               data-tutorial="meta-analyze"
               style={metaTabBtn(metaTab === "analyze")}
@@ -615,7 +583,7 @@ export function AppHeaderWide({
             </button>
           </Tooltip>
           {BACKEND_ENABLED && (
-            <Tooltip text="Run the formal rethon RE simulation on your active elements.">
+            <Tooltip text="Run the formal rethon simulation on your position.">
               <button
                 style={metaTabBtn(metaTab === "simulate")}
                 onClick={() => {

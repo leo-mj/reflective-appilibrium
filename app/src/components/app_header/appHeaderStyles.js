@@ -34,6 +34,27 @@ export const menuIconStyle = {
 /** Horizontal rule between menu sections. Render as <div style={menuDividerStyle} />. */
 export const menuDividerStyle = { height: 1, background: C.border, margin: "2px 0" };
 
+/**
+ * One labelled block of the ☰ menu. Both layouts group the same rows under the
+ * same headings, in the same order — Content, Model, Appearance, Text panel,
+ * Session — so that what a setting reaches is legible from where it sits: the
+ * two that change what the app works with are at the top, the two that dress a
+ * single panel are near the bottom.
+ *
+ * A block is one element so the tour can ring a whole section rather than pick
+ * out single rows.
+ */
+export const menuGroupStyle = { display: "flex", flexDirection: "column", gap: 2 };
+
+/** Heading over a {@link menuGroupStyle} block. */
+export const menuHeadingStyle = {
+  fontSize: 10,
+  color: C.dim,
+  fontWeight: "bold",
+  padding: "4px 4px 2px",
+  letterSpacing: "0.05em",
+};
+
 /** Vertical divider between inline toolbar buttons. Render as <div style={inlineDividerStyle} />. */
 export const inlineDividerStyle = {
   width: 1,
