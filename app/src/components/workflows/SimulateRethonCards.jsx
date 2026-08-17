@@ -10,10 +10,10 @@ import { C } from "../../constants/colors.js";
 
 export function elementColor(type) {
   return type === "judgment"
-    ? C.judgment.high
+    ? C.judgment.accent
     : type === "principle"
-      ? C.principle.high
-      : C.theory.high;
+      ? C.principle.accent
+      : C.theory.accent;
 }
 
 // ─── SectionHead ──────────────────────────────────────────────────────────────
@@ -154,12 +154,12 @@ export function ArgumentCard({ argument }) {
 export function ScoreRow({ scores, highlight = false, stepType = null }) {
   if (!scores) return null;
   const fmt = (v) => v.toFixed(3);
-  const ACCENT = C.principle.high;
+  const ACCENT = C.principle.accent;
   const allEntries = [
     { key: "z", label: "Z-Score", value: scores.z, color: highlight ? ACCENT : C.dim },
-    { key: "account", label: "Account", value: scores.account, color: C.judgment.high },
-    { key: "systematicity", label: "Systematicity", value: scores.systematicity, color: C.principle.high },
-    { key: "faithfulness", label: "Faithfulness", value: scores.faithfulness, color: C.theory.high },
+    { key: "account", label: "Account", value: scores.account, color: C.judgment.accent },
+    { key: "systematicity", label: "Systematicity", value: scores.systematicity, color: C.principle.accent },
+    { key: "faithfulness", label: "Faithfulness", value: scores.faithfulness, color: C.theory.accent },
   ];
   const entries = allEntries.filter(({ key }) => {
     if (!stepType) return true;
@@ -183,7 +183,10 @@ export function ScoreRow({ scores, highlight = false, stepType = null }) {
 
 export function EvolutionStep({ step, stepType, position, scores }) {
   const isCommitments = stepType === "commitments";
-  const typeColor = isCommitments ? C.judgment.high : C.principle.high;
+  const typeColor = isCommitments ? C.judgment.accent : C.principle.accent;
+  // The badge draws its border in the fill tone and its letter in the text
+  // tone: at 10px bold the fill tone does not clear AA on the panel.
+  const typeTextColor = isCommitments ? C.judgment.text : C.principle.text;
   const typeLabel = isCommitments ? "C" : "T";
   return (
     <div
@@ -209,7 +212,7 @@ export function EvolutionStep({ step, stepType, position, scores }) {
       <span
         title={isCommitments ? "Commitments position" : "Theory position"}
         style={{
-          color: typeColor,
+          color: typeTextColor,
           border: `1px solid ${typeColor}`,
           borderRadius: 3,
           padding: "0 4px",

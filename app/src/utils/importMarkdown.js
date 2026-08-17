@@ -133,9 +133,9 @@ function validateQuestionnaireSuggestion(s, i) {
   const ctx = `questionnaireSpec.suggestions[${i}]`;
   return {
     question: str(s.question, `${ctx}.question`, 1_000),
-    // 100, not 20: the shipped DARCA questionnaire has a question with 31
-    // answers, so the old bound made its own sessions un-importable — and in
-    // the demo build, export/import is the only way to keep one.
+    // 100, not 20: a shipped questionnaire has a question with 31 answers, so
+    // the old bound made its own sessions un-importable — and in the demo
+    // build, export/import is the only way to keep one.
     judgments: arr(s.judgments, `${ctx}.judgments`, 100).map((j, ji) =>
       validateQuestionnaireJudgment(j, `${ctx}.judgments[${ji}]`),
     ),

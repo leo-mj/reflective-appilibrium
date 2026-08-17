@@ -151,7 +151,7 @@ export function PlaybackControls({ playback, maxRound }) {
           style={{
             background: playing ? C.conflicts : C.supports,
             border: "none",
-            color: "#fff",
+            color: C.onFill,
             borderRadius: 4,
             padding: "6px 14px",
             cursor: "pointer",

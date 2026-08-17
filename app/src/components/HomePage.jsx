@@ -5,8 +5,8 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { C } from "../constants/colors.js";
-import { useTheme } from "../hooks/useTheme.js";
+import { C, inkOn } from "../constants/colors.js";
+import { useTheme, usePalette } from "../hooks/useTheme.js";
 import {
   fetchSessions,
   loadSession,
@@ -107,7 +107,7 @@ function NewProcessCard({ onStart }) {
         style={{
           ...BTN_STYLE,
           background: trimmed ? C.supports : C.border,
-          color: trimmed ? "#fff" : C.dim,
+          color: trimmed ? C.onFill : C.dim,
           cursor: trimmed ? "pointer" : "not-allowed",
         }}
         disabled={!trimmed}
@@ -156,7 +156,7 @@ function ResumeCard({ draft, onResume, onDiscard }) {
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button
-          style={{ ...BTN_STYLE, background: C.supports, color: "#fff" }}
+          style={{ ...BTN_STYLE, background: C.supports, color: C.onFill }}
           onClick={onResume}
         >
           Resume
@@ -196,8 +196,8 @@ function SampleProcessCard({ onLoad, onTour }) {
         <button
           style={{
             ...BTN_STYLE,
-            background: C.principle.high,
-            color: "#fff",
+            background: C.principle.accent,
+            color: C.onFill,
           }}
           onClick={onTour}
         >
@@ -207,8 +207,8 @@ function SampleProcessCard({ onLoad, onTour }) {
           style={{
             ...BTN_STYLE,
             background: "transparent",
-            border: `1px solid ${C.supports}`,
-            color: C.supports,
+            border: `1px solid ${C.supportsText}`,
+            color: C.supportsText,
           }}
           onClick={onLoad}
         >
@@ -246,12 +246,19 @@ function renderDescription(description) {
 }
 
 function QuestionnaireCard({ spec, onLoad }) {
+  const palette = usePalette();
   return (
     <div style={{ ...CARD_STYLE, minWidth: 300 }}>
       <h2 style={TITLE_STYLE}>{spec.card.title}</h2>
       <div style={DESC_STYLE}>{renderDescription(spec.card.description)}</div>
       <button
-        style={{ ...BTN_STYLE, background: C.theory.high, color: "#fff" }}
+        // Asked for rather than named: this ink was pinned dark once, and
+        // stayed pinned when the colour under it moved.
+        style={{
+          ...BTN_STYLE,
+          background: palette.theory.high,
+          color: inkOn(palette.theory.high),
+        }}
         onClick={onLoad}
       >
         {spec.card.buttonLabel}
@@ -363,7 +370,7 @@ function SessionsCard({ onLoad }) {
             padding: "4px 12px",
             fontSize: 11,
             background: loadingId === s.session_id ? C.border : C.supports,
-            color: "#fff",
+            color: C.onFill,
           }}
           disabled={loadingId === s.session_id || deletingId === s.session_id}
           onClick={() => handleLoad(s.session_id)}
@@ -448,7 +455,9 @@ export function HomePage({
     setDraft(null);
   };
   return (
-    <div
+    // <main>: the landing page's one main landmark. Semantic only — it lays out
+    // exactly as the div it replaces.
+    <main
       style={{
         // svh, not vh: the floor has to be the viewport at its smallest, with
         // the phone's URL bar showing, or the page is born taller than the
@@ -544,7 +553,8 @@ export function HomePage({
       </div>
 
       {/* Cards */}
-      <div
+      <section
+        aria-label="Start a process"
         style={{
           display: "flex",
           gap: 20,
@@ -581,7 +591,7 @@ export function HomePage({
         {BACKEND_ENABLED && capabilities.sessions && (
           <SessionsCard onLoad={onLoadSession} />
         )}
-      </div>
+      </section>
       <div
         style={{
           ...DESC_STYLE,
@@ -608,6 +618,6 @@ export function HomePage({
           </a>
         </span>
       </div>
-    </div>
+    </main>
   );
 }

@@ -138,8 +138,9 @@ export function SectionHeader({ title, onAdd, collapsed, onToggle }) {
  * carries the selection, which was previously visible only as a colour.
  */
 export function Badge({ id }) {
-  const { badgeColor, selected, onSelect } = useContext(Ctx);
+  const { badgeColor, badgeTextColor, selected, onSelect } = useContext(Ctx);
   const color = badgeColor(id);
+  const ink = badgeTextColor(id);
   const isSelected = selected === id;
   return (
     <button
@@ -159,7 +160,7 @@ export function Badge({ id }) {
         marginRight: "5px",
         borderRadius: 4,
         background: isSelected ? color + "44" : color + "22",
-        color,
+        color: ink,
         border: `1px solid ${isSelected ? color : color + "55"}`,
         flexShrink: 0,
         lineHeight: 1.8,

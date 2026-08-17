@@ -66,7 +66,7 @@ function SuggestionCard({
   return (
     <div
       style={{
-        borderLeft: `3px solid ${C.principle.high}`,
+        borderLeft: `3px solid ${C.principle.accent}`,
         background: C.panel,
         borderRadius: "0 6px 6px 0",
         padding: "10px 14px",
@@ -86,7 +86,7 @@ function SuggestionCard({
           <ModifyTextarea
             value={draft}
             onChange={onModifyChange}
-            accentColor={C.principle.high}
+            accentColor={C.principle.accent}
           />
         ) : (
           <div
@@ -116,7 +116,7 @@ function SuggestionCard({
             baseline={baseline}
             weights={weights}
           />
-          <AcceptButton onClick={onAccept} accentColor={C.principle.high} />
+          <AcceptButton onClick={onAccept} accentColor={C.principle.accent} />
           <RejectButton onClick={onReject} />
           {isEditing ? (
             <CancelButton onClick={onModifyCancel} />
@@ -126,7 +126,7 @@ function SuggestionCard({
           {!suggestionsAreSample && (
             <ChatButton
               isOpen={convOpen}
-              accentColor={C.principle.high}
+              accentColor={C.principle.accent}
               onClick={() => setConvOpen((o) => !o)}
             />
           )}
@@ -145,8 +145,8 @@ function SuggestionCard({
           style={{
             fontSize: 10,
             lineHeight: 1,
-            color: C.principle.high,
-            border: `1px solid ${C.principle.high}`,
+            color: C.principle.text,
+            border: `1px solid ${C.principle.accent}`,
             borderRadius: 4,
             padding: "3px 6px",
           }}
@@ -252,7 +252,7 @@ export function PrincipleSuggestTab({
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         <SuggestionToolbar
-          accent={C.principle.high}
+          accent={C.principle.text}
           title="Suggest Principles"
           actionLabel="Suggest"
           rerunLabel="Re-suggest"

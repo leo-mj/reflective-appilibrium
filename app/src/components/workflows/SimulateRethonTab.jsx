@@ -24,7 +24,9 @@ import {
 } from "./SimulateRethonCards.jsx";
 import { SimulateScoresChart } from "../graphs_shared/SimulateScoresChart.jsx";
 
-const ACCENT = C.principle.high;
+const ACCENT = C.principle.accent;
+/** The same accent where it is type rather than a shape — see index.css. */
+const ACCENT_TEXT = C.principle.text;
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
@@ -191,7 +193,7 @@ export function SimulateRethonTab({
           }}
         >
           <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-            <span style={{ color: ACCENT, fontWeight: "bold" }}>Simulate RE</span>
+            <span style={{ color: ACCENT_TEXT, fontWeight: "bold" }}>Simulate RE</span>
             <span style={{ color: C.dim }}>
               {" · "}
               {activeCount} active element{activeCount !== 1 ? "s" : ""}
@@ -233,7 +235,7 @@ export function SimulateRethonTab({
               style={{
                 background: "transparent",
                 border: `1px solid ${baseDisabled ? C.border : ACCENT}`,
-                color: baseDisabled ? C.dim : ACCENT,
+                color: baseDisabled ? C.dim : ACCENT_TEXT,
                 borderRadius: 6,
                 padding: "5px 12px",
                 fontSize: 12,
@@ -274,7 +276,7 @@ export function SimulateRethonTab({
                   style={{
                     background: "transparent",
                     border: `1px solid ${stepDisabled ? C.border : ACCENT}`,
-                    color: stepDisabled ? C.dim : ACCENT,
+                    color: stepDisabled ? C.dim : ACCENT_TEXT,
                     borderRadius: 6,
                     padding: "5px 12px",
                     fontSize: 12,

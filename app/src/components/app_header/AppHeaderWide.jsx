@@ -79,7 +79,12 @@ export function AppHeaderWide({
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
-  const { isDark, toggle: toggleTheme } = useTheme();
+  const {
+    isDark,
+    accessible,
+    toggle: toggleTheme,
+    toggleAccessible,
+  } = useTheme();
 
   // The tour walks the menu, so it opens and shuts it as it goes. It drives the
   // header's own state rather than overriding it, so a reader who closes the
@@ -382,9 +387,7 @@ export function AppHeaderWide({
                       style={{ ...menuItem, textAlign: "left " }}
                     >
                       <span style={menuIconStyle}>→</span>
-                      {hideNonEntailsRels
-                        ? "Show all relations"
-                        : "Arguments only"}
+                      {hideNonEntailsRels ? "All relations" : "Arguments only"}
                     </button>
                   </Tooltip>
 
@@ -410,7 +413,9 @@ export function AppHeaderWide({
                         onClick={() => setWeightsOpen((o) => !o)}
                         style={{
                           ...menuItem,
-                          color: weightsChanged ? C.principle.high : undefined,
+                          color: weightsChanged
+                            ? C.principle.accent
+                            : undefined,
                         }}
                       >
                         <span style={menuIconStyle}>⚖</span>
@@ -513,6 +518,19 @@ export function AppHeaderWide({
                     </button>
                   </Tooltip>
 
+                  <Tooltip text="Node colours picked for maximum contrast and for colour-vision deficiency. Overrides the theme's own palette.">
+                    <button
+                      onClick={toggleAccessible}
+                      style={menuItem}
+                      aria-pressed={accessible}
+                    >
+                      <span style={menuIconStyle}>
+                        {accessible ? "◉" : "◎"}
+                      </span>
+                      High-contrast
+                    </button>
+                  </Tooltip>
+
                   <div style={menuDividerStyle} />
 
                   <div style={menuGroup} data-tutorial="menu-files">
@@ -530,7 +548,7 @@ export function AppHeaderWide({
                     <Tooltip text="Export the current RE state as a JSON file you can re-import later.">
                       <button
                         onClick={close(onDownload)}
-                        style={{ ...menuItem, color: C.theory.high }}
+                        style={{ ...menuItem, color: C.theory.text }}
                       >
                         <span style={menuIconStyle}>↓</span>Export
                       </button>

@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { C } from "../../constants/colors.js";
+import { C, typeTokens } from "../../constants/colors.js";
 import { LLM_ENABLED } from "../../config.js";
 import { buildTourSections } from "./tourSections.js";
 import { TOUR_W, TOUR_Z } from "./tourZ.js";
@@ -48,11 +48,6 @@ const EMPTY = [];
 /** Ties the spotlight's holes to the sheet they are cut out of. */
 const SPOTLIGHT_MASK = "tour-spotlight-mask";
 
-const TYPE_COLOR = {
-  judgment: C.judgment.high,
-  principle: C.principle.high,
-  theory: C.theory.high,
-};
 const TYPE_LABEL = {
   judgment: "Judgment",
   principle: "Principle",
@@ -67,7 +62,10 @@ const TYPE_LABEL = {
  * the graph beside it no longer holds.
  */
 function QuoteCard({ element }) {
-  const color = TYPE_COLOR[element.type] ?? C.dim;
+  // The `text` tone, not the fill: this writes the id as type, where the fill
+  // tones measure 2.83:1 on the dark panel. It is also mode-independent, which
+  // the fills are not.
+  const color = typeTokens(element.type).text;
   const gone = element.status === "withdrawn" || element.status === "rejected";
   return (
     <div
@@ -427,6 +425,8 @@ export function GuidedTour({
         >
           <defs>
             <mask id={SPOTLIGHT_MASK}>
+              {/* Mask values, not colours: white is opaque, black is the
+                  hole. Tokenizing either would blank the spotlight. */}
               <rect x="0" y="0" width="100%" height="100%" fill="#fff" />
               {rects.map((r, i) => (
                 <rect
@@ -672,7 +672,7 @@ export function GuidedTour({
                 ...navBtn(true),
                 background: C.supports,
                 border: "none",
-                color: "#fff",
+                color: C.onFill,
                 fontWeight: "bold",
               }}
             >

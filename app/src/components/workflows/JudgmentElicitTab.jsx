@@ -71,7 +71,7 @@ function SuggestionCard({
   return (
     <div
       style={{
-        borderLeft: `3px solid ${C.judgment.high}`,
+        borderLeft: `3px solid ${C.judgment.accent}`,
         background: C.panel,
         borderRadius: "0 6px 6px 0",
         marginBottom: 10,
@@ -86,7 +86,7 @@ function SuggestionCard({
           fontStyle: "italic",
           padding: "8px 14px",
           borderBottom: `1px solid ${C.border}`,
-          background: C.judgment.high + "10",
+          background: C.judgment.accent + "10",
         }}
       >
         {suggestion.question}
@@ -108,7 +108,7 @@ function SuggestionCard({
                 gap: 8,
                 background:
                   isHovered && !isEditing
-                    ? C.judgment.high + "08"
+                    ? C.judgment.accent + "08"
                     : "transparent",
                 transition: "background 0.12s",
               }}
@@ -118,8 +118,8 @@ function SuggestionCard({
                 style={{
                   fontSize: 10,
                   lineHeight: 1,
-                  color: C.judgment.high,
-                  border: `1px solid ${C.judgment.high}`,
+                  color: C.judgment.text,
+                  border: `1px solid ${C.judgment.accent}`,
                   borderRadius: 4,
                   padding: "3px 6px",
                   flexShrink: 0,
@@ -135,7 +135,7 @@ function SuggestionCard({
                 <ModifyTextarea
                   value={editing.draft}
                   onChange={onModifyChange}
-                  accentColor={C.judgment.high}
+                  accentColor={C.judgment.accent}
                 />
               ) : (
                 <div style={{ color: C.text, lineHeight: 1.6, flex: 1 }}>
@@ -164,7 +164,7 @@ function SuggestionCard({
                 />
                 <AcceptButton
                   onClick={() => onAcceptJudgment(j)}
-                  accentColor={C.judgment.high}
+                  accentColor={C.judgment.accent}
                 />
                 <RejectButton onClick={() => onRejectJudgment(j)} />
                 {isEditing ? (
@@ -175,7 +175,7 @@ function SuggestionCard({
                 {!suggestionsAreSample && (
                   <ChatButton
                     isOpen={isConvOpen}
-                    accentColor={C.judgment.high}
+                    accentColor={C.judgment.accent}
                     onClick={() => setConvOpen((o) => ({ ...o, [i]: !o[i] }))}
                   />
                 )}
@@ -288,7 +288,7 @@ export function JudgmentElicitTab({
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         <SuggestionToolbar
-          accent={C.judgment.high}
+          accent={C.judgment.text}
           title="Elicit Judgments"
           actionLabel="Elicit"
           rerunLabel="Re-elicit"

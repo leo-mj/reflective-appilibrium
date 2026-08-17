@@ -656,11 +656,11 @@ describe("importStateFromFile — relation: rejectedRound", () => {
 // ─── Questionnaire mode ───────────────────────────────────────────────────────
 
 const MINIMAL_SPEC = {
-  id: "darca",
-  name: "DARCA",
-  model: "darca",
+  id: "example",
+  name: "Example",
+  model: "example",
   card: {
-    title: "DARCA Questionnaire",
+    title: "Example Questionnaire",
     description: "A test questionnaire.",
     buttonLabel: "Start",
   },
@@ -720,9 +720,9 @@ describe("importStateFromFile — questionnaire: questionnaireSpec round-trip", 
     };
     const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
     const spec = result.questionnaireSpec;
-    expect(spec.id).toBe("darca");
-    expect(spec.name).toBe("DARCA");
-    expect(spec.card.title).toBe("DARCA Questionnaire");
+    expect(spec.id).toBe("example");
+    expect(spec.name).toBe("Example");
+    expect(spec.card.title).toBe("Example Questionnaire");
     expect(spec.card.description).toBe("A test questionnaire.");
     expect(spec.card.buttonLabel).toBe("Start");
     expect(spec.suggestions).toHaveLength(1);
@@ -733,7 +733,7 @@ describe("importStateFromFile — questionnaire: questionnaireSpec round-trip", 
   });
 
   it("accepts a question with more answers than the old 20 cap", async () => {
-    // The shipped DARCA questionnaire has a question with 31 answers. The cap
+    // A shipped questionnaire has a question with 31 answers. The cap
     // used to be 20, which made that questionnaire's own exports refuse to
     // re-import — and in the demo build, export/import is the only way to keep
     // a session at all.
@@ -855,7 +855,7 @@ describe("importStateFromFile — questionnaire: questionnaireSpec round-trip", 
   it("accepts questionnaireSpec without model field (independent fields)", async () => {
     const state = { ...MINIMAL_STATE, questionnaireSpec: MINIMAL_SPEC };
     const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
-    expect(result.questionnaireSpec.id).toBe("darca");
+    expect(result.questionnaireSpec.id).toBe("example");
     expect(result).not.toHaveProperty("model");
   });
 
@@ -942,7 +942,7 @@ describe("importStateFromFile — questionnaire: elements with possible status",
         {
           ...BASE_EL,
           status: "possible",
-          origin: "darca",
+          origin: "example",
           text: "Yes answer.",
           questionnaireIndex: 1,
         },
@@ -950,7 +950,7 @@ describe("importStateFromFile — questionnaire: elements with possible status",
           ...BASE_EL,
           id: "J2",
           status: "possible",
-          origin: "darca",
+          origin: "example",
           text: "No answer.",
           questionnaireIndex: 2,
         },

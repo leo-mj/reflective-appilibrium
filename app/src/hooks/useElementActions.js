@@ -32,8 +32,17 @@ export function useElementActions({
   const [editingEl, setEditingEl] = useState(null);
   const [withdrawingId, setWithdrawingId] = useState(null);
 
+  /**
+   * Opens the revise modal on an element.
+   *
+   * Deliberately leaves the selection alone. Selection is the user's own
+   * pointer — clicking a node or a text card — and it dims everything it is not
+   * connected to; revising from a card three screens down the list would
+   * otherwise silently re-focus the graph on an element the user never picked.
+   *
+   * @param {string} elementId
+   */
   const handleEditRequest = (elementId) => {
-    setSelected(elementId);
     setEditingEl(state.elements.find((e) => e.id === elementId) ?? null);
   };
 

@@ -48,7 +48,7 @@ export function MobileAddButton({
           background: C.supports,
           border: "none",
           borderRadius: 6,
-          color: "#fff",
+          color: C.onFill,
           cursor: "pointer",
           fontSize: 20,
           lineHeight: 1,

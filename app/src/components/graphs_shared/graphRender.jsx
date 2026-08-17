@@ -10,7 +10,7 @@
 
 /** @import { REElement, RERelation, PositionMap } from '../../types.js' */
 
-import { C, confOp, TRANSITION } from "../../constants/colors.js";
+import { C, TRANSITION } from "../../constants/colors.js";
 import { nodeRadius, computeJunction } from "../../utils/graphHelpers.js";
 import { isWithdrawnAt } from "../../utils/stateUtils.js";
 import { GraphEdge, GraphNode, PulseRing } from "./GraphElements.jsx";
@@ -138,7 +138,7 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
   const isNew = newIds.has(element.id);
   return {
     isWithdrawn,
-    opacity: isFuture ? 0 : isWithdrawn ? 0.25 : confOp(element.confidence),
+    opacity: isFuture ? 0 : isWithdrawn ? 0.25 : 1,
     transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
     children:
       isNew && !isWithdrawn ? (
@@ -167,21 +167,31 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
   const isCtrlFirst = element.id === ctrlFirst;
   const isRecentlyAdded = element.id === recentlyAdded;
   const isPreviewWithdrawn = previewWithdrawnIds?.has(element.id) ?? false;
-  const baseOpacity =
-    isWithdrawn || isPreviewWithdrawn ? 0.25 : isRejected ? 0.35 : confOp(element.confidence);
+  const isDimmed = dimNode(element.id);
+  // Opacity is now only ever about *state* — dimmed by a selection elsewhere,
+  // withdrawn, rejected. Confidence used to fade the node too, which washed the
+  // id out along with the disc and capped label contrast at ~3.8:1 however the
+  // ink was chosen; it lives in the fill colour now (see constants/colors.js).
   const r = nodeRadius(element.type, element.confidence);
   return {
     isWithdrawn: isWithdrawn || isPreviewWithdrawn,
     isRejected,
-    opacity: dimNode(element.id) ? 0.12 : baseOpacity,
+    opacity: isDimmed
+      ? 0.12
+      : isWithdrawn || isPreviewWithdrawn
+        ? 0.25
+        : isRejected
+          ? 0.35
+          : 1,
     transition: TRANSITION,
     children: isSelected ? (
       <circle
         r={r + 8}
         fill="none"
-        stroke="#fff"
+        // Theme-aware: a white ring on the light ground measures 1.05:1.
+        stroke={C.text}
         strokeWidth={2}
-        opacity={0.45}
+        opacity={0.6}
       />
     ) : isPreviewWithdrawn ? (
       <circle

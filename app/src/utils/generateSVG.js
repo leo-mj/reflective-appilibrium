@@ -6,7 +6,8 @@
 
 /** @import { REElement, RERelation, PositionMap } from '../types.js' */
 
-import { C, getColors, confOp } from "../constants/colors.js";
+import { C, getColors } from "../constants/colors.js";
+import { PALETTES } from "../constants/palettes.js";
 import { nodeRadius, arrowGeometry, edgeDashArray } from "./graphHelpers.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -27,6 +28,26 @@ export function svgToDataUrl(svg) {
 
 // ─── <defs> ───────────────────────────────────────────────────────────────────
 
+/**
+ * The two theme tokens this SVG references, carried inside it.
+ *
+ * Node and edge colours are literal hex, but the label colour and the backdrop
+ * come from `C.dim` and `C.bg`, which are `var(--c-…)` references that only the
+ * app's stylesheet defines. An exported file is read somewhere else — an editor,
+ * a browser, a markdown viewer — where neither resolves: labels fall back to
+ * black and the backdrop to transparent, which on a dark viewer means invisible
+ * labels. Restating them here keeps the export self-contained.
+ *
+ * Both schemes are declared rather than freezing in whichever theme happened to
+ * be on at export time, so the file suits whoever opens it. Light is the
+ * default because a viewer that expresses no preference is usually light.
+ */
+const THEME_STYLE =
+  "<style>" +
+  "svg{--c-dim:#64748b;--c-bg:#f2f3f4}" +
+  "@media(prefers-color-scheme:dark){svg{--c-dim:#94a3b8;--c-bg:#0f172a}}" +
+  "</style>";
+
 function buildDefs() {
   const markers = REL_TYPES.flatMap((t) =>
     [false, true].map((w) => {
@@ -39,7 +60,7 @@ function buildDefs() {
       );
     }),
   );
-  return `<defs>${markers.join("")}</defs>`;
+  return `<defs>${THEME_STYLE}${markers.join("")}</defs>`;
 }
 
 // ─── Edge ─────────────────────────────────────────────────────────────────────
@@ -68,11 +89,12 @@ function edgeSVG(r, byId, positions, ox, oy) {
 
 // ─── Node ─────────────────────────────────────────────────────────────────────
 
-function nodeSVG(el, positions, ox, oy) {
+function nodeSVG(el, positions, ox, oy, palette) {
   const pos = positions[el.id];
   if (!pos) return "";
-  const { fill, stroke } = getColors(el);
-  const op = confOp(el.confidence ?? 1);
+  // No confidence fade: `getColors` already carries confidence in the fill, and
+  // the on-screen graph draws these shapes opaque too.
+  const { fill, stroke } = getColors(el, palette);
   const r = nodeRadius(el.type, el.confidence);
   const cx = f(pos.x - ox);
   const cy = f(pos.y - oy);
@@ -83,13 +105,13 @@ function nodeSVG(el, positions, ox, oy) {
       rh = f(r * 1.5);
     shape =
       `<rect x="${f(-rw / 2)}" y="${f(-rh / 2)}" width="${rw}" height="${rh}" rx="8"` +
-      ` fill="${fill}" stroke="${stroke}" stroke-width="2" opacity="${op}"/>`;
+      ` fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;
   } else if (el.type === "theory") {
     shape =
       `<polygon points="0,${f(-r)} ${r},0 0,${r} ${f(-r)},0"` +
-      ` fill="${fill}" stroke="${stroke}" stroke-width="2" opacity="${op}"/>`;
+      ` fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;
   } else {
-    shape = `<circle r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2" opacity="${op}"/>`;
+    shape = `<circle r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;
   }
 
   const label =
@@ -110,13 +132,16 @@ function nodeSVG(el, positions, ox, oy) {
  * @param {PositionMap}  positions
  * @param {Object}  [opts]
  * @param {boolean} [opts.showWithdrawn=false]
+ * @param {import('../constants/palettes.js').Palette} [opts.palette] - Defaults
+ *   to the standard palette. An export is read in a document rather than in the
+ *   app, so it does not follow a reader's high-contrast setting unless asked to.
  * @returns {string|null}
  */
 export function generateGraphSVG(
   elements,
   relations,
   positions,
-  { showWithdrawn = false } = {},
+  { showWithdrawn = false, palette = PALETTES.default } = {},
 ) {
   const visEls = showWithdrawn
     ? elements
@@ -141,7 +166,7 @@ export function generateGraphSVG(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" style="background:${C.bg};border-radius:8px">`,
     `  ${buildDefs()}`,
     ...visRels.map((r) => edgeSVG(r, byId, positions, ox, oy)).filter(Boolean),
-    ...visEls.map((el) => nodeSVG(el, positions, ox, oy)).filter(Boolean),
+    ...visEls.map((el) => nodeSVG(el, positions, ox, oy, palette)).filter(Boolean),
     `</svg>`,
   ];
 

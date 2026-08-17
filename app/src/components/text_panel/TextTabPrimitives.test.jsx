@@ -59,6 +59,7 @@ describe("Badge", () => {
       <Ctx.Provider
         value={{
           badgeColor: () => "#888",
+          badgeTextColor: () => "#ccc",
           selected: null,
           onSelect: () => {},
           ...ctx,

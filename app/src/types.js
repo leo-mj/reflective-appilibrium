@@ -60,14 +60,16 @@ export {};
 
 /**
  * How strongly the user holds an element, as a float in [0, 1].
- * Maps to node opacity and size in the graph via {@link module:constants/colors.confOp}
+ * Maps to node fill and size in the graph via {@link module:constants/colors.getColors}
  * and {@link module:utils/graphHelpers.nodeRadius}.
  *
  * @typedef {number} ConfidenceLevel
  */
 
 /**
- * The four directional relation types allowed between elements.
+ * The directional relation types allowed between elements, in two families: the
+ * dialectical four, then the inferential four that make up arguments (the set
+ * `ARGUMENT_RELATION_TYPES` in utils/stateUtils.js).
  * See `skill/re-relations-reference.md` for the full matrix of which pairs are legal.
  * - `supports`  — source provides a positive reason for target (teal arrow)
  * - `conflicts` — source and target are incompatible (orange dashed arrow)
@@ -123,7 +125,7 @@ export {};
  * @property {string}        [origin]       - Who introduced it — see {@link REElement.origin} for the
  *                                           value convention. Absent on relations added before this
  *                                           field existed.
- * @property {string}        [argumentId]    - Set on `entails` relations only; all premises of the same detected argument share this ID.
+ * @property {string}        [argumentId]    - Set on the inferential relation types only; all premises of the same argument share this ID.
  * @property {ElementStatus} [status]        - Lifecycle status; absence or `"active"` means currently in play.
  * @property {number}        [revisedRound]  - Round in which this relation was last revised.
  * @property {REHistoryEvent[]} [history] - Everything that has happened to this relation,

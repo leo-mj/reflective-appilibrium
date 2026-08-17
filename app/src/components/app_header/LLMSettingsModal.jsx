@@ -206,13 +206,13 @@ export function LLMSettingsModal({ open, onClose }) {
               lineHeight: 1.5,
               color: C.text,
               background: C.bg,
-              border: `1px solid ${C.theory.high}`,
+              border: `1px solid ${C.theory.accent}`,
               borderRadius: 4,
               padding: "8px 10px",
               marginBottom: 16,
             }}
           >
-            <strong style={{ color: C.theory.high }}>Demo only.</strong> This
+            <strong style={{ color: C.theory.text }}>Demo only.</strong> This
             build has no backend, so no key can be sent and nothing here is
             saved. The form is shown to illustrate how a provider is configured.
           </div>

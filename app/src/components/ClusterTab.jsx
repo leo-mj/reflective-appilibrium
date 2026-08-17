@@ -7,7 +7,7 @@
 /** @import { REState, PositionMap } from '../types.js' */
 
 import { useState, useRef, useMemo } from "react";
-import { C } from "../constants/colors.js";
+import { C, clusterColor, clusterTextColor } from "../constants/colors.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import {
@@ -20,7 +20,7 @@ import {
   graphEdgeVisuals,
   graphNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
-import { findCoherentClusters, clusterColor } from "../utils/clusterUtils.js";
+import { findCoherentClusters } from "../utils/clusterUtils.js";
 import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 
@@ -196,7 +196,7 @@ export function ClusterTab({ state, positions, hideNonEntailsRels = false }) {
               padding: "6px 10px",
               fontSize: 11,
               fontWeight: "bold",
-              color: clusterColor(i),
+              color: clusterTextColor(i),
               borderBottom: `1px solid ${C.border}`,
               flexShrink: 0,
             }}

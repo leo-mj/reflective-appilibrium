@@ -321,7 +321,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   };
 
   return (
-    <div
+    // <main>, not <div>: this is the app's one main landmark, which lets
+    // assistive tech skip straight to it. Purely semantic — a block container
+    // either way, so nothing about the layout changes.
+    <main
       style={{
         background: C.bg,
         color: C.text,
@@ -402,7 +405,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         tourMenuOpen={wideTour && tourChrome.menu}
       />
 
-      <div
+      <section
+        aria-label="Reflective equilibrium workspace"
         style={{
           flex: 1,
           minHeight: 0,
@@ -459,7 +463,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
             fullscreenHides="text panel"
           />
         )}
-      </div>
+      </section>
 
       {isWide && !isAssistTab && !isSimulateTab && showAddBar && (
         <AddBar
@@ -501,6 +505,6 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onWithdrawConfirm={handleWithdrawConfirm}
         onWithdrawCancel={() => setWithdrawingId(null)}
       />
-    </div>
+    </main>
   );
 }

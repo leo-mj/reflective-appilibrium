@@ -150,7 +150,7 @@ export function ModalShell({
               borderRadius: 4,
               border: "none",
               background: saveDisabled ? C.border : C.supports,
-              color: "#fff",
+              color: C.onFill,
               cursor: saveDisabled ? "default" : "pointer",
               fontSize: 12,
               fontWeight: "bold",

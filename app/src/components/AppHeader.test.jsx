@@ -139,11 +139,10 @@ describe("what closes the menu", () => {
   // Select Font lives inside the menu in both layouts and nowhere else.
   const menuIsOpen = () => screen.queryByText("Select Font") !== null;
 
-  // The wide menu abbreviates two of these; the rows are otherwise the same.
-  const settings = (isWide) => [
+  const settings = [
     "Hide nav bar",
-    isWide ? "Minimize toggles" : "Minimize all toggles",
-    isWide ? "Show all relations" : "All relations",
+    "Minimize toggles",
+    "All relations",
     "Light mode",
   ];
 
@@ -159,7 +158,12 @@ describe("what closes the menu", () => {
       it(`stays open for "${label}" (${layout})`, () => {
         // Both states are pinned, so each row's label is the one named above.
         render(
-          <AppHeader {...PROPS} isWide={isWide} showTabNav hideNonEntailsRels />,
+          <AppHeader
+            {...PROPS}
+            isWide={isWide}
+            showTabNav
+            hideNonEntailsRels
+          />,
         );
         openMenu();
         expect(menuIsOpen()).toBe(true);

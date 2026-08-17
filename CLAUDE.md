@@ -5,6 +5,21 @@ Three phases: Phase 1 = Claude Skill (working);
 Phase 2 = React SPA + FastAPI backend for LLM access (in progress);
 Phase 3 = Integration of rethon (computational RE).
 
+## Layout
+
+- `app/` — the React SPA (Vite). See `app/CLAUDE.md`.
+- `backend/` — FastAPI: LLM proxy plus the Python RE computation layer. See `backend/CLAUDE.md`.
+- `skill/` — Phase 1 Claude Skill, and the prose reference the domain model below follows.
+- `plans/`, `sessions/` — design notes and captured runs.
+
+One codebase ships two ways, selected by `VITE_APP_ENV` (`app/src/config.js`):
+`demo` is the public static build with no backend and no LLM; `dev` and `backend`
+turn on the backend, the LLM features and the BYOK settings modal. State files are
+interchangeable between them — export/import is the handoff.
+
+Frontend tests are Vitest (`npm test` in `app/`) plus Playwright (`npm run test:e2e`,
+see `app/e2e/README.md`); the backend is pytest from the repo root.
+
 ## RE domain model
 
 ### Element types
@@ -13,15 +28,38 @@ Phase 3 = Integration of rethon (computational RE).
 - **Principles (P)** — General moral rules. Rounded rectangles.
 - **Background Theories (T)** — Meta-ethical commitments. Diamonds. Deferred to Round 5+.
 
+Every element carries a `confidence` in [0, 1] and a `status`: `active`, `revised`,
+`withdrawn`, `rejected`, or `possible` (an option offered but not yet affirmed —
+questionnaire mode uses this). Only `possible` elements are barred from new
+arguments; withdrawn and rejected ones stay eligible, since a fresh argument is how
+an element earns a second look.
+
 ### Relation types
+
+Two families, both directional, and a pair of elements may carry several at once.
+
+**Dialectical** — reasons for and against, offered by the two-endpoint pickers.
 
 - **Supports** — A provides positive reason for B
 - **Conflicts** — A and B are incompatible
 - **Undermines** — A weakens B without flat contradiction
 - **Depends** — A presupposes B
-- **Jointly Entails** - A (together with some other element) entails B
 
-Directional; a pair can have multiple. Full matrix in `skill/re-relations-reference.md`.
+**Inferential** — formal argument steps, and what the rethon simulation reads.
+
+- **Entails** — A entails B
+- **Precludes** — A entails the negation of B
+- **Jointly entails** — A together with the argument's other premises entails B
+- **Jointly precludes** — likewise, for the negation of B
+
+The four inferential types are `ARGUMENT_RELATION_TYPES` in `utils/stateUtils.js`;
+prefer that set over listing them by hand. Each such relation carries an
+`argumentId`, and the joint pair uses it to tie the premises of one argument
+together: the graph draws the group as converging lines into a junction dot, and
+withdrawing, reinstating or deleting any one of them applies to the whole argument.
+
+Which pairs of element types may legally hold which relation is the full matrix in
+`skill/re-relations-reference.md`.
 
 ### State schema
 
@@ -42,6 +80,10 @@ Directional; a pair can have multiple. Full matrix in `skill/re-relations-refere
   log: [{ round, findings, options, decision, changes }]
 }
 ```
+
+`origin` records who introduced an item: `"user"`, a model name, or a model name
+plus `"+user"` when the user edited an LLM suggestion. `utils/stateUtils.js` has the
+helpers (`llmOrigin`, `withUserEdit`) — don't parse it by hand.
 
 ### Item history
 

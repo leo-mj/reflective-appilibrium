@@ -4,15 +4,20 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { usePalette } from "../../hooks/useTheme.js";
 import { Tooltip } from "../Tooltip.jsx";
 
 export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRels }) {
+  // The element swatches come from the palette in force, not from the fixed
+  // accent tones: a legend that keeps showing the default blue while the graph
+  // is drawn in the high-contrast one is worse than no legend.
+  const palette = usePalette();
   const items = [
-    { label: "Judgment", shape: "judgment-gradient", key: "J" },
-    { label: "Principle", shape: "roundrect", color: "#7c3aed", key: "P" },
-    { label: "Theory", shape: "diamond", color: "#d97706", key: "T" },
-    { label: "Withdrawn", shape: "circle", color: "#64748b", key: "withdrawn" },
-    { label: "Rejected", shape: "circle", color: "#fb7185", key: "rejected" },
+    { label: "Judgment", shape: "judgment-gradient", ramp: palette.judgment, key: "J" },
+    { label: "Principle", shape: "roundrect", color: palette.principle.high, key: "P" },
+    { label: "Theory", shape: "diamond", color: palette.theory.high, key: "T" },
+    { label: "Withdrawn", shape: "circle", color: C.withdrawn, key: "withdrawn" },
+    { label: "Rejected", shape: "circle", color: C.rejected, key: "rejected" },
   ];
   const lines = [
     ...(!hideNonEntailsRels ? [
@@ -73,8 +78,10 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRe
                   width: 22,
                   height: 10,
                   borderRadius: 5,
-                  background: "linear-gradient(to right, #93c5fd, #2563eb)",
-                  border: "1px solid #2563eb",
+                  // The whole confidence ramp in one swatch — which is what
+                  // makes it the judgment entry rather than a plain circle.
+                  background: `linear-gradient(to right, ${it.ramp.low}, ${it.ramp.high})`,
+                  border: `1px solid ${it.ramp.stroke}`,
                 }}
               />
             )}

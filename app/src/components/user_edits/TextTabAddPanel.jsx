@@ -365,7 +365,7 @@ export function AddBar({
               cursor: canSubmit ? "pointer" : "default",
               border: "none",
               background: C.supports,
-              color: "#fff",
+              color: C.onFill,
               opacity: canSubmit ? 1 : 0.4,
             }}
           >

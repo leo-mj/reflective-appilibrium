@@ -11,12 +11,26 @@
 
 // ─── Node sizing ─────────────────────────────────────────────────────────────
 
-/** Base visual radii by element type (at confidence = 1). */
+/** Base visual radii by element type, at the middle of the confidence range. */
 const BASE_RADIUS = { principle: 28, theory: 22, judgment: 18 };
 
 /**
+ * How far confidence moves the radius, as a fraction of the base.
+ *
+ * Confidence 0 → `MIN`, confidence 1 → `MIN + SPAN`. Size is the main way
+ * confidence reads on the graph, so the ends are set far apart on purpose:
+ * 1.85× the radius is 3.4× the area, and area is what the eye compares.
+ *
+ * The floor is set by the label, not by taste. The id is drawn inside the node,
+ * and 0.65 is the smallest that still contains a three-character id at 11px
+ * bold — a judgment there is 23px across against a ~20px label.
+ */
+const RADIUS_MIN = 0.65;
+const RADIUS_SPAN = 0.55;
+
+/**
  * Visual radius of a node scaled by confidence.
- * Confidence 1.0 → full base radius; confidence 0.0 → 50% of base radius.
+ * Confidence 1.0 → 120% of the base radius; confidence 0.0 → 65%.
  *
  * @param {string} type       - Element type ('judgment' | 'principle' | 'theory').
  * @param {number} [confidence=1] - Element confidence in [0, 1].
@@ -25,19 +39,23 @@ const BASE_RADIUS = { principle: 28, theory: 22, judgment: 18 };
 export function nodeRadius(type, confidence = 1) {
   const base = BASE_RADIUS[type] ?? 18;
   const t = Math.max(0, Math.min(1, confidence));
-  return base * (0.5 + 0.5 * t);
+  return base * (RADIUS_MIN + RADIUS_SPAN * t);
 }
 
 /**
- * Hit-test radius for pointer click detection — slightly larger than the
- * visual radius so small nodes are easier to tap.
+ * Hit-test radius for pointer click detection — larger than the visual radius so
+ * small nodes are easier to tap.
+ *
+ * The floor guards the small end of the size range against a touch target too
+ * small to hit. It does not bind at the current `RADIUS_MIN`; it is here so that
+ * lowering that does not silently make the smallest nodes unpickable.
  *
  * @param {string} type       - Element type.
  * @param {number} [confidence=1] - Element confidence in [0, 1].
  * @returns {number}
  */
 export function hitRadius(type, confidence = 1) {
-  return nodeRadius(type, confidence) + 6;
+  return Math.max(nodeRadius(type, confidence) + 8, 18);
 }
 
 // ─── Edge styling ─────────────────────────────────────────────────────────────

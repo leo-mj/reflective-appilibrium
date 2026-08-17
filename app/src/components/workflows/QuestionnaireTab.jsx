@@ -7,7 +7,8 @@
 
 import { C } from "../../constants/colors.js";
 
-const ACCENT = C.judgment.high;
+/** The judgment accent as type — the fill tone does not clear AA on the panel. */
+const ACCENT_TEXT = C.judgment.text;
 
 function QuestionCard({ suggestion, elByIndex, onSelectAnswer }) {
   const selectedJudgment = suggestion.judgments.find(
@@ -116,7 +117,7 @@ export function QuestionnaireTab({ state, onSelectAnswer }) {
             padding: "10px 0 14px",
           }}
         >
-          <span style={{ color: ACCENT, fontWeight: "bold", fontSize: 12 }}>
+          <span style={{ color: ACCENT_TEXT, fontWeight: "bold", fontSize: 12 }}>
             {state.questionnaireSpec.name}
           </span>
           <span style={{ fontSize: 11, color: C.dim }}>

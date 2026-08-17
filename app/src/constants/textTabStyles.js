@@ -23,8 +23,8 @@ export const GHOST_BTN_STYLE = {
 
 export const WITHDRAW_BTN_STYLE = {
   ...GHOST_BTN_STYLE,
-  background: "#dc262680",
-  color: "#fff",
+  background: C.danger + "80",
+  color: C.onFill,
 };
 
 export const CARD_STYLE = {

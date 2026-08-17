@@ -3,12 +3,33 @@
   font-family: inherit;
 }
 
+/* The element colours in constants/colors.js are chosen as *fills* — a blue
+   disc, a purple rectangle, an amber diamond — where a mid-tone reads fine
+   against either ground. Used as *type* the same mid-tones do not clear WCAG AA:
+   the judgment blue measures 2.83:1 on the dark panel. These are the same hues
+   pushed light or dark far enough to be legible as text, and they have to be
+   per-theme because the direction differs — #2563eb passes on the light panel
+   (4.72:1) and fails on the dark one. Fills stay as they are; only foregrounds
+   use these. */
 :root {
   --c-bg: #0f172a;
   --c-panel: #1e293b;
   --c-border: #334155;
   --c-text: #e2e8f0;
   --c-dim: #94a3b8;
+  --c-judgment-text: #60a5fa; /* 5.75:1 on panel */
+  --c-principle-text: #c4b5fd; /* 7.92:1 on panel */
+  --c-theory-text: #fcd34d; /* 10.15:1 on panel */
+  --c-supports-text: #06b6d4; /* 6.03:1 on panel */
+  /* Cluster tints as labels. The fills they pair with are fixed hues; these are
+     the same hues lightened to stay readable as type. Four of the six fills
+     failed AA here. */
+  --c-cluster-0-text: #22d3ee;
+  --c-cluster-1-text: #c4b5fd;
+  --c-cluster-2-text: #fcd34d;
+  --c-cluster-3-text: #60a5fa;
+  --c-cluster-4-text: #4ade80;
+  --c-cluster-5-text: #f9a8d4;
 }
 
 [data-theme="light"] {
@@ -16,7 +37,21 @@
   --c-panel: #f1f5f9;
   --c-border: #e2e8f0;
   --c-text: #0f172a;
-  --c-dim: #64748b;
+  /* Slate-500 (#64748b) reads 4.28:1 on this ground — under AA for the 12–13px
+     body copy it is used for. Nudged one step darker to clear it. */
+  --c-dim: #5b6b80;
+  --c-judgment-text: #2563eb; /* 4.72:1 on panel */
+  --c-principle-text: #6d28d9; /* 6.49:1 on panel */
+  --c-theory-text: #854d0e; /* 6.25:1 on panel */
+  /* The edge teal is the one that swings furthest: #06b6d4 is fine on the dark
+     panel and 2.22:1 on this one. */
+  --c-supports-text: #0e7490; /* 4.89:1 on panel */
+  --c-cluster-0-text: #0e7490;
+  --c-cluster-1-text: #6d28d9;
+  --c-cluster-2-text: #854d0e;
+  --c-cluster-3-text: #2563eb;
+  --c-cluster-4-text: #15803d;
+  --c-cluster-5-text: #be185d;
 }
 
 @keyframes spin {

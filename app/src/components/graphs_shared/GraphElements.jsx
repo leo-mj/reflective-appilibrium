@@ -12,6 +12,8 @@
 
 import { useEffect, useRef } from "react";
 import { C, getColors } from "../../constants/colors.js";
+import { usePalette } from "../../hooks/useTheme.js";
+import { inkWeight } from "../../constants/palettes.js";
 import {
   nodeRadius,
   edgeDashArray,
@@ -70,11 +72,15 @@ export function GraphEdge({
   const cy = (y1 + tipY) / 2 + perpY * parallelOffset;
 
   // Arrowhead direction: tangent of the bezier at the tip = (tip - ctrl) normalised.
-  const tdx = tipX - cx, tdy = tipY - cy;
+  const tdx = tipX - cx,
+    tdy = tipY - cy;
   const tlen = Math.hypot(tdx, tdy) || 1;
-  const tux = tdx / tlen, tuy = tdy / tlen;
-  const tperpX = -tuy, tperpY = tux;
-  const bx = tipX - tux * 10, by = tipY - tuy * 10; // arrowhead base
+  const tux = tdx / tlen,
+    tuy = tdy / tlen;
+  const tperpX = -tuy,
+    tperpY = tux;
+  const bx = tipX - tux * 10,
+    by = tipY - tuy * 10; // arrowhead base
 
   const pathD = `M ${x1} ${y1} Q ${cx} ${cy} ${bx} ${by}`;
   const isHollow = relation.type === "entails" || relation.type === "precludes";
@@ -152,6 +158,28 @@ export function PulseRing({ type, radius }) {
 // ─── GraphNode ────────────────────────────────────────────────────────────────
 
 /**
+ * Type size for a node's id.
+ *
+ * Capped by the *smallest* node of that type, not the average one: the id sits
+ * inside the shape, and the shape shrinks to `RADIUS_MIN` (65%) of its base at
+ * zero confidence. The binding case is a three-character id on a judgment
+ * circle, where the room at the glyph's own height is
+ * `2·√(r² − halfHeight²) = 22px` against a width of ~1.65× the font size — which
+ * puts the ceiling at 13. Principles are drawn on a 40px-wide rect and have room
+ * to spare; theories are diamonds, tighter per pixel of radius but never more
+ * than two characters.
+ *
+ * Raising these further means raising `RADIUS_MIN` in utils/graphHelpers.js,
+ * which costs confidence range. `e2e/palette.spec.js` measures the real glyph
+ * boxes and fails if a label outgrows its shape.
+ *
+ * @param {string} type
+ */
+function labelSize(type) {
+  return type === "principle" ? 16 : 13;
+}
+
+/**
  * Renders a graph node: shape, label, and optional overlay children
  * (e.g. a selection ring or a pulse ring).
  *
@@ -160,7 +188,7 @@ export function PulseRing({ type, radius }) {
  * @param {Object}          props.position      - `{ x, y }`.
  * @param {boolean}         props.isWithdrawn
  * @param {boolean}         [props.isRejected]
- * @param {number}          props.opacity
+ * @param {number}          props.opacity      - Fades the whole node (dimmed, withdrawn, rejected).
  * @param {string}          [props.transition]
  * @param {string}          [props.cursor]
  * @param {Function}        [props.onMouseEnter]
@@ -179,12 +207,14 @@ export function GraphNode({
   onMouseLeave,
   children,
 }) {
+  const palette = usePalette();
   const { fill, stroke } = getColors(
     isRejected
       ? { ...element, status: "rejected" }
       : isWithdrawn
         ? { ...element, status: "withdrawn" }
         : element,
+    palette,
   );
   const radius = nodeRadius(element.type, element.confidence);
   return (
@@ -199,9 +229,13 @@ export function GraphNode({
       <text
         textAnchor="middle"
         dy="0.35em"
-        fill={"#fff"}
-        fontSize={element.type === "principle" ? 13 : 11}
-        fontWeight="bold"
+        // One ink for every node — varying it per node reads as noise. Which
+        // ink, and therefore which weight, belongs to the palette: white glyphs
+        // need the weight to hold together at this size, black ones go blobby
+        // with it. See constants/palettes.js.
+        fill={palette.ink}
+        fontSize={labelSize(element.type)}
+        fontWeight={inkWeight(palette.ink)}
         style={{
           textDecoration: isWithdrawn || isRejected ? "line-through" : "none",
           pointerEvents: "none",

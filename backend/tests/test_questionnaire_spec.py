@@ -8,7 +8,7 @@ The bounds mirror ``validateQuestionnaireSpec`` in
 app/src/utils/importMarkdown.js. Where they disagree, a spec that the frontend
 accepts would be rejected on save (or the reverse), and a questionnaire session
 would stop round-tripping — which is exactly how the 20-judgment cap went
-unnoticed until the shipped DARCA spec outgrew it.
+unnoticed until a shipped spec outgrew it.
 """
 
 import pytest
@@ -19,8 +19,8 @@ from backend.models.re_state import QuestionnaireSpec, REState
 
 def spec(**overrides) -> dict:
     return {
-        "id": "darca",
-        "name": "DARCA",
+        "id": "example",
+        "name": "Example",
         "card": {"title": "T", "description": "D", "buttonLabel": "Start"},
         "suggestions": [
             {
@@ -44,7 +44,7 @@ def spec(**overrides) -> dict:
 
 def test_a_well_formed_spec_validates():
     parsed = QuestionnaireSpec.model_validate(spec())
-    assert parsed.id == "darca"
+    assert parsed.id == "example"
     assert parsed.participant_arguments == [[1, 2]]
 
 
@@ -65,7 +65,7 @@ def test_it_round_trips_through_a_state():
 
 
 def test_a_hundred_judgments_are_allowed():
-    """The shipped DARCA questionnaire has a question with 31 answers."""
+    """A shipped questionnaire has a question with 31 answers."""
     judgments = [
         {"index": i, "id": f"J{i}", "confidence": 0.5, "answer": "a", "text": "t"}
         for i in range(100)
@@ -161,14 +161,14 @@ def test_a_description_may_mix_text_and_links():
                 "title": "T",
                 "description": [
                     "Built with ",
-                    {"link": "DARCA", "href": "https://darca.uehiro.ox.ac.uk"},
+                    {"link": "the framework", "href": "https://example.org/framework"},
                     ".",
                 ],
                 "buttonLabel": "Start",
             }
         )
     )
-    assert parsed.card.description[1].href == "https://darca.uehiro.ox.ac.uk"
+    assert parsed.card.description[1].href == "https://example.org/framework"
 
 
 @pytest.mark.parametrize(

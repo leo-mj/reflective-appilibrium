@@ -331,7 +331,7 @@ export function TutorialStepper({
                 background: C.supports,
                 border: "none",
                 borderRadius: 4,
-                color: "#fff",
+                color: C.onFill,
                 fontSize: 11,
                 fontWeight: "bold",
                 cursor: "pointer",

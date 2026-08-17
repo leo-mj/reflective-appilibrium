@@ -6,7 +6,8 @@
 /** @import { REState, RERelation } from '../types.js' */
 
 import { useMemo } from "react";
-import { C, getColors } from "../constants/colors.js";
+import { C, getColors, typeTokens } from "../constants/colors.js";
+import { usePalette } from "./useTheme.js";
 import { getNeighbours } from "../utils/graphHelpers.js";
 import { findCoherentClusters } from "../utils/clusterUtils.js";
 import { computeCoherence } from "../utils/coherence.js";
@@ -63,17 +64,33 @@ export function useTextTabData({
     visIds,
     state.elements,
   );
+  const palette = usePalette();
   const colorById = useMemo(
     () =>
       new Map(
         state.elements.map((e) => [
           e.id,
-          getColors({ ...e, status: "active" }).stroke,
+          getColors({ ...e, status: "active" }, palette).stroke,
+        ]),
+      ),
+    [state.elements, palette],
+  );
+  const badgeColor = (id) => colorById.get(id) ?? C.dim;
+
+  // The badge tints its background and border with the fill tone above, but
+  // writes the id in this one: the fill tone as 12px bold type measures 3.06:1
+  // against its own tinted background.
+  const textById = useMemo(
+    () =>
+      new Map(
+        state.elements.map((e) => [
+          e.id,
+          typeTokens(e.type).text,
         ]),
       ),
     [state.elements],
   );
-  const badgeColor = (id) => colorById.get(id) ?? C.dim;
+  const badgeTextColor = (id) => textById.get(id) ?? C.dim;
 
   const displayEls = search
     ? visibleEls.filter((e) => matchesSearch(e, search))
@@ -150,6 +167,7 @@ export function useTextTabData({
     visRels,
     pCovers,
     badgeColor,
+    badgeTextColor,
     displayEls,
     displayRels,
     highlightedIds,

@@ -34,16 +34,18 @@ import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
 import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 
-const ACCENT = C.judgment.high;
+const ACCENT = C.judgment.accent;
+/** The same accent where it is type rather than a shape — see index.css. */
+const ACCENT_TEXT = C.judgment.text;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function elementColor(type) {
   return type === "judgment"
-    ? C.judgment.high
+    ? C.judgment.accent
     : type === "principle"
-      ? C.principle.high
-      : C.theory.high;
+      ? C.principle.accent
+      : C.theory.accent;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -131,7 +133,7 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
           {isAdded && (
             <span
               style={{
-                color: ACCENT,
+                color: ACCENT_TEXT,
                 fontSize: 10,
                 fontStyle: "italic",
                 marginLeft: 6,
@@ -489,7 +491,7 @@ export function DetectArgumentsTab({
           }}
         >
           <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-            <span style={{ color: ACCENT, fontWeight: "bold" }}>
+            <span style={{ color: ACCENT_TEXT, fontWeight: "bold" }}>
               Detect Arguments
             </span>
             <span style={{ color: C.dim }}>
@@ -512,7 +514,7 @@ export function DetectArgumentsTab({
                 style={{
                   background: "transparent",
                   border: `1px solid ${disabled ? C.border : ACCENT}`,
-                  color: disabled ? C.dim : ACCENT,
+                  color: disabled ? C.dim : ACCENT_TEXT,
                   borderRadius: 6,
                   padding: "5px 12px",
                   fontSize: 12,

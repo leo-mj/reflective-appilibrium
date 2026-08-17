@@ -4,6 +4,8 @@ import {
   distToQuadBezier,
   distToSegment,
   groupJointArguments,
+  hitRadius,
+  nodeRadius,
   parallelEdgeOffsets,
 } from "./graphHelpers.js";
 
@@ -20,6 +22,59 @@ const rel = (from, to, overrides = {}) => ({
 
 const joint = (from, to, argumentId) =>
   rel(from, to, { type: "jointly_entails", argumentId });
+
+// ─── nodeRadius / hitRadius ───────────────────────────────────────────────────
+
+describe("nodeRadius", () => {
+  const TYPES = ["judgment", "principle", "theory"];
+
+  it("gives a confident element several times the area of a tentative one", () => {
+    // Size is the main confidence cue on the graph, so the ends have to be
+    // obviously different. Area, not radius, is what the eye compares.
+    for (const type of TYPES) {
+      const area = (c) => Math.PI * nodeRadius(type, c) ** 2;
+      expect(area(1) / area(0), type).toBeGreaterThan(3);
+    }
+  });
+
+  it("keeps the smallest node wide enough for a three-character id", () => {
+    // What sets the floor. "J14" at 11px bold is ~20px wide; below that the
+    // label spills out of its own shape.
+    expect(nodeRadius("judgment", 0) * 2).toBeGreaterThan(20);
+  });
+
+  it("orders the three types by generality at equal confidence", () => {
+    // A principle covers judgments, so it draws bigger; a theory sits between.
+    for (const c of [0, 0.5, 1]) {
+      expect(nodeRadius("principle", c)).toBeGreaterThan(nodeRadius("theory", c));
+      expect(nodeRadius("theory", c)).toBeGreaterThan(nodeRadius("judgment", c));
+    }
+  });
+
+  it("clamps confidence rather than extrapolating off the ramp", () => {
+    expect(nodeRadius("judgment", -1)).toBe(nodeRadius("judgment", 0));
+    expect(nodeRadius("judgment", 5)).toBe(nodeRadius("judgment", 1));
+  });
+});
+
+describe("hitRadius", () => {
+  it("keeps the smallest node tappable", () => {
+    // A zero-confidence judgment is ~7px across. Without the floor its target
+    // would be smaller than a fingertip, and it is still a node one must be
+    // able to pick.
+    for (const type of ["judgment", "principle", "theory"]) {
+      expect(hitRadius(type, 0), type).toBeGreaterThanOrEqual(18);
+    }
+  });
+
+  it("always exceeds the visual radius", () => {
+    for (const type of ["judgment", "principle", "theory"]) {
+      for (const c of [0, 0.5, 1]) {
+        expect(hitRadius(type, c)).toBeGreaterThan(nodeRadius(type, c));
+      }
+    }
+  });
+});
 
 // ─── groupJointArguments ──────────────────────────────────────────────────────
 

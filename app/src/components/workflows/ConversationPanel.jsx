@@ -128,7 +128,7 @@ export function ConversationPanel({ state, suggestion }) {
               padding: "4px 10px",
               margin: "4px 8px 4px 0",
               fontSize: 11,
-              color: "#fff",
+              color: C.onFill,
               cursor: loading || !input.trim() ? "not-allowed" : "pointer",
               flexShrink: 0,
             }}

@@ -1,6 +1,12 @@
 # app/ — Phase 2 Frontend
 
-React SPA (Vite). `LLM_ENABLED` flag gates AI features; `VITE_USE_DUMMY` enables mock data.
+React SPA (Vite). `src/config.js` derives every feature flag from one build-time
+`VITE_APP_ENV` (`dev` | `demo` | `backend`) — `LLM_ENABLED` and `BYOK_ENABLED` both
+follow `BACKEND_ENABLED`. Mock data is a *runtime* choice, not a flag: the assist
+panel's "use sample suggestions" checkbox passes `useDummy` down to
+`llmClientFactory`, which also falls back to samples whenever `LLM_ENABLED` is false.
+
+Tests: `npm test` (Vitest, jsdom) and `npm run test:e2e` (Playwright — see `e2e/README.md`).
 
 ## Key files
 
@@ -23,11 +29,60 @@ A guided RE mode where all elements and argument relations are pre-populated fro
 
 ## Visualization conventions
 
-Colorblind-safe palette (all colors in `C` in `src/constants/colors.js`):
+Colorblind-safe palette. Two modules, and the split matters:
 
-- Edges: teal (supports), orange (conflicts), amber (undermines), grey (depends)
-- Nodes: blue (judgments), purple (principles), amber (theories) — shaded by confidence
-- Withdrawn: grey at 25% opacity
+- `src/constants/colors.js` — everything that does **not** vary by mode: edges,
+  states, surfaces, and the per-type *foreground* tones (`C.judgment.text`, …).
+- `src/constants/palettes.js` — the node **fills** and the label ink, which do.
+
+Edges: teal (supports), orange (conflicts), amber (undermines), grey (depends);
+green (entails) and rose (precludes), hollow arrowhead for the single-premise
+forms and filled for the joint ones. Withdrawn: grey at 25% opacity; rejected:
+rose at 35%.
+
+### Viewing modes
+
+Two palettes, resolved by `resolvePalette(accessible)` and reached in components
+through `usePalette()` from `hooks/useTheme.js`. **Never import a node fill
+directly** — a component holding a hex is a component that is wrong in one of the
+modes. The theme is *not* a parameter: the fills are the same on both grounds.
+
+| Mode | Judgment · Principle · Theory | Ink | Guarantee |
+|---|---|---|---|
+| `default` | blue · violet · amber, pale → saturated | white, bold | none — see below |
+| `accessible` | pale blue · pink · yellow | black, normal | AAA (7:1) throughout |
+
+**The default palette does not clear AA on its pale end, and that is a decision,
+not a bug.** No single ink can serve that ramp: it runs from tints that want dark
+type to tones that want light, crossing at ~0.183 relative luminance. White is
+chosen for the saturated end, where the eye goes (5.2–5.7:1), and falls to
+1.4–1.9:1 on the tints. Rather than compromise the palette, the compliant path is
+offered as the **high-contrast mode** in the ☰ menu. `constants/palettes.test.js`
+holds each palette to what it actually promises — don't "fix" the default one to
+AA, and don't re-tone these fills to chase a ratio.
+
+Weight follows the ink via `inkWeight()` — light ink bold, dark ink normal — so a
+palette can't arrive with the wrong one.
+
+The mode lives on `<html>` (`data-theme`, `data-contrast`) — that is the single
+source of truth, and `useTheme` reads it rather than mirroring it.
+
+Two things deliberately do *not* use `palette.ink`: the graph's `+J/+P/+T`
+buttons and the questionnaire card's button. They are HTML, where axe enforces AA
+in the e2e audit, so they take `inkOn(fill)` instead. The nodes are the exception
+to AA; a button is not.
+
+### Confidence
+
+Reads two ways, and does **not** fade the node: it tints the fill (`low` → `high`)
+and, mainly, scales the radius — 65%–120% of base, so a confident element has
+~3.4× the area of a tentative one. The 65% floor is set by the label, being the
+smallest node that still contains a three-character id at 11px bold. Opacity is
+reserved for *state*: dimmed by a selection elsewhere, withdrawn, rejected.
+
+Selection follows the user's pointer only: clicking a node or a text card. Actions
+taken on an element (revising, withdrawing) deliberately leave it alone, since
+selection dims the rest of the graph.
 
 Tabs: Graph (D3 force-directed), Text, History (slider, 3.2s/round). Node positions stable via shared force simulation on all elements including withdrawn.
 

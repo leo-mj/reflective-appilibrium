@@ -47,4 +47,16 @@ export default defineConfig([
     files: ["vite.config.js"],
     languageOptions: { globals: globals.node },
   },
+  {
+    // The e2e suite is Node code that *drives* a browser. It needs both sets of
+    // globals: Node for the test process (fs, process, Buffer) and browser for
+    // the snippets handed to page.evaluate, which are authored inline here but
+    // execute in the page.
+    files: ["e2e/**/*.js", "playwright.config.js"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+    rules: {
+      // Progress and audit summaries are the point of a CI test log.
+      "no-console": "off",
+    },
+  },
 ]);

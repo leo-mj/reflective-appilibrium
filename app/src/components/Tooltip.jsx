@@ -92,6 +92,17 @@ export function Tooltip({ text, children, delay = 400 }) {
   // exactly where a ref is meant to be read.
   // eslint-disable-next-line react-hooks/refs
   const trigger = cloneElement(child, {
+    // The icon-only buttons this wraps have no accessible name of their own, so
+    // a screen reader announces a row of anonymous buttons. The tooltip text is
+    // exactly the name they are missing. Naming them here rather than at each
+    // call site means the next icon button is named by construction.
+    //
+    // Two triggers are left alone: one that already carries its own aria-label,
+    // and one with visible text, where an aria-label would override what is on
+    // screen with wording that may not match it.
+    "aria-label":
+      child.props["aria-label"] ??
+      (typeof child.props.children === "string" ? undefined : text),
     onMouseEnter(e) {
       child.props.onMouseEnter?.(e);
       if (touching.current) return;

@@ -1296,11 +1296,27 @@ describe("handleSelectRel", () => {
 // ─── handleEditRequest ────────────────────────────────────────────────────────
 
 describe("handleEditRequest", () => {
-  it("sets selected and editingEl to the matching element", () => {
+  it("sets editingEl to the matching element", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleEditRequest("J1"));
-    expect(result.current.selected).toBe("J1");
     expect(result.current.editingEl).toEqual(result.current.state.elements[0]);
+  });
+
+  it("leaves the selection alone", () => {
+    // Selection follows the user's pointer only — a click on a node or a text
+    // card. Revising is not a click on the element.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleEditRequest("J1"));
+    expect(result.current.selected).toBeNull();
+  });
+
+  it("does not deselect whatever the user had selected", () => {
+    // `handleSelectNode` is the one path selection comes from — it is what
+    // `onSelect` is wired to on both the graph and the text panel.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSelectNode("J1"));
+    act(() => result.current.handleEditRequest("J1"));
+    expect(result.current.selected).toBe("J1");
   });
 
   it("resets editingEl to null when element id is not found", () => {

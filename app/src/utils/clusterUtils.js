@@ -14,16 +14,6 @@
 
 /** @import { REState, RERelation } from '../types.js' */
 
-export const CLUSTER_COLORS = [
-  "#06b6d4",
-  "#7c3aed",
-  "#d97706",
-  "#2563eb",
-  "#16a34a",
-  "#db2777",
-];
-export const clusterColor = (i) => CLUSTER_COLORS[i % CLUSTER_COLORS.length];
-
 // ─── Shared setup ─────────────────────────────────────────────────────────────
 
 /**

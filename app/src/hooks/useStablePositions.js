@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import * as d3 from "d3";
+import { nodeRadius } from "../utils/graphHelpers.js";
 
 /**
  * Runs a D3 force-directed simulation over **all** elements in `state` (including withdrawn
@@ -77,8 +78,11 @@ export function useStablePositions(state, dims) {
       return {
         id: e.id,
         type: e.type,
-        // Node radius used for collision detection — matches the radii in Graph.jsx / HistoryTab.jsx.
-        r: e.type === "principle" ? 28 : e.type === "theory" ? 22 : 18,
+        // Node radius used for collision detection. Asked for rather than
+        // restated: this used to hardcode the base radii and so ignored
+        // confidence, which over-spaced small nodes and — now that confidence
+        // swings the radius by 3× — would let big ones overlap.
+        r: nodeRadius(e.type, e.confidence),
         x: prev?.x ?? halfWidth + ((Math.random() - 0.5) * halfWidth) / 10,
         y: prev?.y ?? halfHeight + ((Math.random() - 0.5) * halfHeight) / 10,
         vx: 0,

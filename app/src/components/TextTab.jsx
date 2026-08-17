@@ -33,6 +33,17 @@ import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 
 // ─── Module-level constants ───────────────────────────────────────────────────
+/**
+ * Bottom padding on the scrolling list, in px.
+ *
+ * The "↑ Top" button floats over the list at `bottom: 10` and stands about 26px
+ * tall, so this has to exceed 36 for a card never to be laid out under it.
+ */
+const TOP_BUTTON_CLEARANCE = 48;
+
+/** How far down the list must be scrolled before "↑ Top" has anything to do. */
+const TOP_BUTTON_AT = 200;
+
 
 const DEFAULT_COLLAPSED_SECTIONS = {
   judgments: false,
@@ -95,6 +106,8 @@ export function TextTab({
   historyView = null,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
+  /** Whether the list is far enough down for "↑ Top" to be worth showing. */
+  const [scrolledDown, setScrolledDown] = useState(false);
   const scrollRef = useRef(null);
   const refJudgments = useRef(null);
   const refPrinciples = useRef(null);
@@ -195,6 +208,7 @@ export function TextTab({
   const {
     pCovers,
     badgeColor,
+    badgeTextColor,
     displayEls,
     displayRels,
     highlightedIds,
@@ -323,6 +337,7 @@ export function TextTab({
         onReinstate,
         onReinstateRel,
         badgeColor,
+        badgeTextColor,
         pCovers,
         search,
         withdrawalDeltas,
@@ -354,10 +369,16 @@ export function TextTab({
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
           <div
             ref={scrollRef}
+            onScroll={(e) =>
+              setScrolledDown(e.currentTarget.scrollTop > TOP_BUTTON_AT)
+            }
             style={{
               overflowY: "auto",
               height: "100%",
-              padding: "0 4px 24px",
+              // The bottom padding clears the floating "↑ Top" button, which is
+              // painted over this box rather than laid out beside it. Without
+              // it the button covers whichever card is scrolled underneath.
+              padding: `0 4px ${TOP_BUTTON_CLEARANCE}px`,
               background: C.bg,
               color: C.text,
             }}
@@ -441,26 +462,30 @@ export function TextTab({
             )}
           </div>
 
-          <button
-            onClick={() =>
-              scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
-            }
-            style={{
-              zIndex: 99,
-              position: "absolute",
-              bottom: 10,
-              left: 10,
-              background: C.panel,
-              border: `1px solid ${C.border}`,
-              borderRadius: 6,
-              color: C.dim,
-              cursor: "pointer",
-              fontSize: 16,
-              padding: "3px 8px",
-            }}
-          >
-            ↑ Top
-          </button>
+          {/* Only once there is something to scroll back from: on a short or
+              empty list it would be a control that does nothing. */}
+          {scrolledDown && (
+            <button
+              onClick={() =>
+                scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+              }
+              style={{
+                zIndex: 99,
+                position: "absolute",
+                bottom: 10,
+                left: 10,
+                background: C.panel,
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                color: C.dim,
+                cursor: "pointer",
+                fontSize: 16,
+                padding: "3px 8px",
+              }}
+            >
+              ↑ Top
+            </button>
+          )}
         </div>
 
         {!isWide && (

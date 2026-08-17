@@ -6,11 +6,10 @@
 /** @import { REState } from '../../types.js' */
 
 import { useContext, useMemo } from "react";
-import { C } from "../../constants/colors.js";
+import { C, clusterColor, clusterTextColor } from "../../constants/colors.js";
 import {
   findCrossClusterTensions,
   findMergeCandidates,
-  clusterColor,
 } from "../../utils/clusterUtils.js";
 import { sortElementIds } from "../../utils/stateUtils.js";
 import {
@@ -76,8 +75,11 @@ export function ClusterSection({
                     fontWeight: "bold",
                     padding: "1px 7px",
                     borderRadius: 4,
+                    // Tint the chip with the cluster's fill, but write the
+                    // label in the text tone — the fills are fixed hues and
+                    // most of them fail AA as type on one theme or the other.
                     background: color + "22",
-                    color,
+                    color: clusterTextColor(i),
                     border: `1px solid ${color}55`,
                   }}
                 >

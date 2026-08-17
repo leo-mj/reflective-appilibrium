@@ -64,7 +64,12 @@ export function AppHeaderNarrow({
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
-  const { isDark, toggle: toggleTheme } = useTheme();
+  const {
+    isDark,
+    accessible,
+    toggle: toggleTheme,
+    toggleAccessible,
+  } = useTheme();
 
   const llmSaved = (() => {
     if (!BYOK_ENABLED) return null;
@@ -290,10 +295,7 @@ export function AppHeaderNarrow({
             </button>
             <div style={menuDividerStyle} />
 
-            <button
-              onClick={() => setShowTabNav((s) => !s)}
-              style={menuBtn()}
-            >
+            <button onClick={() => setShowTabNav((s) => !s)} style={menuBtn()}>
               <span style={menuIconStyle}>
                 <svg
                   width="12"
@@ -340,7 +342,7 @@ export function AppHeaderNarrow({
                   onClick={() => setWeightsOpen((o) => !o)}
                   style={{
                     ...menuBtn(),
-                    color: weightsChanged ? C.principle.high : undefined,
+                    color: weightsChanged ? C.principle.accent : undefined,
                   }}
                 >
                   <span style={menuIconStyle}>⚖</span>
@@ -431,6 +433,14 @@ export function AppHeaderNarrow({
               </span>
               {isDark ? "Light mode" : "Dark mode"}
             </button>
+            <button
+              onClick={toggleAccessible}
+              style={menuBtn()}
+              aria-pressed={accessible}
+            >
+              <span style={menuIconStyle}>{accessible ? "◉" : "◎"}</span>
+              High-contrast
+            </button>
           </div>
           <div style={menuDividerStyle} />
           <div data-tutorial="menu-files" style={group}>
@@ -445,7 +455,7 @@ export function AppHeaderNarrow({
             </button>
             <button
               onClick={close(onDownload)}
-              style={{ ...menuBtn(), color: C.theory.high }}
+              style={{ ...menuBtn(), color: C.theory.text }}
             >
               <span style={menuIconStyle}>↓</span>Export
             </button>

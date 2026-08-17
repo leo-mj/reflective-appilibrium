@@ -64,7 +64,7 @@ export function AddElementPanel({ elementType, onAddElement }) {
             cursor: canSubmit ? "pointer" : "default",
             border: "none",
             background: C.supports,
-            color: "#fff",
+            color: C.onFill,
             opacity: canSubmit ? 1 : 0.4,
           }}
         >
@@ -100,6 +100,7 @@ export function AddElementPanel({ elementType, onAddElement }) {
           min={0}
           max={1}
           step={0.05}
+          aria-label="Confidence, 0 to 1"
           value={form.confidence}
           onChange={(e) => {
             const v = parseFloat(e.target.value);
@@ -245,7 +246,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
             cursor: canSubmit ? "pointer" : "default",
             border: "none",
             background: mode === "entails" ? C.jointly_entails : C.jointly_precludes,
-            color: "#fff",
+            color: C.onFill,
             opacity: canSubmit ? 1 : 0.4,
             flexShrink: 0,
             alignSelf: "center",
@@ -391,7 +392,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
             cursor: canSubmit ? "pointer" : "default",
             border: "none",
             background: C.supports,
-            color: "#fff",
+            color: C.onFill,
             opacity: canSubmit ? 1 : 0.4,
           }}
         >

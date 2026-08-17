@@ -39,9 +39,9 @@ export function ConfidenceInput({ value, onChange }) {
                 padding: "4px 10px",
                 fontSize: 11,
                 borderRadius: 4,
-                border: `1px solid ${active ? C.judgment.high : C.border}`,
-                background: active ? C.judgment.high : C.bg,
-                color: active ? "#fff" : C.text,
+                border: `1px solid ${active ? C.judgment.accent : C.border}`,
+                background: active ? C.judgment.accent : C.bg,
+                color: active ? C.onFill : C.text,
                 cursor: "pointer",
                 flexShrink: 0,
               }}

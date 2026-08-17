@@ -21,6 +21,8 @@ import { suggestionsUnavailable } from "../../utils/disabledReason.js";
  *
  * @param {Object}           props
  * @param {string}           props.accent      Colour for the title and button.
+ *   Used only as a foreground, so callers pass a `text` variant from `C`,
+ *   not the fill tone the graph draws that element type with.
  * @param {string}           props.title       e.g. "Suggest Principles".
  * @param {string}           props.actionLabel Button text before the first result.
  * @param {string}           props.rerunLabel  Button text once there is a result.

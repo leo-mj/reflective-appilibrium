@@ -24,6 +24,7 @@ const CTX = {
   onReinstate: () => {},
   onReinstateRel: () => {},
   badgeColor: () => "#888",
+  badgeTextColor: () => "#ccc",
   pCovers: {},
   search: "",
   withdrawalDeltas: null,

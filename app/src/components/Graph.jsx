@@ -13,7 +13,8 @@ import React, {
   useCallback,
 } from "react";
 
-import { C } from "../constants/colors.js";
+import { C, typeTokens, inkOn } from "../constants/colors.js";
+import { usePalette } from "../hooks/useTheme.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
@@ -51,11 +52,6 @@ import { AddArgumentModal } from "./user_edits/AddArgumentModal.jsx";
 /** Withdrawn and rejected elements offer Reinstate where others offer Withdraw. */
 const isInPlay = (el) => el.status !== "withdrawn" && el.status !== "rejected";
 
-const TYPE_COLORS = {
-  judgment: C.judgment.high,
-  principle: C.principle.high,
-  theory: C.theory.high,
-};
 
 function AddButtonsOverlay({
   onAddEl,
@@ -63,6 +59,7 @@ function AddButtonsOverlay({
   onAddArg,
   hideNonEntailsRels,
 }) {
+  const palette = usePalette();
   return (
     <div
       // Ringed by the tour when it gets to making your own position.
@@ -87,9 +84,14 @@ function AddButtonsOverlay({
           aria-label={`Add ${type}`}
           title={`Add ${type}`}
           style={{
-            background: TYPE_COLORS[type],
+            // Fill matches the nodes it adds, in whichever mode is on. The ink
+            // does not: this is an HTML control, where AA is enforced and the
+            // node palette's black lands at 3.7:1 on the saturated violet. The
+            // nodes themselves are a deliberate exception to that; a button is
+            // not.
+            background: typeTokens(type, palette).high,
             border: "none",
-            color: "#fff",
+            color: inkOn(typeTokens(type, palette).high),
             borderRadius: 6,
             padding: "8px 12px",
             fontSize: 13,
