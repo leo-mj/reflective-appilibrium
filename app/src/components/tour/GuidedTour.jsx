@@ -146,7 +146,9 @@ const navBtn = (enabled) => ({
  */
 function applicableSections(sections, state) {
   const ids = new Set(state.elements.map((e) => e.id));
-  const args = new Set(state.relations.map((r) => r.argumentId).filter(Boolean));
+  const args = new Set(
+    state.relations.map((r) => r.argumentId).filter(Boolean),
+  );
   return sections.filter((s) => {
     const named = [...(s.quote ?? []), ...(s.focus ?? []), s.select].filter(
       Boolean,
@@ -229,7 +231,8 @@ export function GuidedTour({
     // the last section would win.
     if (!root || !root.clientHeight) return;
     if (Date.now() < quietUntil.current) return;
-    const line = root.getBoundingClientRect().top + root.clientHeight * READING_LINE;
+    const line =
+      root.getBoundingClientRect().top + root.clientHeight * READING_LINE;
     let next = 0;
     sectionRefs.current.forEach((el, i) => {
       if (el && el.getBoundingClientRect().top <= line) next = i;
@@ -297,7 +300,8 @@ export function GuidedTour({
       onSelectNode(() => null);
     }
 
-    if (section.focus) onFocusGraph(section.focus.length ? section.focus : null);
+    if (section.focus)
+      onFocusGraph(section.focus.length ? section.focus : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, idx, section?.id]);
 
@@ -521,7 +525,7 @@ export function GuidedTour({
                 padding: 0,
               }}
             >
-              Skip tour
+              Close tour
             </button>
           </div>
           <ProgressBar value={(idx + 1) / sections.length} />

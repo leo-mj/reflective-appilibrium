@@ -259,7 +259,7 @@ describe("leaving", () => {
   it("puts back everything it moved", () => {
     const spies = openTour();
     walkTo("Judgments — the concrete verdicts");
-    fireEvent.click(screen.getByText("Skip tour"));
+    fireEvent.click(screen.getByText("Close tour"));
 
     expect(spies.onSetChrome).toHaveBeenLastCalledWith({
       chrome: true,

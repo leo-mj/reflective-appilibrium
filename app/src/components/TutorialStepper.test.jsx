@@ -5,7 +5,13 @@
 // walks its sections, which at this width is where everything else lives. The
 // wide tour is `tour/GuidedTour.jsx`, covered in its own suite.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  act,
+} from "@testing-library/react";
 import { useState } from "react";
 
 import { TutorialStepper, TOUR_Z } from "./TutorialStepper.jsx";
@@ -70,8 +76,10 @@ describe("the narrow tour", () => {
     walk(() => {
       const heading = document.body.textContent;
       if (heading.includes("Welcome to Reflective")) order.push("welcome");
-      else if (heading.includes("Your position, as a graph")) order.push("graph");
-      else if (heading.includes("Everything else is in here")) order.push("menu");
+      else if (heading.includes("Your position, as a graph"))
+        order.push("graph");
+      else if (heading.includes("Everything else is in here"))
+        order.push("menu");
     });
     expect(order).toEqual(["welcome", "graph", "menu"]);
   });
@@ -117,7 +125,7 @@ describe("the narrow tour", () => {
 
     onSetMenuOpen.mockClear();
     act(() => {
-      fireEvent.click(screen.getByText("Skip tour"));
+      fireEvent.click(screen.getByText("Close tour"));
     });
     expect(onSetMenuOpen).toHaveBeenCalledWith(false);
   });

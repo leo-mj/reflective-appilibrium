@@ -148,7 +148,7 @@ describe("the guided tour", () => {
   it("puts the tab bar back on the way out", () => {
     sessionStorage.setItem("startTour", "1");
     open();
-    fireEvent.click(screen.getByText("Skip tour"));
+    fireEvent.click(screen.getByText("Close tour"));
     expect(tourShown()).toBe(false);
     expect(tabBarShown()).toBe(true);
   });
@@ -184,7 +184,7 @@ describe("the guided tour", () => {
     walkTourTo(/Saving your progress/);
     expect(filesEntry()).not.toBeNull();
 
-    fireEvent.click(screen.getByText("Skip tour"));
+    fireEvent.click(screen.getByText("Close tour"));
     expect(filesEntry()).toBeNull();
   });
 

@@ -305,7 +305,7 @@ export function TutorialStepper({
               padding: "2px 0",
             }}
           >
-            {isLast ? "" : "Skip tour"}
+            {isLast ? "" : "Close tour"}
           </button>
 
           <div style={{ display: "flex", gap: 6 }}>
