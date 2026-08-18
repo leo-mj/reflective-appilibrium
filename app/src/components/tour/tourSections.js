@@ -1,6 +1,6 @@
 /**
- * @fileoverview The script the wide guided tour reads from: one flat, ordered
- * list of sections the visitor scrolls through.
+ * @fileoverview The script the guided tour reads from: one flat, ordered list
+ * of sections the visitor scrolls through.
  *
  * The tour answers, in this order, the four questions a first-time visitor
  * arrives with: what reflective equilibrium is for, what is already on screen
@@ -12,15 +12,41 @@
  * it: which tab is open, whether the app's own chrome is visible, what the
  * graph is zoomed to, and what is selected in it.
  *
+ * **One script, both layouts.** The wide tour reads it down a column beside the
+ * graph and the narrow one along a sheet under it, but they say the same thing:
+ * the method, the demo graph, making changes, the AI. What differs at the two
+ * widths is only ever the *route* to a control — Undo is a header button on one
+ * and a ☰ entry on the other — so a section states its substance once and
+ * carries a `narrow` override for where that control is to be found. Anything
+ * that would have to be said differently is a {@link byLayout} paragraph, which
+ * keeps the two wordings side by side rather than in two scripts that drift.
+ *
  * @module components/tour/tourSections
  */
+
+/**
+ * A paragraph whose wording has to follow the layout, because it names a route
+ * through an interface the two widths do not share.
+ *
+ * Reach for it only for the route. A section whose *substance* differs between
+ * the layouts is a section one of them is not being told something.
+ *
+ * @param {string} wide
+ * @param {string} narrow
+ */
+const byLayout = (wide, narrow) => ({ wide, narrow });
 
 /**
  * @typedef {Object} TourSection
  * @property {string}   id       - Stable key.
  * @property {string}   [chapter] - Chapter heading; set on the section that opens one.
- * @property {string}   title
- * @property {string[]} body     - Paragraphs.
+ * @property {string|{wide: string, narrow: string}} title
+ * @property {(string|{wide: string, narrow: string})[]} body - Paragraphs.
+ * @property {Object}   [narrow] - What this section needs at narrow widths,
+ *   merged over the section itself: usually the `data-tutorial` id the control
+ *   carries there, and whatever has to be on screen to see it.
+ * @property {"narrow"|"wide"} [only] - Restricts the section to one layout, for
+ *   the handful that describe something the other width does not have.
  * @property {string[]} [quote]  - Element IDs whose own text is shown as a card,
  *   read from the live state rather than copied here.
  * @property {string[]} [focus]  - Element IDs the graph zooms to. Omitted keeps
@@ -145,7 +171,7 @@ function graphSections() {
       focus: ["P6", "J7", "J10"],
       argument: "arg-sample-5",
     },
-        {
+    {
       id: "theories",
       title: "Background theories",
       body: [
@@ -165,34 +191,66 @@ function graphSections() {
       body: [
         "Of course, you not only want to read the graph, you want to write it.",
         "+ J, + P and + T put a judgment, a principle or a background theory on the graph; + Arg opens a form for premises and a conclusion.",
-        "Or pick them out on the graph itself: select a node, Ctrl-click the others, and the bar that appears turns the selection into an argument.",
-        "The bar along the bottom does the same thing.",
+        byLayout(
+          "Or pick them out on the graph itself: select a node, Ctrl-click the others, and the bar that appears turns the selection into an argument.",
+          "Or pick them out on the graph itself: tap a node, then tap the others with the argument bar open, and it turns the selection into an argument.",
+        ),
+        byLayout(
+          "The bar along the bottom does the same thing.",
+          "The ⊕ button at the foot of the text view does the same thing.",
+        ),
       ],
       target: ["graph-add", "add-bar"],
       addBar: true,
       focus: [],
+      // No add bar along the bottom at this width — the sheet is there — so the
+      // graph's own buttons are the whole of what this section can point at.
+      narrow: { target: "graph-add", addBar: false },
+    },
+    {
+      id: "narrow-menu",
+      only: "narrow",
+      title: "Everything else is behind ☰",
+      body: [
+        "There is no room for a tab bar on a screen this narrow, so everything that is not the graph lives behind the ☰ button: the other views, the settings, import and export, and undo.",
+        "The rest of the tour opens it as it goes, and rings whatever it is describing. Nothing here is doing anything until you tap it.",
+      ],
+      target: "btn-menu",
     },
     {
       id: "revising",
       title: "Revising the graph",
       body: [
-        "Click any node to modify it: revise the wording or withdraw it entirely. Withdrawing is not deleting — the node greys out and keeps its place in the record, and can be reinstated.",
+        byLayout(
+          "Click any node to modify it: revise the wording or withdraw it entirely. Withdrawing is not deleting — the node greys out and keeps its place in the record, and can be reinstated.",
+          "Tap any node to modify it: revise the wording or withdraw it entirely. Withdrawing is not deleting — the node greys out and keeps its place in the record, and can be reinstated.",
+        ),
         "The principle below went in round 3, once it turned out to conflict with judgments its owner was far more sure of.",
-        "And nothing is final either way: Undo, ringed in the header, steps back through the changes, as does Ctrl+Z. They are grouped by round rather than by keystroke, so it walks back through the thinking rather than through the typing.",
+        byLayout(
+          "And nothing is final either way: Undo, ringed in the header, steps back through the changes, as does Ctrl+Z. They are grouped by round rather than by keystroke, so it walks back through the thinking rather than through the typing.",
+          "And nothing is final either way: Undo, ringed in the ☰ menu, steps back through the changes. They are grouped by round rather than by keystroke, so it walks back through the thinking rather than through the typing.",
+        ),
       ],
       quote: ["P4"],
       target: "btn-undo",
+      narrow: { target: "menu-undo", menu: true },
     },
     {
       id: "text",
-      title: "The text panel",
+      title: byLayout("The text panel", "The text view"),
       body: [
         "Reading the contents of your position is not limited to the graph. Every element and relation with its round, its confidence, its history, and the same buttons to revise, withdraw or reinstate it can be found in the text panel.",
-        "(You reach it via Assist → Text and Analyze → Graph in the tab bar. The tab bar is hidden while the tour is reading the graph — it comes back a few sections below.)",
+        byLayout(
+          "(You reach it via Assist → Text and Analyze → Graph in the tab bar. The tab bar is hidden while the tour is reading the graph — it comes back a few sections below.)",
+          "(You reach it via ☰ → Analyze → Text, and come back the same way.)",
+        ),
       ],
       target: "text-panel",
       tab: "graph",
       text: true,
+      // A tab of its own at this width rather than a panel beside the graph, so
+      // it is reached by opening it rather than by asking for the chrome.
+      narrow: { tab: "text", text: false },
     },
     {
       id: "menu-files",
@@ -226,19 +284,27 @@ function assistSections(cycle, llmEnabled) {
       tab: "elicitJudgments",
       chrome: true,
       focus: [],
+      narrow: { target: "menu-assist", menu: true },
     },
     {
       id: "cycle",
       title: `The Workflow cycle: ${cycle}`,
       body: [
-        "The three Assist tabs are one iteration of the process: draw out judgments, find principles that cover them, and detect the arguments between them.",
+        byLayout(
+          "The three Assist tabs are one iteration of the process: draw out judgments, find principles that cover them, and detect the arguments between them.",
+          "The three Assist views are one iteration of the process: draw out judgments, find principles that cover them, and detect the arguments between them.",
+        ),
         "This helps you build out your views and spot both where they hangs together well and where the problems lie.",
-        "Start Workflow runs the iteration for you, tab by tab, and loops. Each iteration is meant to leave your position a little more coherent than it found it.",
+        byLayout(
+          "Start Workflow runs the iteration for you, tab by tab, and loops. Each iteration is meant to leave your position a little more coherent than it found it.",
+          "Start Workflow runs the iteration for you, view by view, and loops. Each iteration is meant to leave your position a little more coherent than it found it.",
+        ),
         "Go ahead and click the workflow button.",
       ],
       target: "btn-workflow",
       tab: "elicitJudgments",
       chrome: true,
+      narrow: { menu: true },
     },
     {
       id: "llm-settings",
@@ -276,6 +342,7 @@ function chromeSections() {
       // Back to the whole graph: the last thing that framed it was a section
       // about three nodes, and this one is about the view as a whole.
       focus: [],
+      narrow: { target: "menu-analyze", menu: true },
     },
     {
       id: "history",
@@ -286,6 +353,9 @@ function chromeSections() {
       target: "tab-history",
       tab: "history",
       chrome: true,
+      // Same entry, in the menu rather than the tab bar — so the menu has to be
+      // open before there is anything to ring.
+      narrow: { menu: true },
     },
     {
       id: "clusters",
@@ -296,20 +366,55 @@ function chromeSections() {
       target: "tab-clusters",
       tab: "clusters",
       chrome: true,
+      narrow: { menu: true },
     },
     {
       id: "done",
       title: "That's the tour",
       body: [
-        "The demo is yours to explore — click nodes, drag the graph, withdraw something and see what it takes with it. Nothing you do here is saved by us.",
-        "Hover any button to find out what it does. Press ? in the header to read this guided tour again.",
+        byLayout(
+          "The demo is yours to explore — click nodes, drag the graph, withdraw something and see what it takes with it. Nothing you do here is saved by us.",
+          "The demo is yours to explore — tap nodes, drag the graph, withdraw something and see what it takes with it. Nothing you do here is saved by us.",
+        ),
+        byLayout(
+          "Hover any button to find out what it does. Press ? in the header to read this guided tour again.",
+          "Long-press any button to find out what it does. Open ☰ → Guided tour to read this again.",
+        ),
       ],
       tab: "graph",
       chrome: true,
       text: true,
       focus: [],
+      // The text panel is a tab here, and ending the tour on it would leave the
+      // reader looking at a list rather than at the graph they were just
+      // invited to explore.
+      narrow: { text: false },
     },
   ];
+}
+
+/**
+ * Settles a script written for both layouts into the one being rendered:
+ * drops the sections the other width owns, picks the wording that names the
+ * right route, and merges the `narrow` override over the section itself.
+ *
+ * What comes out is a plain list of sections with `title` and `body` as
+ * strings, so neither tour has to know that the other exists.
+ */
+function forLayout(sections, isNarrow) {
+  const layout = isNarrow ? "narrow" : "wide";
+  const pick = (value) =>
+    value && typeof value === "object" ? value[layout] : value;
+  return sections
+    .filter((s) => !s.only || s.only === layout)
+    .map(({ narrow: override, ...section }) => {
+      const resolved = isNarrow ? { ...section, ...override } : section;
+      return {
+        ...resolved,
+        title: pick(resolved.title),
+        body: resolved.body.map(pick),
+      };
+    });
 }
 
 /**
@@ -324,6 +429,9 @@ function chromeSections() {
  *   relation modes that are on, matching the tabs actually on screen.
  * @param {boolean} options.llmEnabled
  * @param {string}  [options.topic]
+ * @param {boolean} [options.narrow] - Which layout is going to read it. The
+ *   sections are the same either way; this settles where each one says its
+ *   controls are to be found.
  * @returns {TourSection[]}
  */
 export function buildTourSections({
@@ -331,14 +439,18 @@ export function buildTourSections({
   hideNonEntailsRels,
   llmEnabled,
   topic,
+  narrow = false,
 }) {
   const cycle = hideNonEntailsRels
     ? "judgments → principles → arguments"
     : "judgments → principles → relations → arguments";
-  return [
-    ...openingSections(topic),
-    ...(isSample ? graphSections() : []),
-    ...assistSections(cycle, llmEnabled),
-    ...chromeSections(),
-  ];
+  return forLayout(
+    [
+      ...openingSections(topic),
+      ...(isSample ? graphSections() : []),
+      ...assistSections(cycle, llmEnabled),
+      ...chromeSections(),
+    ],
+    narrow,
+  );
 }

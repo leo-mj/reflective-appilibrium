@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import { GuidedTour } from "./GuidedTour.jsx";
-import { TOUR_Z } from "./tourZ.js";
+import { TOUR_Z, sheetHeight } from "./tourZ.js";
 import { SAMPLE_STATE } from "../../state.js";
 
 beforeEach(() => {
@@ -314,6 +314,109 @@ describe("leaving", () => {
     walkTo("That's the tour");
     fireEvent.click(screen.getByText("Finish"));
     expect(spies.onClose).toHaveBeenCalled();
+  });
+});
+
+describe("the same tour on a narrow screen", () => {
+  // A phone has no room for a column beside the graph, so the tour lies along
+  // the bottom edge instead — and that is the whole of the difference. It reads
+  // the same script, the graph above it keeps up the same way, and the ☰ menu
+  // stands in for the tab bar and the header buttons the width cannot hold.
+  const openSheet = (overrides = {}) =>
+    openTour({ layout: "sheet", ...overrides });
+  const sheetVar = () =>
+    document.documentElement.style.getPropertyValue("--tour-sheet-h");
+
+  it("carries the chapters the phone's old card stack never had", () => {
+    openSheet();
+    expect(screen.getByText("Reflective equilibrium")).toBeTruthy();
+    expect(screen.getByText(/Judgments — the concrete verdicts/)).toBeTruthy();
+    expect(screen.getByText(/Assist proposes, you decide/)).toBeTruthy();
+  });
+
+  it("frames and selects on the graph above it, same as the column does", () => {
+    const spies = openSheet();
+    walkTo("Judgments — the concrete verdicts");
+
+    expect(spies.onFocusGraph).toHaveBeenLastCalledWith(["J1"]);
+    expect(lastSelectedNode(spies)).toBe("J1");
+  });
+
+  it("asks for the ☰ menu where the column asks for the header", () => {
+    // Undo is ringed in the header on a wide screen. There is no room for it
+    // there at this width, so the section that points at it opens the menu.
+    const spies = openSheet();
+    walkTo("Revising the graph");
+
+    expect(spies.onSetChrome).toHaveBeenLastCalledWith({
+      chrome: false,
+      text: false,
+      menu: true,
+      addBar: false,
+    });
+  });
+
+  it("opens the text as a tab, having no panel to put beside the graph", () => {
+    const spies = openSheet();
+    walkTo("The text view");
+
+    expect(spies.onSetTab).toHaveBeenLastCalledWith("text");
+    expect(spies.onSetChrome).toHaveBeenLastCalledWith({
+      chrome: false,
+      text: false,
+      menu: false,
+      addBar: false,
+    });
+  });
+
+  it("introduces the ☰ menu once, before it starts opening it", () => {
+    openSheet();
+    expect(screen.getByText(/Everything else is behind ☰/)).toBeTruthy();
+  });
+
+  it("swaps between its two heights from the handle, and says which", () => {
+    const onExpandChange = vi.fn();
+    openSheet({ onExpandChange });
+
+    const handle = screen.getByLabelText("Expand the tour");
+    fireEvent.pointerDown(handle, { clientY: 100 });
+    fireEvent.pointerUp(handle, { clientY: 100 });
+
+    expect(onExpandChange).toHaveBeenLastCalledWith(true);
+    expect(screen.getByLabelText("Shrink the tour")).toBeTruthy();
+  });
+
+  it("takes a swipe as the direction asked for rather than as a toggle", () => {
+    // Dragging a short sheet further down should leave it short, not expand it
+    // because a tap would have.
+    const onExpandChange = vi.fn();
+    openSheet({ onExpandChange });
+
+    const handle = screen.getByLabelText("Expand the tour");
+    fireEvent.pointerDown(handle, { clientY: 100 });
+    fireEvent.pointerUp(handle, { clientY: 180 });
+
+    expect(onExpandChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("publishes its height, so the ☰ menu can bound itself to what is left", () => {
+    // That menu is longer than a phone is tall and nowhere near the tour in the
+    // tree, so the number reaches it as a custom property rather than a prop.
+    openSheet();
+    expect(sheetVar()).toBe(`${sheetHeight(window.innerHeight, false)}px`);
+  });
+
+  it("gives the bottom edge back on the way out", () => {
+    const spies = openSheet();
+    fireEvent.click(screen.getByText("Close tour"));
+    expect(spies.onClose).toHaveBeenCalled();
+    cleanup();
+    expect(sheetVar()).toBe("");
+  });
+
+  it("leaves the bottom edge alone on a wide screen", () => {
+    openTour();
+    expect(sheetVar()).toBe("");
   });
 });
 

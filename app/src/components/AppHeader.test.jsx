@@ -20,7 +20,7 @@ vi.mock("../config.js", async (importOriginal) => ({
 
 import { AppHeader } from "./AppHeader.jsx";
 import { TAB_LABELS } from "../constants/tabConstants.jsx";
-import { TOUR_Z } from "./TutorialStepper.jsx";
+import { TOUR_Z } from "./tour/tourZ.js";
 
 afterEach(() => {
   cleanup();
@@ -260,11 +260,12 @@ describe("the narrow text button", () => {
 });
 
 describe("the guided tour", () => {
-  // Which tour runs is a property of the width, and the header only owns one of
-  // them. The phone's card stack is mounted here, next to the ☰ menu it walks;
-  // the wide tour drives the graph's selection and framing, so REState mounts
-  // that one and both of them run off the `tourActive` it holds.
-  const welcome = () => screen.queryByText(/Welcome to Reflective APPilibrium/);
+  // The tour itself is mounted by REState at either width — it reads the demo
+  // graph, so it needs the selection and the framing only that component holds.
+  // What the header owns is the ☰ menu the narrow tour walks: opening it when
+  // the tour asks, and lifting it over the tour's dim while it does.
+  const assistGroup = () =>
+    document.querySelector('[data-tutorial="menu-assist"]');
 
   it("asks the app to start the tour rather than starting one itself", () => {
     const onStartTour = vi.fn();
@@ -272,7 +273,6 @@ describe("the guided tour", () => {
 
     fireEvent.click(screen.getByLabelText("Start the step-by-step tour"));
     expect(onStartTour).toHaveBeenCalled();
-    expect(welcome()).toBeNull();
   });
 
   it("can be started from the narrow menu", () => {
@@ -284,33 +284,52 @@ describe("the guided tour", () => {
     expect(onStartTour).toHaveBeenCalled();
   });
 
-  it("shows the phone's card stack while the tour runs, but never on a wide screen", () => {
+  it("renders no tour of its own, at either width", () => {
+    // Two tours on screen at once is what this header used to be capable of.
     render(<AppHeader {...PROPS} tourActive isWide={false} />);
-    expect(welcome()).not.toBeNull();
+    expect(screen.queryByLabelText("Guided tour")).toBeNull();
     cleanup();
 
-    // The wide tour is a scrolling page mounted by REState. Rendering the phone
-    // cards here too would put two tours on screen at once.
     render(<AppHeader {...PROPS} tourActive isWide />);
-    expect(welcome()).toBeNull();
+    expect(screen.queryByLabelText("Guided tour")).toBeNull();
   });
 
-  it("opens the narrow menu itself once the tour gets that far", () => {
-    render(<AppHeader {...PROPS} tourActive isWide={false} />);
-    // The tour opens the menu when it reaches the steps that walk it, not before.
-    expect(document.querySelector('[data-tutorial="menu-assist"]')).toBeNull();
+  it("opens the narrow menu when the tour reaches what is inside it", () => {
+    const { rerender } = render(
+      <AppHeader {...PROPS} tourActive isWide={false} />,
+    );
+    // Shut until a section asks: the opening chapters are read against the
+    // graph, and the menu covers it.
+    expect(assistGroup()).toBeNull();
 
-    // welcome → the graph → the ☰ button → the first section inside it
-    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByText("Next →"));
-
-    expect(screen.getByText(/Assist — the RE cycle/)).toBeTruthy();
-    const section = document.querySelector('[data-tutorial="menu-assist"]');
+    rerender(<AppHeader {...PROPS} tourActive isWide={false} tourMenuOpen />);
+    const section = assistGroup();
     expect(section).not.toBeNull();
-    // Lifted over the tour's dim, or the section being described reads as
-    // greyed out as everything else.
+    // Lifted over the tour's dim, or the entry being described reads as greyed
+    // out as everything else.
     expect(section.closest('[style*="position: absolute"]').style.zIndex).toBe(
       String(TOUR_Z.menu),
     );
+
+    // And shut again when the tour moves past them.
+    rerender(
+      <AppHeader {...PROPS} tourActive isWide={false} tourMenuOpen={false} />,
+    );
+    expect(assistGroup()).toBeNull();
+  });
+
+  it("leaves a menu the reader opened themselves alone", () => {
+    // The tour only touches the menu as it crosses into and out of the sections
+    // that walk it. Anything else and opening it mid-tour would snap shut on
+    // the next render.
+    const { rerender } = render(
+      <AppHeader {...PROPS} tourActive isWide={false} />,
+    );
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    expect(assistGroup()).not.toBeNull();
+
+    rerender(<AppHeader {...PROPS} tourActive isWide={false} round={9} />);
+    expect(assistGroup()).not.toBeNull();
   });
 });
 

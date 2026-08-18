@@ -86,6 +86,30 @@ selection dims the rest of the graph.
 
 Tabs: Graph (D3 force-directed), Text, History (slider, 3.2s/round). Node positions stable via shared force simulation on all elements including withdrawn.
 
+## Guided tour
+
+One script, two layouts. `tour/tourSections.js` is the whole tour — an ordered
+list of sections, each describing what the reader should *see* while they read
+it (tab, chrome, graph framing, selection, control to ring). `tour/GuidedTour.jsx`
+applies it and renders it either as a `column` down a wide screen's left edge or
+as a `sheet` along a narrow one's bottom, both scroll-driven, with the app
+padding itself by whichever edge it has given away (`TOUR_W`, `sheetHeight()`).
+
+**Never fork the script.** A phone used to get a separate nine-card tour that
+walked the ☰ menu and never mentioned reflective equilibrium — the one thing a
+first-time visitor is there to find out. What may legitimately differ between
+the widths is the *route* to a control, never the substance:
+
+- `narrow: { … }` on a section overrides where its control lives at that width
+  (`btn-undo` → `menu-undo`) and what has to be on screen to see it.
+- `byLayout(wide, narrow)` covers a paragraph or title that has to name a
+  different route. Both wordings sit side by side, so they cannot drift.
+- `only: "narrow" | "wide"` is for the rare section describing something the
+  other width does not have. There is exactly one today (`narrow-menu`).
+
+`tourSections.test.js` holds both layouts to the same chapters and the same
+paragraph counts, so dropping a paragraph rather than rewording it fails.
+
 ## LLM integration
 
 - LLM response must include a fenced ` ```re-state ``` ` block; parser extracts it

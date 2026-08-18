@@ -220,6 +220,75 @@ describe("the guided tour", () => {
   });
 });
 
+describe("the guided tour on a narrow screen", () => {
+  // Same tour, laid along the bottom edge because there is no room for a column
+  // beside the graph. What this component owns is the other half of that deal:
+  // keeping the app clear of the sheet, and driving the ☰ menu the sections
+  // walk in place of the tab bar this width does not have.
+  const narrowViewport = () => {
+    window.innerWidth = 420;
+    window.innerHeight = 800;
+  };
+
+  beforeEach(narrowViewport);
+  afterEach(() => {
+    window.innerWidth = 1024;
+    window.innerHeight = 768;
+    sessionStorage.removeItem("startTour");
+  });
+
+  const workspace = () =>
+    screen.getByLabelText("Reflective equilibrium workspace").closest("main");
+
+  it("runs the tour here too, rather than a card stack of its own", () => {
+    sessionStorage.setItem("startTour", "1");
+    open();
+    expect(screen.queryByLabelText("Guided tour")).not.toBeNull();
+    // The method, which the phone's old tour never mentioned.
+    expect(screen.getByText("Reflective equilibrium")).toBeTruthy();
+  });
+
+  it("keeps the app clear of the sheet, and gives the space back after", () => {
+    // The graph is read against the tour at this width just as at any other, so
+    // it has to be above the sheet rather than behind it.
+    sessionStorage.setItem("startTour", "1");
+    open();
+    const padded = parseInt(workspace().style.paddingBottom, 10);
+    expect(padded).toBeGreaterThan(16);
+
+    fireEvent.click(screen.getByText("Close tour"));
+    expect(workspace().style.paddingBottom).toBe("16px");
+  });
+
+  it("gives more of it away when the reader expands the sheet", () => {
+    sessionStorage.setItem("startTour", "1");
+    open();
+    const before = parseInt(workspace().style.paddingBottom, 10);
+
+    fireEvent.click(screen.getByLabelText("Expand the tour"));
+    expect(parseInt(workspace().style.paddingBottom, 10)).toBeGreaterThan(
+      before,
+    );
+  });
+
+  it("opens the ☰ menu for the sections that walk it", () => {
+    // Those entries stand in for the tab bar and the header buttons the wide
+    // tour rings, and none of them are in the DOM until the menu is open.
+    sessionStorage.setItem("startTour", "1");
+    open();
+    const filesEntry = () =>
+      document.querySelector('[data-tutorial="menu-files"]');
+    expect(filesEntry()).toBeNull();
+
+    for (let i = 0; i < 40 && !filesEntry(); i++) {
+      const button = screen.queryByText("Next ↓");
+      if (!button) break;
+      fireEvent.click(button);
+    }
+    expect(filesEntry()).not.toBeNull();
+  });
+});
+
 describe("questionnaire mode", () => {
   it("still opens on its own tab, which is the whole point of that mode", () => {
     const spec = {

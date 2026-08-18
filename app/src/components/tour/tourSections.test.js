@@ -114,6 +114,85 @@ describe("the tour's shape", () => {
   });
 });
 
+describe("the same tour at either width", () => {
+  // The phone used to get a different tour entirely — nine cards that walked
+  // the ☰ menu and never said what reflective equilibrium was, which is the one
+  // thing a first-time visitor is there to find out. One script now serves
+  // both, and what may differ between them is the route to a control: never
+  // which chapters a reader gets.
+  const narrow = (overrides = {}) => build({ narrow: true, ...overrides });
+  const byId = (sections) => new Map(sections.map((s) => [s.id, s]));
+
+  it("says the same things on a phone as on a desktop", () => {
+    const narrowIds = ids(narrow());
+    ids(build()).forEach((id) => expect(narrowIds).toContain(id));
+  });
+
+  it("adds only what the other width has no equivalent of", () => {
+    // The tab bar's chapter is the ☰ menu's chapter here, so the menu has to be
+    // introduced once before the tour starts opening it.
+    const wideIds = ids(build());
+    expect(ids(narrow()).filter((id) => !wideIds.includes(id))).toEqual([
+      "narrow-menu",
+    ]);
+  });
+
+  it("tells both widths as much as each other, section for section", () => {
+    // A paragraph dropped rather than reworded is the old narrow tour coming
+    // back one line at a time.
+    const wide = byId(build());
+    narrow().forEach((s) => {
+      const twin = wide.get(s.id);
+      if (twin) expect(s.body.length, s.id).toBe(twin.body.length);
+    });
+  });
+
+  it("points at each control where that width actually keeps it", () => {
+    const wide = byId(build());
+    const thin = byId(narrow());
+    // Undo is a header button on one and a ☰ entry on the other; Assist is a
+    // tab-bar group on one and a menu group on the other.
+    expect(wide.get("revising").target).toBe("btn-undo");
+    expect(thin.get("revising").target).toBe("menu-undo");
+    expect(wide.get("assist").target).toBe("meta-assist");
+    expect(thin.get("assist").target).toBe("menu-assist");
+    // And the text is a panel beside the graph on one, a tab of its own on the
+    // other — so it is reached by opening it rather than by asking for chrome.
+    expect(wide.get("text").text).toBe(true);
+    expect(thin.get("text").tab).toBe("text");
+  });
+
+  it("only rings what is on screen at that width", () => {
+    // There is no tab bar here, so everything the tour points at is either
+    // always drawn or inside the ☰ menu — and the menu ones have to open it.
+    const ALWAYS_DRAWN = ["topic", "btn-menu", "graph-add", "text-panel"];
+    narrow()
+      .filter((s) => s.target && !ALWAYS_DRAWN.includes(s.target))
+      .forEach((s) => {
+        expect(s.menu, `${s.id} rings ${s.target} with the menu shut`).toBe(
+          true,
+        );
+      });
+  });
+
+  it("never points twice at the same control either", () => {
+    const targets = narrow()
+      .flatMap((s) => (s.target ? [s.target].flat() : []))
+      .filter(Boolean);
+    expect(new Set(targets).size).toBe(targets.length);
+  });
+
+  it("hands the tour plain strings, whichever width is reading", () => {
+    // The per-layout wordings are resolved here, so neither tour has to know
+    // that the other exists.
+    [...build(), ...narrow()].forEach((s) => {
+      expect(typeof s.title, s.id).toBe("string");
+      expect(s.title.length).toBeGreaterThan(0);
+      s.body.filter(Boolean).forEach((p) => expect(typeof p).toBe("string"));
+    });
+  });
+});
+
 describe("what the tour claims", () => {
   it("owns up to the demo build having no model behind it", () => {
     const assist = build({ llmEnabled: false }).find((s) => s.id === "assist");

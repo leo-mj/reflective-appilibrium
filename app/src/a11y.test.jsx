@@ -27,7 +27,10 @@ const NEEDS_A_BROWSER = ["color-contrast", "target-size"];
  */
 async function violationsIn(container) {
   const results = await axe.run(container, {
-    runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] },
+    runOnly: {
+      type: "tag",
+      values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+    },
     rules: Object.fromEntries(
       NEEDS_A_BROWSER.map((id) => [id, { enabled: false }]),
     ),
@@ -82,12 +85,16 @@ const expectSaneHeadings = (container) => {
   const levels = [...container.querySelectorAll("h1,h2,h3,h4,h5,h6")].map((h) =>
     Number(h.tagName[1]),
   );
-  expect(levels.filter((l) => l === 1), "expected exactly one h1").toHaveLength(1);
+  expect(
+    levels.filter((l) => l === 1),
+    "expected exactly one h1",
+  ).toHaveLength(1);
   expect(levels[0], "the first heading should be the h1").toBe(1);
   levels.reduce((deepest, level) => {
-    expect(level, `heading jumped from h${deepest} to h${level}`).toBeLessThanOrEqual(
-      deepest + 1,
-    );
+    expect(
+      level,
+      `heading jumped from h${deepest} to h${level}`,
+    ).toBeLessThanOrEqual(deepest + 1);
     return Math.max(deepest, level);
   }, 1);
 };
@@ -150,6 +157,25 @@ describe("the main app view", () => {
     expect(unnamedButtons(container)).toBe("");
     expectSaneHeadings(container);
     sessionStorage.removeItem("startTour");
+    vi.unstubAllGlobals();
+  });
+
+  it("still has none with the tour open as a sheet on a narrow screen", async () => {
+    // Same prose, laid along the bottom edge — plus one control the column has
+    // no use for, the handle that swaps the sheet between its two heights. A
+    // grabber bar is a drag affordance with nothing to announce unless it is
+    // given a name, so this is the audit that holds it to one.
+    stubBrowserWork();
+    window.innerWidth = 420;
+    window.innerHeight = 800;
+    sessionStorage.setItem("startTour", "1");
+    const { container } = app();
+    await expectNoViolations(container);
+    expect(unnamedButtons(container)).toBe("");
+    expectSaneHeadings(container);
+    sessionStorage.removeItem("startTour");
+    window.innerWidth = 1024;
+    window.innerHeight = 768;
     vi.unstubAllGlobals();
   });
 });

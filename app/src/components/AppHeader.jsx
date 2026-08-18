@@ -5,7 +5,6 @@
 
 import { useState, useRef } from "react";
 import { TutorialOverlay } from "./TutorialOverlay.jsx";
-import { TutorialStepper } from "./TutorialStepper.jsx";
 
 const SaveIcon = () => (
   <svg
@@ -67,13 +66,17 @@ import { C } from "../constants/colors.js";
  * @param {function} props.onRedo
  * @param {boolean}  props.canRedo
  * @param {boolean}  props.tourActive  - Whether the guided tour is running. Held
- *   by REState because the wide tour drives the graph, not just the header.
- * @param {function} props.onStartTour - Behind the header's ? button.
- * @param {function} props.onCloseTour
+ *   by REState because the tour drives the graph, not just the header — at
+ *   either width. All this header does with it is lift the ☰ menu over the
+ *   tour's dim while the tour is describing what is inside it.
+ * @param {function} props.onStartTour - Behind the header's ? button, and the
+ *   matching ☰ entry at narrow widths.
  * @param {boolean}  props.hideTabBar  - Set while the wide tour's opening
- *   chapters read against a bare graph.
- * @param {boolean}  props.tourMenuOpen - The wide tour walks the ☰ menu's own
- *   entries, so it opens and shuts the menu as it goes.
+ *   chapters read against a bare graph. There is no tab bar to hide at narrow
+ *   widths, where the same chapters are read against the ☰ menu staying shut.
+ * @param {boolean}  props.tourMenuOpen - The tour walks the ☰ menu's own
+ *   entries, so it opens and shuts the menu as it goes. Both menus: the wide
+ *   header keeps its own, and this one holds the narrow header's.
  */
 export function AppHeader({
   round,
@@ -112,12 +115,21 @@ export function AppHeader({
   onResetWeights,
   tourActive,
   onStartTour,
-  onCloseTour,
   hideTabBar,
   tourMenuOpen,
 }) {
   const fileInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The narrow tour walks the ☰ menu's own entries, so it opens and shuts the
+  // menu as it goes — but only as it crosses into and out of those sections,
+  // which is what tracking the last value it asked for gives us. Left as a
+  // plain effect it would slam the menu shut again every time the reader opened
+  // it themselves mid-tour. (The wide header does the same for its own menu.)
+  const [tourWantedMenu, setTourWantedMenu] = useState(!!tourMenuOpen);
+  if (tourWantedMenu !== !!tourMenuOpen) {
+    setTourWantedMenu(!!tourMenuOpen);
+    setMenuOpen(!!tourMenuOpen);
+  }
   const [tutorialMode] = useState(false);
   const [importConfirmPending, setImportConfirmPending] = useState(null);
   const [importError, setImportError] = useState(null);
@@ -261,22 +273,15 @@ export function AppHeader({
   };
 
   if (!isWide) {
-    // The phone's tour is a stack of cards that walks the ☰ menu, because on a
-    // screen this narrow the menu is where everything except the graph lives.
-    // The wide tour is a different thing entirely — a page the reader scrolls,
-    // mounted by REState, which is where the graph selection it drives lives.
+    // Both tours are mounted by REState — they read the demo graph, so they
+    // need the selection and the framing only that component holds. What the
+    // header owns at this width is the ☰ menu the tour walks, which it opens
+    // and shuts on the tour's behalf.
     return (
       <>
         {hiddenInput}
         {importModals}
         <TutorialOverlay active={tutorialMode} />
-        <TutorialStepper
-          active={tourActive}
-          onClose={onCloseTour}
-          onSetTab={setTab}
-          onSetMenuOpen={setMenuOpen}
-          hideNonEntailsRels={hideNonEntailsRels}
-        />
         <AppHeaderNarrow
           {...shared}
           menuOpen={menuOpen}

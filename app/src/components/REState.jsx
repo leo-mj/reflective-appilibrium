@@ -19,6 +19,7 @@ import { AppHeader } from "./AppHeader.jsx";
 import { TextPanel } from "./TextPanel.jsx";
 import { GraphPanel } from "./GraphPanel.jsx";
 import { GuidedTour, TOUR_W } from "./tour/GuidedTour.jsx";
+import { sheetHeight } from "./tour/tourZ.js";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
@@ -54,6 +55,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   // bare graph, and bring the tab bar, the text panel and the ☰ menu back as
   // each becomes what the reader is being shown.
   const [tourChrome, setTourChrome] = useState({ chrome: true, text: true });
+  // Whether the narrow tour's sheet is at its taller height, which is how much
+  // of the bottom edge the app has to keep clear of it.
+  const [tourExpanded, setTourExpanded] = useState(false);
   const [graphFocus, setGraphFocus] = useState(null);
   const focusSeq = useRef(0);
   // A new key on every call, so scrolling back to a section re-frames it even
@@ -124,7 +128,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   useEffect(() => {
     const onKeyDown = (e) => {
       // Never while typing: in a textarea these are the editor's own undo.
-      if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+      if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")
+        return;
       if (!(e.ctrlKey || e.metaKey)) return;
 
       // Ctrl/Cmd+Shift+Z, and Ctrl+Y for the Windows habit.
@@ -146,8 +151,12 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
   const dims = useWindowSize();
   const isWide = dims.w > 768 && dims.h > 500;
-  // The phone gets its own tour, run from the header; this is the wide one.
+  // The same tour either way; what differs is where the screen has room for it.
+  // Wide reads it down a column beside the graph, narrow along a sheet under
+  // it, and the app pads itself by whichever edge it has given away.
   const wideTour = isWide && tourActive;
+  const narrowTour = !isWide && tourActive;
+  const tourSheetH = narrowTour ? sheetHeight(dims.h, tourExpanded) : 0;
   const tourHidesChrome = wideTour && !tourChrome.chrome;
   // The add bar goes away with the rest of the chrome for the chapters that are
   // about reading the graph — except for the one section that is about adding
@@ -336,11 +345,14 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         display: "flex",
         flexDirection: "column",
         padding: 16,
-        // The tour is a fixed column down the left edge. Padding the app by its
-        // width keeps everything it points at out from under it.
+        // The tour is fixed to one edge — the left on a wide screen, the bottom
+        // on a narrow one. Padding the app by what it takes keeps everything it
+        // points at, and the graph it is read against, out from under it.
         paddingLeft: wideTour ? TOUR_W + 16 : 16,
+        paddingBottom: narrowTour ? tourSheetH + 16 : 16,
         opacity: ready ? 1 : 0,
-        transition: "opacity 0.6s ease, padding-left 0.35s ease",
+        transition:
+          "opacity 0.6s ease, padding-left 0.35s ease, padding-bottom 0.3s ease",
       }}
     >
       {!LLM_ENABLED && (
@@ -400,9 +412,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onResetWeights={() => setWeights(DEFAULT_WEIGHTS)}
         tourActive={tourActive}
         onStartTour={() => setTourActive(true)}
-        onCloseTour={() => setTourActive(false)}
         hideTabBar={tourHidesChrome}
-        tourMenuOpen={wideTour && tourChrome.menu}
+        tourMenuOpen={tourActive && !!tourChrome.menu}
       />
 
       <section
@@ -478,20 +489,20 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
       {/* After the header, so the tour's own headings never come before the
           page's h1 in the reading order. */}
-      {isWide && (
-        <GuidedTour
-          active={tourActive}
-          state={state}
-          isSample={isSample}
-          hideNonEntailsRels={hideNonEntailsRels}
-          onClose={() => setTourActive(false)}
-          onSetTab={handleSetTab}
-          onSelectNode={handleSelectNode}
-          onSelectRel={handleSelectRel}
-          onSetChrome={setTourChrome}
-          onFocusGraph={focusGraph}
-        />
-      )}
+      <GuidedTour
+        active={tourActive}
+        state={state}
+        isSample={isSample}
+        hideNonEntailsRels={hideNonEntailsRels}
+        onClose={() => setTourActive(false)}
+        onSetTab={handleSetTab}
+        onSelectNode={handleSelectNode}
+        onSelectRel={handleSelectRel}
+        onSetChrome={setTourChrome}
+        onFocusGraph={focusGraph}
+        layout={isWide ? "column" : "sheet"}
+        onExpandChange={setTourExpanded}
+      />
 
       <EditModals
         editingEl={editingEl}

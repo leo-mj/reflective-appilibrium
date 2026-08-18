@@ -1,16 +1,25 @@
 /**
- * @fileoverview The wide-screen guided tour: one page the visitor scrolls.
+ * @fileoverview The guided tour: one page the visitor scrolls, beside the app
+ * rather than over it.
  *
- * The tour is a column down the left of the screen. Scrolling it is what moves
- * the tour on — whichever section is nearest the reading line is the active
- * one, and the app behind rearranges itself to show what that section is
- * talking about: the graph zooms to the elements named, selects them, opens the
- * tab under discussion, and rings a control when the section is about one.
+ * Scrolling it is what moves the tour on — whichever section is nearest the
+ * reading line is the active one, and the app rearranges itself to show what
+ * that section is talking about: the graph zooms to the elements named, selects
+ * them, opens the tab under discussion, and rings a control when the section is
+ * about one.
  *
  * Why a page rather than a stack of Next/Back cards: the opening chapters are
  * an explanation of a method, not a walk round a toolbar, and they read better
  * as continuous prose with the graph answering alongside. Back and Next remain
  * in the footer for anyone who would rather step than scroll.
+ *
+ * **Two layouts, one tour.** `column` runs down the left of a wide screen;
+ * `sheet` runs along the bottom of a narrow one. The difference is where the
+ * reader's own screen has room — beside the graph or under it — and nothing
+ * else: the same script, the same scrolling, the same graph keeping up. A phone
+ * used to get a stack of cards that walked the ☰ menu and never said what
+ * reflective equilibrium was, which is the one thing a first-time visitor is
+ * there to find out.
  *
  * The script lives in `tourSections.js`; this file only applies it.
  *
@@ -21,12 +30,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { C, typeTokens } from "../../constants/colors.js";
 import { LLM_ENABLED } from "../../config.js";
 import { buildTourSections } from "./tourSections.js";
-import { TOUR_W, TOUR_Z } from "./tourZ.js";
+import { TOUR_W, TOUR_Z, sheetHeight } from "./tourZ.js";
 
 // Re-exported for the app around it, which pads itself by the column's width.
 export { TOUR_W };
 
 const RING_PAD = 5;
+
+/** Gap left above the sheet when it scrolls a ringed control clear of it. */
+const REVEAL_PAD = 12;
+
+/** Past this, a press on the sheet's handle is a swipe rather than a tap. */
+const SWIPE_MIN = 8;
 
 /**
  * How far down the column the reading line sits, as a fraction of its height.
@@ -124,6 +139,57 @@ function ProgressBar({ value }) {
   );
 }
 
+/**
+ * The grabber along the top of the narrow sheet: tap to swap between the two
+ * heights, or swipe it the way you want it to go.
+ *
+ * A button rather than a bare drag surface, so it has a name, a tab stop and an
+ * expanded state. Two heights rather than a free drag because the sheet is
+ * sharing the screen with a graph that reflows to whatever is left: a
+ * continuous drag would have the graph re-fitting under the reader's thumb all
+ * the way down.
+ */
+function SheetHandle({ expanded, onToggle }) {
+  const pressedAt = useRef(null);
+  return (
+    <button
+      onPointerDown={(e) => {
+        pressedAt.current = e.clientY;
+      }}
+      onPointerUp={(e) => {
+        const dy = e.clientY - (pressedAt.current ?? e.clientY);
+        onToggle(Math.abs(dy) < SWIPE_MIN ? !expanded : dy < 0);
+      }}
+      // Keyboards and assistive tech never send the pointer events above.
+      onClick={(e) => {
+        if (e.detail === 0) onToggle(!expanded);
+      }}
+      aria-expanded={expanded}
+      aria-label={expanded ? "Shrink the tour" : "Expand the tour"}
+      style={{
+        background: "transparent",
+        border: "none",
+        padding: "8px 0 4px",
+        width: "100%",
+        display: "flex",
+        justifyContent: "center",
+        cursor: "pointer",
+        touchAction: "none",
+      }}
+    >
+      <span
+        style={{
+          width: 36,
+          height: 4,
+          borderRadius: 2,
+          background: C.border,
+          display: "block",
+        }}
+      />
+    </button>
+  );
+}
+
 const navBtn = (enabled) => ({
   background: "transparent",
   border: `1px solid ${C.border}`,
@@ -158,6 +224,37 @@ function applicableSections(sections, state) {
   });
 }
 
+/** The nearest ancestor that has somewhere to scroll to. */
+function scrollParent(el) {
+  for (let node = el?.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if (
+      (overflowY === "auto" || overflowY === "scroll") &&
+      node.scrollHeight > node.clientHeight
+    )
+      return node;
+  }
+  return null;
+}
+
+/**
+ * Scrolls a control out from behind the narrow sheet.
+ *
+ * Most of what that layout rings are entries in the ☰ menu, which is longer
+ * than the strip of screen left above the sheet. `scrollIntoView` will not do
+ * it: it reckons in viewport, and by the viewport's arithmetic an entry behind
+ * the sheet is already perfectly visible.
+ *
+ * @param {Element} el
+ * @param {number}  limitY - Screen y the sheet's top edge sits at.
+ */
+function revealAbove(el, limitY) {
+  const box = scrollParent(el);
+  if (!box) return;
+  const overshoot = el.getBoundingClientRect().bottom - limitY;
+  if (overshoot > 0) box.scrollTop += overshoot + REVEAL_PAD;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 /**
@@ -173,6 +270,11 @@ function applicableSections(sections, state) {
  * @param {Function} props.onSetChrome    - `{ chrome, text, menu, addBar }` —
  *   what the app should have on screen for the section being read.
  * @param {Function} props.onFocusGraph   - Element IDs to frame, or null for all of them.
+ * @param {"column"|"sheet"} [props.layout] - Where the reader's screen has room
+ *   for it: a column beside the app, or a sheet under it.
+ * @param {Function} [props.onExpandChange] - Sheet only. The app pads itself by
+ *   the sheet's height, and works that height out from the same viewport, so
+ *   only the expanded flag has to cross.
  */
 export function GuidedTour({
   active,
@@ -185,7 +287,10 @@ export function GuidedTour({
   onSelectRel,
   onSetChrome,
   onFocusGraph,
+  layout = "column",
+  onExpandChange,
 }) {
+  const sheet = layout === "sheet";
   const sections = useMemo(
     () =>
       applicableSections(
@@ -194,21 +299,35 @@ export function GuidedTour({
           hideNonEntailsRels,
           llmEnabled: LLM_ENABLED,
           topic: state.topic,
+          narrow: sheet,
         }),
         state,
       ),
     // The script depends on the shape of the state, not on every edit to it:
     // rebuilding on each keystroke would reset nothing but would churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isSample, hideNonEntailsRels, state.topic, state.elements.length],
+    [isSample, hideNonEntailsRels, state.topic, state.elements.length, sheet],
   );
 
   const [idx, setIdx] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const setSheetExpanded = useCallback(
+    (value) => {
+      setExpanded(value);
+      onExpandChange?.(value);
+    },
+    [onExpandChange],
+  );
   const [rects, setRects] = useState(EMPTY);
   const panelRef = useRef(null);
   const scrollRef = useRef(null);
   const sectionRefs = useRef([]);
   const quietUntil = useRef(0);
+  // Resizing across the wide/narrow line mid-tour rebuilds the script, and the
+  // two are not the same length — the sheet carries a section introducing the
+  // ☰ menu that the column has no use for. Left alone, an index taken from the
+  // longer of the two lands past the end of the shorter and the tour vanishes.
+  if (idx > sections.length - 1) setIdx(sections.length - 1);
   const section = sections[idx];
 
   // The spotlight points at a control and dims everything else, which is right
@@ -311,14 +430,19 @@ export function GuidedTour({
   const targets = section?.target ? [section.target].flat() : EMPTY;
   const targetKey = targets.join(" ");
   const measureRing = useCallback(() => {
-    setRects(
-      targets
-        .map((t) => document.querySelector(`[data-tutorial="${t}"]`))
-        .filter(Boolean)
-        .map((el) => el.getBoundingClientRect()),
-    );
+    const found = targets
+      .map((t) => document.querySelector(`[data-tutorial="${t}"]`))
+      .filter(Boolean);
+    // Bring them out from under the sheet before reading where they are, or
+    // the ring is drawn correctly around something nobody can see.
+    if (sheet) {
+      const top =
+        window.innerHeight - sheetHeight(window.innerHeight, expanded);
+      found.forEach((el) => revealAbove(el, top));
+    }
+    setRects(found.map((el) => el.getBoundingClientRect()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetKey]);
+  }, [targetKey, sheet, expanded]);
 
   useEffect(() => {
     if (!active) return;
@@ -367,6 +491,20 @@ export function GuidedTour({
     };
   }, [active]);
 
+  // ── How much of the bottom edge the sheet has taken ───────────────────────
+  // On <html>, beside the theme attributes, because what needs it is a stylesheet
+  // rather than a component: the ☰ menu bounds itself to the space left above
+  // the sheet, and it is nowhere near this in the tree.
+  useEffect(() => {
+    if (!active || !sheet) return;
+    const root = document.documentElement;
+    root.style.setProperty(
+      "--tour-sheet-h",
+      `${sheetHeight(window.innerHeight, expanded)}px`,
+    );
+    return () => root.style.removeProperty("--tour-sheet-h");
+  }, [active, sheet, expanded]);
+
   // ── Leaving ───────────────────────────────────────────────────────────────
   const handleClose = useCallback(() => {
     onSelectNode(() => null);
@@ -403,6 +541,37 @@ export function GuidedTour({
 
   const elementById = new Map(state.elements.map((e) => [e.id, e]));
   const isLast = idx === sections.length - 1;
+  // Read at render rather than held in state: the app around it re-renders on
+  // every resize, and one arithmetic for the sheet's height means the padding
+  // it asks the app for can never disagree with the space it takes.
+  const sheetH = sheet ? sheetHeight(window.innerHeight, expanded) : 0;
+  const panelBox = sheet
+    ? {
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: sheetH,
+        borderTop: `1px solid ${C.border}`,
+        borderRadius: "12px 12px 0 0",
+        boxShadow: "0 -4px 24px rgba(0,0,0,0.35)",
+        transition: "height 0.3s ease",
+      }
+    : {
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: TOUR_W,
+        borderRight: `1px solid ${C.border}`,
+        boxShadow: "4px 0 24px rgba(0,0,0,0.35)",
+      };
+  // The sheet is short, so its furniture is trimmed to leave the prose the room.
+  const pad = sheet ? 16 : 24;
+  // Which chapter the reader is in. The column shows it inline, where it stays
+  // in view; in a sheet a few paragraphs tall it has long scrolled off, so that
+  // layout pins it to the header instead of naming itself there.
+  const chapter = sections
+    .slice(0, idx + 1)
+    .reduce((found, s) => s.chapter ?? found, null);
 
   return (
     <>
@@ -474,21 +643,19 @@ export function GuidedTour({
         aria-label="Guided tour"
         style={{
           position: "fixed",
-          top: 0,
-          left: 0,
-          bottom: 0,
-          width: TOUR_W,
           background: C.panel,
-          borderRight: `1px solid ${C.border}`,
-          boxShadow: "4px 0 24px rgba(0,0,0,0.35)",
           zIndex: TOUR_Z.card,
           display: "flex",
           flexDirection: "column",
+          ...panelBox,
         }}
       >
+        {sheet && (
+          <SheetHandle expanded={expanded} onToggle={setSheetExpanded} />
+        )}
         <div
           style={{
-            padding: "14px 24px 10px",
+            padding: sheet ? `0 ${pad}px 8px` : "14px 24px 10px",
             borderBottom: `1px solid ${C.border}`,
             display: "flex",
             flexDirection: "column",
@@ -512,7 +679,7 @@ export function GuidedTour({
                 color: C.dim,
               }}
             >
-              Guided tour
+              {sheet ? (chapter ?? "Guided tour") : "Guided tour"}
             </span>
             <button
               onClick={handleClose}
@@ -542,7 +709,7 @@ export function GuidedTour({
             // both the reader and those scrolls, landing a section past the
             // one that was asked for.
             position: "relative",
-            padding: "0 24px",
+            padding: `0 ${pad}px`,
           }}
         >
           {sections.map((s, i) => {
@@ -562,7 +729,7 @@ export function GuidedTour({
                 aria-labelledby={`tour-title-${s.id}`}
                 aria-current={isActive ? "step" : undefined}
                 style={{
-                  padding: "24px 0",
+                  padding: sheet ? "16px 0" : "24px 0",
                   borderBottom:
                     i === sections.length - 1
                       ? "none"
@@ -644,13 +811,14 @@ export function GuidedTour({
           {/* Lets the last section climb to the reading line rather than
               stopping at the bottom edge. It cannot reach it on a tall screen,
               which is why `measureActive` also treats "scrolled to the end" as
-              the last section. */}
-          <div style={{ height: "40vh" }} aria-hidden="true" />
+              the last section. Measured against the box rather than the
+              viewport in a sheet, where 40vh would be most of the sheet. */}
+          <div style={{ height: sheet ? "40%" : "40vh" }} aria-hidden="true" />
         </div>
 
         <div
           style={{
-            padding: "10px 24px",
+            padding: `10px ${pad}px`,
             borderTop: `1px solid ${C.border}`,
             display: "flex",
             alignItems: "center",

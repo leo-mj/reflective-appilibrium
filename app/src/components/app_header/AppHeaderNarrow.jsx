@@ -28,7 +28,15 @@ import { MoonIcon, SearchIcon } from "./menuIcons.jsx";
 import { MenuToggle } from "./MenuToggle.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
-import { TOUR_Z } from "../TutorialStepper.jsx";
+import { TOUR_Z } from "../tour/tourZ.js";
+
+/**
+ * What sits above the ☰ menu — the app's padding, the round, the topic — and so
+ * has to come off the height the menu is allowed. Deliberately generous: too
+ * much only makes the menu start scrolling a little early, while too little
+ * puts its last entry back off the bottom of the screen.
+ */
+const MENU_TOP_ALLOWANCE = 96;
 
 export function AppHeaderNarrow({
   round,
@@ -120,7 +128,7 @@ export function AppHeaderNarrow({
           justifyContent: "space-between",
         }}
       >
-        <div style={{ minWidth: 0 }}>
+        <div data-tutorial="topic" style={{ minWidth: 0 }}>
           <h1
             style={{
               fontSize: 14,
@@ -161,10 +169,6 @@ export function AppHeaderNarrow({
             // menu has to sit above the tour's dim rather than under it. The
             // ring draws higher still, and dims everything it does not enclose.
             zIndex: tourActive ? TOUR_Z.menu : 100,
-            // Display only for the duration: a tap during the tour falls
-            // through to the dim, which is what closes the tour, rather than
-            // firing a menu item the card is in the middle of explaining.
-            pointerEvents: tourActive ? "none" : undefined,
             background: C.panel,
             border: `1px solid ${C.border}`,
             borderRadius: 6,
@@ -173,6 +177,13 @@ export function AppHeaderNarrow({
             flexDirection: "column",
             gap: 2,
             width: "100%",
+            // This menu is longer than a phone is tall, and `overflowY` has
+            // nothing to do until something bounds it — so the last entries ran
+            // off the bottom of the screen with no way to reach them. The tour
+            // needs them worse than anyone: it rings them one at a time, and
+            // scrolls this box to bring each one out from behind its sheet,
+            // whose height it publishes on <html> for exactly that.
+            maxHeight: `calc(100dvh - var(--tour-sheet-h, 0px) - ${MENU_TOP_ALLOWANCE}px)`,
             overflowY: "auto",
             boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
           }}
@@ -216,6 +227,7 @@ export function AppHeaderNarrow({
             ))}
             {workflowPhase ? (
               <button
+                data-tutorial="btn-workflow"
                 onClick={close(onStopWorkflow)}
                 style={{
                   ...menuBtn(),
@@ -231,6 +243,7 @@ export function AppHeaderNarrow({
               </button>
             ) : (
               <button
+                data-tutorial="btn-workflow"
                 onClick={close(onStartWorkflow)}
                 style={{ ...menuBtn(), color: C.supports }}
               >
@@ -253,6 +266,7 @@ export function AppHeaderNarrow({
             {ANALYZE_TABS.filter(isTabVisible).map((t) => (
               <button
                 key={t}
+                data-tutorial={`tab-${t}`}
                 onClick={close(() => setTab(t))}
                 style={menuBtn(tab === t)}
               >
@@ -306,6 +320,7 @@ export function AppHeaderNarrow({
             <div style={menuDividerStyle} />
             <div style={menuHeadingStyle}>{MENU_HEADINGS.model}</div>
             <button
+              data-tutorial="btn-llm"
               onClick={() => {
                 setMenuOpen(false);
                 setLlmOpen(true);
