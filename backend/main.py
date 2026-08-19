@@ -25,6 +25,7 @@ from .routers import (
     llm,
     principles,
     relations,
+    review,
     sessions,
     simulate_rethon,
     arguments,
@@ -36,6 +37,16 @@ _handler = logging.StreamHandler()
 _handler.setFormatter(logging.Formatter("%(levelname)-8s %(name)s: %(message)s"))
 logging.getLogger("backend").addHandler(_handler)
 logging.getLogger("backend").setLevel(logging.INFO)
+
+# `import rethon`, reached above through routers.simulate_rethon, applies a logging
+# configuration with `disable_existing_loggers` left at its default — which switches
+# off every logger that already exists, i.e. every module imported before it. That
+# silently dropped all output from the routers earlier in the import list above, the
+# assist routers among them, including the error logs that say a model returned
+# unparseable JSON. Undo it for our own tree; it must stay after the imports.
+for _name, _logger in logging.Logger.manager.loggerDict.items():
+    if _name.startswith("backend") and isinstance(_logger, logging.Logger):
+        _logger.disabled = False
 
 # ── App ────────────────────────────────────────────────────────────────────────
 
@@ -69,6 +80,7 @@ app.include_router(judgments.router, dependencies=_gated)
 app.include_router(llm.router, dependencies=_gated)
 app.include_router(principles.router, dependencies=_gated)
 app.include_router(relations.router, dependencies=_gated)
+app.include_router(review.router, dependencies=_gated)
 app.include_router(
     sessions.router, dependencies=_gated + [Depends(require_sessions_enabled)]
 )

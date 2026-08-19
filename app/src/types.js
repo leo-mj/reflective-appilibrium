@@ -178,6 +178,29 @@ export {};
  */
 
 /**
+ * One LLM reading of the process as a whole, as the user accepted it.
+ *
+ * A review is *about* the process rather than a move in it: accepting one does
+ * not advance the round or write a log entry, for the same reason the round it
+ * reports on must not change underneath it. Reviews accumulate rather than
+ * replace, oldest first, so the series reads as a commentary on the process's
+ * own development — a later review is given the earlier ones and asked to say
+ * what has moved since.
+ *
+ * @typedef {Object} REReview
+ * @property {string} id        - Unique, from {@link module:utils/stateUtils.newReviewId}.
+ * @property {number} round     - The round the process had reached when this was taken.
+ * @property {string} headline  - One sentence naming this review's through-line.
+ * @property {string} arc       - How the position moved across the rounds.
+ * @property {string} surprises - Where the process turned unexpectedly.
+ * @property {string} missed    - Coherence that was available and not taken.
+ * @property {string} method    - How the process was conducted, not what it concluded.
+ * @property {string} model     - The model that produced it, for the AI disclosure.
+ * @property {string} origin    - Provenance, per {@link REElement.origin} — the model
+ *   name, plus a user-edit marker when the review was modified before acceptance.
+ */
+
+/**
  * The complete RE process state.  This is the single source of truth passed down
  * through the component tree.  In Phase 1 it is produced by Claude and pasted in;
  * in Phase 2 it will be maintained live by the app.
@@ -193,6 +216,9 @@ export {};
  * @property {REGroup[]}     [groups]  - The user's graph groups. Absent on every
  *   state written before groups existed; read it through
  *   {@link module:utils/groupUtils.groupsOf} rather than directly.
+ * @property {REReview[]}    [reviews] - Accepted process reviews, oldest first. Absent
+ *   on every state written before reviews existed; read it through
+ *   {@link module:utils/stateUtils.reviewsOf} rather than directly.
  * @property {'questionnaire'} [model] - Present only in questionnaire mode, where the
  *   elements and argument relations are pre-populated and the user works through
  *   questions rather than building the graph themselves.

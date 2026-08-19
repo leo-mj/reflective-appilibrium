@@ -111,6 +111,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleQuestionnaireSelectAnswer,
     handleRejectElements,
     handleRejectRelations,
+    handleSaveReview,
+    handleDiscardReview,
     handleApplyRethonEquilibrium,
     handleImportFile,
     handleCreateGroup,
@@ -329,6 +331,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onScrollToRelations: scrollToRelations,
     onRejectElements: handleRejectElements,
     onRejectRelations: handleRejectRelations,
+    onSaveReview: handleSaveReview,
+    onDiscardReview: handleDiscardReview,
     onApplyRethonEquilibrium: handleApplyRethonEquilibrium,
     weights: effectiveWeights,
     equilibriumPreviewWithdrawnIds:

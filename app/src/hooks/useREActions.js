@@ -10,6 +10,7 @@ import { importStateFromFile } from "../utils/importMarkdown.js";
 import { useElementActions } from "./useElementActions.js";
 import { useGroupActions } from "./useGroupActions.js";
 import { useRelationActions } from "./useRelationActions.js";
+import { useReviewActions } from "./useReviewActions.js";
 
 /** How many past states undo can reach back through. */
 const MAX_UNDO = 20;
@@ -152,6 +153,8 @@ export function useREActions(initialState) {
     setSelectedRel,
   });
 
+  const reviewActions = useReviewActions({ state, mutate });
+
   const relationActions = useRelationActions({
     state,
     mutate,
@@ -239,6 +242,7 @@ export function useREActions(initialState) {
     ...elementActions,
     ...relationActions,
     ...groupActions,
+    ...reviewActions,
     handleImportFile,
     handleQuestionnaireSelectAnswer,
   };

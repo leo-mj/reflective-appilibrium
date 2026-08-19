@@ -119,6 +119,41 @@ export function ClusterIcon({ size = "2em" }) {
   );
 }
 
+/**
+ * A magnifier over a written page: the process, read back.
+ *
+ * Deliberately not another node-and-edge glyph — the Review tab is the one place
+ * in the Assist group whose output is prose about the graph rather than a change
+ * to it, and the icon is the only thing saying so before the panel opens.
+ */
+export function ReviewIcon({ size = "2em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <g
+        stroke="currentColor"
+        strokeWidth="22"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      >
+        <path d="M112 64h198l90 90v200a30 30 0 0 1-30 30H112a30 30 0 0 1-30-30V94a30 30 0 0 1 30-30z" />
+        <polyline points="306,64 306,158 400,158" />
+        <line x1="140" y1="196" x2="240" y2="196" />
+        <line x1="140" y1="254" x2="210" y2="254" />
+      </g>
+      <g stroke="currentColor" strokeWidth="26" strokeLinecap="round" fill="none">
+        <circle cx="286" cy="316" r="72" />
+        <line x1="338" y1="368" x2="418" y2="448" />
+      </g>
+    </svg>
+  );
+}
+
 export function SuggestIcon({ size = "2em" }) {
   return (
     <svg

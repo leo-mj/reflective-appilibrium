@@ -12,10 +12,34 @@ Tests: `npm test` (Vitest, jsdom) and `npm run test:e2e` (Playwright — see `e2
 
 - `src/App.jsx` — root component
 - `src/components/REState.jsx` — main state management and layout
-- `src/components/workflows/` — JudgmentElicitTab, PrincipleSuggestTab, RelationSuggestTab, QuestionnaireTab
+- `src/components/workflows/` — JudgmentElicitTab, PrincipleSuggestTab, RelationSuggestTab, ProcessReviewTab, QuestionnaireTab
 - `src/utils/` — LLM client, workflow utilities, state utilities
 - `src/state.js`, `types.js`, `config.js` — app state and config
 - `src/constants/colors.js` — `C` object with all viz colors
+
+## Process review
+
+`ProcessReviewTab` — the one Assist tab whose output is prose *about* the graph
+rather than a change to it. The domain note is in the root `CLAUDE.md`; what
+matters on this side:
+
+- **It is not a workflow phase.** Three things keep it out, and one alone is not
+  enough: it is absent from `WORKFLOW_NEXT_PHASE`/`WORKFLOW_PHASE_LABELS`;
+  `GraphPanel` passes it `autoFetch={false}` and withholds `workflowPhase`
+  (`autoFetch` is on for the *whole panel* whenever a workflow is running, so
+  passing it through would fire an LLM call at a user who merely switched tabs,
+  past the disclosure the run button carries); and `workflowUtils.test.js` pins
+  the absence. Its place last in `ASSIST_TABS` is deliberate — the four before it
+  are the workflow's phases, in run order.
+- **One review is carried as a one-element `suggestions` list.** That is the
+  shape `useSuggestionWorkflow` consumes, and the fit is otherwise exact: a
+  review *is* a suggestion the user accepts, rejects, or modifies. The sample
+  fixture is stored already in that shape, since `makeLLMClient` serves
+  `dummyData` without running `transformResponse`.
+- **Modify is per-section**, so `editing.draft` is an object of five strings
+  rather than one, and the origin stamp goes through `llmOrigin` as everywhere
+  else. Saved reviews are delete-only: editing happens before acceptance, which
+  is what keeps `origin` honest.
 
 ## Questionnaire mode
 

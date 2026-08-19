@@ -92,6 +92,7 @@ def test_fixture_carries_the_shapes_the_two_sides_disagreed_about():
     assert any(
         e.previous_text is None for e in state.elements
     ), "needs an unset optional field, the kind that used to serialise as null"
+    assert state.reviews, "needs a process review — the newest field across the seam"
 
 
 def test_written_file_contains_no_explicit_nulls(store):

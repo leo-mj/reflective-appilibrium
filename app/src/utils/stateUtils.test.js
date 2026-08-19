@@ -16,6 +16,8 @@ import {
   asOfRound,
   statusTag,
   stateAtRound,
+  reviewsOf,
+  newReviewId,
 } from "./stateUtils.js";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -566,5 +568,39 @@ describe("argumentPostulateExplanation", () => {
     expect(argumentPostulateExplanation(["First bridge.", "Second bridge."])).toBe(
       "Valid given: First bridge. Second bridge.",
     );
+  });
+});
+
+// ─── reviewsOf / newReviewId ──────────────────────────────────────────────────
+
+describe("reviewsOf", () => {
+  it("returns an empty list for a state written before reviews existed", () => {
+    // Every saved state predating the feature lacks the key entirely, which is
+    // why nothing reads `state.reviews` directly.
+    expect(reviewsOf({ round: 1, elements: [] })).toEqual([]);
+  });
+
+  it("tolerates a missing state", () => {
+    expect(reviewsOf(undefined)).toEqual([]);
+    expect(reviewsOf(null)).toEqual([]);
+  });
+
+  it("returns the reviews in the order they were accepted", () => {
+    const reviews = [{ id: "a", round: 2 }, { id: "b", round: 5 }];
+    expect(reviewsOf({ reviews })).toBe(reviews);
+  });
+});
+
+describe("newReviewId", () => {
+  it("is unique across calls in the same millisecond", () => {
+    // Two reviews can share a round — nothing stops a second run before the next
+    // change — so the round cannot be the identifier and this has to collide-proof
+    // itself rather than lean on the clock.
+    const ids = new Set(Array.from({ length: 200 }, () => newReviewId()));
+    expect(ids.size).toBeGreaterThan(150);
+  });
+
+  it("is prefixed so it cannot be mistaken for an element or argument id", () => {
+    expect(newReviewId()).toMatch(/^rev-/);
   });
 });

@@ -155,6 +155,35 @@ class RELogEntry(BaseModel):
     changes: str = Field(max_length=5_000, default="")
 
 
+# ── Process review ─────────────────────────────────────────────────────────────
+
+
+class REReview(BaseModel):
+    """One LLM reading of the process as a whole, as the user accepted it.
+
+    Reviews accumulate rather than replace: each is stamped with the ``round`` it
+    was taken at, and a later one is given the earlier ones so it can say what has
+    moved since.  ``headline`` is what carries that context cheaply — a later
+    prompt takes the most recent review in full and every earlier one as round
+    plus headline, so the twentieth review costs no more to ask for than the third.
+
+    ``origin`` follows the same convention as elements: the model name, plus a
+    user-edit marker when the review was modified before being accepted.
+    """
+
+    id: str = Field(max_length=100)
+    round: int = Field(ge=1)
+    headline: str = Field(max_length=1_000, default="")
+    arc: str = Field(max_length=5_000, default="")
+    surprises: str = Field(max_length=5_000, default="")
+    missed: str = Field(max_length=5_000, default="")
+    method: str = Field(max_length=5_000, default="")
+    model: str = Field(max_length=200, default="")
+    origin: str = Field(max_length=200, default="")
+
+    model_config = {"extra": "forbid"}
+
+
 # ── Coherence ──────────────────────────────────────────────────────────────────
 
 
@@ -294,6 +323,10 @@ class REState(BaseModel):
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
     coherence: RECoherence = Field(default_factory=RECoherence)
     log: list[RELogEntry] = Field(default_factory=list, max_length=1_000)
+    # Oldest first. Declared here and not only on the frontend because the session
+    # store round-trips state through this model, so a field missing from it is
+    # dropped on save — which is how ``history`` went missing once already.
+    reviews: list[REReview] = Field(default_factory=list, max_length=100)
     questionnaire_spec: Optional[QuestionnaireSpec] = Field(
         None, alias="questionnaireSpec"
     )

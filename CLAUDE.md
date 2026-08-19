@@ -83,6 +83,34 @@ graph.
 `state.groups` is absent from every state written before the feature existed —
 read it through `groupsOf(state)`, never directly.
 
+### Process reviews
+
+A **review** is an LLM reading of the process as a whole — `state.reviews`,
+`components/workflows/ProcessReviewTab.jsx`, backed by `POST /api/review/analyze`.
+Five parts, 500 words: a one-sentence `headline`, then `arc` (how the position
+moved), `surprises`, `missed` (coherence available and not taken), and `method`
+(how the process was *conducted* — adding versus revising, whether suggestions
+were reworded before acceptance, read off `origin` and `confidence`).
+
+Reviews **accumulate**, oldest first. A later run is given the earlier ones —
+the newest in full, the rest as round plus headline, which is what keeps the
+prompt bounded — and is asked to say what has moved since and whether an
+opportunity an earlier review named was taken. That series is the feature; a
+single end-of-run summary cannot comment on the process's own development.
+
+Like grouping and for a sharper reason, accepting or discarding a review
+**does not advance the round and does not appear in the log**: a review is a
+reading *of* the process, so recording it as a change would alter the record it
+describes — and would reach the next review's timeline as though it were a move
+in the argument. That is also what makes running one mid-process safe.
+
+It is an Assist tab because it is an AI task, but it is deliberately **not a
+workflow phase**: it is absent from `WORKFLOW_NEXT_PHASE`, and `GraphPanel`
+passes it `autoFetch={false}` and no `workflowPhase`.
+
+`state.reviews` is absent from every state written before the feature existed —
+read it through `reviewsOf(state)`, never directly.
+
 ### State schema
 
 ```javascript
@@ -100,6 +128,7 @@ read it through `groupsOf(state)`, never directly.
   relations: [{ from, to, type, explanation, addedRound, ?origin, ?status, ?history, ?argumentId, ?revisedRound }],
   coherence: { tensions: [], orphans: [], clusters: [] },
   ?groups: [{ id, label, members: [elementId], collapsed }],
+  ?reviews: [{ id, round, headline, arc, surprises, missed, method, model, origin }],
   log: [{ round, findings, options, decision, changes }]
 }
 ```

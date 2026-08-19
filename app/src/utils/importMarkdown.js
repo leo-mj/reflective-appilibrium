@@ -332,6 +332,34 @@ function validateGroup(g, i, elementIds) {
   };
 }
 
+/**
+ * Validates one accepted process review.
+ *
+ * Unlike a group, a review is not dropped when something about it looks stale:
+ * it is a text the user accepted, and it stays readable however far the process
+ * has since moved past the round it names.
+ *
+ * @param {unknown} r
+ * @param {number} i
+ * @returns {import('../types.js').REReview}
+ */
+function validateReview(r, i) {
+  const ctx = `reviews[${i}]`;
+  if (!r || typeof r !== "object" || Array.isArray(r))
+    throw new Error(`${ctx} must be an object`);
+  return {
+    id: str(r.id, `${ctx}.id`, 100),
+    round: num(r.round, `${ctx}.round`),
+    headline: str(r.headline ?? "", `${ctx}.headline`, 1_000),
+    arc: str(r.arc ?? "", `${ctx}.arc`, 5_000),
+    surprises: str(r.surprises ?? "", `${ctx}.surprises`, 5_000),
+    missed: str(r.missed ?? "", `${ctx}.missed`, 5_000),
+    method: str(r.method ?? "", `${ctx}.method`, 5_000),
+    model: str(r.model ?? "", `${ctx}.model`, 200),
+    origin: str(r.origin ?? "", `${ctx}.origin`, 200),
+  };
+}
+
 function validateLogEntry(l, i) {
   const ctx = `log[${i}]`;
   return {
@@ -396,6 +424,12 @@ export function validateState(raw) {
         return { ...g, members };
       })
       .filter((g) => g.members.length > 1);
+  }
+
+  // Absent on every state written before reviews existed, so the key is added
+  // only when the file actually carries one — same contract as `groups`.
+  if (raw.reviews !== undefined) {
+    result.reviews = arr(raw.reviews, "reviews", 100).map(validateReview);
   }
 
   if (raw.model !== undefined) {

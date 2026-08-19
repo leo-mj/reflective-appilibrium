@@ -160,6 +160,53 @@ PRINCIPLES_SCHEMA = ResponseSchema(
 )
 
 
+REVIEW_SCHEMA = ResponseSchema(
+    name="record_process_review",
+    description=(
+        "Record a macro-level review of how an RE process developed across its rounds."
+    ),
+    schema={
+        "type": "object",
+        "properties": {
+            "headline": {
+                "type": "string",
+                "description": "One sentence naming this review's through-line (~20 words).",
+            },
+            "arc": {
+                "type": "string",
+                "description": (
+                    "How the position moved: which commitments became load-bearing, "
+                    "whether the range of views widened or narrowed (~200 words)."
+                ),
+            },
+            "surprises": {
+                "type": "string",
+                "description": (
+                    "Where the process turned in a way its earlier rounds did not "
+                    "predict (~110 words)."
+                ),
+            },
+            "missed": {
+                "type": "string",
+                "description": (
+                    "Where higher coherence was available and not taken (~110 words)."
+                ),
+            },
+            "method": {
+                "type": "string",
+                "description": (
+                    "How the process was conducted rather than what it concluded: "
+                    "adding versus revising, and whether suggestions were reworded "
+                    "before acceptance (~60 words)."
+                ),
+            },
+        },
+        "required": ["headline", "arc", "surprises", "missed", "method"],
+        "additionalProperties": False,
+    },
+)
+
+
 ARGUMENTS_SCHEMA = ResponseSchema(
     name="record_arguments",
     description=(

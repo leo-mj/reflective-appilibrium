@@ -87,6 +87,19 @@ Saved: 2026-01-15 09:30:00 UTC
       "decision": "Withdraw.",
       "changes": "J1 withdrawn."
     }
+  ],
+  "reviews": [
+    {
+      "id": "rev-1737000000000-a1b2c3",
+      "round": 3,
+      "headline": "A single principle absorbed the work two judgments had been doing.",
+      "arc": "The process began with J1 carrying the whole objection to paternalism and ended with P1 carrying it instead, narrowed to competent refusal.",
+      "surprises": "J1 was reinstated in round 3 and withdrawn again in round 4 — the second withdrawal, unlike the first, gave the same reason.",
+      "missed": "P1 and J1 were never related after the revision, so the support edge still points at wording P1 no longer has.",
+      "method": "Mostly revising rather than adding, and the one model suggestion was reworded before acceptance.",
+      "model": "gpt-4o",
+      "origin": "gpt-4o & user"
+    }
   ]
 }
 ```

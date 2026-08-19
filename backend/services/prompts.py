@@ -1,9 +1,15 @@
 """LLM prompt builders for all RE analysis tasks."""
 
 import json
-from typing import Any
+from typing import Any, Union
 
-from ..models.re_state import REElement, RERelation, RELogEntry, REState
+from ..models.re_state import (
+    REElement,
+    RERelation,
+    REReview,
+    RELogEntry,
+    REState,
+)
 
 
 # Element text, relation explanations, and log findings are all user-authored,
@@ -264,6 +270,251 @@ Respond with valid JSON only, in exactly this format:
 }}
 
 If the existing principles already cover all judgments well, return {{"suggestions": []}}."""
+
+
+# ── Process review ─────────────────────────────────────────────────────────────
+#
+# The review prompt is the only one that reads the *shape* of the process rather
+# than its current contents.  ``state.log`` alone cannot carry that: entries the
+# app writes are one line each ("J4 added"), and ``makeLogEntry`` hardcodes an
+# empty ``options``.  What actually records the trajectory is the state's own
+# history — ``added_round`` plus the ``history`` event list on every element and
+# relation, with ``previous_text`` preserving the wording each revision replaced.
+
+
+def _history_events(item: Union[REElement, RERelation]) -> list[dict[str, Any]]:
+    """An item's history, migrating the older scalar shape on read.
+
+    Mirrors ``legacyHistory``/``historyOf`` in app/src/utils/stateUtils.js, which
+    migrates on read rather than on import — so a state that reaches this backend
+    can still carry ``withdrawn_round``/``revised_round``/``rejected_round`` and no
+    ``history`` at all.  Without this the timeline of an older session would show
+    additions and nothing else, which is precisely the part a review is for.
+    """
+    if item.history:
+        return [
+            {
+                "round": e.round,
+                "type": e.type,
+                "reason": e.reason,
+                "previous_text": e.previous_text,
+            }
+            for e in item.history
+        ]
+
+    events: list[dict[str, Any]] = []
+    if item.revised_round:
+        events.append(
+            {
+                "round": item.revised_round,
+                "type": "revised",
+                "reason": None,
+                "previous_text": item.previous_text,
+            }
+        )
+    if item.rejected_round:
+        events.append(
+            {
+                "round": item.rejected_round,
+                "type": "rejected",
+                "reason": None,
+                "previous_text": None,
+            }
+        )
+    if item.withdrawn_round:
+        events.append(
+            {
+                "round": item.withdrawn_round,
+                "type": "withdrawn",
+                "reason": getattr(item, "reason", None),
+                "previous_text": None,
+            }
+        )
+    return sorted(events, key=lambda e: e["round"])
+
+
+def _event_line(event: dict[str, Any]) -> str:
+    """One history event as an indented line under the item it happened to."""
+    line = f"    R{event['round']} {event['type']}"
+    if event["type"] == "revised" and event["previous_text"]:
+        return f'{line} — was: "{event["previous_text"]}"'
+    if event["reason"]:
+        return f'{line} — "{event["reason"]}"'
+    return line
+
+
+def _element_block(elements: list[REElement]) -> str:
+    lines: list[str] = []
+    for e in elements:
+        origin = f", origin: {e.origin}" if e.origin else ""
+        lines.append(
+            f"  {e.id} [{e.type}] (confidence {e.confidence}, {e.status}, "
+            f"added R{e.added_round}{origin}): {e.text}"
+        )
+        lines += [_event_line(ev) for ev in _history_events(e)]
+    return "\n".join(lines) or "  (none)"
+
+
+def _relation_block(relations: list[RERelation]) -> str:
+    lines: list[str] = []
+    for r in relations:
+        origin = f", origin: {r.origin}" if r.origin else ""
+        status = f", {r.status}" if r.status and r.status != "active" else ""
+        lines.append(
+            f"  {r.from_id} --{r.type}--> {r.to_id} "
+            f"(added R{r.added_round}{status}{origin}): {r.explanation}"
+        )
+        lines += [_event_line(ev) for ev in _history_events(r)]
+    return "\n".join(lines) or "  (none)"
+
+
+def _timeline_block(state: REState) -> str:
+    """Round-by-round: what entered, changed, or left, plus the user's own notes.
+
+    Derived from the state rather than read off the log, because the log records
+    only what the app chose to write a sentence about — and says nothing at all
+    for a round in which only relations moved.
+    """
+    by_round: dict[int, list[str]] = {}
+
+    def note(round_: int, text: str) -> None:
+        by_round.setdefault(round_, []).append(text)
+
+    for e in state.elements:
+        note(e.added_round, f"added {e.id}")
+        for ev in _history_events(e):
+            note(ev["round"], f"{ev['type']} {e.id}")
+    for r in state.relations:
+        edge = f"{r.from_id} --{r.type}--> {r.to_id}"
+        note(r.added_round, f"added {edge}")
+        for ev in _history_events(r):
+            note(ev["round"], f"{ev['type']} {edge}")
+
+    log_by_round: dict[int, list[RELogEntry]] = {}
+    for entry in state.log:
+        log_by_round.setdefault(entry.round, []).append(entry)
+
+    lines: list[str] = []
+    for round_ in sorted(set(by_round) | set(log_by_round)):
+        changes = "; ".join(by_round.get(round_, [])) or "no changes recorded"
+        lines.append(f"  Round {round_}: {changes}")
+        for entry in log_by_round.get(round_, []):
+            notes = " / ".join(
+                part for part in (entry.findings, entry.decision, entry.changes) if part
+            )
+            if notes:
+                lines.append(f"    note: {notes}")
+    return "\n".join(lines) or "  (none)"
+
+
+def _earlier_reviews_block(reviews: list[REReview]) -> str:
+    """Prior reviews, newest in full and the rest as one line each.
+
+    Bounded by construction: a twentieth review costs the same to ask for as a
+    third, because only one of them is ever carried at length.
+    """
+    if not reviews:
+        return "  (none)"
+
+    *earlier, latest = reviews
+    lines = [f'  Round {r.round} — "{r.headline}"' for r in earlier]
+    lines.append(f"  Round {latest.round} (most recent, in full):")
+    for label, body in (
+        ("How the position moved", latest.arc),
+        ("Surprising turns", latest.surprises),
+        ("Missed opportunities", latest.missed),
+        ("How the process was conducted", latest.method),
+    ):
+        lines.append(f"    {label}: {body}")
+    return "\n".join(lines)
+
+
+def build_review_prompt(state: REState) -> str:
+    """Build the LLM prompt for a macro-level review of the whole process.
+
+    Deliberately not a round-by-round recap: the app already replays the process
+    in the History tab and lists every change in the round log, so the only thing
+    a review can add is the altitude above them — where the centre of the position
+    moved, what the process did that its earlier rounds did not predict, and what
+    coherence was available and left on the table.
+
+    Earlier reviews are fenced along with everything else.  They are model-authored,
+    but the user can edit one before accepting it, so on the way back in they are
+    the user's material like anything else.
+    """
+    reviews = state.reviews
+    continuity = (
+        """
+Earlier reviews of this same process are given above. Carry the thread forward:
+- Do not restate what an earlier review already established — the reader has it.
+- Say what has moved since the most recent review.
+- For each opportunity an earlier review named, say whether it was taken, is \
+still open, or has been overtaken by where the process went instead.
+"""
+        if reviews
+        else ""
+    )
+
+    return f"""\
+You are reviewing a wide reflective equilibrium (RE) process in ethics.
+Topic: "{state.topic or '(unspecified)'}" — {state.round} rounds so far.
+
+{DATA_RULE}
+
+### Elements
+{fence(_element_block(state.elements))}
+
+### Relations
+{fence(_relation_block(state.relations))}
+
+### Round timeline
+{fence(_timeline_block(state))}
+
+### Earlier reviews of this process
+{fence(_earlier_reviews_block(reviews))}
+
+Task: report what this process amounts to, at the macro level, in five parts.
+
+1. headline (about 20 words) — one sentence naming the through-line of this \
+review. It is what titles this review in a list of them, so make it specific to \
+this process rather than to RE in general.
+
+2. arc (about 200 words) — how the position moved. Which commitments became \
+load-bearing and which lost that role; whether the range of views under \
+consideration widened or narrowed; whether the process moved from judgments \
+toward principles or the other way. Name elements by ID.
+
+3. surprises (about 110 words) — where the process turned in a way its earlier \
+rounds did not predict: a confidently held element abandoned, a reversal, a \
+reinstatement, a direction nothing before it pointed at. If nothing genuinely \
+surprising happened, say so plainly rather than inflating a routine change.
+
+4. missed (about 110 words) — where higher coherence was available and not \
+taken: elements that bear on each other and were never related, a tension left \
+standing for several rounds, two groups of elements one relation would have \
+bridged.
+
+5. method (about 60 words) — how the process was *conducted*, not what it \
+concluded: adding versus revising, whether the suggestions the model made were \
+accepted as they came or reworded first (the origin field records this — a \
+model name alone means accepted as offered, "& user" means edited), and whether \
+element strength was set deliberately or left at the default 0.67.
+{continuity}
+Constraints:
+- The five parts together must not exceed 500 words.
+- Do not recap the rounds one by one. The user already has that record; this is \
+the view above it.
+- Do not judge the moral positions themselves, argue for or against them, or say \
+which you find more plausible. Report the shape of the process, not a verdict on it.
+
+Respond with valid JSON only, in exactly this format:
+{{
+  "headline": "One sentence naming the through-line.",
+  "arc": "How the position moved.",
+  "surprises": "Where it turned unexpectedly.",
+  "missed": "Coherence that was available and not taken.",
+  "method": "How the process was conducted."
+}}"""
 
 
 def build_conversation_system(state: REState, suggestion: dict[str, Any]) -> str:

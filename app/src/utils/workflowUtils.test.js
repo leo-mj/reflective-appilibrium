@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { nextPhaseEnabled } from "./workflowUtils.js";
+import {
+  nextPhaseEnabled,
+  WORKFLOW_NEXT_PHASE,
+  WORKFLOW_PHASE_LABELS,
+} from "./workflowUtils.js";
+import { ASSIST_TABS } from "../constants/tabConstants.jsx";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -83,6 +88,37 @@ describe("nextPhaseEnabled", () => {
 
     it("returns true when workflowPhase is null", () => {
       expect(nextPhaseEnabled(null, stateWith([]))).toBe(true);
+    });
+  });
+});
+
+// ─── the workflow's membership ────────────────────────────────────────────────
+
+describe("the phase maps", () => {
+  it("leaves processReview out of the workflow", () => {
+    // Review is an assist tab but not a workflow phase: the four phases loop to
+    // build the position, and this one steps back and looks at it. Being absent
+    // from both maps is what stops advanceWorkflow ever landing on it, and what
+    // keeps the next-phase control out of its toolbar.
+    expect(WORKFLOW_NEXT_PHASE).not.toHaveProperty("processReview");
+    expect(WORKFLOW_PHASE_LABELS).not.toHaveProperty("processReview");
+    expect(Object.values(WORKFLOW_NEXT_PHASE)).not.toContain("processReview");
+  });
+
+  it("keeps the loop closed over exactly the phases it labels", () => {
+    // A phase named in one map and not the other is a phase the workflow either
+    // cannot leave or cannot announce.
+    expect(Object.keys(WORKFLOW_NEXT_PHASE).sort()).toEqual(
+      Object.keys(WORKFLOW_PHASE_LABELS).sort(),
+    );
+    Object.values(WORKFLOW_NEXT_PHASE).forEach((next) => {
+      expect(WORKFLOW_NEXT_PHASE).toHaveProperty(next);
+    });
+  });
+
+  it("draws every phase from the assist tabs", () => {
+    Object.keys(WORKFLOW_NEXT_PHASE).forEach((phase) => {
+      expect(ASSIST_TABS).toContain(phase);
     });
   });
 });

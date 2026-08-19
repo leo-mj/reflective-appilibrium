@@ -85,6 +85,12 @@ const DetectArgumentsTab = lazy(() =>
   })),
 );
 
+const ProcessReviewTab = lazy(() =>
+  import("./workflows/ProcessReviewTab.jsx").then((m) => ({
+    default: m.ProcessReviewTab,
+  })),
+);
+
 const SimulateRethonTab = lazy(() =>
   import("./workflows/SimulateRethonTab.jsx").then((m) => ({
     default: m.SimulateRethonTab,
@@ -115,6 +121,8 @@ export function GraphPanel({
   onScrollToRelations,
   onRejectElements,
   onRejectRelations,
+  onSaveReview,
+  onDiscardReview,
   onApplyRethonEquilibrium,
   equilibriumPreviewWithdrawnIds,
   onSetEquilibriumPreview,
@@ -299,6 +307,24 @@ export function GraphPanel({
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
+            />
+          </Suspense>
+        )}
+        {tab === "processReview" && (
+          <Suspense fallback={null}>
+            {/* No `autoFetch`, no `workflowPhase`: review is an assist tab but not
+                a workflow phase. `autoFetch` above is on whenever a workflow is
+                running, so passing it here would fire an LLM call at a user who
+                only switched tabs — past the disclosure the run button carries —
+                and withholding `workflowPhase` is separately what keeps the
+                next-phase control out of this tab's toolbar. */}
+            <ProcessReviewTab
+              state={state}
+              onSaveReview={onSaveReview}
+              onDiscardReview={onDiscardReview}
+              useDummy={useDummyAssist}
+              suggestionsAreSample={suggestionsAreSample}
+              suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
         )}

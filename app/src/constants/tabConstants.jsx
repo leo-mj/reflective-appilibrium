@@ -10,15 +10,20 @@ import {
   SuggestIcon,
   PrincipleIcon,
   JudgmentIcon,
+  ReviewIcon,
   SimulateIcon,
 } from "../components/Icons.jsx";
 
+// `processReview` sits last on purpose: the four tabs before it are the guided
+// workflow's phases, in the order it runs them, and it is not one of them —
+// see WORKFLOW_NEXT_PHASE in utils/workflowUtils.js, which it stays out of.
 export const ASSIST_TABS = [
   "questionnaire",
   "elicitJudgments",
   "suggestPrinciples",
   "detectArguments",
   "suggestRelations",
+  "processReview",
 ];
 
 export const SIMULATE_TABS = ["simulateRethon"];
@@ -50,6 +55,7 @@ export const TAB_ICONS = {
   suggestPrinciples: <PrincipleIcon />,
   elicitJudgments: <JudgmentIcon />,
   detectArguments: <SimulateIcon />,
+  processReview: <ReviewIcon />,
   simulateRethon: <SimulateIcon />,
 };
 
@@ -62,6 +68,7 @@ export const TAB_LABELS = {
   suggestPrinciples: "Principles",
   detectArguments: "Arguments",
   suggestRelations: "Relations",
+  processReview: "Review",
   simulateRethon: "Simulate",
 };
 
@@ -81,4 +88,6 @@ export const TAB_TOOLTIPS = {
     "Run the formal rethon RE simulation on your active elements.",
   detectArguments:
     "AI detects logically valid arguments formed of existing elements and additional premises.",
+  processReview:
+    "AI reads your process so far and reports the major shifts across rounds.",
 };

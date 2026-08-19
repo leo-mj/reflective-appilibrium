@@ -1146,6 +1146,100 @@ describe("importing a session file written by the backend", () => {
     expect(state.elements[0]).not.toHaveProperty("previousText");
     expect(state.elements[0]).not.toHaveProperty("history");
   });
+
+  it("keeps the process review the backend wrote", async () => {
+    const state = await importStateFromFile(makeFile(fixture, "session.md"));
+    expect(state.reviews).toHaveLength(1);
+    expect(state.reviews[0]).toMatchObject({
+      round: 3,
+      model: "gpt-4o",
+      origin: "gpt-4o & user",
+    });
+    expect(state.reviews[0].headline).toMatch(/single principle/);
+    expect(state.reviews[0].method).toBeTruthy();
+  });
+});
+
+// ─── Process reviews ──────────────────────────────────────────────────────────
+
+describe("importStateFromFile — reviews", () => {
+  const aReview = (overrides = {}) => ({
+    id: "rev-1",
+    round: 3,
+    headline: "A headline.",
+    arc: "How it moved.",
+    surprises: "What turned.",
+    missed: "What was left.",
+    method: "How it was done.",
+    model: "gpt-4o",
+    origin: "gpt-4o",
+    ...overrides,
+  });
+
+  const importWith = (reviews) =>
+    importStateFromFile(
+      makeFile(wrapInMarkdown({ ...MINIMAL_STATE, reviews })),
+    );
+
+  it("has no reviews key when the file predates the feature", async () => {
+    const state = await importStateFromFile(makeFile(wrapInMarkdown(MINIMAL_STATE)));
+    expect(state).not.toHaveProperty("reviews");
+  });
+
+  it("round-trips a review", async () => {
+    const state = await importWith([aReview()]);
+    expect(state.reviews).toEqual([aReview()]);
+  });
+
+  it("keeps several reviews in the order they were written", async () => {
+    // Oldest first, because each review's back-references point at the ones
+    // before it — reordering here would scramble the thread.
+    const state = await importWith([
+      aReview({ id: "rev-1", round: 2 }),
+      aReview({ id: "rev-2", round: 5 }),
+      aReview({ id: "rev-3", round: 5 }),
+    ]);
+    expect(state.reviews.map((r) => r.id)).toEqual(["rev-1", "rev-2", "rev-3"]);
+  });
+
+  it("defaults every prose part that is missing", async () => {
+    const state = await importWith([{ id: "rev-1", round: 2 }]);
+    expect(state.reviews[0]).toEqual({
+      id: "rev-1",
+      round: 2,
+      headline: "",
+      arc: "",
+      surprises: "",
+      missed: "",
+      method: "",
+      model: "",
+      origin: "",
+    });
+  });
+
+  it("rejects an oversized section", async () => {
+    await expect(importWith([aReview({ arc: "x".repeat(5_001) })])).rejects.toThrow(
+      /reviews\[0\]\.arc/,
+    );
+  });
+
+  it("rejects a review that is not an object", async () => {
+    await expect(importWith(["not an object"])).rejects.toThrow(
+      /reviews\[0\] must be an object/,
+    );
+  });
+
+  it("rejects a review with no id to discard it by", async () => {
+    await expect(importWith([aReview({ id: undefined })])).rejects.toThrow(
+      /reviews\[0\]\.id/,
+    );
+  });
+
+  it("rejects more reviews than the cap allows", async () => {
+    await expect(
+      importWith(Array.from({ length: 101 }, (_, i) => aReview({ id: `r${i}` }))),
+    ).rejects.toThrow(/"reviews" exceeds 100 items/);
+  });
 });
 
 // ─── Groups ───────────────────────────────────────────────────────────────────

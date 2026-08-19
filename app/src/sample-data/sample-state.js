@@ -2,7 +2,13 @@
 // Topic: obligations to future generations
 // 8 rounds, 13 judgments, 6 principles, 2 theories, mix of statuses
 
+import { SAMPLE_EARLIER_REVIEW } from "./sample-review.js";
+
 export default {
+  // One already-accepted review, taken at round 4. It is here so the Review tab
+  // opens on a series rather than an empty panel, and so the round-8 reading the
+  // sample client returns has something to refer back to.
+  reviews: [SAMPLE_EARLIER_REVIEW],
   topic: "Do we have moral obligations to people who do not yet exist?",
   phase: 3,
   round: 8,

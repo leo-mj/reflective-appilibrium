@@ -6,7 +6,7 @@
  * @module utils/stateUtils
  */
 
-/** @import { REElement, RERelation, RELogEntry, REHistoryEvent } from '../types.js' */
+/** @import { REElement, RERelation, RELogEntry, REHistoryEvent, REState, REReview } from '../types.js' */
 
 // ─── Item history ─────────────────────────────────────────────────────────────
 //
@@ -420,6 +420,33 @@ export function defaultPickerIds(elements) {
  */
 export function newArgumentId() {
   return `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+}
+
+// ─── Process reviews ──────────────────────────────────────────────────────────
+
+/**
+ * The accepted process reviews, oldest first.
+ *
+ * Every state written before reviews existed lacks the field entirely, so read
+ * it through here rather than touching `state.reviews` — the same contract
+ * {@link module:utils/groupUtils.groupsOf} holds for groups.
+ *
+ * @param {REState} [state]
+ * @returns {REReview[]}
+ */
+export function reviewsOf(state) {
+  return state?.reviews ?? [];
+}
+
+/**
+ * Generates the id a saved review is keyed and deleted by. Two reviews can share
+ * a round — nothing stops a second run before the next change — so the round is
+ * not an identifier.
+ *
+ * @returns {string}
+ */
+export function newReviewId() {
+  return `rev-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
 }
 
 /**

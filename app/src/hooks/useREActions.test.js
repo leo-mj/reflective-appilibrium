@@ -1357,6 +1357,98 @@ describe("handleImportFile", () => {
 
 // ─── Groups ───────────────────────────────────────────────────────────────────
 
+describe("review actions", () => {
+  const aReview = (overrides = {}) => ({
+    headline: "The centre moved.",
+    arc: "How it moved.",
+    surprises: "What turned.",
+    missed: "What was left.",
+    method: "How it was done.",
+    model: "gpt-4o",
+    origin: "gpt-4o",
+    ...overrides,
+  });
+
+  it("stamps a saved review with an id and the current round", () => {
+    const { result } = renderHook(() => useREActions(baseState({ round: 5 })));
+    act(() => result.current.handleSaveReview(aReview()));
+
+    expect(result.current.state.reviews).toHaveLength(1);
+    expect(result.current.state.reviews[0]).toMatchObject({
+      round: 5,
+      headline: "The centre moved.",
+      origin: "gpt-4o",
+    });
+    expect(result.current.state.reviews[0].id).toMatch(/^rev-/);
+  });
+
+  it("appends rather than replaces", () => {
+    // The series is the feature: a later review is given the earlier ones and
+    // asked what has moved since, so replacing on accept would cut the thread
+    // every time it was used.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSaveReview(aReview({ headline: "First." })));
+    act(() => result.current.handleSaveReview(aReview({ headline: "Second." })));
+
+    expect(result.current.state.reviews.map((r) => r.headline)).toEqual([
+      "First.",
+      "Second.",
+    ]);
+  });
+
+  it("works on a state written before reviews existed", () => {
+    const before = baseState();
+    delete before.reviews;
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleSaveReview(aReview()));
+
+    expect(result.current.state.reviews).toHaveLength(1);
+  });
+
+  it("discards by id, leaving the rest of the series", () => {
+    // Keyed on id, not round: two reviews can share a round, since nothing stops
+    // a second run before the next change.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSaveReview(aReview({ headline: "First." })));
+    act(() => result.current.handleSaveReview(aReview({ headline: "Second." })));
+    const firstId = result.current.state.reviews[0].id;
+    act(() => result.current.handleDiscardReview(firstId));
+
+    expect(result.current.state.reviews.map((r) => r.headline)).toEqual(["Second."]);
+  });
+
+  it("does not advance the round or write to the log", () => {
+    // A review is a reading *of* the process. Logging one as a change would
+    // alter the record it describes, and would then reach the next review's
+    // timeline as though it were a move in the argument. Not bumping the round
+    // is also what makes running a review mid-process safe.
+    const { result } = renderHook(() => useREActions(baseState({ round: 3 })));
+    act(() => result.current.handleSaveReview(aReview()));
+    const id = result.current.state.reviews[0].id;
+    act(() => result.current.handleDiscardReview(id));
+
+    expect(result.current.state.round).toBe(3);
+    expect(result.current.state.log).toEqual([]);
+  });
+
+  it("leaves the elements and relations untouched", () => {
+    const before = baseState();
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleSaveReview(aReview()));
+
+    expect(result.current.state.elements).toEqual(before.elements);
+    expect(result.current.state.relations).toEqual(before.relations);
+  });
+
+  it("is undoable", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSaveReview(aReview()));
+    expect(result.current.canUndo).toBe(true);
+    act(() => result.current.handleUndo());
+    expect(result.current.state.reviews ?? []).toEqual([]);
+  });
+});
+
 describe("group actions", () => {
   const twoElements = () =>
     baseState({
