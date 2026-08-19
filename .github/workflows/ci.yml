@@ -10,6 +10,9 @@ jobs:
   test-backend:
     name: Backend tests
     runs-on: ubuntu-latest
+    # Every job carries a cap. The default is six hours, which is not a timeout
+    # so much as a licence for a wedged download to burn the whole budget.
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +39,7 @@ jobs:
   test:
     name: Frontend tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: app
@@ -74,6 +78,9 @@ jobs:
   e2e:
     name: Frontend end-to-end tests
     runs-on: ubuntu-latest
+    # Generous next to a green run of a few minutes, but the retries: 2 in
+    # playwright.config.js mean a genuinely failing suite takes three passes.
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: app
@@ -90,11 +97,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Keyed on the lockfile, so a Playwright bump re-downloads and every other
+      # run reuses the binary.
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('app/package-lock.json') }}
+
+      # This is the apt half of what used to be `install --with-deps`. The
+      # ubuntu-latest image already ships the shared libraries headless chromium
+      # needs, so it is belt-and-braces — but it shells out to apt, and an apt
+      # mirror that accepted the connection and then stopped answering once hung
+      # this job for six hours, until the default job timeout killed it. Hence
+      # the hard cap and the swallowed failure: a sulking mirror must not block a
+      # run the image can already satisfy. If chromium ever fails to launch with
+      # a missing-library error, this is the step to look at first.
+      - name: Install Playwright system dependencies
+        run: |
+          timeout 300 npx playwright install-deps chromium \
+            || echo "::warning::playwright install-deps failed or timed out; relying on the runner image's preinstalled libraries"
+
       # Only chromium: the mobile project pins browserName to chromium too, so
-      # nothing here needs firefox or webkit. --with-deps pulls the system
-      # libraries the headless browser needs on a bare runner.
+      # nothing here needs firefox or webkit.
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
+        timeout-minutes: 5
 
       - name: Run end-to-end tests
         run: npm run test:e2e
@@ -114,6 +142,7 @@ jobs:
     needs: [test, test-backend, e2e]
     if: github.ref == 'refs/heads/deploy' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       pages: write
       id-token: write
