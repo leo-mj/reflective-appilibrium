@@ -64,7 +64,18 @@ export function MetaChip({ color = C.dim, title, children }) {
 
 // ─── Section header ───────────────────────────────────────────────────────────
 
-export function SectionHeader({ title, onAdd, collapsed, onToggle }) {
+/**
+ * @param {Object} props
+ * @param {string} props.title
+ * @param {function} [props.onAdd] - Renders a "+" at the trailing edge.
+ * @param {string} [props.addLabel] - Its accessible name. "+" on its own is a
+ *   name with no word in it, which tells a screen reader nothing about what
+ *   pressing it would do — and the visible title usually carries a count, so it
+ *   cannot stand in.
+ * @param {boolean} [props.collapsed]
+ * @param {function} [props.onToggle]
+ */
+export function SectionHeader({ title, onAdd, addLabel, collapsed, onToggle }) {
   return (
     <div
       onClick={onToggle}
@@ -109,6 +120,8 @@ export function SectionHeader({ title, onAdd, collapsed, onToggle }) {
             e.stopPropagation();
             onAdd();
           }}
+          aria-label={addLabel ?? `Add to ${title}`}
+          title={addLabel ?? `Add to ${title}`}
           className="tap-target-square"
           style={{
             ...GHOST_BTN_STYLE,

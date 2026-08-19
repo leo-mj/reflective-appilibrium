@@ -125,6 +125,10 @@ export function GraphPanel({
   nextPhaseIsEnabled,
   hideNonEntailsRels,
   onCtrlSecondSelect,
+  onCreateGroup,
+  onToggleGroup,
+  onEditGroupRequest,
+  onUngroup,
   onEditRequest,
   onWithdrawRequest,
   onReinstate,
@@ -220,6 +224,10 @@ export function GraphPanel({
             onWithdrawRequest={onWithdrawRequest}
             onReinstate={onReinstate}
             onCtrlSecondSelect={onCtrlSecondSelect}
+            onCreateGroup={onCreateGroup}
+            onToggleGroup={onToggleGroup}
+            onEditGroupRequest={onEditGroupRequest}
+            onUngroup={onUngroup}
             ready={ready}
             recentlyAdded={recentlyAdded}
             hideNonEntailsRels={hideNonEntailsRels}

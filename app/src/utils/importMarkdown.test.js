@@ -1147,3 +1147,91 @@ describe("importing a session file written by the backend", () => {
     expect(state.elements[0]).not.toHaveProperty("history");
   });
 });
+
+// ─── Groups ───────────────────────────────────────────────────────────────────
+
+describe("importStateFromFile — groups", () => {
+  const els = (...ids) =>
+    ids.map((id) => ({
+      id,
+      type: "judgment",
+      status: "active",
+      confidence: 1,
+      text: id,
+      addedRound: 1,
+    }));
+
+  const importWith = (groups, ids = ["J1", "J2", "J3"]) =>
+    importStateFromFile(
+      makeFile(
+        wrapInMarkdown({ ...MINIMAL_STATE, elements: els(...ids), groups }),
+      ),
+    );
+
+  it("has no groups key when the file predates the feature", async () => {
+    const state = await importStateFromFile(makeFile(wrapInMarkdown(MINIMAL_STATE)));
+    expect(state).not.toHaveProperty("groups");
+  });
+
+  it("round-trips a group", async () => {
+    const state = await importWith([
+      { id: "G1", label: "Duties", members: ["J1", "J2"], collapsed: true },
+    ]);
+    expect(state.groups).toEqual([
+      { id: "G1", label: "Duties", members: ["J1", "J2"], collapsed: true },
+    ]);
+  });
+
+  it("defaults a group's name and collapsed flag", async () => {
+    const state = await importWith([{ id: "G1", members: ["J1", "J2"] }]);
+    expect(state.groups[0]).toMatchObject({ label: "G1", collapsed: false });
+  });
+
+  it("drops members that are not elements of this state", async () => {
+    // A stale id is not a reason to refuse a perfectly good RE process.
+    const state = await importWith([
+      { id: "G1", label: "G1", members: ["J1", "J2", "GONE"] },
+    ]);
+    expect(state.groups[0].members).toEqual(["J1", "J2"]);
+  });
+
+  it("drops a group that is left with fewer than two members", async () => {
+    const state = await importWith([
+      { id: "G1", label: "G1", members: ["J1", "GONE"] },
+    ]);
+    expect(state.groups).toEqual([]);
+  });
+
+  it("leaves an element in at most one group", async () => {
+    // The projection draws one node per collapsed group, so an element claimed
+    // twice would be drawn twice. First claim wins.
+    const state = await importWith(
+      [
+        { id: "G1", label: "G1", members: ["J1", "J2"] },
+        { id: "G2", label: "G2", members: ["J2", "J3", "J4"] },
+      ],
+      ["J1", "J2", "J3", "J4"],
+    );
+    expect(state.groups.map((g) => g.members)).toEqual([
+      ["J1", "J2"],
+      ["J3", "J4"],
+    ]);
+  });
+
+  it("drops a group the de-duplication empties out", async () => {
+    const state = await importWith([
+      { id: "G1", label: "G1", members: ["J1", "J2"] },
+      { id: "G2", label: "G2", members: ["J2", "J3"] },
+    ]);
+    expect(state.groups.map((g) => g.id)).toEqual(["G1"]);
+  });
+
+  it("rejects a malformed group rather than guessing", async () => {
+    await expect(importWith([{ id: 7, members: [] }])).rejects.toThrow(
+      /groups\[0\]\.id/,
+    );
+    await expect(
+      importWith([{ id: "G1", members: ["J1", "J2"], collapsed: "yes" }]),
+    ).rejects.toThrow(/groups\[0\]\.collapsed/);
+  });
+});

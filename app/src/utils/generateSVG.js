@@ -8,7 +8,12 @@
 
 import { C, getColors } from "../constants/colors.js";
 import { PALETTES } from "../constants/palettes.js";
-import { nodeRadius, arrowGeometry, edgeDashArray } from "./graphHelpers.js";
+import { elementRadius, arrowGeometry, edgeDashArray } from "./graphHelpers.js";
+import {
+  GROUP_LABEL_METRICS,
+  groupLabelLines,
+  projectGroups,
+} from "./groupUtils.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -20,6 +25,19 @@ const REL_TYPES = ["supports", "conflicts", "undermines", "depends"];
 
 /** Rounds a float to 1 decimal place for compact SVG attributes. */
 const f = (n) => +n.toFixed(1);
+
+/**
+ * Escapes text for an SVG text node.
+ *
+ * Element ids match `[JPT]\d+` and never needed this, but a group's name is
+ * whatever the user typed, and an unescaped `&` or `<` is enough to make the
+ * whole file unparseable.
+ */
+const esc = (t) =>
+  String(t).replace(
+    /[&<>]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c],
+  );
 
 /** Encodes an SVG string as a base64 data-URL for use in `<img src="...">`. */
 export function svgToDataUrl(svg) {
@@ -73,8 +91,8 @@ function edgeSVG(r, byId, positions, ox, oy) {
   const { x1, y1, x2, y2 } = arrowGeometry(
     sp,
     tp,
-    nodeRadius(byId[r.from]?.type),
-    nodeRadius(byId[r.to]?.type),
+    elementRadius(byId[r.from]),
+    elementRadius(byId[r.to]),
   );
   const color = isW ? C.withdrawn : C[r.type];
   const op = isW ? 0.25 : 1;
@@ -89,13 +107,64 @@ function edgeSVG(r, byId, positions, ox, oy) {
 
 // ─── Node ─────────────────────────────────────────────────────────────────────
 
+/** The dashed box an expanded group is drawn in, plus its name. */
+function hullSVG({ group, box }, ox, oy) {
+  return (
+    `<g><rect x="${f(box.x - ox)}" y="${f(box.y - oy)}" width="${f(box.w)}" height="${f(box.h)}"` +
+    ` rx="18" fill="${C.withdrawn}" fill-opacity="0.06" stroke="${C.withdrawn}"` +
+    ` stroke-width="1.5" stroke-dasharray="7 5"/>` +
+    `<text x="${f(box.x - ox + 14)}" y="${f(box.y - oy + 18)}" font-size="12"` +
+    ` fill="${C.withdrawn}" font-family="system-ui,sans-serif">${esc(group.label)}</text></g>`
+  );
+}
+
+/**
+ * A collapsed group, as the double-ringed disc the canvas draws.
+ *
+ * One light outline. It used to be two concentric rings, which is the shape the
+ * selected-node ring already has on screen.
+ *
+ * Literal `C.withdrawn` grey rather than the `var(--c-dim)` the app uses: an
+ * export is read outside the app, where that variable resolves to nothing. The
+ * two happen to be the same slate — see the THEME_STYLE note above, which
+ * carries the tokens the labels do need.
+ */
+function groupNodeSVG(el, positions, ox, oy) {
+  const pos = positions[el.id];
+  if (!pos) return "";
+  const r = elementRadius(el);
+  const cx = f(pos.x - ox);
+  const cy = f(pos.y - oy);
+  const n = el.memberIds.length;
+
+  const lines = groupLabelLines(el.label);
+  const { fontSize, lineHeight, countLineHeight } = GROUP_LABEL_METRICS;
+  const top = -(lines.length * lineHeight + countLineHeight) / 2 + fontSize;
+  const label = lines
+    .map(
+      (line, i) =>
+        `<text y="${f(top + i * lineHeight)}" text-anchor="middle" font-size="${fontSize}"` +
+        ` font-weight="bold" fill="${C.dim}" font-family="system-ui,sans-serif">${esc(line)}</text>`,
+    )
+    .join("");
+
+  return (
+    `<g transform="translate(${cx},${cy})">` +
+    `<circle r="${f(r)}" fill="${C.bg}" stroke="${C.withdrawn}" stroke-width="1.5"/>` +
+    label +
+    `<text y="${f(top + lines.length * lineHeight + 2)}" text-anchor="middle" font-size="9"` +
+    ` fill="${C.dim}" font-family="system-ui,sans-serif">${n} ${n === 1 ? "element" : "elements"}</text>` +
+    `</g>`
+  );
+}
+
 function nodeSVG(el, positions, ox, oy, palette) {
   const pos = positions[el.id];
   if (!pos) return "";
   // No confidence fade: `getColors` already carries confidence in the fill, and
   // the on-screen graph draws these shapes opaque too.
   const { fill, stroke } = getColors(el, palette);
-  const r = nodeRadius(el.type, el.confidence);
+  const r = elementRadius(el);
   const cx = f(pos.x - ox);
   const cy = f(pos.y - oy);
 
@@ -132,6 +201,9 @@ function nodeSVG(el, positions, ox, oy, palette) {
  * @param {PositionMap}  positions
  * @param {Object}  [opts]
  * @param {boolean} [opts.showWithdrawn=false]
+ * @param {import('../types.js').REGroup[]} [opts.groups=[]] - Drawn exactly as
+ *   the canvas draws them, so a downloaded graph is the graph that was on
+ *   screen: collapsed groups as one node, expanded ones inside a dashed hull.
  * @param {import('../constants/palettes.js').Palette} [opts.palette] - Defaults
  *   to the standard palette. An export is read in a document rather than in the
  *   app, so it does not follow a reader's high-contrast setting unless asked to.
@@ -141,22 +213,44 @@ export function generateGraphSVG(
   elements,
   relations,
   positions,
-  { showWithdrawn = false, palette = PALETTES.default } = {},
+  { showWithdrawn = false, palette = PALETTES.default, groups = [] } = {},
 ) {
-  const visEls = showWithdrawn
+  const shownEls = showWithdrawn
     ? elements
     : elements.filter((e) => e.status !== "withdrawn");
-  const visIds = new Set(visEls.map((e) => e.id));
-  const visRels = relations.filter(
-    (r) => visIds.has(r.from) && visIds.has(r.to),
+  const shownIds = new Set(shownEls.map((e) => e.id));
+  const shownRels = relations.filter(
+    (r) => shownIds.has(r.from) && shownIds.has(r.to),
   );
-  const byId = Object.fromEntries(elements.map((e) => [e.id, e]));
 
-  const pts = visEls.map((e) => positions[e.id]).filter(Boolean);
+  const {
+    elements: visEls,
+    relations: visRels,
+    positions: visPositions,
+    hulls,
+  } = projectGroups({
+    elements: shownEls,
+    relations: shownRels,
+    groups,
+    positions,
+    radiusOf: elementRadius,
+  });
+  const byId = Object.fromEntries(visEls.map((e) => [e.id, e]));
+
+  const pts = visEls.map((e) => visPositions[e.id]).filter(Boolean);
   if (!pts.length) return null;
 
-  const xs = pts.map((p) => p.x);
-  const ys = pts.map((p) => p.y);
+  // Hulls stick out past the nodes they surround, so they have to be in the
+  // bounding box or an expanded group gets its outline clipped off.
+  const boxes = hulls.map((h) => h.box);
+  const xs = [
+    ...pts.map((p) => p.x),
+    ...boxes.flatMap((b) => [b.x, b.x + b.w]),
+  ];
+  const ys = [
+    ...pts.map((p) => p.y),
+    ...boxes.flatMap((b) => [b.y, b.y + b.h]),
+  ];
   const ox = Math.min(...xs) - PADDING;
   const oy = Math.min(...ys) - PADDING;
   const w = Math.ceil(Math.max(...xs) - ox + PADDING);
@@ -165,8 +259,15 @@ export function generateGraphSVG(
   const lines = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" style="background:${C.bg};border-radius:8px">`,
     `  ${buildDefs()}`,
-    ...visRels.map((r) => edgeSVG(r, byId, positions, ox, oy)).filter(Boolean),
-    ...visEls.map((el) => nodeSVG(el, positions, ox, oy, palette)).filter(Boolean),
+    ...hulls.map((hull) => hullSVG(hull, ox, oy)),
+    ...visRels.map((r) => edgeSVG(r, byId, visPositions, ox, oy)).filter(Boolean),
+    ...visEls
+      .map((el) =>
+        el.type === "group"
+          ? groupNodeSVG(el, visPositions, ox, oy)
+          : nodeSVG(el, visPositions, ox, oy, palette),
+      )
+      .filter(Boolean),
     `</svg>`,
   ];
 

@@ -4,7 +4,7 @@
 // it arrived, and only then how its status has since changed. These tests pin
 // that order, and the status-dependent styling that goes with it.
 import { vi, describe, it, expect, afterEach } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { render, fireEvent, cleanup } from "@testing-library/react";
 
 import { Ctx } from "./TextTabContext.js";
 import { ElementCard, RelationCard } from "./TextTabCards.jsx";
@@ -196,5 +196,40 @@ describe("RelationCard metadata order", () => {
   it("renders the relation type between its endpoints", () => {
     const { container } = renderIn(<RelationCard r={rel()} dim={false} />);
     expect(container.textContent).toContain("supports");
+  });
+});
+
+// ─── Group membership ─────────────────────────────────────────────────────────
+
+describe("an element that belongs to a group", () => {
+  const GROUPS = [
+    { id: "G1", label: "Duties", members: ["J1"], collapsed: true },
+  ];
+
+  it("says so, since a collapsed group is why it is not on the canvas", () => {
+    const { container } = renderIn(<ElementCard e={el()} />, { groups: GROUPS });
+    expect(container.textContent).toContain("Group: Duties");
+  });
+
+  it("says nothing when it belongs to none", () => {
+    const { container } = renderIn(<ElementCard e={el()} />, { groups: [] });
+    expect(container.textContent).not.toContain("Group:");
+  });
+
+  it("survives a state written before groups existed", () => {
+    const { container } = renderIn(<ElementCard e={el()} />);
+    expect(container.textContent).not.toContain("Group:");
+  });
+
+  it("selects the group from the tag", () => {
+    const onSelect = vi.fn();
+    const { container } = renderIn(<ElementCard e={el()} />, {
+      groups: GROUPS,
+      onSelect,
+    });
+    fireEvent.click(
+      container.querySelector('[aria-label="Select group Duties"]'),
+    );
+    expect(onSelect.mock.calls[0][0](null)).toBe("G1");
   });
 });

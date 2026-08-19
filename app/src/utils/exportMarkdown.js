@@ -14,6 +14,7 @@ import {
 } from "./clusterUtils.js";
 import { buildPrincipleCovers } from "./textTabHelpers.js";
 import { sortElementIds, historyOf } from "./stateUtils.js";
+import { groupsOf } from "./groupUtils.js";
 import { generateGraphSVG, svgToDataUrl } from "./generateSVG.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -94,8 +95,24 @@ function relationsSection(relations) {
   return "## Relations\n\n" + lines.join("\n");
 }
 
-function graphSection(elements, relations, positions) {
-  const svg = generateGraphSVG(elements, relations, positions);
+/**
+ * The user's groups, as prose.
+ *
+ * The graph image below already shows them, but an export is also read as text
+ * — and a collapsed group's members are, by construction, the elements the
+ * picture does not name.
+ */
+function groupsSection(groups) {
+  if (!groups.length) return "";
+  const lines = groups.map(
+    (g) =>
+      `- **${esc(g.label)}**${g.collapsed ? " *(collapsed)*" : ""}: ${g.members.join(", ")}`,
+  );
+  return "## Groups\n\n" + lines.join("\n");
+}
+
+function graphSection(elements, relations, positions, groups) {
+  const svg = generateGraphSVG(elements, relations, positions, { groups });
   if (!svg) return "";
   return (
     '## Graph\n\n<img src="' + svgToDataUrl(svg) + '" style="max-width:100%"/>'
@@ -213,7 +230,11 @@ export function buildMarkdown(state, positions) {
     header,
     elementsBlock,
     relationsSection(state.relations),
-    graphSection(state.elements, state.relations, positions),
+    groupsSection(groupsOf(state)),
+    // Groups are the user's own filing, so the graph is drawn as they left it.
+    // The cluster diagrams below are not: a coherent cluster is computed from
+    // the relations, and cuts across the grouping rather than following it.
+    graphSection(state.elements, state.relations, positions, groupsOf(state)),
     clustersSection(state, positions),
     coherenceSection(state.coherence),
     logSection(state.log),

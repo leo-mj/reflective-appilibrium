@@ -145,6 +145,28 @@ export {};
  */
 
 /**
+ * A set of elements the user has bracketed together to tidy the graph.
+ *
+ * A view device, not part of the RE process: grouping does not advance the
+ * round, appear in the log, or enter the coherence analysis. It is distinct
+ * from the *coherent cluster* of {@link module:utils/clusterUtils}, which is
+ * computed from the relations rather than chosen.
+ *
+ * Collapsed, the group is drawn as one node and its members are not drawn at
+ * all. Relations between two members go with them; every relation crossing the
+ * group's boundary is kept and re-drawn against the group node.
+ *
+ * An element belongs to at most one group — {@link module:utils/groupUtils.createGroup}
+ * merges rather than nests.
+ *
+ * @typedef {Object} REGroup
+ * @property {string}   id        - `"G1"`, `"G2"`, …
+ * @property {string}   label     - What the hull and the chip call it.
+ * @property {string[]} members   - Element IDs.
+ * @property {boolean}  collapsed - Whether it is currently drawn as one node.
+ */
+
+/**
  * A single entry in the round-by-round audit log.
  *
  * @typedef {Object} RELogEntry
@@ -168,6 +190,9 @@ export {};
  * @property {RERelation[]}  relations - All relations across all rounds.
  * @property {RECoherence}   coherence - Most recent coherence analysis.
  * @property {RELogEntry[]}  log       - Ordered list of round log entries.
+ * @property {REGroup[]}     [groups]  - The user's graph groups. Absent on every
+ *   state written before groups existed; read it through
+ *   {@link module:utils/groupUtils.groupsOf} rather than directly.
  * @property {'questionnaire'} [model] - Present only in questionnaire mode, where the
  *   elements and argument relations are pre-populated and the user works through
  *   questions rather than building the graph themselves.

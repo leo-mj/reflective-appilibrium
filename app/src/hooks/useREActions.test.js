@@ -1354,3 +1354,241 @@ describe("handleImportFile", () => {
     expect(result.current.selectedRel).toBeNull();
   });
 });
+
+// ─── Groups ───────────────────────────────────────────────────────────────────
+
+describe("group actions", () => {
+  const twoElements = () =>
+    baseState({
+      elements: [makeEl(), makeEl({ id: "J2" }), makeEl({ id: "J3" })],
+      relations: [],
+    });
+
+  it("groups the elements it is given", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+
+    expect(result.current.state.groups).toEqual([
+      { id: "G1", label: "Group 1", members: ["J1", "J2"], collapsed: true },
+    ]);
+  });
+
+  it("does not advance the round or write to the log", () => {
+    // Grouping is a view device. The log is the record of the RE process —
+    // what was accepted, revised, withdrawn, and why — and tidying the canvas
+    // is none of those.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleToggleGroup("G1"));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1", "J2"],
+      }),
+    );
+
+    expect(result.current.state.round).toBe(1);
+    expect(result.current.state.log).toEqual([]);
+  });
+
+  it("leaves the elements themselves untouched", () => {
+    const before = twoElements();
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleToggleGroup("G1"));
+
+    expect(result.current.state.elements).toEqual(before.elements);
+  });
+
+  it("ignores a selection of fewer than two elements", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1"]));
+    expect(result.current.state.groups ?? []).toEqual([]);
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("expands, renames and dissolves", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    expect(result.current.state.groups[0].collapsed).toBe(true);
+
+    act(() => result.current.handleToggleGroup("G1"));
+    expect(result.current.state.groups[0].collapsed).toBe(false);
+
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1", "J2"],
+      }),
+    );
+    expect(result.current.state.groups[0].label).toBe("Duties");
+    // Editing does not re-collapse what the user just expanded.
+    expect(result.current.state.groups[0].collapsed).toBe(false);
+    expect(result.current.editingGroup).toBeNull();
+
+    act(() => result.current.handleUngroup("G1"));
+    expect(result.current.state.groups).toEqual([]);
+    // Dissolving the group leaves its members exactly where they were.
+    expect(result.current.state.elements).toHaveLength(3);
+  });
+
+  it("changes membership from the dialog, moving elements between groups", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+
+    // An exact list, unlike a canvas selection: J3 joins and J1 leaves.
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J2", "J3"],
+      }),
+    );
+    expect(result.current.state.groups[0].members).toEqual(["J2", "J3"]);
+  });
+
+  it("keeps hold of the group it just saved", () => {
+    // The chip is drawn only for the selection, so dropping it here took the
+    // handles away from under the hand that had opened the dialog.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1", "J2", "J3"],
+      }),
+    );
+    expect(result.current.selected).toBe("G1");
+  });
+
+  it("selects a group created from the dialog", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: null,
+        label: "Duties",
+        members: ["J1", "J2"],
+      }),
+    );
+    expect(result.current.selected).toBe("G1");
+  });
+
+  it("has nothing to hold on to when the save dissolves the group", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleSelectNode(() => "G1"));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1"],
+      }),
+    );
+    expect(result.current.selected).toBeNull();
+  });
+
+  it("creates a group from the dialog when it is given no id", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: null,
+        label: "Duties",
+        members: ["J1", "J3"],
+      }),
+    );
+    expect(result.current.state.groups).toEqual([
+      { id: "G1", label: "Duties", members: ["J1", "J3"], collapsed: true },
+    ]);
+  });
+
+  it("dissolves a group saved with fewer than two members", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1"],
+      }),
+    );
+    expect(result.current.state.groups).toEqual([]);
+  });
+
+  it("takes one element out from the panel's member list", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2", "J3"]));
+    act(() => result.current.handleRemoveFromGroup("J2"));
+    expect(result.current.state.groups[0].members).toEqual(["J1", "J3"]);
+  });
+
+  it("opens the dialog on a group, or on nothing to make one", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleEditGroupRequest());
+    expect(result.current.editingGroup).toBe("new");
+
+    act(() => result.current.setEditingGroup(null));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleEditGroupRequest("G1"));
+    expect(result.current.editingGroup).toMatchObject({ id: "G1" });
+  });
+
+  it("is undoable like any other edit", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    expect(result.current.canUndo).toBe(true);
+
+    act(() => result.current.handleUndo());
+    expect(result.current.state.groups ?? []).toEqual([]);
+  });
+
+  it("keeps hold of a group while it is being opened", () => {
+    // Expanding replaces the group's node with its members, but the group is
+    // still what the user has hold of — dropping it here would take the handle
+    // to close it again off the canvas at the moment of reaching for it.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleSelectNode(() => "G1"));
+
+    act(() => result.current.handleToggleGroup("G1"));
+    expect(result.current.state.groups[0].collapsed).toBe(false);
+    expect(result.current.selected).toBe("G1");
+  });
+
+  it("lets go of a group as it is closed", () => {
+    // Closing one is putting it away. Its handles are drawn for the selection,
+    // and leaving them up over a tidied-away group is the clutter that
+    // collapsing was asked to remove.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleToggleGroup("G1", false));
+    act(() => result.current.handleSelectNode(() => "G1"));
+
+    act(() => result.current.handleToggleGroup("G1"));
+    expect(result.current.state.groups[0].collapsed).toBe(true);
+    expect(result.current.selected).toBeNull();
+  });
+
+  it("leaves another selection alone when a group closes", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleToggleGroup("G1", false));
+    act(() => result.current.handleSelectNode(() => "J3"));
+
+    act(() => result.current.handleToggleGroup("G1"));
+    expect(result.current.selected).toBe("J3");
+  });
+
+  it("drops a selection pointing at a group that is going away", () => {
+    // Selection dims everything it is not connected to, so it must never be
+    // left on something the canvas has stopped drawing at all.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleSelectNode(() => "G1"));
+
+    act(() => result.current.handleUngroup("G1"));
+    expect(result.current.selected).toBeNull();
+  });
+});

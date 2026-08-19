@@ -24,6 +24,10 @@ import { confidenceDetail } from "../../utils/confidenceLabel.js";
  * Absolutely-positioned tooltip card rendered above a hovered graph node.
  * Returns `null` when `tooltip` is `null`.
  *
+ * Also serves the pseudo-element a collapsed group is drawn as, which has a
+ * member list where an element has a statement, and no confidence, origin or
+ * round of its own.
+ *
  * @param {Object}            props
  * @param {TooltipState|null} props.tooltip - Current tooltip data, or `null` to hide.
  * @param {React.ReactNode}   [props.actions] - Buttons for a pinned tooltip. Their
@@ -67,12 +71,27 @@ export function NodeTooltip({ tooltip, actions = null }) {
           marginBottom: 4,
         }}
       >
-        {el.id} ({el.type}) — {el.status}
+        {el.type === "group"
+          ? `${el.label} — group of ${el.memberIds.length}`
+          : `${el.id} (${el.type}) — ${el.status}`}
       </div>
-      <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.4 }}>
-        {el.text}
-      </div>
-      {el.previousText && (
+      {el.type === "group" ? (
+        // What the disc is standing in for. A collapsed group hides its members
+        // but keeps every relation they hold against the rest of the graph, so
+        // the one thing the card has to answer is which elements those are.
+        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>
+          {el.members.map((m) => (
+            <div key={m.id}>
+              <span style={{ color: C.text }}>{m.id}</span> {m.text}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.4 }}>
+          {el.text}
+        </div>
+      )}
+      {el.type !== "group" && el.previousText && (
         <div
           style={{
             color: C.revised,
@@ -84,7 +103,7 @@ export function NodeTooltip({ tooltip, actions = null }) {
           Previously: {el.previousText}
         </div>
       )}
-      {el.reason && (
+      {el.type !== "group" && el.reason && (
         <div
           style={{
             color: C.withdrawnMark,
@@ -96,12 +115,14 @@ export function NodeTooltip({ tooltip, actions = null }) {
           Withdrawn: {el.reason}
         </div>
       )}
-      <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
-        {/* Already a hover surface, so the exact value goes inline rather than
-            behind a title nobody could reach. */}
-        Confidence: {confidenceDetail(el.confidence)} · Origin: {el.origin}
-        {el.addedRound && ` · Added: Round ${el.addedRound}`}
-      </div>
+      {el.type !== "group" && (
+        <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
+          {/* Already a hover surface, so the exact value goes inline rather than
+              behind a title nobody could reach. */}
+          Confidence: {confidenceDetail(el.confidence)} · Origin: {el.origin}
+          {el.addedRound && ` · Added: Round ${el.addedRound}`}
+        </div>
+      )}
       {actions && (
         <div
           style={{

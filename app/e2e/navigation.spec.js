@@ -57,6 +57,29 @@ test.describe("Filtering and search", () => {
     await park(page);
   });
 
+  test("orders the pills: the process, then the user's filing, then the analysis", async ({
+    page,
+  }) => {
+    // Groups are what the user has filed away; coherence is what the app makes
+    // of the result, and clusters are part of that rather than a topic of their
+    // own — one pill, not two.
+    const labels = await page
+      .locator("button[aria-label^='Jump to']")
+      .evaluateAll((bs) => bs.map((b) => b.textContent.replace(/\s*\(\d+\)$/, "")));
+    // No "R": the app opens showing arguments only, which titles the single
+    // relations section "Arguments" and takes its pill with it.
+    expect(labels).toEqual(["J", "P", "T", "A", "G", "C", "L"]);
+  });
+
+  test("reads the clusters out under the coherence heading", async ({ page }) => {
+    const pill = page.getByRole("button", { name: /Jump to coherence/ });
+    await pill.click();
+    await park(page);
+    const panel = page.locator('[data-tutorial="text-panel"]');
+    await expect(panel).toContainText("Coherence");
+    await expect(panel).toContainText("Cluster 1");
+  });
+
   for (const chip of ["P", "T", "A", "C", "L"]) {
     test(`the ${chip} chip opens its section`, async ({ page }) => {
       const button = page.locator("button").filter({ hasText: new RegExp(`^${chip} \\(\\d+\\)$`) });

@@ -11,9 +11,14 @@
 /** @import { REElement, RERelation, PositionMap } from '../../types.js' */
 
 import { C, TRANSITION } from "../../constants/colors.js";
-import { nodeRadius, computeJunction } from "../../utils/graphHelpers.js";
+import { elementRadius, computeJunction } from "../../utils/graphHelpers.js";
 import { isWithdrawnAt } from "../../utils/stateUtils.js";
-import { GraphEdge, GraphNode, PulseRing } from "./GraphElements.jsx";
+import {
+  GraphEdge,
+  GraphGroupNode,
+  GraphNode,
+  PulseRing,
+} from "./GraphElements.jsx";
 
 // ─── Tooltip handler factory ──────────────────────────────────────────────────
 
@@ -142,7 +147,7 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
     transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
     children:
       isNew && !isWithdrawn ? (
-        <PulseRing type={element.type} radius={nodeRadius(element.type, element.confidence)} />
+        <PulseRing type={element.type} radius={elementRadius(element)} />
       ) : null,
   };
 }
@@ -172,7 +177,7 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
   // withdrawn, rejected. Confidence used to fade the node too, which washed the
   // id out along with the disc and capped label contrast at ~3.8:1 however the
   // ink was chosen; it lives in the fill colour now (see constants/colors.js).
-  const r = nodeRadius(element.type, element.confidence);
+  const r = elementRadius(element);
   return {
     isWithdrawn: isWithdrawn || isPreviewWithdrawn,
     isRejected,
@@ -237,7 +242,7 @@ export function renderJointArgument(rels, positions, elementById, visuals) {
   if (premises.length === 0) return null;
 
   // Conclusion node radius — needed for junction clamping and arrow geometry.
-  const tr = nodeRadius(conclusionEl.type, conclusionEl.confidence);
+  const tr = elementRadius(conclusionEl);
 
   const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
   const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
@@ -255,7 +260,7 @@ export function renderJointArgument(rels, positions, elementById, visuals) {
   return (
     <g opacity={opacity} style={{ transition }}>
       {premises.map(({ r, el, pos }) => {
-        const sr = nodeRadius(el.type, el.confidence);
+        const sr = elementRadius(el);
         const dx = jx - pos.x, dy = jy - pos.y;
         const dist = Math.hypot(dx, dy) || 1;
         return (
@@ -293,7 +298,11 @@ export function renderEdge(relation, positions, elementById, visuals, parallelOf
   const { sourcePos, targetPos, sourceEl, targetEl } = resolved;
   return (
     <GraphEdge
-      key={`${relation.from}-${relation.to}-${relation.type}-${relation.addedRound ?? 1}`}
+      // The source endpoints, not the drawn ones: two members of one
+      // collapsed group holding the same relation type against the same
+      // outside element are re-pointed to the same pair, and would otherwise
+      // collide on this key.
+      key={`${relation.sourceFrom ?? relation.from}-${relation.sourceTo ?? relation.to}-${relation.type}-${relation.addedRound ?? 1}`}
       relation={relation}
       sourcePos={sourcePos}
       targetPos={targetPos}
@@ -326,15 +335,33 @@ export function renderNode(
   const position = positions[element.id];
   if (!position) return null;
   const { children = null, ...nodeProps } = visuals;
+  const shared = {
+    key: element.id,
+    element,
+    position,
+    cursor: isDragging ? "grabbing" : "pointer",
+    ...makeTooltipHandlers(isDragging, setTooltip, element),
+  };
+  // A collapsed group is a node in every way the canvas cares about — it is
+  // hit-tested, selected, hovered and drawn at a position like any other — but
+  // it has no type ramp and no confidence, so it gets its own shape rather than
+  // a branch inside `NodeShape`.
+  if (element.type === "group") {
+    // Named rather than spread: `isWithdrawn` and `isRejected` are the rest of
+    // what the factory returns, and neither is a state a group can be in.
+    return (
+      <GraphGroupNode
+        {...shared}
+        radius={elementRadius(element)}
+        opacity={nodeProps.opacity}
+        transition={nodeProps.transition}
+      >
+        {children}
+      </GraphGroupNode>
+    );
+  }
   return (
-    <GraphNode
-      key={element.id}
-      element={element}
-      position={position}
-      cursor={isDragging ? "grabbing" : "pointer"}
-      {...makeTooltipHandlers(isDragging, setTooltip, element)}
-      {...nodeProps}
-    >
+    <GraphNode {...shared} {...nodeProps}>
       {children}
     </GraphNode>
   );

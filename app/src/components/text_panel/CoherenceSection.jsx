@@ -5,6 +5,7 @@
 
 import { C } from "../../constants/colors.js";
 import { SectionHeader, CoherenceGroup } from "./TextTabCards.jsx";
+import { ClusterListing } from "./TextTabClusterSection.jsx";
 
 /**
  * Reads out what the relation graph says about the current commitments.
@@ -14,19 +15,26 @@ import { SectionHeader, CoherenceGroup } from "./TextTabCards.jsx";
  * and would otherwise sit empty forever. Computing them means they are exact
  * and current, and they work with no backend.
  *
- * Clusters are not shown here — the Clusters tab is the place for those.
+ * Coherent clusters are read out here too, under {@link ClusterListing}. They
+ * used to be a section of their own, which asked the reader to know that a
+ * cluster is a coherence finding before they could think to look for it —
+ * tensions, orphans and clusters are all answers to the same question.
  *
- * Rendered only when there is something to report: the caller gates on
- * `hasCoherence`, so at least one of the two lists is non-empty.
+ * Rendered only when there is something to report: the caller gates on there
+ * being at least one finding or one cluster.
  *
  * @param {Object}      props
  * @param {{tensions: string[], orphans: string[], possibleSupport: string[]}} props.coherence
+ * @param {import('../../types.js').REState} props.state
+ * @param {Array}       props.clusters
  * @param {React.Ref}   props.sectionRef
  * @param {boolean}     props.isCollapsed
  * @param {function}    props.onToggle
  */
 export function CoherenceSection({
   coherence,
+  state,
+  clusters,
   sectionRef,
   isCollapsed,
   onToggle,
@@ -58,6 +66,7 @@ export function CoherenceSection({
             color={C.supports}
             items={possibleSupport}
           />
+          <ClusterListing state={state} clusters={clusters} />
         </>
       )}
     </div>

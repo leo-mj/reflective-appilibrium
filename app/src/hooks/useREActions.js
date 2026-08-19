@@ -8,6 +8,7 @@
 import { useState, useReducer } from "react";
 import { importStateFromFile } from "../utils/importMarkdown.js";
 import { useElementActions } from "./useElementActions.js";
+import { useGroupActions } from "./useGroupActions.js";
 import { useRelationActions } from "./useRelationActions.js";
 
 /** How many past states undo can reach back through. */
@@ -144,6 +145,13 @@ export function useREActions(initialState) {
     setRecentlyAddedRel,
   });
 
+  const groupActions = useGroupActions({
+    state,
+    mutate,
+    setSelected,
+    setSelectedRel,
+  });
+
   const relationActions = useRelationActions({
     state,
     mutate,
@@ -230,6 +238,7 @@ export function useREActions(initialState) {
     canRedo,
     ...elementActions,
     ...relationActions,
+    ...groupActions,
     handleImportFile,
     handleQuestionnaireSelectAnswer,
   };

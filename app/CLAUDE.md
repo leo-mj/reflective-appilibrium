@@ -72,6 +72,76 @@ buttons and the questionnaire card's button. They are HTML, where axe enforces A
 in the e2e audit, so they take `inkOn(fill)` instead. The nodes are the exception
 to AA; a button is not.
 
+### Groups
+
+User-defined boxes around nodes, collapsible to one node each. State lives in
+`state.groups`; the domain note is in the root `CLAUDE.md`.
+
+- `utils/groupUtils.js` — the pure half. `projectGroups()` is the whole feature:
+  it rewrites the visible elements, relations and positions so a collapsed group
+  is one node. Everything that draws the graph consumes its output — `Graph.jsx`
+  and `generateSVG.js` alike, so a downloaded graph is the graph on screen.
+- **A group is not a fourth element type.** It has no type ramp and no
+  confidence, so it takes no palette fill: the disc is `C.panel` inside a `C.dim`
+  outline, the app's own "this is a container" pairing. Ask `elementRadius(el)`
+  rather than `nodeRadius(el.type, el.confidence)` — that pair is exactly what a
+  group node lacks.
+- **Re-pointed edges are copies.** Selection compares relations by identity, so
+  `projectGroups` returns a `relSource` map back to the relation held in state,
+  which `Graph.jsx` passes to `useGraphClick` as `toSourceRel`. Relations it had
+  no reason to rewrite are the very objects passed in — don't "simplify" that
+  into copying them all.
+- Identity is drawn in SVG (the hull, the disc, the name); the *actions* are HTML
+  buttons in `graphs_shared/GroupChips.jsx`, so they get a tab stop and a name.
+- The layout knows about groups: `useStablePositions` pulls members together and
+  packs collapsed ones tighter. The History tab deliberately does not collapse —
+  playback is about the process, not about how the user has filed it.
+
+**Two ways in, and they mean different things.** `createGroup` takes a canvas
+selection, which is a vague instruction — "these belong together" — so it folds
+into whatever group the selection already touches, which is what makes "pick a
+node and a member, then Group" read as *adding* to that group. `upsertGroup`
+takes the dialog's list, which is exact: an element ticked there *moves* out of
+the group that had it, and a group left under two members is dissolved.
+
+**Where the feature announces itself.** A canvas gives no hint that a modifier
+key does anything, so grouping is reachable three ways: `+ Grp` in the graph
+toolbar, the `+` on the text panel's Groups section — which renders even at zero,
+carrying the prose that explains the feature — and the `Group` button on the
+ctrl+click selection bar. `GroupModal` is the single dialog behind the first two
+and behind every chip's pencil; it does name and membership together, because
+those are the only two things a group is.
+
+**The panel is not decoration.** A collapsed group's members are by design what
+the canvas cannot show, and `text_panel/TextTabGroupSection.jsx` is the one place
+they stay spelled out — hence the per-member "×" there, and the Expand/Edit/
+Ungroup handles matching the canvas chips. Every element card also carries a
+`Group: …` tag, so the panel never looks like it disagrees with a canvas that is
+not drawing it.
+
+**A group can be selected, exactly as an element can** — from its disc, from
+inside an expanded group's box, from the panel's group chip, or from an element's
+group tag. Selection is still one id, so `selectionIds()` is what turns that id
+into what it covers: the group's node *and* its members. Both `Graph.jsx` and
+`useTextTabData.js` highlight from it, which is what keeps them agreeing.
+Reading the id literally is what left a selected group showing "G1" over an
+empty card, since neither surface holds anything by that name.
+
+**Two rules the canvas depends on.** Clicking a collapsed group *opens* it — a
+group is a lid, and it re-asserts the selection rather than toggling it, because
+the thing clicked is about to be replaced by the members underneath. And chips
+are drawn for the selected group only: one over every group turned the canvas
+into a row of toolbars. So opening a group keeps hold of it (the handle to close
+it again has to stay under the hand), `handleSaveGroup` keeps hold of what it
+saved, and **closing one lets go** — putting a group away and leaving its
+toolbar floating over the result is the clutter collapsing was asked to remove.
+
+**`onSelect` and `onSelectRel` are not independent.** `useREActions` couples
+them: each clears the other's selection. A handler that calls both in sequence
+therefore has its second updater run against state the first already blanked —
+which is how letting go of a group by clicking its box came to re-select it
+instead. Test harnesses must couple them the same way or they will not see it.
+
 ### Confidence
 
 Reads two ways, and does **not** fade the node: it tints the fill (`low` → `high`)

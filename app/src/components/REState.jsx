@@ -21,6 +21,7 @@ import { GraphPanel } from "./GraphPanel.jsx";
 import { GuidedTour, TOUR_W } from "./tour/GuidedTour.jsx";
 import { sheetHeight } from "./tour/tourZ.js";
 import { EditModals } from "./user_edits/EditModals.jsx";
+import { GroupModal } from "./user_edits/GroupModal.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
   // Graph, not the Assist panel: assist controls are gated on a backend, so in
@@ -112,6 +113,14 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleRejectRelations,
     handleApplyRethonEquilibrium,
     handleImportFile,
+    handleCreateGroup,
+    handleToggleGroup,
+    handleUngroup,
+    handleRemoveFromGroup,
+    handleSaveGroup,
+    handleEditGroupRequest,
+    editingGroup,
+    setEditingGroup,
     handleUndo,
     canUndo,
     handleRedo,
@@ -280,6 +289,12 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onReinstateRel: handleReinstateRelation,
     onAddElement: handleAddElement,
     onAddRelation: handleAddRelation,
+    // The panel is where a collapsed group's members are still spelled out, so
+    // it gets the same handles the canvas chips have.
+    onToggleGroup: handleToggleGroup,
+    onEditGroupRequest: handleEditGroupRequest,
+    onUngroup: handleUngroup,
+    onRemoveFromGroup: handleRemoveFromGroup,
     recentlyAdded,
     recentlyAddedRel,
     showTabNav,
@@ -323,6 +338,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     focus: graphFocus,
     isWide,
     onCtrlSecondSelect: setAddBarCtrlTo,
+    onCreateGroup: handleCreateGroup,
+    onToggleGroup: handleToggleGroup,
+    onUngroup: handleUngroup,
+    onEditGroupRequest: handleEditGroupRequest,
     ready,
     isSample,
     hideNonEntailsRels,
@@ -503,6 +522,16 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         layout={isWide ? "column" : "sheet"}
         onExpandChange={setTourExpanded}
       />
+
+      {editingGroup && (
+        <GroupModal
+          group={editingGroup === "new" ? null : editingGroup}
+          elements={linkableElements(state.elements)}
+          groups={state.groups ?? []}
+          onSave={handleSaveGroup}
+          onCancel={() => setEditingGroup(null)}
+        />
+      )}
 
       <EditModals
         editingEl={editingEl}

@@ -76,23 +76,41 @@ const POSITIONS = {
 };
 
 function Harness({
+  state = STATE,
+  positions = POSITIONS,
   onAddRelation = () => {},
   hideNonEntailsRels = false,
   onEditRequest = () => {},
   onWithdrawRequest = () => {},
   onReinstate = () => {},
+  onCreateGroup = () => {},
+  onToggleGroup = () => {},
+  onUngroup = () => {},
+  onEditGroupRequest = () => {},
 }) {
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
+  // Coupled exactly as `useREActions` couples them: picking a node clears any
+  // relation selection and vice versa. Independent setters here hid a bug in
+  // which letting go of a group re-selected it, because the second updater ran
+  // against state the first had already blanked.
+  const selectNode = (updater) => {
+    setSelectedRel(null);
+    setSelected(updater);
+  };
+  const selectRel = (updater) => {
+    setSelected(null);
+    setSelectedRel(updater);
+  };
   return (
     <Graph
-      state={STATE}
+      state={state}
       hiddenLegendKeys={new Set()}
-      positions={POSITIONS}
+      positions={positions}
       selected={selected}
-      onSelect={setSelected}
+      onSelect={selectNode}
       selectedRel={selectedRel}
-      onSelectRel={setSelectedRel}
+      onSelectRel={selectRel}
       onAddElement={() => {}}
       onAddRelation={onAddRelation}
       onEditRequest={onEditRequest}
@@ -103,6 +121,10 @@ function Harness({
       ready={false}
       recentlyAdded={null}
       hideNonEntailsRels={hideNonEntailsRels}
+      onCreateGroup={onCreateGroup}
+      onToggleGroup={onToggleGroup}
+      onUngroup={onUngroup}
+      onEditGroupRequest={onEditGroupRequest}
     />
   );
 }
@@ -460,5 +482,272 @@ describe("clicking a node pins its tooltip", () => {
     );
     expect(onWithdrawRequest).toHaveBeenCalledWith("J1");
     expect(card()).toBeUndefined();
+  });
+});
+
+// Grouping is a view device: it changes what the canvas draws, never what the
+// state says. These tests are about the first half of that — the second is
+// utils/groupUtils.test.js.
+describe("groups", () => {
+  /** J1, J2 and P1, with P1 outside whatever gets grouped. */
+  const GROUP_STATE = {
+    ...STATE,
+    elements: [
+      { id: "J1", type: "judgment", status: "active", confidence: 1, text: "J1.", addedRound: 1 },
+      { id: "J2", type: "judgment", status: "active", confidence: 1, text: "J2.", addedRound: 1 },
+      { id: "P1", type: "principle", status: "active", confidence: 1, text: "P1.", addedRound: 1 },
+    ],
+    relations: [
+      { from: "J1", to: "P1", type: "supports", explanation: "", addedRound: 1 },
+      { from: "J2", to: "P1", type: "supports", explanation: "", addedRound: 1 },
+      { from: "J1", to: "J2", type: "supports", explanation: "", addedRound: 1 },
+    ],
+  };
+  const withGroup = (collapsed) => ({
+    ...GROUP_STATE,
+    groups: [
+      { id: "G1", label: "Duties", members: ["J1", "J2"], collapsed },
+    ],
+  });
+
+  /** A click at simulation coordinates, wherever they land. */
+  const clickAt = (svg, x, y) => {
+    const common = { clientX: x, clientY: y, pointerId: 1, pointerType: "mouse" };
+    fireEvent.pointerDown(svg, common);
+    fireEvent.pointerUp(svg, common);
+  };
+
+  /** Clicks the collapsed group's disc, at the centroid of J1 and J2. */
+  const clickGroupNode = (container) =>
+    clickAt(container.querySelector("svg"), 200, 100);
+
+  /** Node ids the canvas is currently drawing, read off the label texts. */
+  const drawnIds = (svg) =>
+    [...svg.querySelectorAll("g[transform] > text")].map((t) => t.textContent);
+
+  /** One per drawn edge — every relation type here has a filled arrowhead. */
+  const arrowheads = (svg) => svg.querySelectorAll("polygon").length;
+
+  it("offers Group for a ctrl+click selection, and reports both nodes", () => {
+    const onCreateGroup = vi.fn();
+    const { container, svg } = setup({
+      state: GROUP_STATE,
+      onCreateGroup,
+    });
+
+    clickNode(svg, "J1");
+    clickNode(svg, "J2", { ctrl: true });
+    fireEvent.click(button(container, "Group"));
+
+    expect(onCreateGroup).toHaveBeenCalledWith(["J1", "J2"]);
+  });
+
+  it("leaves an expanded group's nodes and edges exactly as they were", () => {
+    const bare = setup({ state: GROUP_STATE });
+    const grouped = setup({ state: withGroup(false) });
+
+    expect(drawnIds(grouped.svg)).toEqual(drawnIds(bare.svg));
+    expect(arrowheads(grouped.svg)).toBe(arrowheads(bare.svg));
+    // …but says where its boundary is.
+    expect(grouped.svg.textContent).toContain("Duties");
+  });
+
+  it("draws a collapsed group as one node in place of its members", () => {
+    const { svg } = setup({ state: withGroup(true) });
+    const ids = drawnIds(svg);
+    expect(ids).not.toContain("J1");
+    expect(ids).not.toContain("J2");
+    expect(ids).toContain("P1");
+    // Count, unit and name — the disc says how much it is standing in for.
+    expect(svg.textContent).toContain("Duties");
+    expect(svg.textContent).toContain("2 elements");
+  });
+
+  it("keeps both crossing relations and drops the internal one", () => {
+    // J1→P1 and J2→P1 both survive as G1→P1; J1→J2 goes with its endpoints.
+    const { svg } = setup({ state: withGroup(true) });
+    expect(arrowheads(svg)).toBe(2);
+  });
+
+  it("lists the members in the card hovering the group node shows", () => {
+    const { svg } = setup({ state: withGroup(true) });
+    // `:scope >` matters: the pan/zoom wrapper is a transformed <g> too, and
+    // it contains every label on the canvas.
+    const disc = [...svg.querySelectorAll("g[transform]")].find(
+      (g) => g.querySelector(":scope > text")?.textContent === "Duties",
+    );
+    fireEvent.mouseOver(disc);
+
+    const card = [...document.body.querySelectorAll("div")].find(
+      (d) => d.style.position === "fixed" && d.textContent.includes("Duties"),
+    );
+    expect(card).toBeDefined();
+    expect(card.textContent).toContain("J1");
+    expect(card.textContent).toContain("J2");
+    // A group is not a claim, so it is offered none of an element's actions.
+    expect(card.textContent).not.toContain("Withdraw");
+  });
+
+  it("opens a collapsed group when it is clicked, and selects it", () => {
+    // A group is a lid: the obvious thing to want from clicking one is to see
+    // what is under it.
+    const onToggleGroup = vi.fn();
+    const { container } = setup({ state: withGroup(true), onToggleGroup });
+    clickGroupNode(container);
+
+    expect(onToggleGroup).toHaveBeenCalledWith("G1", false);
+    // Selected as well, so its handles are on screen — the harness holds the
+    // state flat, so the group is still collapsed here.
+    expect(
+      container.querySelector('[aria-label="Expand group Duties"]'),
+    ).not.toBeNull();
+  });
+
+  it("keeps its handles off the canvas until the group is reached for", () => {
+    // A chip over every group turns the canvas into a row of toolbars.
+    const { container } = setup({ state: withGroup(true) });
+    expect(container.querySelector('[aria-label^="Expand group"]')).toBeNull();
+  });
+
+  it("selects an expanded group from inside its box", () => {
+    // Its members are ordinary nodes by then, so clicking one of those selects
+    // the element; the box itself is the only handle the group has left.
+    const { container, svg } = setup({ state: withGroup(false) });
+    expect(container.querySelector('[aria-label^="Collapse group"]')).toBeNull();
+
+    clickAt(svg, 200, 60); // inside the hull, clear of every node and edge
+    expect(
+      container.querySelector('[aria-label="Collapse group Duties"]'),
+    ).not.toBeNull();
+  });
+
+  it("does not let a group be ctrl-picked into an argument", () => {
+    const { container, svg } = setup({
+      state: withGroup(true),
+    });
+    clickNode(svg, "P1", { ctrl: false });
+    fireEvent.pointerDown(svg, { clientX: 200, clientY: 100, pointerId: 1, pointerType: "mouse" });
+    fireEvent.pointerUp(svg, {
+      clientX: 200, clientY: 100, pointerId: 1, pointerType: "mouse", ctrlKey: true,
+    });
+
+    expect(button(container, "Add relation")).toBeUndefined();
+    expect(button(container, "Add argument")).toBeUndefined();
+  });
+
+  it("puts the collapse, edit and ungroup handles on a chip", () => {
+    const onToggleGroup = vi.fn();
+    const onUngroup = vi.fn();
+    const onEditGroupRequest = vi.fn();
+    const { container, svg } = setup({
+      state: withGroup(false),
+      onToggleGroup,
+      onUngroup,
+      onEditGroupRequest,
+    });
+    clickAt(svg, 200, 60); // select the group by its box
+    const chip = (label) => container.querySelector(`[aria-label="${label}"]`);
+
+    fireEvent.click(chip("Collapse group Duties"));
+    expect(onToggleGroup).toHaveBeenCalledWith("G1");
+
+    fireEvent.click(chip("Edit group Duties"));
+    expect(onEditGroupRequest).toHaveBeenCalledWith("G1");
+
+    fireEvent.click(chip("Ungroup Duties"));
+    expect(onUngroup).toHaveBeenCalledWith("G1");
+  });
+
+  it("puts its handles away when the group is closed from its own chip", () => {
+    // Closing a group is tidying it away, and a toolbar left floating over the
+    // result is the clutter that was being removed. `useGroupActions` drops the
+    // selection on collapse; the harness below does what it does.
+    const Live = () => {
+      const [collapsed, setCollapsed] = useState(false);
+      const [selected, setSelected] = useState(null);
+      return (
+        <Graph
+          state={withGroup(collapsed)}
+          hiddenLegendKeys={new Set()}
+          positions={POSITIONS}
+          selected={selected}
+          onSelect={setSelected}
+          selectedRel={null}
+          onSelectRel={() => {}}
+          onAddElement={() => {}}
+          onAddRelation={() => {}}
+          ready={false}
+          recentlyAdded={null}
+          hideNonEntailsRels={false}
+          onToggleGroup={(id, next) => {
+            const closing = next ?? !collapsed;
+            setCollapsed(closing);
+            if (closing) setSelected((prev) => (prev === id ? null : prev));
+          }}
+        />
+      );
+    };
+    const { container } = render(<Live />);
+    const svg = container.querySelector("svg");
+
+    clickAt(svg, 200, 60); // select the expanded group by its box
+    const collapse = container.querySelector(
+      '[aria-label="Collapse group Duties"]',
+    );
+    expect(collapse).not.toBeNull();
+
+    fireEvent.click(collapse);
+    // The disc is drawn, and nothing is floating over it.
+    expect(drawnIds(container.querySelector("svg"))).not.toContain("J1");
+    expect(container.querySelector("[aria-label$='group Duties']")).toBeNull();
+  });
+
+  it("lets go of an expanded group when its box is clicked again", () => {
+    // Clicking what is already selected drops it, the same as clicking a
+    // selected node does.
+    const { container, svg } = setup({ state: withGroup(false) });
+
+    clickAt(svg, 200, 60);
+    expect(
+      container.querySelector('[aria-label="Collapse group Duties"]'),
+    ).not.toBeNull();
+
+    clickAt(svg, 200, 60);
+    expect(
+      container.querySelector('[aria-label="Collapse group Duties"]'),
+    ).toBeNull();
+  });
+
+  it("keeps a group's handles on screen when it sits against an edge", () => {
+    // The chip floats above the shape, so culling on the chip's own anchor
+    // took the handles away from any group near the top of the panel — and an
+    // expanded one there had no way left to close itself.
+    const atTop = { J1: { x: 120, y: 10 }, J2: { x: 280, y: 10 }, P1: { x: 500, y: 260 } };
+    const { container, svg } = setup({
+      state: withGroup(false),
+      positions: atTop,
+    });
+
+    clickAt(svg, 200, 45); // inside the hull, clear of both nodes and the edge
+    expect(
+      container.querySelector('[aria-label="Collapse group Duties"]'),
+    ).not.toBeNull();
+  });
+
+  it("says grouping exists, without needing a modifier key found first", () => {
+    // The ctrl+click path is quicker and the tooltip says so, but nobody
+    // discovers a modifier key by looking at a canvas.
+    const onEditGroupRequest = vi.fn();
+    const { container } = setup({ state: GROUP_STATE, onEditGroupRequest });
+
+    fireEvent.click(container.querySelector('[aria-label="New group"]'));
+    expect(onEditGroupRequest).toHaveBeenCalledWith();
+  });
+
+  it("offers to expand once collapsed", () => {
+    const { container } = setup({ state: withGroup(true) });
+    clickGroupNode(container);
+    expect(container.querySelector('[aria-label="Expand group Duties"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Collapse group Duties"]')).toBeNull();
   });
 });

@@ -8,6 +8,57 @@
 import { useState, useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { nodeRadius } from "../utils/graphHelpers.js";
+import { groupsOf } from "../utils/groupUtils.js";
+
+/**
+ * How hard a group pulls its members together, as a fraction of the distance
+ * to their centroid per tick.
+ *
+ * An expanded group only wants to be *drawable*: its hull is the bounding box
+ * of its members, so members strewn across the canvas would box in half the
+ * graph. A gentle pull is enough, and anything stronger would override the
+ * link and charge forces that are saying something about the argument rather
+ * than about the user's filing.
+ *
+ * A collapsed group is drawn as a single node, so its members have to actually
+ * converge — otherwise collapsing hides them without reclaiming the space they
+ * were using, which is the entire point of collapsing.
+ */
+const EXPANDED_PULL = 0.09;
+const COLLAPSED_PULL = 0.6;
+
+/**
+ * A D3 force pulling the members of each group toward their common centroid.
+ *
+ * @param {import('../types.js').REGroup[]} groups
+ * @returns {Function} A force with the `initialize` hook D3 calls on start.
+ */
+function groupingForce(groups) {
+  let members = [];
+  const force = (alpha) => {
+    for (const { nodes, collapsed } of members) {
+      const cx = nodes.reduce((s, n) => s + n.x, 0) / nodes.length;
+      const cy = nodes.reduce((s, n) => s + n.y, 0) / nodes.length;
+      const k = (collapsed ? COLLAPSED_PULL : EXPANDED_PULL) * alpha;
+      for (const n of nodes) {
+        n.vx += (cx - n.x) * k;
+        n.vy += (cy - n.y) * k;
+      }
+    }
+  };
+  // Resolved once per simulation rather than per tick: the membership cannot
+  // change without the effect below re-running and building a new simulation.
+  force.initialize = (all) => {
+    const byId = new Map(all.map((n) => [n.id, n]));
+    members = groups
+      .map((g) => ({
+        collapsed: !!g.collapsed,
+        nodes: g.members.map((id) => byId.get(id)).filter(Boolean),
+      }))
+      .filter((g) => g.nodes.length > 1);
+  };
+  return force;
+}
 
 /**
  * Runs a D3 force-directed simulation over **all** elements in `state` (including withdrawn
@@ -31,6 +82,7 @@ import { nodeRadius } from "../utils/graphHelpers.js";
  * | `charge`    | Repels all nodes from each other to avoid overlap        |
  * | `center`    | Draws the whole graph toward `dims.w/2, dims.h/2`        |
  * | `collision` | Prevents nodes from overlapping (radius = node r + 12)   |
+ * | `group`     | Pulls the members of a user-defined group together       |
  * | `x` / `y`  | Weak restoring force to keep nodes on-screen             |
  *
  * The `alphaDecay` is set low (`0.01`) so the simulation runs long enough
@@ -38,9 +90,10 @@ import { nodeRadius } from "../utils/graphHelpers.js";
  * a guaranteed minimum so the UI doesn't stay invisible indefinitely.
  *
  * ### When does the simulation restart?
- * The `useEffect` dependency array is `[elements.length, relations.length, dims.w, dims.h]`.
- * The simulation restarts only when the number of elements/relations changes or the
- * panel dimensions change — **not** on every re-render — so performance is not a concern.
+ * The `useEffect` dependency array is `[elements.length, relations.length, groupSignature,
+ * dims.w, dims.h]`. The simulation restarts only when the number of elements/relations
+ * changes, a group is created, collapsed or dissolved, or the panel dimensions change —
+ * **not** on every re-render — so performance is not a concern.
  *
  * @param {REState} state - Full RE state; all elements and relations are used for layout.
  * @param {Dims}    dims  - Pixel dimensions of the graph panel. The simulation centre is
@@ -66,11 +119,21 @@ export function useStablePositions(state, dims) {
   const [ready, setReady] = useState(false);
   const halfWidth = dims.w / 2;
   const halfHeight = dims.h / 2;
+  // Same reasoning as the element and relation counts below: only a change to
+  // the grouping itself should re-run the layout, and `state.groups` is a fresh
+  // array after every mutation anywhere in the state.
+  const groupSignature = groupsOf(state)
+    .map((g) => `${g.id}:${g.collapsed ? 1 : 0}:${g.members.join(",")}`)
+    .join("|");
 
   useEffect(() => {
     if (!dims.w || !dims.h) return;
     const allEls = state.elements;
     const allRels = state.relations;
+    const groups = groupsOf(state);
+    const collapsedIds = new Set(
+      groups.filter((g) => g.collapsed).flatMap((g) => g.members),
+    );
 
     // Build D3 node objects, reusing previous positions where available.
     const nodes = allEls.map((e) => {
@@ -83,6 +146,14 @@ export function useStablePositions(state, dims) {
         // confidence, which over-spaced small nodes and — now that confidence
         // swings the radius by 3× — would let big ones overlap.
         r: nodeRadius(e.type, e.confidence),
+        // Members of a collapsed group pack far tighter than the rest: they are
+        // drawn as one node, and keeping them a node-width apart would leave
+        // the group's disc ringed by the hole its own members were holding
+        // open. Not to a single point, though — the History tab shares this one
+        // simulation and does *not* collapse anything, playback being about the
+        // process rather than about how the user has filed it, so a pile of
+        // exactly coincident nodes there would be unreadable.
+        collapsed: collapsedIds.has(e.id),
         x: prev?.x ?? halfWidth + ((Math.random() - 0.5) * halfWidth) / 10,
         y: prev?.y ?? halfHeight + ((Math.random() - 0.5) * halfHeight) / 10,
         vx: 0,
@@ -109,8 +180,9 @@ export function useStablePositions(state, dims) {
       .force("center", d3.forceCenter(halfWidth, halfHeight))
       .force(
         "collision",
-        d3.forceCollide().radius((d) => d.r + 12),
+        d3.forceCollide().radius((d) => (d.collapsed ? d.r * 0.4 : d.r + 12)),
       )
+      .force("group", groupingForce(groups))
       // Weak restoring forces keep isolated nodes from drifting off-screen.
       .force("x", d3.forceX(halfWidth).strength(0.04))
       .force("y", d3.forceY(halfHeight).strength(0.04))
@@ -146,6 +218,7 @@ export function useStablePositions(state, dims) {
   }, [
     state.elements.length,
     state.relations.length,
+    groupSignature,
     dims.w,
     dims.h,
     halfWidth,

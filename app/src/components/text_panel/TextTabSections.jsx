@@ -62,7 +62,8 @@ function sortEls(els, sort) {
 export function HighlightedSection({
   selectedRel,
   selected,
-  selectedEl,
+  selectedEls,
+  selectedGroup,
   neighbourEls,
   hlRels,
   restEls,
@@ -86,8 +87,17 @@ export function HighlightedSection({
         )
       ) : (
         <>
-          <SectionHeader title={selected} />
-          {selectedEl && <ElementCard e={selectedEl} />}
+          {/* A group's name, not its id: "G1" is an internal handle, and the
+              members below are the only thing that makes the heading mean
+              anything. For an element the id *is* what it is called. */}
+          <SectionHeader
+            title={
+              selectedGroup
+                ? `${selectedGroup.label} (${selectedGroup.members.length})`
+                : selected
+            }
+          />
+          <ElementCards els={selectedEls} />
           {neighbourEls.length > 0 && <SectionHeader title="Neighbours" />}
           <ElementCards els={neighbourEls} />
           {hlRels.length > 0 && (

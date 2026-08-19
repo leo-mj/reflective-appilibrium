@@ -20,11 +20,13 @@ import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import { useGraphClick } from "../hooks/useGraphClick.js";
 import {
+  elementRadius,
   fitView,
   getNeighbours,
   parallelEdgeOffsets,
   groupJointArguments,
 } from "../utils/graphHelpers.js";
+import { groupsOf, projectGroups, selectionIds } from "../utils/groupUtils.js";
 import {
   elementsAtRound,
   argumentRelationType,
@@ -33,8 +35,10 @@ import {
 } from "../utils/stateUtils.js";
 import {
   GraphCanvas,
+  GroupHull,
   OffscreenIndicators,
 } from "./graphs_shared/GraphElements.jsx";
+import { GroupChips } from "./graphs_shared/GroupChips.jsx";
 import {
   renderEdge,
   renderJointArgument,
@@ -42,6 +46,7 @@ import {
   graphEdgeVisuals,
   graphNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
+import { Tooltip } from "./Tooltip.jsx";
 import { ActionButtons } from "./text_panel/TextTabPrimitives.jsx";
 import { AddElementModal } from "./user_edits/AddElementModal.jsx";
 import { AddRelationModal } from "./user_edits/AddRelationModal.jsx";
@@ -52,11 +57,11 @@ import { AddArgumentModal } from "./user_edits/AddArgumentModal.jsx";
 /** Withdrawn and rejected elements offer Reinstate where others offer Withdraw. */
 const isInPlay = (el) => el.status !== "withdrawn" && el.status !== "rejected";
 
-
 function AddButtonsOverlay({
   onAddEl,
   onAddRel,
   onAddArg,
+  onAddGroup,
   hideNonEntailsRels,
 }) {
   const palette = usePalette();
@@ -135,6 +140,28 @@ function AddButtonsOverlay({
       >
         + Arg
       </button>
+      {/* The one affordance that says grouping exists at all. Ctrl-clicking
+          nodes and choosing Group is the quicker way and the tooltip says so,
+          but nobody discovers a modifier key by looking at a canvas. Chrome
+          colours, not a relation's: a group asserts nothing. */}
+      <Tooltip text="Bracket elements into a group, which can then collapse into one node. Ctrl/⌘-click nodes on the graph to group them there instead.">
+        <button
+          onClick={onAddGroup}
+          aria-label="New group"
+          style={{
+            background: "transparent",
+            border: `1px solid ${C.border}`,
+            color: C.dim,
+            borderRadius: 6,
+            padding: "8px 12px",
+            fontSize: 13,
+            cursor: "pointer",
+            width: "100%",
+          }}
+        >
+          + Grp
+        </button>
+      </Tooltip>
     </div>
   );
 }
@@ -149,6 +176,7 @@ function CtrlSelectionBar({
   ctrlArgNodes,
   asRelation,
   onConfirm,
+  onGroup,
   onCancel,
 }) {
   if (!selected || ctrlArgNodes.length === 0) return null;
@@ -206,6 +234,24 @@ function CtrlSelectionBar({
         }}
       >
         {asRelation ? "Add relation" : "Add argument"}
+      </button>
+      {/* Same selection, a different thing to do with it. Grouping says nothing
+          about what follows from what, so it sits apart from the inferential
+          action rather than replacing it. */}
+      <button
+        onClick={onGroup}
+        aria-label="Group the selected elements"
+        style={{
+          background: "transparent",
+          border: `1px solid ${C.border}`,
+          borderRadius: 4,
+          color: C.dim,
+          fontSize: 12,
+          padding: "2px 10px",
+          cursor: "pointer",
+        }}
+      >
+        Group
       </button>
       <button
         onClick={onCancel}
@@ -349,9 +395,16 @@ function GraphModals({
  *   node again, or click the background, to deselect.
  * - **Click an edge** — selects the relation; its two endpoint nodes highlight.
  * - **Hover tooltip** — hovering over a node shows a {@link module:components/NodeTooltip}.
+ * - **Group** — the ctrl+click selection can also be bracketed into a group,
+ *   which the chip over it then collapses into a single node and expands again.
  *
  * A click is distinguished from a drag by comparing pointer-up to pointer-down
  * positions (threshold: 4 px).
+ *
+ * ### Groups
+ * Everything from `projectGroups` down works on the *projected* graph, in which
+ * a collapsed group is one node and the relations crossing its boundary run to
+ * that node instead of to its members. See {@link module:utils/groupUtils}.
  *
  * @param {Object}      props
  * @param {REState}     props.state
@@ -386,6 +439,10 @@ export function Graph({
   onWithdrawRequest,
   onReinstate,
   onCtrlSecondSelect,
+  onCreateGroup,
+  onToggleGroup,
+  onEditGroupRequest,
+  onUngroup,
   ready,
   recentlyAdded,
   hideNonEntailsRels,
@@ -448,19 +505,53 @@ export function Graph({
       ),
   );
 
-  // All relations belonging to the same argument as selectedRel (or just [selectedRel]).
+  // ── Groups ────────────────────────────────────────────────────────────────
+  // Everything below this point works on the *projected* graph: a collapsed
+  // group is one node, its internal edges are gone, and every edge that crossed
+  // its boundary now runs to the group. Projecting after the visibility filter
+  // rather than before it is what keeps the two consistent — a group whose
+  // members the legend has hidden has nothing left to stand for.
+  const {
+    elements: displayEls,
+    relations: displayRels,
+    relSource,
+    positions: displayPositions,
+    hulls,
+    groupNodes,
+  } = projectGroups({
+    elements: visibleEls,
+    relations: visRels,
+    groups: groupsOf(state),
+    positions,
+    radiusOf: elementRadius,
+  });
+  /** The relation as held in state — see `relSource` in utils/groupUtils. */
+  const toSourceRel = (r) => relSource.get(r) ?? r;
+  const groupIds = new Set(groupNodes.map((g) => g.id));
+
+  // What the selection covers, narrowed to what is actually on the canvas: a
+  // selected group is its own node while collapsed and its members once
+  // expanded, and it can be selected in either state.
+  const displayIds = new Set(displayEls.map((e) => e.id));
+  const focusIds = selectionIds(groupsOf(state), selected).filter((id) =>
+    displayIds.has(id),
+  );
+  const focusSet = new Set(focusIds);
+
+  // All relations belonging to the same argument as selectedRel (or just the
+  // edges standing for it, of which a re-pointed one is not the same object).
   const selectedArgRels = selectedRel?.argumentId
-    ? visRels.filter((r) => r.argumentId === selectedRel.argumentId)
+    ? displayRels.filter((r) => r.argumentId === selectedRel.argumentId)
     : selectedRel
-      ? [selectedRel]
+      ? displayRels.filter((r) => toSourceRel(r) === selectedRel)
       : [];
   const selectedArgRelSet = new Set(selectedArgRels);
 
   const highlightedIds =
     ctrlArgNodes.length > 0 && selected
       ? new Set([selected, ...ctrlArgNodes])
-      : selected
-        ? getNeighbours(selected, visRels)
+      : focusIds.length > 0
+        ? new Set(focusIds.flatMap((id) => [...getNeighbours(id, displayRels)]))
         : selectedArgRels.length > 0
           ? new Set(selectedArgRels.flatMap((r) => [r.from, r.to]))
           : null;
@@ -468,15 +559,20 @@ export function Graph({
   const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
   const dimEdge = (r) => {
     if (selectedRel) return !selectedArgRelSet.has(r);
-    if (highlightedIds) return r.from !== selected && r.to !== selected;
+    if (highlightedIds) return !focusSet.has(r.from) && !focusSet.has(r.to);
     return false;
   };
 
-  const elementById = useMemo(
+  const stateElementById = useMemo(
     () => new Map(state.elements.map((e) => [e.id, e])),
     [state.elements],
   );
-  const { solo: soloRels, jointGroups } = groupJointArguments(visRels);
+  // Group nodes belong here too: edge geometry and hit-testing look their
+  // endpoints up in this map, and a collapsed group is now one of them.
+  const elementById = new Map(stateElementById);
+  for (const g of groupNodes) elementById.set(g.id, g);
+
+  const { solo: soloRels, jointGroups } = groupJointArguments(displayRels);
   const edgeOffsets = parallelEdgeOffsets(soloRels);
 
   // ── Pan + click ───────────────────────────────────────────────────────────
@@ -495,6 +591,9 @@ export function Graph({
     resetView,
   } = usePan();
 
+  // The raw positions, not the projected ones: a collapsed group's members keep
+  // theirs, so framing still covers the ground the group is standing on — and
+  // the tour, below, can frame an element that is currently inside one.
   useAutoFit({ positions, dims, resetView, enabled: ready });
 
   // The tour re-frames the graph on the elements the section being read names.
@@ -516,18 +615,30 @@ export function Graph({
   const { onPointerDown, onPointerUp } = useGraphClick({
     panDown,
     panUp,
-    visibleEls,
-    visRels,
+    visibleEls: displayEls,
+    visRels: displayRels,
     jointGroups,
     elementById,
     edgeOffsets,
-    positions,
+    positions: displayPositions,
+    hulls,
     pan,
     zoom,
     onSelect,
     onSelectRel,
+    toSourceRel,
     setTooltip,
     onNodeClick: (el, clientX, clientY) => {
+      // A group is a lid, not a claim. Clicking one opens it — and re-asserts
+      // the selection rather than toggling it off, because what the click was
+      // aimed at is about to be replaced by the members underneath, and a
+      // toggle would leave them with nothing holding the chip on screen.
+      if (el?.type === "group") {
+        setPinned(null);
+        onSelect(() => el.id);
+        onToggleGroup?.(el.id, false);
+        return;
+      }
       // Clicking the pinned node again closes it, matching how selection toggles.
       setPinned((prev) =>
         !el || prev?.el?.id === el.id
@@ -535,7 +646,16 @@ export function Graph({
           : { x: clientX, y: clientY - 10, el },
       );
     },
+    onHullClick: (groupId) => {
+      // The only handle an expanded group has left: its members are ordinary
+      // nodes, and clicking one of those selects the element, not the box.
+      setPinned(null);
+      onSelect((prev) => (prev === groupId ? null : groupId));
+    },
     onCtrlNodeClick: (id) => {
+      // A group is a box, not a claim: it cannot be a premise, a conclusion or
+      // the end of a relation, so ctrl+click has nothing to accumulate here.
+      if (groupIds.has(id) || groupIds.has(selected)) return;
       if (selected && id !== selected && !ctrlArgNodes.includes(id)) {
         setCtrlArgState((prev) => ({
           base: selected,
@@ -556,6 +676,12 @@ export function Graph({
   const ctrlSelectionIsRelation =
     !hideNonEntailsRels && ctrlArgNodes.length === 1;
 
+  // A pinned card outlives the click that opened it, so it has to let go when
+  // the node underneath stops being drawn — expanding a group from its chip
+  // dissolves exactly the node whose members the card is listing.
+  const pinnedNode =
+    pinned && displayEls.some((e) => e.id === pinned.el.id) ? pinned : null;
+
   return (
     <>
       <GraphCanvas
@@ -571,27 +697,30 @@ export function Graph({
         applyWheel={applyWheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}
-        tooltip={pinned ?? tooltip}
+        tooltip={pinnedNode ?? tooltip}
         tooltipActions={
-          pinned && (
+          // Nothing for a group: revising and withdrawing are things you do to
+          // a claim, and what you can do to a group is on its chip already.
+          pinnedNode &&
+          pinnedNode.el.type !== "group" && (
             <ActionButtons
               onRevise={() => {
-                onEditRequest?.(pinned.el.id);
+                onEditRequest?.(pinnedNode.el.id);
                 setPinned(null);
               }}
               onWithdraw={
-                isInPlay(pinned.el)
+                isInPlay(pinnedNode.el)
                   ? () => {
-                      onWithdrawRequest?.(pinned.el.id);
+                      onWithdrawRequest?.(pinnedNode.el.id);
                       setPinned(null);
                     }
                   : null
               }
               onReinstate={
-                isInPlay(pinned.el)
+                isInPlay(pinnedNode.el)
                   ? null
                   : () => {
-                      onReinstate?.(pinned.el.id);
+                      onReinstate?.(pinnedNode.el.id);
                       setPinned(null);
                     }
               }
@@ -608,12 +737,29 @@ export function Graph({
                 setAddingRel(true);
               }}
               onAddArg={() => setAddingArg(true)}
+              onAddGroup={() => onEditGroupRequest?.()}
               hideNonEntailsRels={hideNonEntailsRels}
+            />
+            <GroupChips
+              hulls={hulls}
+              groupNodes={groupNodes}
+              positions={displayPositions}
+              pan={pan}
+              zoom={zoom}
+              dims={dims}
+              selectedId={selected}
+              onToggle={(id) => onToggleGroup?.(id)}
+              onEdit={(g) => onEditGroupRequest?.(g.id)}
+              onUngroup={(id) => onUngroup?.(id)}
             />
             <CtrlSelectionBar
               selected={selected}
               ctrlArgNodes={ctrlArgNodes}
               asRelation={ctrlSelectionIsRelation}
+              onGroup={() => {
+                onCreateGroup?.([selected, ...ctrlArgNodes]);
+                clearCtrlArg();
+              }}
               onConfirm={() => {
                 const all = [selected, ...ctrlArgNodes];
                 if (ctrlSelectionIsRelation) {
@@ -631,8 +777,8 @@ export function Graph({
               onCancel={clearCtrlArg}
             />
             <OffscreenIndicators
-              els={visibleEls}
-              positions={positions}
+              els={displayEls}
+              positions={displayPositions}
               pan={pan}
               zoom={zoom}
               dims={dims}
@@ -641,11 +787,23 @@ export function Graph({
           </>
         }
       >
+        {/* ── Group hulls ── */}
+        {/* First, so they stay a backdrop: an outline drawn over the edges it
+            surrounds would read as another relation. */}
+        {hulls.map(({ group, box }) => (
+          <GroupHull
+            key={group.id}
+            box={box}
+            label={group.label}
+            dimmed={!!highlightedIds}
+          />
+        ))}
+
         {/* ── Edges ── */}
         {soloRels.map((r) =>
           renderEdge(
             r,
-            positions,
+            displayPositions,
             elementById,
             graphEdgeVisuals(r, wIds, dimEdge, selectedArgRelSet),
             edgeOffsets.get(r) ?? 0,
@@ -655,7 +813,7 @@ export function Graph({
           <React.Fragment key={rels[0].argumentId}>
             {renderJointArgument(
               rels,
-              positions,
+              displayPositions,
               elementById,
               graphEdgeVisuals(rels[0], wIds, dimEdge, selectedArgRelSet, rels),
             )}
@@ -663,10 +821,10 @@ export function Graph({
         ))}
 
         {/* ── Nodes ── */}
-        {visibleEls.map((el) =>
+        {displayEls.map((el) =>
           renderNode(
             el,
-            positions,
+            displayPositions,
             graphNodeVisuals(
               el,
               wIds,

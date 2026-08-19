@@ -147,3 +147,79 @@ describe("svgToDataUrl", () => {
     expect(decoded).toBe(svg);
   });
 });
+
+// ─── Groups ───────────────────────────────────────────────────────────────────
+
+describe("generateGraphSVG — groups", () => {
+  const ELS = [el("J1"), el("P1"), el("T1")];
+  const parse = (svg) =>
+    new DOMParser().parseFromString(svg, "image/svg+xml");
+
+  it("draws an expanded group's hull and name", () => {
+    const svg = generateGraphSVG(ELS, [], POSITIONS, {
+      groups: [
+        { id: "G1", label: "Duties", members: ["J1", "P1"], collapsed: false },
+      ],
+    });
+    expect(labelsIn(svg)).toEqual(["Duties", "J1", "P1", "T1"]);
+    // Dashed, so it never reads as a relation.
+    expect(svg).toContain('stroke-dasharray="7 5"');
+  });
+
+  it("takes the hull into the viewport, not just the nodes", () => {
+    // The box clears the outermost member by a wide margin; forgetting it in
+    // the bounding box would have the outline clipped at the edge of the file.
+    const plain = parse(generateGraphSVG(ELS, [], POSITIONS));
+    const grouped = parse(
+      generateGraphSVG(ELS, [], POSITIONS, {
+        groups: [
+          { id: "G1", label: "Duties", members: ["J1", "P1"], collapsed: false },
+        ],
+      }),
+    );
+    const width = (doc) => Number(doc.documentElement.getAttribute("width"));
+    expect(width(grouped)).toBeGreaterThan(width(plain));
+  });
+
+  it("draws a collapsed group as one node, with the members gone", () => {
+    const svg = generateGraphSVG(ELS, [], POSITIONS, {
+      groups: [
+        { id: "G1", label: "Duties", members: ["J1", "P1"], collapsed: true },
+      ],
+    });
+    // The disc carries the group's name and how much it stands for; only T1 is
+    // still drawn as itself.
+    expect(labelsIn(svg)).toEqual(["2 elements", "Duties", "T1"]);
+  });
+
+  it("keeps a crossing relation and drops an internal one", () => {
+    const relations = [rel("J1", "P1"), rel("J1", "T1")];
+    const svg = generateGraphSVG(ELS, relations, POSITIONS, {
+      groups: [
+        { id: "G1", label: "Duties", members: ["J1", "P1"], collapsed: true },
+      ],
+    });
+    // One line: J1→T1, re-pointed to G1→T1. J1→P1 went inside the group.
+    expect(parse(svg).querySelectorAll("line")).toHaveLength(1);
+  });
+
+  it("escapes a group name that would otherwise break the markup", () => {
+    const svg = generateGraphSVG(ELS, [], POSITIONS, {
+      groups: [
+        {
+          id: "G1",
+          label: 'Rights & <duties>',
+          members: ["J1", "P1"],
+          collapsed: true,
+        },
+      ],
+    });
+    const doc = parse(svg);
+    expect(doc.querySelector("parsererror")).toBeNull();
+    // The name is wrapped to fit the disc, so it comes back as its lines —
+    // each one parsed straight back to the characters that were written.
+    const lines = [...doc.querySelectorAll("text")].map((t) => t.textContent);
+    expect(lines).toContain("Rights &");
+    expect(lines).toContain("<duties>");
+  });
+});

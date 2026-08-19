@@ -61,6 +61,28 @@ withdrawing, reinstating or deleting any one of them applies to the whole argume
 Which pairs of element types may legally hold which relation is the full matrix in
 `skill/re-relations-reference.md`.
 
+### Groups
+
+A **group** is a set of elements the user has bracketed together to tidy the
+graph — `state.groups`, `app/src/utils/groupUtils.js`. It is a view device and
+nothing more: grouping does not advance the round, does not appear in the log,
+and does not enter the coherence analysis. Don't confuse it with the *coherent
+cluster* of `utils/clusterUtils.js`, which is computed from the relations rather
+than chosen, and lives on its own tab.
+
+Collapsed — which is how a new one arrives, grouping being asked for to tidy the
+canvas — a group is drawn as one node carrying its name, and its members are not
+drawn at all. Relations between two members go with them; **every relation
+crossing the group's boundary is kept**, re-pointed at the group node, and stays
+a separate edge. An element belongs to at most one group.
+
+Groups are listed in the text panel too, where a collapsed one's members are
+still spelled out, and both name and membership are editable there and from the
+graph.
+
+`state.groups` is absent from every state written before the feature existed —
+read it through `groupsOf(state)`, never directly.
+
 ### State schema
 
 ```javascript
@@ -77,6 +99,7 @@ Which pairs of element types may legally hold which relation is the full matrix 
   elements: [{ id, type, status, confidence, origin, text, addedRound, ?history, ?previousText, ?revisedRound, ?reason, ?rejectedRound, ?questionnaireIndex }],
   relations: [{ from, to, type, explanation, addedRound, ?origin, ?status, ?history, ?argumentId, ?revisedRound }],
   coherence: { tensions: [], orphans: [], clusters: [] },
+  ?groups: [{ id, label, members: [elementId], collapsed }],
   log: [{ round, findings, options, decision, changes }]
 }
 ```

@@ -17,6 +17,7 @@ import {
   cardActions,
 } from "../../constants/textTabStyles.js";
 import { relationTypeLabel, statusTag } from "../../utils/stateUtils.js";
+import { groupOfElement } from "../../utils/groupUtils.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
 import { Ctx } from "./TextTabContext.js";
 import {
@@ -37,14 +38,20 @@ export function ElementCard({ e, dim }) {
   const {
     state,
     pCovers,
+    groups,
     onEditRequest,
     onWithdrawRequest,
     onReinstate,
+    onSelect,
     badgeColor,
     search,
     withdrawalDeltas,
     isWide,
   } = useContext(Ctx);
+  // Which group holds it, if any. On the canvas a collapsed group is the reason
+  // an element is not drawn at all, so a card that said nothing about it left
+  // the panel and the graph looking like they disagreed.
+  const inGroup = groupOfElement(groups ?? [], e.id);
   const isW = e.status === "withdrawn";
   const isR = e.status === "rejected";
   const isActive = e.status === "active" || e.status === "revised";
@@ -71,6 +78,24 @@ export function ElementCard({ e, dim }) {
           <StatusLabel tag={statusTag(e, state.round)} />
           {pCovers[e.id]?.length > 0 && (
             <MetaChip>covers: {pCovers[e.id].join(", ")}</MetaChip>
+          )}
+          {inGroup && (
+            <button
+              type="button"
+              onClick={() =>
+                onSelect((prev) => (prev === inGroup.id ? null : inGroup.id))
+              }
+              aria-label={`Select group ${inGroup.label}`}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                display: "flex",
+              }}
+            >
+              <MetaChip>Group: {inGroup.label}</MetaChip>
+            </button>
           )}
           {withdrawalDelta != null &&
             (() => {

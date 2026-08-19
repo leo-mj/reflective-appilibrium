@@ -12,6 +12,7 @@ import {
 } from "../utils/stateUtils.js";
 import { BACKEND_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
+import { groupsOf } from "../utils/groupUtils.js";
 import { useTextTabData } from "../hooks/useTextTabData.js";
 import { useActiveSection } from "../hooks/useActiveSection.js";
 import { Ctx } from "./text_panel/TextTabContext.js";
@@ -25,7 +26,7 @@ import {
   HighlightedSection,
   SectionListing,
 } from "./text_panel/TextTabSections.jsx";
-import { ClusterSection } from "./text_panel/TextTabClusterSection.jsx";
+import { GroupSection } from "./text_panel/TextTabGroupSection.jsx";
 import { NavBar } from "./text_panel/TextTabNavBar.jsx";
 import { HistoryRoundBanner } from "./text_panel/TextTabPrimitives.jsx";
 import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
@@ -51,8 +52,8 @@ const DEFAULT_COLLAPSED_SECTIONS = {
   theories: true,
   arguments: true,
   relations: true,
+  groups: true,
   coherence: true,
-  clusters: true,
   log: true,
 };
 
@@ -67,10 +68,12 @@ const NAV_SECTIONS = [
   { key: "theories", label: "T", name: "theories" },
   { key: "arguments", label: "A", name: "arguments" },
   { key: "relations", label: "R", name: "relations" },
-  // "!" rather than a letter: C is the clusters pill, and what this section
-  // lists is the things wanting attention. The accessible name spells it out.
-  { key: "coherence", label: "!", name: "coherence" },
-  { key: "clusters", label: "C", name: "clusters" },
+  // The user's own filing, before the analysis of it.
+  { key: "groups", label: "G", name: "groups" },
+  // One pill, because it is one section: tensions, orphans and clusters are
+  // all answers to how the commitments hang together. It used to be two — "!"
+  // for the findings and "C" for the clusters — which split the question.
+  { key: "coherence", label: "C", name: "coherence" },
   { key: "log", label: "L", name: "log" },
 ];
 
@@ -92,6 +95,10 @@ export function TextTab({
   onReinstateRel,
   onAddElement,
   onAddRelation,
+  onToggleGroup,
+  onEditGroupRequest,
+  onUngroup,
+  onRemoveFromGroup,
   isWide,
   clusterSectionRef,
   scrollToRelationsKey,
@@ -114,7 +121,7 @@ export function TextTab({
   const refTheories = useRef(null);
   const refArguments = useRef(null);
   const refRelations = useRef(null);
-  const refCoherence = useRef(null);
+  const refGroups = useRef(null);
   const refLog = useRef(null);
 
   // ── State ───────────────────────────────────────────────────────────────
@@ -212,7 +219,8 @@ export function TextTab({
     displayEls,
     displayRels,
     highlightedIds,
-    selectedEl,
+    selectedEls,
+    selectedGroup,
     neighbourEls,
     restEls,
     hlRels,
@@ -235,6 +243,8 @@ export function TextTab({
     hideNonEntailsRels,
   });
 
+  const groups = groupsOf(state);
+
   // ── Navigation ───────────────────────────────────────────────────────────
   // Stable, so useActiveSection can key its scroll listener on it.
   const sectionRefs = useMemo(
@@ -244,8 +254,10 @@ export function TextTab({
       theories: refTheories,
       arguments: refArguments,
       relations: refRelations,
-      coherence: refCoherence,
-      clusters: clusterSectionRef,
+      groups: refGroups,
+      // The merged section is what the Clusters tab scrolls to, so it keeps
+      // the ref that used to be the clusters section's.
+      coherence: clusterSectionRef,
       log: refLog,
     }),
     [clusterSectionRef],
@@ -305,8 +317,14 @@ export function TextTab({
         !highlightedIds &&
         (hideNonEntailsRels ? displayRels.length > 0 : plainRelCount > 0),
     },
-    coherence: { count: null, show: !highlightedIds && hasCoherence },
-    clusters: { count: clusterCount || null, show: clusterCount > 0 },
+    // Shown even at zero, unlike every other pill: the section's "+" is the
+    // panel's answer to "how do I make a group", and a pill that appears only
+    // once you have one is no help to anyone who has not.
+    groups: { count: groups.length || null, show: !highlightedIds },
+    coherence: {
+      count: clusterCount || null,
+      show: !highlightedIds && (hasCoherence || clusterCount > 0),
+    },
     log: { count: state.log.length || null, show: state.log.length > 0 },
   };
   const navItems = NAV_SECTIONS.map(({ key, label, name }) => {
@@ -341,6 +359,11 @@ export function TextTab({
         pCovers,
         search,
         withdrawalDeltas,
+        groups,
+        onToggleGroup,
+        onEditGroupRequest,
+        onUngroup,
+        onRemoveFromGroup,
         // Cards lay their headers out differently once there is no room to put
         // the chips and the action buttons on the same line.
         isWide,
@@ -389,7 +412,8 @@ export function TextTab({
               <HighlightedSection
                 selectedRel={selectedRel}
                 selected={selected}
-                selectedEl={selectedEl}
+                selectedEls={selectedEls}
+                selectedGroup={selectedGroup}
                 neighbourEls={neighbourEls}
                 hlRels={hlRels}
                 restEls={restEls}
@@ -434,22 +458,27 @@ export function TextTab({
               />
             )}
 
-            {hasCoherence && (
+            {/* The user's own filing comes before the analysis of it. */}
+            {!highlightedIds && (
+              <GroupSection
+                state={state}
+                groups={groups}
+                sectionRef={refGroups}
+                collapsed={isCollapsed("groups")}
+                onToggle={() => toggle("groups")}
+              />
+            )}
+
+            {(hasCoherence || clusterCount > 0) && (
               <CoherenceSection
                 coherence={coherence}
-                sectionRef={refCoherence}
+                state={state}
+                clusters={clusters}
+                sectionRef={clusterSectionRef}
                 isCollapsed={isCollapsed("coherence")}
                 onToggle={() => toggle("coherence")}
               />
             )}
-
-            <ClusterSection
-              state={state}
-              clusters={clusters}
-              clusterSectionRef={clusterSectionRef}
-              collapsed={isCollapsed("clusters")}
-              onToggle={() => toggle("clusters")}
-            />
 
             {state.log.length > 0 && (
               <LogSection

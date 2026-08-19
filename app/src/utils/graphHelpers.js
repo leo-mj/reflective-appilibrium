@@ -9,6 +9,8 @@
 
 /** @import { REElement, RERelation, Position } from '../types.js' */
 
+import { groupRadius } from "./groupUtils.js";
+
 // ─── Node sizing ─────────────────────────────────────────────────────────────
 
 /** Base visual radii by element type, at the middle of the confidence range. */
@@ -42,6 +44,11 @@ export function nodeRadius(type, confidence = 1) {
   return base * (RADIUS_MIN + RADIUS_SPAN * t);
 }
 
+/** How far past its outline a node stays clickable. */
+const HIT_PADDING = 8;
+/** Floor on a touch target, whatever the node's own size. */
+const MIN_HIT_RADIUS = 18;
+
 /**
  * Hit-test radius for pointer click detection — larger than the visual radius so
  * small nodes are easier to tap.
@@ -55,7 +62,38 @@ export function nodeRadius(type, confidence = 1) {
  * @returns {number}
  */
 export function hitRadius(type, confidence = 1) {
-  return Math.max(nodeRadius(type, confidence) + 8, 18);
+  return Math.max(nodeRadius(type, confidence) + HIT_PADDING, MIN_HIT_RADIUS);
+}
+
+/**
+ * Visual radius of whatever the graph is drawing at that spot.
+ *
+ * The same thing as {@link nodeRadius} for an element, and the reason to prefer
+ * it: a collapsed group is drawn as a node too, and its size comes from how
+ * many members it holds rather than from a type and a confidence it does not
+ * have. Anything that has the element in hand should ask this instead of
+ * picking `type` and `confidence` off it — that pair is precisely what a group
+ * node lacks, and the fallback it lands on is a judgment-sized disc under a
+ * shape three times the size.
+ *
+ * @param {REElement} el
+ * @returns {number} Radius in SVG pixels.
+ */
+export function elementRadius(el) {
+  if (el?.type === "group")
+    return groupRadius(el.memberIds?.length ?? 0, el.label);
+  return nodeRadius(el?.type, el?.confidence);
+}
+
+/**
+ * Hit-test radius for whatever the graph is drawing at that spot.
+ * {@link hitRadius} is to {@link nodeRadius} as this is to {@link elementRadius}.
+ *
+ * @param {REElement} el
+ * @returns {number}
+ */
+export function elementHitRadius(el) {
+  return Math.max(elementRadius(el) + HIT_PADDING, MIN_HIT_RADIUS);
 }
 
 // ─── Edge styling ─────────────────────────────────────────────────────────────

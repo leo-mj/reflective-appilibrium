@@ -9,6 +9,7 @@ import { useMemo } from "react";
 import { C, getColors, typeTokens } from "../constants/colors.js";
 import { usePalette } from "./useTheme.js";
 import { getNeighbours } from "../utils/graphHelpers.js";
+import { groupsOf, selectionIds } from "../utils/groupUtils.js";
 import { findCoherentClusters } from "../utils/clusterUtils.js";
 import { computeCoherence } from "../utils/coherence.js";
 import {
@@ -107,32 +108,54 @@ export function useTextTabData({
       : [];
   const selectedArgRelSet = new Set(selectedArgRels);
 
+  // A selection is one id, but a group's is the group *and* its members: this
+  // panel holds no node called "G1", so reading the selection literally left a
+  // selected group showing its own name over an empty card.
+  const groups = groupsOf(state);
+  const selectedGroup = selected
+    ? (groups.find((g) => g.id === selected) ?? null)
+    : null;
+  const focusIds = selectionIds(groups, selected).filter((id) => visIds.has(id));
+  const focusSet = new Set(focusIds);
+
   let highlightedIds = null;
-  if (selected) highlightedIds = getNeighbours(selected, visRels);
+  if (focusIds.length > 0)
+    highlightedIds = new Set(
+      focusIds.flatMap((id) => [...getNeighbours(id, visRels)]),
+    );
   else if (selectedArgRels.length > 0)
     highlightedIds = new Set(selectedArgRels.flatMap((r) => [r.from, r.to]));
 
   const selectedEl = selected
     ? (visibleEls.find((e) => e.id === selected) ?? null)
     : null;
+  // What the selection *is*, as cards: the element itself, or a group's members.
+  const selectedEls = selectedGroup
+    ? visibleEls.filter((e) => focusSet.has(e.id))
+    : selectedEl
+      ? [selectedEl]
+      : [];
+  const selectedIdSet = new Set(selectedEls.map((e) => e.id));
   const neighbourEls = highlightedIds
-    ? visibleEls.filter((e) => highlightedIds.has(e.id) && e.id !== selected)
+    ? visibleEls.filter(
+        (e) => highlightedIds.has(e.id) && !selectedIdSet.has(e.id),
+      )
     : [];
   const restEls = highlightedIds
     ? visibleEls.filter((e) => !highlightedIds.has(e.id))
     : visibleEls;
 
   let hlRels = [];
-  if (selected)
-    hlRels = visRels.filter((r) => r.from === selected || r.to === selected);
+  if (focusIds.length > 0)
+    hlRels = visRels.filter((r) => focusSet.has(r.from) || focusSet.has(r.to));
   else if (selectedArgRels.length > 0) hlRels = selectedArgRels;
 
   let restRels = visRels;
   if (selectedArgRels.length > 0)
     restRels = visRels.filter((r) => !selectedArgRelSet.has(r));
-  else if (selected)
+  else if (focusIds.length > 0)
     restRels = visRels.filter(
-      (r) => r.from !== selected && r.to !== selected,
+      (r) => !focusSet.has(r.from) && !focusSet.has(r.to),
     );
 
   // Read off the graph rather than taken from `state.coherence`, which nothing
@@ -172,6 +195,8 @@ export function useTextTabData({
     displayRels,
     highlightedIds,
     selectedEl,
+    selectedEls,
+    selectedGroup,
     neighbourEls,
     restEls,
     hlRels,

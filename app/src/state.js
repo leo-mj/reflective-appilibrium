@@ -58,6 +58,9 @@ const _inlineState = {
     orphans: [],
     clusters: [],
   },
+  groups: [
+    // { id: "G1", label: "Group 1", members: ["J1", "J2"], collapsed: false }
+  ],
   log: [
     // { round: 1, findings: "...", options: "...", decision: "...", changes: "..." }
   ],

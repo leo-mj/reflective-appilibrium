@@ -304,6 +304,34 @@ function validateRelation(r, i) {
   return result;
 }
 
+/**
+ * Validates one group, dropping members that are not elements of this state.
+ *
+ * Dropping rather than throwing: a group is a view convenience, and a file
+ * whose grouping has drifted from its element list is still a perfectly good
+ * RE process. Refusing to open it over a stale id would be the wrong trade.
+ *
+ * @param {unknown} g
+ * @param {number} i
+ * @param {Set<string>} elementIds
+ * @returns {import('../types.js').REGroup}
+ */
+function validateGroup(g, i, elementIds) {
+  const ctx = `groups[${i}]`;
+  if (!g || typeof g !== "object" || Array.isArray(g))
+    throw new Error(`${ctx} must be an object`);
+  const id = str(g.id, `${ctx}.id`, 20);
+  const members = arr(g.members ?? [], `${ctx}.members`, 1_000)
+    .map((m, j) => str(m, `${ctx}.members[${j}]`, 10))
+    .filter((m) => elementIds.has(m));
+  return {
+    id,
+    label: str(g.label ?? id, `${ctx}.label`, 200) || id,
+    members: [...new Set(members)],
+    collapsed: g.collapsed == null ? false : bool(g.collapsed, `${ctx}.collapsed`),
+  };
+}
+
 function validateLogEntry(l, i) {
   const ctx = `log[${i}]`;
   return {
@@ -350,6 +378,25 @@ export function validateState(raw) {
     },
     log: arr(raw.log ?? [], "log", 1_000).map(validateLogEntry),
   };
+
+  // After `elements`, which it is checked against; and dropped entirely once it
+  // is down to one member, since a group of one is a group of none.
+  if (raw.groups !== undefined) {
+    const elementIds = new Set(result.elements.map((e) => e.id));
+    const groups = arr(raw.groups, "groups", 500)
+      .map((g, i) => validateGroup(g, i, elementIds))
+      .filter((g) => g.members.length > 1);
+    // An element in two groups would leave the projection with two nodes to
+    // draw it as; first claim wins.
+    const claimed = new Set();
+    result.groups = groups
+      .map((g) => {
+        const members = g.members.filter((m) => !claimed.has(m));
+        members.forEach((m) => claimed.add(m));
+        return { ...g, members };
+      })
+      .filter((g) => g.members.length > 1);
+  }
 
   if (raw.model !== undefined) {
     if (raw.model !== "questionnaire")
