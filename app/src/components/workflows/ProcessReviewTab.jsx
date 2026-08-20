@@ -429,9 +429,7 @@ export function ProcessReviewTab({
         )}
 
         {hasResult && !candidate && saved.length === 0 && (
-          <div style={{ fontSize: 12, color: C.dim }}>
-            No review kept. Analyse again for a fresh reading.
-          </div>
+          <div style={{ fontSize: 12, color: C.dim }}>No review saved.</div>
         )}
 
         {saved.length > 0 && (

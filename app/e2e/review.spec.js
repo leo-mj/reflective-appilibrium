@@ -6,10 +6,22 @@ import { gotoHome, loadSample, showView, park, openMenu } from "./helpers.js";
  * calling out — the same arrangement assist.spec.js relies on, and what makes
  * this safe to run in CI without a key.
  *
- * The sample state ships with one already-accepted review taken at round 4, so
- * these also cover the case the feature exists for: a *series* of readings, each
- * one written with the earlier ones in hand.
+ * The sample ships with nothing accepted, so the series the feature exists for
+ * is built up here the way a visitor builds it: run, accept, run again.
  */
+/** Build up a two-review series the way a visitor does: run, accept, repeat. */
+async function acceptTwo(page) {
+  await page.getByRole("button", { name: /Analyse/ }).click();
+  await park(page);
+  await page.getByRole("button", { name: /Accept/i }).first().click();
+  await expect(page.locator("text=/Saved reviews · 1/")).toBeVisible();
+
+  await page.getByRole("button", { name: /Analyse again/ }).click();
+  await park(page);
+  await page.getByRole("button", { name: /Accept/i }).first().click();
+  await expect(page.locator("text=/Saved reviews · 2/")).toBeVisible();
+}
+
 test.describe("Process review", () => {
   test.beforeEach(async ({ page }) => {
     await gotoHome(page);
@@ -19,23 +31,60 @@ test.describe("Process review", () => {
     await park(page);
   });
 
-  test("opens on the review already saved with the sample", async ({ page }) => {
-    await expect(page.locator("text=/Saved reviews/")).toBeVisible();
-    // Stamped with the round it read, and with where the process has since got
-    // to — the sample is at round 8.
-    await expect(page.locator("text=/Round 4 of 8/")).toBeVisible();
+  test("opens with nothing accepted", async ({ page }) => {
+    // Nothing may look accepted that the visitor did not accept — which is also
+    // what stops a rejected candidate leaving a review behind in the list.
+    await expect(page.locator("text=/Ask for a reading of the process/")).toBeVisible();
+    await expect(page.locator("text=/Saved reviews/")).toHaveCount(0);
   });
 
   test("asks for nothing until the button is pressed", async ({ page }) => {
     // The run button carries the disclosure that this sends the process to an
-    // LLM, so nothing may be fetched merely by opening the tab.
-    //
-    // Checked on the word count, which only the pending candidate carries. The
-    // AI-generated line is no use here: the saved reviews are attributed too, so
-    // asserting its absence passes whether or not the panel has even rendered.
+    // LLM, so nothing may be fetched merely by opening the tab. Checked on the
+    // word count, which only the pending candidate carries.
     await expect(page.getByRole("button", { name: /Analyse/ })).toBeVisible();
-    await expect(page.locator("text=/Saved reviews/")).toBeVisible();
+    await expect(page.locator("text=/Ask for a reading of the process/")).toBeVisible();
     await expect(page.locator("text=/\\d+ words/")).toHaveCount(0);
+  });
+
+  test("rejecting a review leaves nothing behind, before or after a reload", async ({
+    page,
+  }) => {
+    // The reported bug: reject, and a review was still listed as saved. It was
+    // the one seeded into the sample state, and reloading the demo brought it
+    // back — the sample is deliberately never autosaved.
+    await page.getByRole("button", { name: /Analyse/ }).click();
+    await park(page);
+    await page.getByRole("button", { name: /Reject/i }).first().click();
+    await park(page);
+
+    await expect(page.locator("text=/Saved reviews/")).toHaveCount(0);
+
+    await page.reload();
+    await loadSample(page);
+    await showView(page, "Assist");
+    await page.locator('button:text-is("Review")').click();
+    await park(page);
+
+    await expect(page.locator("text=/Saved reviews/")).toHaveCount(0);
+  });
+
+  test("a second run picks up the first", async ({ page }) => {
+    // The series is the whole point of accumulating, so the demo has to show a
+    // reading written with an earlier one in hand.
+    await page.getByRole("button", { name: /Analyse/ }).click();
+    await park(page);
+    const first = await page.locator("text=/\\d+ words/").first().textContent();
+    expect(first).toBeTruthy();
+    await page.getByRole("button", { name: /Accept/i }).first().click();
+    await expect(page.locator("text=/Saved reviews · 1/")).toBeVisible();
+
+    await page.getByRole("button", { name: /Analyse again/ }).click();
+    await park(page);
+
+    await expect(
+      page.locator("text=/previous review/").first(),
+    ).toBeVisible();
   });
 
   test("analysing produces all five parts, and accepting keeps them", async ({
@@ -60,23 +109,11 @@ test.describe("Process review", () => {
     await page.getByRole("button", { name: /Accept/i }).first().click();
     await park(page);
 
-    await expect(page.locator("text=/Saved reviews · 2/")).toBeVisible();
-  });
-
-  test("rejecting keeps nothing", async ({ page }) => {
-    await page.getByRole("button", { name: /Analyse/ }).click();
-    await park(page);
-    await page.getByRole("button", { name: /Reject/i }).first().click();
-    await park(page);
-
     await expect(page.locator("text=/Saved reviews · 1/")).toBeVisible();
   });
 
   test("a discarded review leaves the rest of the series", async ({ page }) => {
-    await page.getByRole("button", { name: /Analyse/ }).click();
-    await park(page);
-    await page.getByRole("button", { name: /Accept/i }).first().click();
-    await expect(page.locator("text=/Saved reviews · 2/")).toBeVisible();
+    await acceptTwo(page);
 
     await page
       .getByRole("button", { name: /Discard this review/ })
@@ -88,10 +125,7 @@ test.describe("Process review", () => {
   });
 
   test("the export carries the reviews", async ({ page }) => {
-    await page.getByRole("button", { name: /Analyse/ }).click();
-    await park(page);
-    await page.getByRole("button", { name: /Accept/i }).first().click();
-    await expect(page.locator("text=/Saved reviews · 2/")).toBeVisible();
+    await acceptTwo(page);
 
     await openMenu(page);
     const [download] = await Promise.all([

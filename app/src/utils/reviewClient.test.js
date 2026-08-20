@@ -36,22 +36,45 @@ describe("fetchProcessReview", () => {
     const result = await fetchProcessReview(aState(), false);
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(result).toEqual(sampleReview);
+    expect(result).toEqual(sampleReview(aState()));
   });
 
   it("serves the sample already shaped as one suggestion", async () => {
     // makeLLMClient returns dummyData without running transformResponse, so the
     // fixture has to arrive in the shape useSuggestionWorkflow destructures. A
     // fixture in the raw endpoint shape would make the demo build render nothing.
-    expect(sampleReview.suggestions).toHaveLength(1);
-    expect(Object.keys(sampleReview.suggestions[0]).sort()).toEqual([
+    const served = sampleReview(aState());
+    expect(served.suggestions).toHaveLength(1);
+    expect(Object.keys(served.suggestions[0]).sort()).toEqual([
       "arc",
       "headline",
       "method",
       "missed",
       "surprises",
     ]);
-    expect(sampleReview.model).toBeTruthy();
+    expect(served.model).toBeTruthy();
+  });
+
+  it("serves a second, back-referencing reading once one has been accepted", async () => {
+    // The series is the feature, so the demo has to be able to show a review
+    // picking up an earlier one. Seeding a saved review into the sample state
+    // would do it too, and misleads — nothing may look accepted that the
+    // visitor did not accept.
+    const first = sampleReview(aState()).suggestions[0];
+    const second = sampleReview(
+      aState({ reviews: [{ id: "rev-1", round: 8, headline: "h" }] }),
+    ).suggestions[0];
+
+    expect(second.headline).not.toBe(first.headline);
+    expect(second.missed).toMatch(/previous review/);
+  });
+
+  it("offers no review as already accepted", async () => {
+    // The sample state must open the tab empty, exactly as the other assist
+    // tabs do: a pre-banked review reads as one the visitor accepted, and
+    // survives rejecting the candidate, which looks like the reject was ignored.
+    const { default: SAMPLE_STATE } = await import("../sample-data/sample-state.js");
+    expect(SAMPLE_STATE.reviews ?? []).toEqual([]);
   });
 
   it("sends the whole state, so earlier reviews travel with it", async () => {
@@ -125,6 +148,6 @@ describe("fetchProcessReview", () => {
     const result = await fetchProcessReview(aState(), true);
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(result).toEqual(sampleReview);
+    expect(result).toEqual(sampleReview(aState()));
   });
 });
