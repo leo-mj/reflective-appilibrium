@@ -1,18 +1,46 @@
 /**
  * @fileoverview Regression tests for defects found in the browser audit.
  *
- * Most are fixed, so those assert the fixed behaviour and must pass. The one
- * still open is marked `test.fail()`: Playwright expects the failure, so the
- * suite stays green while the bug is open, and turns red the moment it is
- * fixed — "expected to fail, but passed" being the signal to drop the marker
- * and keep the assertion.
+ * Most are fixed, so those assert the fixed behaviour and must pass. The ones
+ * still open assert that the defect is *still there*: green while it is open,
+ * red the moment it is fixed, and the failure message says which assertion
+ * flipped and what to write in its place.
+ *
+ * They were `test.fail()` until CI showed why that cannot work here. Under
+ * `test.fail()` every failure is the expected one, so the only way an open
+ * defect can report anything is by *passing* — and an audit that measured
+ * nothing passes too. That is what happened: the card these two are about sits
+ * a couple of hundred pixels above the fold on a Mac and below it on CI's
+ * fonts, axe never measured it, and CI announced "expected to fail, but passed"
+ * over a defect nobody had touched. Asserting the defect directly separates the
+ * two outcomes, and {@link fadedCardContrast} reports what it managed to
+ * measure so "clean" and "unmeasured" can never be confused again.
  */
 
 import { test, expect } from "@playwright/test";
-import { gotoHome, loadSample, park, clickNode, axeViolations } from "./helpers.js";
+import { gotoHome, loadSample, park, clickNode, fadedCardContrast } from "./helpers.js";
+
+/**
+ * Assert that a faded card is still failing AA, and that we actually looked.
+ *
+ * @param {{card: string|null, evaluated: number, unmeasured: number, failing: string[]}} result
+ */
+function stillUnderAA({ card, evaluated, unmeasured, failing }) {
+  expect(
+    evaluated,
+    `nothing was measured — no faded card on screen, or all ${unmeasured} of its ` +
+      `nodes were unmeasurable. This is not evidence the defect is fixed.`,
+  ).toBeGreaterThan(0);
+  expect(
+    failing,
+    `all ${evaluated} nodes in "${card}" now clear AA — if that is deliberate, ` +
+      `this defect is fixed: assert \`expect(failing).toEqual([])\` instead, and ` +
+      `drop the matching \`ignoreDimmed\` from a11y.spec.js.`,
+  ).not.toEqual([]);
+}
 
 test.describe("Open defects", () => {
-  test("dimmed cards stay readable", async ({ page }) => {
+  test("dimmed list cards are still under AA", async ({ page }) => {
     // src/components/text_panel/TextTabCards.jsx — the "All elements" listing
     // and the cluster member cards de-emphasise with `opacity: 0.4`, which puts
     // everything inside them under AA: element id badges land at 2.81:1 and the
@@ -22,25 +50,21 @@ test.describe("Open defects", () => {
     // separates the focused element from the rest — so the fix is a design
     // call about how the panel signals de-emphasis (a lighter ground, smaller
     // type, a rule), not a number to nudge.
-    test.fail();
-
     await gotoHome(page);
     await loadSample(page);
 
     // Selecting an element is what puts the rest of the list under "All
     // elements" with `dim`. Driving it this way rather than opening the
     // clusters section keeps the test deterministic — that section is
-    // collapsed by default, so the dimmed cards were sometimes absent and the
-    // test then "passed" by having nothing to measure.
+    // collapsed by default, so the dimmed cards were sometimes absent.
     await clickNode(page, "J1");
     await expect(page.locator("text=/^All elements$/i").first()).toBeVisible();
     await park(page);
 
-    const contrast = (await axeViolations(page)).find((v) => v.id === "color-contrast");
-    expect(contrast, `${contrast?.nodes} nodes under AA`).toBeUndefined();
+    stillUnderAA(await fadedCardContrast(page, 0.4));
   });
 
-  test("withdrawn cards stay readable", async ({ page }) => {
+  test("withdrawn cards are still under AA", async ({ page }) => {
     // The same defect as above at the other opacity: a withdrawn or rejected
     // element card is drawn at `opacity: 0.55` (TextTabCards.jsx), which takes
     // its id badge to 2.81:1 and its chips, status label and action buttons to
@@ -55,14 +79,11 @@ test.describe("Open defects", () => {
     // Left open for the same reason: opacity is doing real work, and the fix is
     // a design call about how the panel signals de-emphasis — a lighter ground,
     // a rule, a muted-but-legible ink — not a number to nudge.
-    test.fail();
-
     await gotoHome(page);
     await loadSample(page);
     await park(page);
 
-    const contrast = (await axeViolations(page)).find((v) => v.id === "color-contrast");
-    expect(contrast, `${contrast?.nodes} nodes under AA`).toBeUndefined();
+    stillUnderAA(await fadedCardContrast(page, 0.55));
   });
 });
 

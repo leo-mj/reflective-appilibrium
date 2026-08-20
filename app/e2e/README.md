@@ -38,7 +38,7 @@ and waits for the port, and `reuseExistingServer` is on outside CI, so a
 | `questionnaire.spec.js` | questionnaire mode end to end (skips if no spec present) |
 | `responsive.spec.js` | narrow layout — runs only under the `mobile` project |
 | `a11y.spec.js` | axe-core audit of the composed pages, keyboard reachability |
-| `known-issues.spec.js` | open defects, marked `test.fail()` |
+| `known-issues.spec.js` | fixed defects, and open ones asserted to be still open |
 
 `helpers.js` holds the shared vocabulary — `loadSample`, `addElement`,
 `expectCounts` and friends. Prefer adding to it over repeating a selector.
@@ -63,10 +63,24 @@ and waits for the port, and `reuseExistingServer` is on outside CI, so a
 
 ## `known-issues.spec.js`
 
-Each test there is marked `test.fail()` — Playwright expects it to fail, so the
-suite stays green while the defect is open. **When you fix the bug, the run goes
-red** with "expected to fail, but passed". That is the signal to delete the
-`test.fail()` line; the assertion below it is already the regression test.
+Fixed defects assert the fixed behaviour. Open ones assert that the defect is
+**still there**, so the suite stays green while it is open and goes red the
+moment it is fixed — the message then says what to write in the assertion's
+place.
+
+They used to be `test.fail()`, which does not survive contact with an audit.
+Under `test.fail()` every failure is the expected one, so an open defect can
+only report by *passing* — and a check that measured nothing passes too. CI hit
+exactly that: the faded card the contrast defects are about sits just above the
+fold on a Mac and just below it on CI's fonts, axe skips anything off screen, and
+the run announced "expected to fail, but passed" over a defect nobody had
+touched. Asserting the defect directly keeps those two outcomes apart.
+
+**If you audit something that can scroll, prove you measured it.**
+`fadedCardContrast` scrolls its target to the middle of the viewport and returns
+`evaluated` alongside `failing`, because axe resolves backgrounds with
+`elementsFromPoint`: a node below the fold is reported as `incomplete`, never as
+a violation, and an audit of it comes back clean.
 
 ## Limitations
 

@@ -427,3 +427,61 @@ export async function axeViolations(page, { ignoreDimmed = false } = {}) {
       }));
   }, ignoreDimmed);
 }
+
+/**
+ * Scroll the first element card faded to `opacity` into the middle of the
+ * viewport and measure the contrast inside it.
+ *
+ * Two things a page-wide {@link axeViolations} cannot do, both of which let a
+ * test about a faded card pass while measuring nothing:
+ *
+ * 1. **axe only measures what is on screen.** It resolves an element's
+ *    background with `elementsFromPoint`, so a node scrolled out of the viewport
+ *    lands in `incomplete` and never reaches `violations` — a card below the
+ *    fold comes back clean. The sample's withdrawn card sits ~210px above the
+ *    fold on this machine and below it on CI's fonts, which is exactly how the
+ *    open-defect audits came to report the bug as fixed. Hence the scroll, and
+ *    hence `evaluated`, which is how a caller tells "clean" from "unmeasured".
+ * 2. **A page-wide audit cannot say *which* card it found.** Both open defects
+ *    are contrast inside a faded card, so either would satisfy a test about the
+ *    other. The opacity is what tells them apart, and a card is identified by
+ *    holding an id badge.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number} opacity  0.4 for a dimmed list card, 0.55 for a withdrawn one.
+ * @returns {Promise<{card: string|null, evaluated: number, unmeasured: number,
+ *   failing: string[]}>}
+ */
+export async function fadedCardContrast(page, opacity) {
+  await page.addScriptTag({
+    path: new URL("../node_modules/axe-core/axe.min.js", import.meta.url).pathname,
+  });
+  return page.evaluate(async (target) => {
+    const card = [...document.querySelectorAll("div")].find(
+      (d) =>
+        Math.abs(Number(getComputedStyle(d).opacity) - target) < 0.005 &&
+        d.querySelector('[aria-label^="Select "]'),
+    );
+    if (!card) return { card: null, evaluated: 0, unmeasured: 0, failing: [] };
+
+    card.scrollIntoView({ block: "center" });
+    // Two frames: one for the scroll to apply, one for it to have been painted
+    // before axe starts hit-testing against it.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const r = await window.axe.run(card, { runOnly: ["color-contrast"] });
+    const count = (list) => list[0]?.nodes.length ?? 0;
+    return {
+      card: card.innerText.replace(/\s+/g, " ").trim().slice(0, 60),
+      // Nodes whose contrast axe could actually compute — a violation is only
+      // meaningful, and its absence only meaningful, against this being > 0.
+      evaluated: count(r.violations) + count(r.passes),
+      unmeasured: count(r.incomplete),
+      failing: (r.violations[0]?.nodes ?? []).map(
+        (n) =>
+          `${n.html.replace(/\s+/g, " ").slice(0, 60)} — ` +
+          (n.any?.[0]?.message ?? "").replace(/\s+/g, " ").slice(0, 90),
+      ),
+    };
+  }, opacity);
+}
