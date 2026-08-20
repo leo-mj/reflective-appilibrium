@@ -123,6 +123,7 @@ export function ElementCard({ e, dim }) {
         </div>
         <div style={cardActions}>
           <ActionButtons
+            compact={isWide}
             onRevise={() => onEditRequest(e.id)}
             onWithdraw={!isW && !isR ? () => onWithdrawRequest(e.id) : null}
             onReinstate={isW || isR ? () => onReinstate(e.id) : null}
@@ -221,6 +222,7 @@ export function ArgumentCard({ rels, dim }) {
           </div>
           <div onClick={(e) => e.stopPropagation()} style={cardActions}>
             <ActionButtons
+              compact={isWide}
               onRevise={() => onEditRelRequest(r)}
               onWithdraw={
                 r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null
@@ -358,6 +360,7 @@ export function RelationCard({ r, dim }) {
         </div>
         <div onClick={(e) => e.stopPropagation()} style={cardActions}>
           <ActionButtons
+            compact={isWide}
             onRevise={() => onEditRelRequest(r)}
             onWithdraw={
               r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null

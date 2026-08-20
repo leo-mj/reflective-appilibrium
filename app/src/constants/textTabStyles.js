@@ -27,6 +27,27 @@ export const WITHDRAW_BTN_STYLE = {
   color: C.onFill,
 };
 
+/**
+ * A card's action buttons dropped to the metadata chips' type scale — the wide
+ * layout only, applied by {@link module:components/text_panel/TextTabPrimitives.ActionButtons}.
+ *
+ * Wide, the chips and the buttons share one line, and at 12px against the chips'
+ * 10px the controls were the loudest thing in a card whose point is the claim
+ * underneath them. Narrow keeps the larger text: there the panel is the whole
+ * screen and these are the primary way to act on a card.
+ *
+ * The floor is carried by `minHeight` rather than by the padding alone, so a
+ * font with different metrics cannot quietly drop the button under the 24px
+ * WCAG 2.2 AA target size. Touch pointers still get 36px from `.tap-target` in
+ * index.css, which keys on the pointer rather than the viewport — so a wide
+ * screen that is thumbed gets the smaller text and the bigger target both.
+ */
+export const COMPACT_BTN_STYLE = {
+  fontSize: 10,
+  padding: "3px 8px",
+  minHeight: 24,
+};
+
 export const CARD_STYLE = {
   paddingBottom: 14,
   borderBottom: `1px solid ${C.border}`,
@@ -86,7 +107,7 @@ export const META_LABEL_STYLE = {
   lineHeight: 1.5,
 };
 
-export const CONTENT_FONT_SIZE = 14;
+export const CONTENT_FONT_SIZE = 12;
 
 export const CLUSTER_CARD_STYLE = {
   display: "flex",

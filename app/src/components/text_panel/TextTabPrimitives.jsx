@@ -8,6 +8,7 @@
 import { useContext } from "react";
 import { C } from "../../constants/colors.js";
 import {
+  COMPACT_BTN_STYLE,
   GHOST_BTN_STYLE,
   WITHDRAW_BTN_STYLE,
 } from "../../constants/textTabStyles.js";
@@ -265,7 +266,29 @@ export function HistoryRoundBanner({ historyView }) {
 
 // ─── Action buttons ───────────────────────────────────────────────────────────
 
-export function ActionButtons({ onRevise, onWithdraw, onReinstate }) {
+/**
+ * @param {Object}    props
+ * @param {Function}  props.onRevise
+ * @param {Function} [props.onWithdraw]
+ * @param {Function} [props.onReinstate]
+ * @param {boolean}  [props.compact]  Wide-screen size: the metadata chips' type
+ *   scale rather than the panel's, so the header reads as one band. See
+ *   {@link module:constants/textTabStyles.COMPACT_BTN_STYLE}. The graph's pinned
+ *   -node tooltip leaves this off — there the buttons are the only thing in a
+ *   small popover, with no chips to sit level with.
+ */
+export function ActionButtons({
+  onRevise,
+  onWithdraw,
+  onReinstate,
+  compact = false,
+}) {
+  const ghost = compact
+    ? { ...GHOST_BTN_STYLE, ...COMPACT_BTN_STYLE }
+    : GHOST_BTN_STYLE;
+  const withdraw = compact
+    ? { ...WITHDRAW_BTN_STYLE, ...COMPACT_BTN_STYLE }
+    : WITHDRAW_BTN_STYLE;
   return (
     // Grouped and named: a card holds several buttons — the id badge among them
     // — and "Revise" on its own says nothing about what it revises.
@@ -274,15 +297,11 @@ export function ActionButtons({ onRevise, onWithdraw, onReinstate }) {
       aria-label="Item actions"
       style={{ display: "flex", gap: 4, flexShrink: 0 }}
     >
-      <button onClick={onRevise} className="tap-target" style={GHOST_BTN_STYLE}>
+      <button onClick={onRevise} className="tap-target" style={ghost}>
         Revise
       </button>
       {onWithdraw && (
-        <button
-          onClick={onWithdraw}
-          className="tap-target"
-          style={WITHDRAW_BTN_STYLE}
-        >
+        <button onClick={onWithdraw} className="tap-target" style={withdraw}>
           Withdraw
         </button>
       )}
@@ -290,7 +309,7 @@ export function ActionButtons({ onRevise, onWithdraw, onReinstate }) {
         <button
           onClick={onReinstate}
           className="tap-target"
-          style={{ ...GHOST_BTN_STYLE, color: C.supports }}
+          style={{ ...ghost, color: C.supports }}
         >
           Reinstate
         </button>

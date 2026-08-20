@@ -39,6 +39,31 @@ test.describe("Open defects", () => {
     const contrast = (await axeViolations(page)).find((v) => v.id === "color-contrast");
     expect(contrast, `${contrast?.nodes} nodes under AA`).toBeUndefined();
   });
+
+  test("withdrawn cards stay readable", async ({ page }) => {
+    // The same defect as above at the other opacity: a withdrawn or rejected
+    // element card is drawn at `opacity: 0.55` (TextTabCards.jsx), which takes
+    // its id badge to 2.81:1 and its chips, status label and action buttons to
+    // 2.98:1 — everything in the card at once, whatever size the type is.
+    //
+    // Recorded separately because it needs no selection to reproduce: the
+    // sample ships J6 withdrawn, so it is on screen from the moment the editor
+    // opens. The editor audit in a11y.spec.js was clean only because the card
+    // sat outside the region axe evaluates; shortening the action buttons
+    // brought it into view, which is what surfaced this.
+    //
+    // Left open for the same reason: opacity is doing real work, and the fix is
+    // a design call about how the panel signals de-emphasis — a lighter ground,
+    // a rule, a muted-but-legible ink — not a number to nudge.
+    test.fail();
+
+    await gotoHome(page);
+    await loadSample(page);
+    await park(page);
+
+    const contrast = (await axeViolations(page)).find((v) => v.id === "color-contrast");
+    expect(contrast, `${contrast?.nodes} nodes under AA`).toBeUndefined();
+  });
 });
 
 test.describe("Fixed defects", () => {

@@ -51,6 +51,65 @@ describe("ActionButtons", () => {
     );
     expect(onReinstate).toHaveBeenCalledTimes(1);
   });
+
+  describe("compact", () => {
+    const buttons = (c) => [...c.querySelectorAll("button")];
+
+    const render3 = (compact) =>
+      render(
+        <ActionButtons
+          compact={compact}
+          onRevise={() => {}}
+          onWithdraw={() => {}}
+          onReinstate={() => {}}
+        />,
+      ).container;
+
+    it("drops every button to the metadata chips' type scale", () => {
+      // MetaChip is 10px. Wide, the chips and the buttons share one line, and
+      // the point of this is that they read as one band.
+      buttons(render3(true)).forEach((b) => {
+        expect(b.style.fontSize).toBe("10px");
+      });
+    });
+
+    it("keeps the larger text when it is not compact", () => {
+      // Narrow, and the graph's pinned-node tooltip, which passes nothing.
+      buttons(render3(false)).forEach((b) => {
+        expect(b.style.fontSize).toBe("12px");
+      });
+    });
+
+    it("never drops a button under the 24px target-size floor", () => {
+      // Carried by minHeight rather than by the padding, so a font whose metrics
+      // differ from the one this was measured against cannot quietly shrink it
+      // past WCAG 2.2 AA. jsdom has no layout, so the declaration is what there
+      // is to check — which is also the thing a careless edit would remove.
+      buttons(render3(true)).forEach((b) => {
+        expect(parseInt(b.style.minHeight, 10)).toBeGreaterThanOrEqual(24);
+      });
+    });
+
+    it("still asks for the touch target class in either size", () => {
+      // `.tap-target` keys on the pointer, not the viewport, so a wide screen
+      // that is thumbed has to get the smaller text and the 36px target both.
+      [true, false].forEach((compact) => {
+        buttons(render3(compact)).forEach((b) => {
+          expect(b.className).toContain("tap-target");
+        });
+      });
+    });
+
+    it("keeps withdraw looking like the destructive one", () => {
+      // The compact override is size only: it must not flatten the fill that
+      // separates Withdraw from the ghost buttons beside it.
+      const withdraw = buttons(render3(true)).find(
+        (b) => b.textContent.trim() === "Withdraw",
+      );
+      expect(withdraw.style.background).not.toBe("");
+      expect(withdraw.style.background).not.toBe("none");
+    });
+  });
 });
 
 describe("Badge", () => {
