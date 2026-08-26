@@ -190,7 +190,8 @@ source of truth, and `useTheme` reads it rather than mirroring it.
 Two things deliberately do *not* use `palette.ink`: the graph's `+J/+P/+T`
 buttons and the questionnaire card's button. They are HTML, where axe enforces AA
 in the e2e audit, so they take `inkOn(fill)` instead. The nodes are the exception
-to AA; a button is not.
+to AA; a button generally is not — the add buttons are the exception, and are
+marked as such; see the ink note further down.
 
 **The text panel's id badge is a node.** `useTextTabData` gives it
 `typeTokens(type, palette).high` and `inkOn()` of that — the same two lines
@@ -203,13 +204,34 @@ magenta node wore a violet badge. A tint cannot be fixed in place, either — it
 ink has to read against the *panel*, and neither ramp holds a tone dark enough to
 do that on the light one, which is why the badge is filled rather than re-tinted.
 
-**Any button on a filled ground asks `inkOn(fill)` rather than naming an ink.**
-The three add-panel buttons in `user_edits/WorkflowAddPanels.jsx` used to say
-`C.onFill`, and white on `C.supports` is 2.43:1 — the worst contrast in the app,
-and invisible precisely because the fill looks strong. Asking costs nothing and
-survives a re-tone; `WorkflowAddPanels.test.jsx` now pins all three. Note this
-changes no palette constant: the fill is untouched, only which of the two inks
-goes on it. Re-toning a *fill* to chase a ratio is the thing that is forbidden.
+**Any button on a filled ground asks for its ink rather than naming one.** What
+it asks is settled by whether the fill is a graph colour the reader is meant to
+recognise. A one-off fill asks `inkOn(fill)`, which picks whichever of the two
+inks reads on it; a control wearing a graph constant takes `palette.ink` and
+`inkWeight()` of it, which is how the mode's own ink follows the colour. Either
+way the *fill* is untouched — re-toning one to chase a ratio is the thing that is
+forbidden.
+
+**Every add button is one button.** `AddBar`'s submit button, whichever of its
+tabs is lit, and the three panel buttons in `user_edits/WorkflowAddPanels.jsx`
+all wear `C.supports` and the palette's ink on it: white and bold in the default
+mode, black and unweighted in high-contrast, exactly as an assist tab's header
+badge is written. Adding a judgment from an assist tab is the same act as adding
+one from the bar, and the two looked like different acts while each coloured its
+own button. `useAddButtonStyle` is the whole of it on the panel side.
+
+Two things this deliberately gives up. The argument panel's button no longer
+carries the entails/precludes colour — that colour is on the toggle beside it,
+which is what it is about. And white on that teal is 2.43:1 in the default mode,
+taken knowingly and by the same reasoning as the node ramp: judged by eye there,
+compliant in high-contrast, where the pair clears AAA. So every one of these
+buttons carries `ACCENT_MARKER` (`data-accent="graph"`, in `addPanelShared.js`),
+the editor and assist audits pass `ignoreGraphAccents` — default mode only, as
+everywhere — and the high-contrast e2e test picks them up for free, since it
+walks exactly that attribute. `TextTabAddPanel.test.jsx` and
+`WorkflowAddPanels.test.jsx` pin the fill, the ink and the weight per mode, which
+is what stops a hex being written back in; it has been written in by hand once in
+each direction already.
 
 ### Groups
 

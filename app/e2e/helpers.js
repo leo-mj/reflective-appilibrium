@@ -379,8 +379,9 @@ export async function openMenu(page) {
  *   happens to be rendering the card. Narrow by construction: only contrast,
  *   only under a faded ancestor, so a failure anywhere else still fails.
  * @param {boolean} [opts.ignoreGraphAccents]  Drop colour-contrast findings on
- *   `[data-accent="graph"]` — the assist tab headers, which take their element or
- *   relation colour from the graph exactly. Several of those are under AA as
+ *   `[data-accent="graph"]` — the assist tab headers, and the add bar's two
+ *   filled buttons, which take their element or relation colour from the graph
+ *   exactly. Several of those are under AA as
  *   12px type in the default mode, and that is the same decision the node ramp
  *   already embodies: the default palette is judged by eye and high-contrast mode
  *   is the compliant path. **Pass this only when auditing the default mode.** In

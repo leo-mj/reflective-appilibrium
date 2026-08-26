@@ -11,7 +11,8 @@ import {
   AddElementPanel,
   AddRelationPanel,
 } from "./WorkflowAddPanels.jsx";
-import { C, inkOn } from "../../constants/colors.js";
+import { C } from "../../constants/colors.js";
+import { PALETTES } from "../../constants/palettes.js";
 
 afterEach(cleanup);
 
@@ -156,10 +157,14 @@ describe("every control on the add panels is named", () => {
   });
 });
 
-// app/CLAUDE.md: the nodes are the exception to AA, a button is not. These three
-// named an ink by hand instead of asking, and white on the cyan is 2.43:1 — the
-// worst contrast in the app. The fill is untouched; only the ink is asked for.
-describe("the add buttons ask for their ink", () => {
+// All three add buttons are the add bar's button: one fill, and the ink the
+// viewing mode puts on a fill — white and bold in the default palette, the badge
+// black and unweighted in high-contrast. Pinned per mode because a hex named
+// here would be wrong in one of them, which is what these buttons were corrected
+// for once already, in the other direction.
+describe("the add buttons take the mode's ink", () => {
+  afterEach(() => document.documentElement.removeAttribute("data-contrast"));
+
   // jsdom normalises an inline hex to rgb(), so the expectation is normalised
   // the same way rather than the assertion being loosened to a substring.
   const asRendered = (hex) => {
@@ -168,11 +173,13 @@ describe("the add buttons ask for their ink", () => {
     return probe.style.color;
   };
 
-  it.each([
-    ["judgment", AddElementPanel, "Add judgment", C.supports],
-    ["relation", AddRelationPanel, "Add relation", C.supports],
-    ["argument", AddArgumentPanel, "Add argument", C.jointly_entails],
-  ])("%s", (_name, Panel, label, fill) => {
+  const PANELS = [
+    ["judgment", AddElementPanel, "Add judgment"],
+    ["relation", AddRelationPanel, "Add relation"],
+    ["argument", AddArgumentPanel, "Add argument"],
+  ];
+
+  const addButton = (Panel, label) => {
     const { container } = render(
       <Panel
         elementType="judgment"
@@ -181,8 +188,32 @@ describe("the add buttons ask for their ink", () => {
         onAddRelation={() => {}}
       />,
     );
-    const el = button(container, label);
-    expect(el.style.color).toBe(asRendered(inkOn(fill)));
-    expect(el.style.color).not.toBe(asRendered(C.onFill));
+    return button(container, label);
+  };
+
+  it.each(PANELS)("%s — the add bar's fill", (_name, Panel, label) => {
+    expect(addButton(Panel, label).style.background).toBe(
+      asRendered(C.supports),
+    );
+  });
+
+  it.each(PANELS)("%s — white and bold by default", (_name, Panel, label) => {
+    const el = addButton(Panel, label);
+    expect(el.style.color).toBe(asRendered(PALETTES.default.ink));
+    expect(el.style.fontWeight).toBe("bold");
+  });
+
+  it.each(PANELS)("%s — black, unweighted, in high-contrast", (_n, Panel, label) => {
+    document.documentElement.setAttribute("data-contrast", "high");
+    const el = addButton(Panel, label);
+    expect(el.style.color).toBe(asRendered(PALETTES.accessible.ink));
+    expect(el.style.fontWeight).toBe("normal");
+  });
+
+  // The default mode's white on that fill is 2.43:1, taken knowingly — the
+  // marker is how the e2e audit tells this from a real failure, and without it
+  // the assist audit fails the moment one of these buttons is enabled.
+  it.each(PANELS)("%s — is marked as a graph accent", (_name, Panel, label) => {
+    expect(addButton(Panel, label).dataset.accent).toBe("graph");
   });
 });

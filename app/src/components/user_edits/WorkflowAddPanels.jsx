@@ -9,7 +9,9 @@
 
 import { useState } from "react";
 
-import { C, inkOn } from "../../constants/colors.js";
+import { C } from "../../constants/colors.js";
+import { inkWeight } from "../../constants/palettes.js";
+import { usePalette } from "../../hooks/useTheme.js";
 import {
   sortElementIds,
   defaultPickerIds,
@@ -18,7 +20,46 @@ import {
 import { Tooltip } from "../Tooltip.jsx";
 import { ElementOptions } from "./ElementOptions.jsx";
 import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
-import { SELECT_STYLE, PANEL_STYLE, makeRelationDefaults } from "./addPanelShared.js";
+import {
+  ACCENT_MARKER,
+  SELECT_STYLE,
+  PANEL_STYLE,
+  makeRelationDefaults,
+} from "./addPanelShared.js";
+
+/**
+ * What all three panels' add buttons wear.
+ *
+ * One fill for the three of them, and the same one the add bar's own submit
+ * button and lit tab carry: adding a judgment from an assist tab is the same act
+ * as adding one from the bar, and looked like a different one while these were
+ * coloured per panel. The argument panel's entails/precludes colour has not gone
+ * anywhere — it is on the toggle beside the button, which is what that colour is
+ * about; the button is just the button.
+ *
+ * The ink is the palette's rather than one named here, so it follows the viewing
+ * mode: white and bold on the teal by default, black and unweighted on it in
+ * high-contrast, exactly as an assist tab's header badge is written. Weight
+ * follows the ink for the reason node ids do — see
+ * {@link module:constants/palettes.inkWeight} — and the contrast this costs in
+ * the default mode is accounted for in {@link ACCENT_MARKER}.
+ *
+ * @param {boolean} canSubmit
+ */
+function useAddButtonStyle(canSubmit) {
+  const ink = usePalette().ink;
+  return {
+    padding: "3px 14px",
+    borderRadius: 4,
+    fontSize: 12,
+    fontWeight: inkWeight(ink),
+    cursor: canSubmit ? "pointer" : "default",
+    border: "none",
+    background: C.supports,
+    color: ink,
+    opacity: canSubmit ? 1 : 0.4,
+  };
+}
 
 
 /**
@@ -38,6 +79,7 @@ export function AddElementPanel({ elementType, onAddElement }) {
   const set = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
   const canSubmit = form.text.trim().length > 0;
+  const addStyle = useAddButtonStyle(canSubmit);
   const handleSubmit = () => {
     onAddElement({ type: elementType, ...form });
     setForm({ confidence: 0.67, origin: "user", text: "" });
@@ -56,21 +98,8 @@ export function AddElementPanel({ elementType, onAddElement }) {
         <button
           disabled={!canSubmit}
           onClick={handleSubmit}
-          style={{
-            padding: "3px 14px",
-            borderRadius: 4,
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: canSubmit ? "pointer" : "default",
-            border: "none",
-            background: C.supports,
-            // The fill is untouched; only which of the two inks goes on it is
-            // asked rather than assumed. White on the cyan is 2.43:1 — worse
-            // than any node — and app/CLAUDE.md already draws the line: the
-            // nodes are the exception to AA, a button is not.
-            color: inkOn(C.supports),
-            opacity: canSubmit ? 1 : 0.4,
-          }}
+          style={addStyle}
+          {...ACCENT_MARKER}
         >
           Add {elementType}
         </button>
@@ -188,6 +217,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
     premises.every(Boolean) &&
     !hasDuplicates &&
     !conclusionClash;
+  const addStyle = useAddButtonStyle(canSubmit);
 
   const relationType =
     mode === "entails"
@@ -242,19 +272,8 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
         <button
           disabled={!canSubmit}
           onClick={handleSubmit}
-          style={{
-            padding: "3px 14px",
-            borderRadius: 4,
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: canSubmit ? "pointer" : "default",
-            border: "none",
-            background: mode === "entails" ? C.jointly_entails : C.jointly_precludes,
-            color: inkOn(mode === "entails" ? C.jointly_entails : C.jointly_precludes),
-            opacity: canSubmit ? 1 : 0.4,
-            flexShrink: 0,
-            alignSelf: "center",
-          }}
+          style={{ ...addStyle, flexShrink: 0, alignSelf: "center" }}
+          {...ACCENT_MARKER}
         >
           Add argument
         </button>
@@ -375,6 +394,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
     setForm((prev) => ({ ...prev, [field]: value }));
   const ids = elements.map((e) => e.id).sort(sortElementIds);
   const canSubmit = form.from && form.to && form.from !== form.to;
+  const addStyle = useAddButtonStyle(canSubmit);
   const handleSubmit = () => {
     onAddRelation(form);
     setForm(makeRelationDefaults(elements));
@@ -393,17 +413,8 @@ export function AddRelationPanel({ elements, onAddRelation }) {
         <button
           disabled={!canSubmit}
           onClick={handleSubmit}
-          style={{
-            padding: "3px 14px",
-            borderRadius: 4,
-            fontSize: 12,
-            fontWeight: "bold",
-            cursor: canSubmit ? "pointer" : "default",
-            border: "none",
-            background: C.supports,
-            color: inkOn(C.supports),
-            opacity: canSubmit ? 1 : 0.4,
-          }}
+          style={addStyle}
+          {...ACCENT_MARKER}
         >
           Add relation
         </button>

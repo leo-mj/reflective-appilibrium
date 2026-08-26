@@ -9,6 +9,7 @@ import { useContext } from "react";
 import { C } from "../../constants/colors.js";
 import {
   COMPACT_BTN_STYLE,
+  CONTENT_FONT_SIZE,
   GHOST_BTN_STYLE,
   WITHDRAW_BTN_STYLE,
 } from "../../constants/textTabStyles.js";
@@ -352,7 +353,7 @@ export function CoherenceGroup({ title, color, items }) {
         <div
           key={item}
           style={{
-            fontSize: 12,
+            fontSize: CONTENT_FONT_SIZE,
             color: C.dim,
             marginBottom: 6,
             lineHeight: 1.5,

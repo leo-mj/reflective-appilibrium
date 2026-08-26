@@ -10,6 +10,19 @@ export const SELECT_STYLE = {
   fontSize: 14,
 };
 
+/**
+ * What marks a control drawn in a graph constant, taken exactly.
+ *
+ * Every add button — the bar's, and the three in the assist tabs' own panels —
+ * wears the supports teal with the palette's own ink on it, so in the default
+ * mode they are under AA at 2.43:1. That is the bargain the node ramp already
+ * strikes: judged by eye there, and high-contrast mode, where the ink turns
+ * black and the pair clears AAA, is the compliant path. The e2e audit reads this
+ * attribute to tell a deliberate default-mode failure from a real one, and only
+ * ever in that mode; see `axeViolations`' `ignoreGraphAccents`.
+ */
+export const ACCENT_MARKER = { "data-accent": "graph" };
+
 export const PANEL_STYLE = {
   flexShrink: 0,
   borderTop: `1px solid ${C.border}`,

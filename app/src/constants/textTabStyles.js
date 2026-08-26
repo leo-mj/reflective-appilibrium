@@ -101,19 +101,27 @@ export const cardChips = (isWide) => ({
 export const cardActions = { marginLeft: "auto" };
 
 export const META_LABEL_STYLE = {
-  fontSize: 12,
+  fontSize: 11,
   fontStyle: "italic",
   marginTop: 5,
   lineHeight: 1.5,
 };
 
-export const CONTENT_FONT_SIZE = 12;
+/**
+ * The claim itself — an element's statement, a relation's explanation, the
+ * premises spelled out under an argument. A notch under the chrome around it
+ * (headers at 12, chips at 10) so that a panel showing two dozen cards fits
+ * more of them on screen without the text dropping to chip size.
+ */
+export const CONTENT_FONT_SIZE = 11;
 
 export const CLUSTER_CARD_STYLE = {
   display: "flex",
   alignItems: "center",
   gap: 4,
-  fontSize: 12,
+  // A cluster member is an element's statement, so it takes the same size the
+  // element's own card gives it.
+  fontSize: CONTENT_FONT_SIZE,
   paddingBottom: 3,
   borderBottom: `1px solid ${C.border}`,
 };

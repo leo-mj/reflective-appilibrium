@@ -17,6 +17,9 @@
 import { useState } from "react";
 
 import { C } from "../../constants/colors.js";
+import { inkWeight } from "../../constants/palettes.js";
+import { useAddBarSize } from "../../hooks/useAddBarSize.js";
+import { usePalette } from "../../hooks/useTheme.js";
 import {
   argumentRelationType,
   newArgumentId,
@@ -25,6 +28,7 @@ import {
 import { ElementOptions } from "./ElementOptions.jsx";
 import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
 import {
+  ACCENT_MARKER,
   arrowStyle,
   complaintStyle,
   fieldStyle,
@@ -69,6 +73,23 @@ export function AddBar({
   // room for one size only.
   const size = roomy ? "roomy" : "compact";
   const linkSize = roomy ? "roomy" : "prominent";
+  // The strip is the reader's to size — the three tabs want different shapes of
+  // it, and only they know which they are about to use. The sheet keeps its own.
+  const { ref: barRef, sizeStyle, handleProps } = useAddBarSize(!roomy);
+  // The bar's two filled buttons — Add, and whichever tab is lit — are written
+  // in the palette's own ink rather than in an ink named here, so that they read
+  // as the same object in either viewing mode: white and bold on the teal in the
+  // default one, the black the assist headers' badges wear and no weight with it
+  // in high-contrast. Weight follows the ink for the reason node ids do, see
+  // {@link module:constants/palettes.inkWeight}.
+  //
+  // White on this teal is 2.43:1, which is the default palette's usual bargain
+  // rather than an oversight here: it is judged by eye and high-contrast mode is
+  // the compliant path. See {@link ACCENT_MARKER}, and WorkflowAddPanels, whose
+  // three add buttons are drawn by the same rule.
+  const palette = usePalette();
+  const fillInk = palette.ink;
+  const fillWeight = inkWeight(fillInk);
   const ghost = ghostBtn(linkSize);
   const arrow = arrowStyle(linkSize);
   const sel = selectStyle(size);
@@ -232,24 +253,38 @@ export function AddBar({
     resetTab();
   };
 
-  const tabBtn = (t) => {
+  /**
+   * Everything one of the three tab buttons wears, its handler included — the
+   * accent marker goes on the lit one only, so it has to be an attribute rather
+   * than part of a style object.
+   */
+  const tabProps = (t) => {
     const active = tab === t;
     return {
-      // Small enough that all three sit beside the submit button on one line —
-      // including the case that has to fit, with relations on offer — and a
-      // clear step under it: they choose what is added, it does the adding.
-      padding: roomy ? "8px 11px" : "2px 10px",
-      minHeight: roomy ? 38 : undefined,
-      borderRadius: 10,
-      fontSize: roomy ? 12 : 11,
-      cursor: "pointer",
-      // Stated three times over — fill, border and weight. The submit button
-      // beside these reads only "Add", so which of them is lit is the only
-      // thing on screen saying what pressing it would add.
-      border: `1px solid ${active ? C.text : C.border}`,
-      fontWeight: active ? "bold" : "normal",
-      background: active ? C.border : "transparent",
-      color: active ? C.text : C.dim,
+      "aria-pressed": active,
+      onClick: () => setActiveTab(t),
+      // Only while it is carrying the fill. See {@link ACCENT_MARKER}.
+      ...(active ? ACCENT_MARKER : null),
+      style: {
+        // Small enough that all three sit beside the submit button on one line —
+        // including the case that has to fit, with relations on offer — and a
+        // clear step under it: they choose what is added, it does the adding.
+        padding: roomy ? "8px 11px" : "2px 10px",
+        minHeight: roomy ? 38 : undefined,
+        borderRadius: 10,
+        fontSize: roomy ? 12 : 11,
+        cursor: "pointer",
+        // Lit in the button colour the bar's own Add wears, so the pair reads as
+        // one control: these say what is being added and it does the adding. The
+        // submit button beside them carries no type in its label, so which of
+        // them is lit is the only thing on screen saying what pressing it would
+        // add — hence fill and border together, rather than a tint alone. Weight
+        // is not a third statement of it: on a fill it belongs to the ink.
+        border: `1px solid ${active ? C.supports : C.border}`,
+        fontWeight: active ? fillWeight : "normal",
+        background: active ? C.supports : "transparent",
+        color: active ? fillInk : C.dim,
+      },
     };
   };
 
@@ -290,6 +325,7 @@ export function AddBar({
 
   return (
     <div
+      ref={barRef}
       // Ringed by the tour alongside the graph's + buttons: this is the other
       // way in, and the one with a text field rather than a dialog.
       data-tutorial="add-bar"
@@ -297,15 +333,32 @@ export function AddBar({
         // The sheet is capped at 85dvh and scrolls past that, so asking for a
         // good share of the screen here is what makes the controls and the text
         // field roomy rather than merely spaced out.
-        minHeight: roomy ? "46dvh" : "20vh",
+        //
+        // The strip's own share is a floor rather than a size: the text field
+        // takes whatever the controls leave over, and anyone who wants more of
+        // it drags the bar's top edge. See {@link module:hooks/useAddBarSize}.
+        minHeight: roomy ? "46dvh" : "16vh",
         flexShrink: 0,
         borderTop: `1px solid ${C.border}`,
         background: C.panel,
         display: "flex",
         flexDirection: "column",
         padding: roomy ? "12px 14px 16px" : "8px 16px",
+        // Last, so a dragged size wins over the floor above.
+        ...sizeStyle,
       }}
     >
+      {/* Two edges and the corner between them. The bar is anchored at the foot
+          of the window and at the left of the row, so those are the two that
+          can move. */}
+      {!roomy && (
+        <>
+          <div {...handleProps("height")} />
+          <div {...handleProps("width")} />
+          <div {...handleProps("both")} />
+        </>
+      )}
+
       {/* ── Controls row ── */}
       <div
         style={{
@@ -352,6 +405,7 @@ export function AddBar({
             // whose label is shorter than its accessible name.
             aria-label={`Add ${tab}`}
             title={`Add ${tab} — ⌘/Ctrl + Enter`}
+            {...ACCENT_MARKER}
             style={{
               // The auto margin is what holds it to the right of the strip. It
               // leads the row here, so it starts at the left edge everything
@@ -361,11 +415,11 @@ export function AddBar({
               minHeight: roomy ? 44 : undefined,
               borderRadius: 4,
               fontSize: roomy ? 15 : 12,
-              fontWeight: "bold",
+              fontWeight: fillWeight,
               cursor: canSubmit ? "pointer" : "default",
               border: "none",
               background: C.supports,
-              color: C.onFill,
+              color: fillInk,
               opacity: canSubmit ? 1 : 0.4,
             }}
           >
@@ -395,29 +449,11 @@ export function AddBar({
               ...(roomy ? { flexBasis: "100%" } : null),
             }}
           >
-            <button
-              style={tabBtn("element")}
-              aria-pressed={tab === "element"}
-              onClick={() => setActiveTab("element")}
-            >
-              Element
-            </button>
+            <button {...tabProps("element")}>Element</button>
             {showRelations && (
-              <button
-                style={tabBtn("relation")}
-                aria-pressed={tab === "relation"}
-                onClick={() => setActiveTab("relation")}
-              >
-                Relation
-              </button>
+              <button {...tabProps("relation")}>Relation</button>
             )}
-            <button
-              style={tabBtn("argument")}
-              aria-pressed={tab === "argument"}
-              onClick={() => setActiveTab("argument")}
-            >
-              Argument
-            </button>
+            <button {...tabProps("argument")}>Argument</button>
           </div>
           {/* Separates the tabs from the fields beside them. Stacked, there is
               nothing to its right to separate them from. */}
@@ -757,7 +793,11 @@ export function AddBar({
           // `flex: 1` alone gives it whatever the controls leave over, which on
           // a phone is not much once the controls have wrapped onto three
           // lines. The floor is what makes it a field worth typing into.
-          minHeight: roomy ? 130 : undefined,
+          //
+          // 0 rather than nothing in the strip: a textarea's own content height
+          // is a floor `flex: 1` cannot shrink past, so a bar dragged short had
+          // the field push its own bottom edge out of the panel instead.
+          minHeight: roomy ? 130 : 0,
           marginTop: roomy ? 12 : 8,
           resize: "none",
           width: "100%",

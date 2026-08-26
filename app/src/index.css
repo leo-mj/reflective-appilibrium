@@ -117,6 +117,39 @@ body {
   margin: 0;
 }
 
+/* Drag handles on the add bar's two movable edges.
+
+   Invisible until the pointer is on one, or one has focus: a grip drawn
+   permanently along two edges of a bar that wide is a lot of furniture for
+   something used once and then left alone. The cursor over the edge is what
+   announces it — the same way a window's own edges do — and the title
+   attribute says the rest. The transition is what makes it read as a control
+   appearing rather than as a rendering artefact.
+
+   Kept as a rule rather than an inline style because :hover and :focus-visible
+   are pseudo-classes; the geometry stays in the hook, which is what knows which
+   edge each handle is. */
+.resize-handle {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.resize-handle:hover,
+.resize-handle:focus-visible {
+  opacity: 0.5;
+  outline: none;
+}
+/* Focus has to be visible on its own terms: the fade above is the same as the
+   hover state, and a keyboard has no pointer to explain it. */
+.resize-handle:focus-visible {
+  opacity: 0.9;
+  box-shadow: 0 0 0 1px var(--c-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .resize-handle {
+    transition: none;
+  }
+}
+
 /* Tap targets.
 
    A thumb needs more room than a mouse pointer, so the panel's small inline

@@ -165,7 +165,15 @@ test.describe("Accessibility", () => {
     // outside the region axe evaluates, and any layout change that brought it
     // back in would have surfaced it. Contrast outside a faded ancestor, and
     // every other rule, still fail here.
-    await audit(page, "editor/dark", { ignoreDimmed: true });
+    // Graph accents excluded for the reason the assist audit below excludes
+    // them, and likewise only in the default mode: every add button — the bar's,
+    // its lit tab, and the assist panels' three — is filled with the supports
+    // teal exactly and written in the palette's own ink, which is white here at
+    // 2.43:1, the same bargain the node ramp strikes. In high-contrast mode that
+    // ink is black on the same fill and clears AAA; the unit tests beside those
+    // components hold them to taking the mode's ink rather than a hex of their
+    // own, and the high-contrast test below walks the same attribute.
+    await audit(page, "editor/dark", { ignoreDimmed: true, ignoreGraphAccents: true });
   });
 
   test("cluster labels are readable in both themes", async ({ page }) => {

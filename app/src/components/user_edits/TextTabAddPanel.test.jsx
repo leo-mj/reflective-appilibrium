@@ -10,6 +10,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
+import { C } from "../../constants/colors.js";
+import { PALETTES } from "../../constants/palettes.js";
 import { AddBar } from "./TextTabAddPanel.jsx";
 
 afterEach(cleanup);
@@ -641,5 +643,119 @@ describe("adding an argument", () => {
       true,
     );
     expect(screen.queryByText("Premise ≠ conclusion")).toBeTruthy();
+  });
+});
+
+// ─── The filled buttons ───────────────────────────────────────────────────────
+// Add and whichever tab is lit carry the same fill, and are written in the ink
+// the viewing mode puts on a fill — white and bold in the default palette, the
+// badge black and no weight in high-contrast. Pinned because naming an ink by
+// hand is exactly what the assist tabs' own add panels had to be corrected for,
+// and a hex written here would be wrong in one of the two modes.
+describe("the add bar's filled buttons", () => {
+  afterEach(() => document.documentElement.removeAttribute("data-contrast"));
+
+  // jsdom normalises an inline hex to rgb(), so the expectation is normalised
+  // the same way rather than the assertion being loosened to a substring.
+  const asRendered = (hex) => {
+    const probe = document.createElement("span");
+    probe.style.color = hex;
+    return probe.style.color;
+  };
+
+  /** The submit button and the lit tab, which is Element on an untouched bar. */
+  const filled = () => [
+    screen.getByRole("button", { name: "Add element" }),
+    screen.getByRole("button", { name: "Element" }),
+  ];
+
+  it("share the add button's colour", () => {
+    renderBar();
+    for (const el of filled())
+      expect(el.style.background).toBe(asRendered(C.supports));
+  });
+
+  it("are written in white, bold, in the default palette", () => {
+    renderBar();
+    for (const el of filled()) {
+      expect(el.style.color).toBe(asRendered(PALETTES.default.ink));
+      expect(el.style.fontWeight).toBe("bold");
+    }
+  });
+
+  it("are written in the badge black, unweighted, in high-contrast", () => {
+    document.documentElement.setAttribute("data-contrast", "high");
+    renderBar();
+    for (const el of filled()) {
+      expect(el.style.color).toBe(asRendered(PALETTES.accessible.ink));
+      expect(el.style.fontWeight).toBe("normal");
+    }
+  });
+
+  it("leaves the tabs that are not lit unfilled", () => {
+    renderBar();
+    const el = screen.getByRole("button", { name: "Argument" });
+    expect(el.style.background).toBe("transparent");
+    expect(el.style.color).not.toBe(asRendered(C.supports));
+  });
+});
+
+// ─── Resizing ─────────────────────────────────────────────────────────────────
+// The strip is the reader's to size, and the size is remembered. jsdom lays
+// nothing out, so what these hold is the wiring: which handles exist, that a key
+// press writes an explicit size onto the bar and into storage, and that
+// double-click takes it back off. The geometry itself is the browser's.
+describe("AddBar resizing", () => {
+  afterEach(() => localStorage.removeItem("addBarSize"));
+
+  const bar = (container) => container.querySelector('[data-tutorial="add-bar"]');
+
+  it("offers a handle per movable edge on the strip", () => {
+    renderBar();
+    expect(screen.getByRole("separator", { name: "Resize add bar height" })).toBeTruthy();
+    expect(screen.getByRole("separator", { name: "Resize add bar width" })).toBeTruthy();
+  });
+
+  it("offers none on the phone sheet, which sizes itself", () => {
+    renderBar({ roomy: true });
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+  });
+
+  it("resizes from the keyboard and remembers what it was left at", () => {
+    const { container } = renderBar();
+    const handle = screen.getByRole("separator", { name: "Resize add bar height" });
+    fireEvent.keyDown(handle, { key: "ArrowUp" });
+
+    expect(bar(container).style.height).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem("addBarSize")).height).toBeGreaterThan(0);
+  });
+
+  it("ignores the arrow keys the edge cannot answer for", () => {
+    const { container } = renderBar();
+    fireEvent.keyDown(
+      screen.getByRole("separator", { name: "Resize add bar height" }),
+      { key: "ArrowRight" },
+    );
+    expect(bar(container).style.width).toBe("");
+  });
+
+  it("double-click puts both axes back to the stylesheet's own sizing", () => {
+    const { container } = renderBar();
+    const handle = screen.getByRole("separator", { name: "Resize add bar height" });
+    fireEvent.keyDown(handle, { key: "ArrowUp" });
+    fireEvent.doubleClick(handle);
+
+    expect(bar(container).style.height).toBe("");
+    expect(JSON.parse(localStorage.getItem("addBarSize"))).toEqual({
+      height: null,
+      width: null,
+    });
+  });
+
+  it("opens at the size the last drag left it", () => {
+    localStorage.setItem("addBarSize", JSON.stringify({ height: 240, width: 500 }));
+    const { container } = renderBar();
+    expect(bar(container).style.height).toBe("240px");
+    expect(bar(container).style.width).toBe("500px");
   });
 });
