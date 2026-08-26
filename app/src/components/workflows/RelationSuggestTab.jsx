@@ -248,12 +248,13 @@ export function RelationSuggestTab({
           workflowPhase={workflowPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
+          disclosure={
+            hasResult &&
+            suggestions.length > 0 && <AiDisclosureBanner model={model} />
+          }
         />
 
         {error && <ErrorBanner message={error} />}
-        {hasResult && suggestions.length > 0 && (
-          <AiDisclosureBanner model={model} />
-        )}
 
         {activeElements.length < 2 && (
           <div style={{ fontSize: 12, color: C.dim }}>

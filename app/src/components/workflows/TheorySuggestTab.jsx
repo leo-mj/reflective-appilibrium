@@ -15,7 +15,8 @@
  * duplicate that tab and put the model's reading of a connection ahead of the
  * user's, which is the opposite of what an RE tool should do.
  *
- * This is an Assist tab but not a workflow phase; see the note in app/CLAUDE.md.
+ * It is the workflow's third phase, between the principles a theory has to bear
+ * on and the two phases that connect what is on the board; see app/CLAUDE.md.
  *
  * @module components/TheorySuggestTab
  */
@@ -227,6 +228,9 @@ export function TheorySuggestTab({
   onAddElement,
   onRejectElements,
   autoFetch,
+  workflowPhase,
+  onAdvanceWorkflow,
+  nextPhaseIsEnabled,
   useDummy = false,
   suggestionsDisabled = false,
 }) {
@@ -242,18 +246,23 @@ export function TheorySuggestTab({
     run,
   } = useSuggestionWorkflow(fetchTheorySuggestions);
 
-  // A background theory bears on principles first of all, and the app defers
-  // theories to the later rounds; with nothing to bear on there is nothing for
-  // one to do.
+  // A background theory bears on principles first of all, which is why this
+  // phase runs after the one that suggests them; with nothing to bear on there
+  // is nothing for one to do.
   const principles = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.status !== "rejected" && e.type === "principle",
   );
 
   const suggest = () => run(state, useDummy);
 
+  // The principle count gates the auto-fetch as well as the button. Every other
+  // phase asking with nothing to work from wastes an LLM call; this one would
+  // spend a round of Crossref lookups on top of it, and on suggestions the tab
+  // has already said it cannot make.
   const autoFetchRef = useRef(autoFetch);
   useEffect(() => {
-    if (autoFetchRef.current && !suggestionsDisabled) suggest();
+    if (autoFetchRef.current && !suggestionsDisabled && principles.length >= 1)
+      suggest();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** What would be accepted right now: the draft when editing, else the suggestion. */
@@ -316,19 +325,25 @@ export function TheorySuggestTab({
           onRun={suggest}
           model={model}
           disabled={suggestionsDisabled}
+          workflowPhase={workflowPhase}
+          advanceWorkflow={onAdvanceWorkflow}
+          nextPhaseIsEnabled={nextPhaseIsEnabled}
           needs={
             principles.length < 1
               ? "Add at least one principle first; a background theory is what grounds one."
               : undefined
           }
+          disclosure={
+            hasResult &&
+            suggestions.length > 0 && (
+              <AiDisclosureBanner
+                model={model}
+                note={`Review carefully before accepting. ${CITATION_CAVEAT}`}
+              />
+            )
+          }
         />
         {error && <ErrorBanner message={error} />}
-        {hasResult && suggestions.length > 0 && (
-          <AiDisclosureBanner
-            model={model}
-            note={`Review carefully before accepting. ${CITATION_CAVEAT}`}
-          />
-        )}
 
         {principles.length < 1 && (
           <div style={{ fontSize: 12, color: C.dim }}>

@@ -19,13 +19,19 @@ Tests: `npm test` (Vitest, jsdom) and `npm run test:e2e` (Playwright — see `e2
 
 ## Background theories
 
-`TheorySuggestTab` — the fifth Assist tab, and the only element type that had no
-LLM path before it. The domain note is in the root `CLAUDE.md`; what matters on
-this side:
+`TheorySuggestTab` — the workflow's third phase, and the only element type that
+had no LLM path before it. The domain note is in the root `CLAUDE.md`; what
+matters on this side:
 
-- **Not a workflow phase**, kept out the same three ways as the review tab, plus
-  one reason of its own: a tab switch that auto-fetched would spend an LLM call
-  *and* a round of Crossref lookups.
+- **The workflow's third phase**, between principles and arguments: it takes
+  `autoFetch`, `workflowPhase` and the next-phase control like the other four,
+  and `workflowUtils.test.js` pins `WORKFLOW_NEXT_PHASE` and `ASSIST_TABS` to the
+  same order, so the tab strip cannot say one thing and the button another.
+- **The principle count gates the auto-fetch, not only the button.** Every phase
+  asking with nothing to work from wastes an LLM call; this one would spend a
+  round of Crossref lookups on top of it, on suggestions the tab has already said
+  it cannot make. That guard is what the earlier `autoFetch={false}` bought, kept
+  now that the tab is a phase and fetching on arrival is the point.
 - **`utils/citation.js` is one ordering function with two renderers** —
   `<Citation>` maps its runs to `<em>`, `citationMarkdown` wraps them in `*`. That
   is what lets the export carry italics without a parser or model-supplied
@@ -125,7 +131,7 @@ matters on this side:
   (`autoFetch` is on for the *whole panel* whenever a workflow is running, so
   passing it through would fire an LLM call at a user who merely switched tabs,
   past the disclosure the run button carries); and `workflowUtils.test.js` pins
-  the absence. Its place last in `ASSIST_TABS` is deliberate — the four before it
+  the absence. Its place last in `ASSIST_TABS` is deliberate — the five before it
   are the workflow's phases, in run order.
 - **One review is carried as a one-element `suggestions` list.** That is the
   shape `useSuggestionWorkflow` consumes, and the fit is otherwise exact: a

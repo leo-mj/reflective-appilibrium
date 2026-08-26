@@ -26,7 +26,8 @@ see `app/e2e/README.md`); the backend is pytest from the repo root.
 
 - **Judgments (J)** — Moral verdicts, any generality. Circles.
 - **Principles (P)** — General moral rules. Rounded rectangles.
-- **Background Theories (T)** — Meta-ethical commitments. Diamonds. Deferred to Round 5+.
+- **Background Theories (T)** — Meta-ethical commitments. Diamonds. Suggested in
+  every round, as the workflow's third step.
 
 Every element carries a `confidence` in [0, 1] and a `status`: `active`, `revised`,
 `withdrawn`, `rejected`, or `possible` (an option offered but not yet affirmed —

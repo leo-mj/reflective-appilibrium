@@ -96,7 +96,7 @@ describe("nextPhaseEnabled", () => {
 
 describe("the phase maps", () => {
   it("leaves processReview out of the workflow", () => {
-    // Review is an assist tab but not a workflow phase: the four phases loop to
+    // Review is an assist tab but not a workflow phase: the five phases loop to
     // build the position, and this one steps back and looks at it. Being absent
     // from both maps is what stops advanceWorkflow ever landing on it, and what
     // keeps the next-phase control out of its toolbar.
@@ -105,14 +105,22 @@ describe("the phase maps", () => {
     expect(Object.values(WORKFLOW_NEXT_PHASE)).not.toContain("processReview");
   });
 
-  it("leaves suggestTheories out of the workflow", () => {
-    // Same reasoning as review, plus one of its own: the four phases loop to
-    // build the position, and background theories enter later in the process.
-    // Absence from both maps is also what stops a tab switch spending an LLM
-    // call and a round of Crossref lookups on its own.
-    expect(WORKFLOW_NEXT_PHASE).not.toHaveProperty("suggestTheories");
-    expect(WORKFLOW_PHASE_LABELS).not.toHaveProperty("suggestTheories");
-    expect(Object.values(WORKFLOW_NEXT_PHASE)).not.toContain("suggestTheories");
+  it("runs the phases in the order the assist tabs are listed in", () => {
+    // The tab strip reads as the workflow's running order, so the two must
+    // agree — theories third in one and fourth in the other would make the tab
+    // the reader clicks and the phase the button advances to different things.
+    const phases = ASSIST_TABS.filter((t) => t in WORKFLOW_NEXT_PHASE);
+    phases.forEach((phase, i) => {
+      const next = phases[(i + 1) % phases.length];
+      expect(WORKFLOW_NEXT_PHASE[phase]).toBe(next);
+    });
+  });
+
+  it("puts theories after principles and before arguments", () => {
+    // A theory has to bear on a principle, and an argument or relation drawn
+    // before the theories are on the board is one the user has to draw again.
+    expect(WORKFLOW_NEXT_PHASE.suggestPrinciples).toBe("suggestTheories");
+    expect(WORKFLOW_NEXT_PHASE.suggestTheories).toBe("detectArguments");
   });
 
   it("keeps the loop closed over exactly the phases it labels", () => {

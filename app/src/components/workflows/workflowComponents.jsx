@@ -12,6 +12,57 @@ import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
 
 /**
+ * The ground the header strip is drawn on, pinned to the top of the tab's own
+ * scroller: the next-phase button is how the workflow is advanced, and a long
+ * list of suggestions must not scroll it out of reach.
+ *
+ * The AI disclosure rides along rather than scrolling with the cards, since what
+ * it discloses is exactly what is on screen — a notice that has scrolled away is
+ * a notice the reader accepting a suggestion no longer has.
+ *
+ * Three things about the box are load-bearing. The negative margin puts the
+ * opaque ground out to the scroller's own 4px padding, or cards slide past it
+ * down either edge. `flow-root` keeps the disclosure's bottom margin *inside*
+ * the strip — collapsed through it, the ground would end at the banner's border
+ * and a card would show in the gap below. And with no disclosure the row's own
+ * 14px is all that is left, which is the spacing the header had before it was
+ * pinned.
+ *
+ * @param {Object}    props
+ * @param {ReactNode} [props.disclosure] The tab's `<AiDisclosureBanner>`, when
+ *   it is showing live model output.
+ * @param {ReactNode} props.children     The header row's contents.
+ */
+export function ToolbarStrip({ disclosure, children }) {
+  return (
+    <div
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 2,
+        background: C.bg,
+        margin: "0 -4px",
+        padding: "10px 4px 0",
+        display: "flow-root",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        {children}
+      </div>
+      {disclosure}
+    </div>
+  );
+}
+
+/**
  * The header strip shared by the three suggestion tabs: a title with a running
  * count and the model name, the button that asks the LLM for more, and the
  * workflow's next-phase control.
@@ -36,6 +87,8 @@ import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
  * @param {boolean}          [props.disabled]  No backend, so nothing can be asked.
  * @param {string}           [props.needs]     What the process still lacks, if
  *   anything, e.g. "Add at least two elements first." Also disables the button.
+ * @param {ReactNode}        [props.disclosure] The AI notice, pinned with the
+ *   header rather than scrolling — see {@link ToolbarStrip}.
  */
 export function SuggestionToolbar({
   tab,
@@ -52,20 +105,13 @@ export function SuggestionToolbar({
   workflowPhase,
   advanceWorkflow,
   nextPhaseIsEnabled,
+  disclosure,
 }) {
   const isDisabled = loading || disabled || Boolean(needs);
   const why = suggestionsUnavailable({ loading, noBackend: disabled, needs });
   const { accent, ink, weight, marker, badge } = useHeaderAccent(tab);
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "10px 0 14px",
-        gap: 12,
-      }}
-    >
+    <ToolbarStrip disclosure={disclosure}>
       <div style={{ fontSize: 12, lineHeight: 1.5 }}>
         <span {...marker} style={{ ...badge, color: ink, fontWeight: weight }}>
           {title}
@@ -121,7 +167,7 @@ export function SuggestionToolbar({
           </>
         )}
       </div>
-    </div>
+    </ToolbarStrip>
   );
 }
 

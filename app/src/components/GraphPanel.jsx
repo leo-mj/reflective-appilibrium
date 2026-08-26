@@ -320,15 +320,14 @@ export function GraphPanel({
         )}
         {tab === "suggestTheories" && (
           <Suspense fallback={null}>
-            {/* `autoFetch={false}` and no `workflowPhase`, for the same reasons
-                spelled out on the review tab below: theories are an assist tab
-                and not a workflow phase, and a tab switch must not spend an LLM
-                call — nor a round of Crossref lookups — on its own. */}
             <TheorySuggestTab
               state={state}
               onAddElement={onAddElement}
               onRejectElements={onRejectElements}
-              autoFetch={false}
+              autoFetch={autoFetch}
+              workflowPhase={workflowPhase}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
               suggestionsDisabled={suggestionsDisabled}
             />

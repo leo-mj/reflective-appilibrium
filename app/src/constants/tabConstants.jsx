@@ -15,16 +15,16 @@ import {
   TheoryIcon,
 } from "../components/Icons.jsx";
 
-// The guided workflow's four phases come first, in the order it runs them; the
-// two after them are Assist tabs that are deliberately *not* phases — see
-// WORKFLOW_NEXT_PHASE in utils/workflowUtils.js, which both stay out of.
+// The guided workflow's five phases come first, in the order it runs them; the
+// one after them is an Assist tab that is deliberately *not* a phase — see
+// WORKFLOW_NEXT_PHASE in utils/workflowUtils.js, which it stays out of.
 export const ASSIST_TABS = [
   "questionnaire",
   "elicitJudgments",
   "suggestPrinciples",
+  "suggestTheories",
   "detectArguments",
   "suggestRelations",
-  "suggestTheories",
   "processReview",
 ];
 

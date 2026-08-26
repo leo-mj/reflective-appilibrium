@@ -118,20 +118,27 @@ test.describe("Background theories", () => {
     expect(cited.sources[0].doi).toBeTruthy();
   });
 
-  test("the guided workflow never lands on this tab", async ({ page }) => {
-    // Theories are an assist tab and not a workflow phase: the four phases loop
-    // to build the position, and a tab switch must not spend an LLM call — nor a
-    // round of Crossref lookups — on its own.
+  test("the guided workflow reaches this tab third", async ({ page }) => {
+    // Theories run after the principles they have to bear on and before the two
+    // phases that connect what is on the board — an argument drawn while the
+    // theories are still missing is one the user has to draw again.
     await page.locator('button:text-is("Judgments")').click();
     await page.getByRole("button", { name: /Start Workflow/ }).click();
-    await expect(page.locator("text=/Elicit Judgments/").first()).toBeVisible();
+    await park(page);
 
-    for (let i = 0; i < 4; i++) {
-      const next = page.getByRole("button", { name: /Next phase|Continue/ });
-      if (!(await next.isVisible().catch(() => false))) break;
-      await next.click();
+    for (const step of ["Suggest Principles", "Suggest Theories"]) {
+      await page
+        .getByRole("button", { name: new RegExp(`Workflow Step: ${step}`) })
+        .click();
       await park(page);
-      await expect(page.locator("text=/Suggest Background Theories/")).toHaveCount(0);
     }
+
+    await expect(
+      page.locator("text=/Suggest Background Theories/").first(),
+    ).toBeVisible();
+    // And it leaves for the arguments phase rather than looping back.
+    await expect(
+      page.getByRole("button", { name: /Workflow Step: Detect Arguments/ }),
+    ).toBeVisible();
   });
 });

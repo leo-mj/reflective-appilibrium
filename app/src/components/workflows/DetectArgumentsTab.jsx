@@ -31,7 +31,7 @@ import {
 import { AddArgumentPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
-import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
+import { ProgressWorkflowBtn, ToolbarStrip } from "./workflowComponents.jsx";
 import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
 import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 
@@ -487,14 +487,13 @@ export function DetectArgumentsTab({
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         {/* Toolbar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 0 14px",
-            gap: 12,
-          }}
+        <ToolbarStrip
+          disclosure={
+            result &&
+            result.translated_arguments.length > 0 && (
+              <AiDisclosureBanner model={result.model} />
+            )
+          }
         >
           <div style={{ fontSize: 12, lineHeight: 1.5 }}>
             <span
@@ -558,7 +557,7 @@ export function DetectArgumentsTab({
               </>
             )}
           </div>
-        </div>
+        </ToolbarStrip>
 
         {activeCount < 3 && (
           <div style={{ fontSize: 12, color: C.dim }}>
@@ -567,9 +566,6 @@ export function DetectArgumentsTab({
         )}
 
         {error && <ErrorBanner message={error} />}
-        {result && result.translated_arguments.length > 0 && (
-          <AiDisclosureBanner model={result.model} />
-        )}
 
         {result && (
           <>

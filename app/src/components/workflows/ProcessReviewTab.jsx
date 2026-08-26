@@ -388,6 +388,14 @@ export function ProcessReviewTab({
               ? "Work through at least two rounds first."
               : undefined
           }
+          disclosure={
+            candidate && (
+              <AiDisclosureBanner
+                model={model}
+                note="Review carefully before accepting it into your process."
+              />
+            )
+          }
         />
         {error && <ErrorBanner message={error} />}
 
@@ -400,10 +408,6 @@ export function ProcessReviewTab({
 
         {candidate && (
           <>
-            <AiDisclosureBanner
-              model={model}
-              note="Review carefully before accepting it into your process."
-            />
             <CandidateCard
               review={candidate}
               draft={draft}
