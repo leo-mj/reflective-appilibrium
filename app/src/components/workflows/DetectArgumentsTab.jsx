@@ -317,9 +317,9 @@ export function DetectArgumentsTab({
   onDeleteRelationsByArgId,
   autoFetch,
   workflowPhase,
+  workflowNextPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
-  hideNonEntailsRels,
 }) {
   const header = useHeaderAccent("detectArguments");
   const [result, setResult] = useState(null);
@@ -551,8 +551,8 @@ export function DetectArgumentsTab({
                 <ProgressWorkflowBtn
                   nextPhaseIsEnabled={nextPhaseIsEnabled}
                   workflowPhase={workflowPhase}
+                  nextPhase={workflowNextPhase}
                   advanceWorkflow={onAdvanceWorkflow}
-                  hideNonEntailsRels={hideNonEntailsRels}
                 />
               </>
             )}

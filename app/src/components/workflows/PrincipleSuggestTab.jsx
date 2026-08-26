@@ -183,6 +183,7 @@ export function PrincipleSuggestTab({
   onRejectElements,
   autoFetch,
   workflowPhase,
+  workflowNextPhase,
   onAdvanceWorkflow,
   useDummy = false,
   suggestionsAreSample = false,
@@ -266,6 +267,7 @@ export function PrincipleSuggestTab({
             jAndPCount < 1 ? "Add a judgment or principle first." : undefined
           }
           workflowPhase={workflowPhase}
+          nextPhase={workflowNextPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
           disclosure={

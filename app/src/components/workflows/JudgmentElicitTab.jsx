@@ -221,6 +221,7 @@ export function JudgmentElicitTab({
   onRejectElements,
   autoFetch,
   workflowPhase,
+  workflowNextPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
   useDummy = false,
@@ -299,6 +300,7 @@ export function JudgmentElicitTab({
           model={model}
           disabled={suggestionsDisabled}
           workflowPhase={workflowPhase}
+          nextPhase={workflowNextPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
           disclosure={

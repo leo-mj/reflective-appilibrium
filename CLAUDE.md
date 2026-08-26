@@ -162,9 +162,13 @@ reading *of* the process, so recording it as a change would alter the record it
 describes — and would reach the next review's timeline as though it were a move
 in the argument. That is also what makes running one mid-process safe.
 
-It is an Assist tab because it is an AI task, but it is deliberately **not a
-workflow phase**: it is absent from `WORKFLOW_NEXT_PHASE`, and `GraphPanel`
-passes it `autoFetch={false}` and no `workflowPhase`.
+It is **not a phase of the iteration** — it is absent from
+`WORKFLOW_NEXT_PHASE`, which holds the five that loop — but the workflow does
+**stop here every fifth iteration** (`REVIEW_EVERY`, `nextWorkflowPhase` in
+`utils/workflowUtils.js`), which is where the accumulating series comes from
+under a reader who only ever presses on. That is a stop *between* iterations,
+and the paragraph above is why it can be: passing through advances no round and
+writes no log entry, so a review still cannot alter the record it describes.
 
 `state.reviews` is absent from every state written before the feature existed —
 read it through `reviewsOf(state)`, never directly.

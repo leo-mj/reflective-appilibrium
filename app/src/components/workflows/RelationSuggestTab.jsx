@@ -160,6 +160,7 @@ export function RelationSuggestTab({
   onRejectRelations,
   autoFetch,
   workflowPhase,
+  workflowNextPhase,
   onAdvanceWorkflow,
   useDummy = false,
   suggestionsAreSample = false,
@@ -246,6 +247,7 @@ export function RelationSuggestTab({
               : undefined
           }
           workflowPhase={workflowPhase}
+          nextPhase={workflowNextPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
           disclosure={

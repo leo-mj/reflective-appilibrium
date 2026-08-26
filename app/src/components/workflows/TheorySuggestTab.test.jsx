@@ -145,6 +145,22 @@ describe("gating", () => {
     renderTab({ autoFetch: true, suggestionsDisabled: true });
     expect(fetchTheorySuggestions).not.toHaveBeenCalled();
   });
+
+  it("does not auto-fetch when there is no principle to bear on", () => {
+    // The workflow can arrive at this phase with nothing here — the reader may
+    // have accepted no principle — and the gate that greys the button has to
+    // hold the auto-fetch too, or arriving spends a call and a round of
+    // Crossref lookups on suggestions the tab has just said it cannot make.
+    renderTab({ autoFetch: true, state: aState({ elements: [] }) });
+    expect(fetchTheorySuggestions).not.toHaveBeenCalled();
+  });
+
+  it("auto-fetches on arrival once a principle is there", async () => {
+    await act(async () => {
+      renderTab({ autoFetch: true });
+    });
+    expect(fetchTheorySuggestions).toHaveBeenCalled();
+  });
 });
 
 // ─── Rendering ────────────────────────────────────────────────────────────────

@@ -13,8 +13,9 @@ import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
 import { saveSession } from "../utils/sessionsClient.js";
 import {
-  WORKFLOW_NEXT_PHASE,
+  completesIteration,
   nextPhaseEnabled,
+  nextWorkflowPhase,
 } from "../utils/workflowUtils.js";
 import { AppHeader } from "./AppHeader.jsx";
 import { TextPanel } from "./TextPanel.jsx";
@@ -240,13 +241,20 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     ? new Set([...hiddenLegendKeys, ...NON_ENTAILS_TYPES])
     : hiddenLegendKeys;
 
+  // Where pressing on goes, computed here and handed down rather than worked out
+  // again in the button: the label and the destination have to be the same thing.
+  const workflowNextPhase = nextWorkflowPhase(workflowPhase, {
+    loops: workflowLoops,
+    hideNonEntailsRels,
+  });
   const advanceWorkflow = () => {
-    let next = WORKFLOW_NEXT_PHASE[workflowPhase];
-    if (hideNonEntailsRels && next === "suggestRelations")
-      next = WORKFLOW_NEXT_PHASE["suggestRelations"];
-    if (next === "elicitJudgments") setWorkflowLoops((n) => n + 1);
-    setWorkflowPhase(next);
-    setTab(next);
+    // Counted on leaving the iteration's last phase, not on arriving at its
+    // first — the review sits between the two, and an iteration the workflow
+    // pauses to read must still count as one that happened.
+    if (completesIteration(workflowPhase, hideNonEntailsRels))
+      setWorkflowLoops((n) => n + 1);
+    setWorkflowPhase(workflowNextPhase);
+    setTab(workflowNextPhase);
   };
   const workflowNextPhaseEnabled = nextPhaseEnabled(workflowPhase, state);
 
@@ -378,6 +386,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
       {...graphPanelCommonProps}
       tab={tab}
       workflowPhase={workflowPhase}
+      workflowNextPhase={workflowNextPhase}
       onAdvanceWorkflow={advanceWorkflow}
       nextPhaseIsEnabled={workflowNextPhaseEnabled}
       isFullscreen={!showingTextPanel}
@@ -538,6 +547,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
               {...graphPanelCommonProps}
               tab="graph"
               workflowPhase={null}
+              workflowNextPhase={null}
               onAdvanceWorkflow={null}
               nextPhaseIsEnabled={false}
               onCtrlSecondSelect={setAddBarCtrlTo}

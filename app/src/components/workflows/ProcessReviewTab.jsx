@@ -3,11 +3,12 @@
  * process and report what it amounts to, then lets the user accept, reject, or
  * modify that reading before it is saved.
  *
- * An assist tab, because it is an AI task, but deliberately **not** a workflow
- * phase: the workflow's four tabs loop to build the position, and this one steps
- * back and looks at it. That is why no `workflowPhase` or `autoFetch` reaches
- * here — see the note in {@link module:components/GraphPanel} and the guard in
- * `workflowUtils.test.js`.
+ * Not one of the workflow's five phases — those loop to build the position, and
+ * this one steps back and looks at it — but the workflow does stop here every
+ * fifth iteration, which is what `nextWorkflowPhase` inserts and what brings
+ * `workflowPhase` and `autoFetch` to this tab. It remains a stop *between*
+ * iterations: a review advances no round and writes no log entry, so passing
+ * through cannot alter the record it describes.
  *
  * Reviews accumulate rather than replace. A later run is given the earlier ones
  * (they travel inside the state) and asked to say what has moved since, so the
@@ -18,7 +19,7 @@
 
 /** @import { REState, REReview } from '../../types.js' */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchProcessReview } from "../../utils/reviewClient.js";
 import { llmOrigin, reviewsOf } from "../../utils/stateUtils.js";
@@ -310,6 +311,11 @@ export function ProcessReviewTab({
   state,
   onSaveReview,
   onDiscardReview,
+  autoFetch,
+  workflowPhase,
+  workflowNextPhase,
+  onAdvanceWorkflow,
+  nextPhaseIsEnabled,
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
@@ -349,6 +355,16 @@ export function ProcessReviewTab({
 
   const analyse = () => run(state, useDummy);
 
+  // Gated on the same round count as the run button. A review is a reading of
+  // how the position moved, so asking for one before there is a process to read
+  // spends a call on a question that has no answer yet — and the workflow can
+  // reach its fifth iteration with a short log if the reader loops quickly.
+  const autoFetchRef = useRef(autoFetch);
+  useEffect(() => {
+    if (autoFetchRef.current && !suggestionsDisabled && state.log.length >= 2)
+      analyse();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const accept = () => {
     const merged = { ...candidate, ...draft };
     const wasEdited = FIELDS.some((key) => merged[key] !== candidate[key]);
@@ -383,6 +399,10 @@ export function ProcessReviewTab({
           onRun={analyse}
           model={model}
           disabled={suggestionsDisabled}
+          workflowPhase={workflowPhase}
+          nextPhase={workflowNextPhase}
+          advanceWorkflow={onAdvanceWorkflow}
+          nextPhaseIsEnabled={nextPhaseIsEnabled}
           needs={
             state.log.length < 2
               ? "Work through at least two rounds first."

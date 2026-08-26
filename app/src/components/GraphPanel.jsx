@@ -137,6 +137,7 @@ export function GraphPanel({
   onRoundChange,
   isWide,
   workflowPhase,
+  workflowNextPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
   hideNonEntailsRels,
@@ -276,6 +277,7 @@ export function GraphPanel({
               onRejectRelations={onRejectRelations}
               autoFetch={autoFetch}
               workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
@@ -292,6 +294,7 @@ export function GraphPanel({
               onRejectElements={onRejectElements}
               autoFetch={autoFetch}
               workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
@@ -309,6 +312,7 @@ export function GraphPanel({
               onRejectElements={onRejectElements}
               autoFetch={autoFetch}
               workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
@@ -326,6 +330,7 @@ export function GraphPanel({
               onRejectElements={onRejectElements}
               autoFetch={autoFetch}
               workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
@@ -335,16 +340,20 @@ export function GraphPanel({
         )}
         {tab === "processReview" && (
           <Suspense fallback={null}>
-            {/* No `autoFetch`, no `workflowPhase`: review is an assist tab but not
-                a workflow phase. `autoFetch` above is on whenever a workflow is
-                running, so passing it here would fire an LLM call at a user who
-                only switched tabs — past the disclosure the run button carries —
-                and withholding `workflowPhase` is separately what keeps the
-                next-phase control out of this tab's toolbar. */}
+            {/* The workflow stops here every fifth iteration, so this tab takes
+                the same props the phases do. `workflowPhase` is what puts the
+                next-phase control in its toolbar; the tab's own round gate is
+                what keeps `autoFetch` from asking for a reading of a process
+                too short to have one. */}
             <ProcessReviewTab
               state={state}
               onSaveReview={onSaveReview}
               onDiscardReview={onDiscardReview}
+              autoFetch={autoFetch}
+              workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
@@ -373,9 +382,9 @@ export function GraphPanel({
               onDeleteRelationsByArgId={onDeleteRelationsByArgId}
               autoFetch={autoFetch}
               workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-              hideNonEntailsRels={hideNonEntailsRels}
             />
           </Suspense>
         )}

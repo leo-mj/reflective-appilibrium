@@ -145,20 +145,34 @@ test.describe("Process review", () => {
     expect(state.reviews).toHaveLength(2);
   });
 
-  test("the guided workflow never routes through Review", async ({ page }) => {
-    // Review is an assist tab but not a workflow phase. Stepping the whole loop
-    // must never land on it — and must never fire its request, which has no
-    // disclosure of its own once a workflow is driving.
+  test("the guided workflow routes through Review every fifth iteration", async ({
+    page,
+  }) => {
+    // Non-entails relations are hidden by default, so the workflow skips the
+    // relations phase and an iteration is four presses long — twenty to reach
+    // the fifth iteration's end, which is where the review belongs.
     await page.getByRole("button", { name: /Start Workflow/ }).click();
     await park(page);
 
-    for (let i = 0; i < 5; i++) {
-      await expect(page.locator("text=/Review Process/")).toHaveCount(0);
-      const next = page.getByRole("button", { name: /Next|Continue/ }).first();
-      if (!(await next.isVisible().catch(() => false))) break;
-      await next.click();
+    const step = () =>
+      page.getByRole("button", { name: /Workflow Step:/ }).first();
+
+    // Read the label before each press: it names where that press goes, which
+    // is the thing under test — a button announcing a phase it does not travel
+    // to is the failure this catches.
+    const announced = [];
+    for (let i = 0; i < 20; i++) {
+      announced.push((await step().textContent()).trim());
+      await step().click();
       await park(page);
     }
-    await expect(page.locator("text=/Review Process/")).toHaveCount(0);
+
+    expect(announced.filter((l) => /Review Process/.test(l))).toHaveLength(1);
+    expect(announced[19]).toMatch(/Review Process/);
+    // Arrived, and the tab's own control is the one on screen.
+    await expect(page.getByRole("button", { name: /Analyse/ })).toBeVisible();
+    // And it hands back to the top of the next iteration rather than looping
+    // its own way — a review is a stop between iterations, not one of them.
+    await expect(step()).toHaveText(/Elicit Judgments/);
   });
 });

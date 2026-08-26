@@ -1,8 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  WORKFLOW_NEXT_PHASE,
-  WORKFLOW_PHASE_LABELS,
-} from "../../utils/workflowUtils.js";
+import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { SpinnerIcon } from "../Icons.jsx";
@@ -103,6 +100,7 @@ export function SuggestionToolbar({
   disabled = false,
   needs,
   workflowPhase,
+  nextPhase,
   advanceWorkflow,
   nextPhaseIsEnabled,
   disclosure,
@@ -162,6 +160,7 @@ export function SuggestionToolbar({
             <ProgressWorkflowBtn
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               workflowPhase={workflowPhase}
+              nextPhase={nextPhase}
               advanceWorkflow={advanceWorkflow}
             />
           </>
@@ -265,17 +264,25 @@ const workflowBtnStyle = {
   color: C.dim,
 };
 
+/**
+ * The control that moves the workflow on, labelled with where it goes.
+ *
+ * `nextPhase` is handed in rather than worked out here. It is `REState` that
+ * routes — and the routing now turns on the hidden-relations setting *and* the
+ * iteration count, neither of which is this button's business — so recomputing
+ * it here is how the label comes to name a phase the press does not go to. It
+ * had drifted that way once already: the button read the skip past the relations
+ * phase off a `hideNonEntailsRels` default of `true` that its own caller never
+ * passed.
+ */
 export function ProgressWorkflowBtn({
   nextPhaseIsEnabled,
   workflowPhase,
+  nextPhase,
   advanceWorkflow,
-  hideNonEntailsRels = true,
 }) {
   if (!workflowPhase) return null;
-  let label = WORKFLOW_PHASE_LABELS[WORKFLOW_NEXT_PHASE[workflowPhase]];
-  if (workflowPhase === "detectArguments" && hideNonEntailsRels) {
-    label = "Workflow Step: Elicit Judgments";
-  }
+  const label = WORKFLOW_PHASE_LABELS[nextPhase];
   const tooltipText =
     !nextPhaseIsEnabled && workflowPhase === "elicitJudgments"
       ? "Add at least 3 judgments to continue"

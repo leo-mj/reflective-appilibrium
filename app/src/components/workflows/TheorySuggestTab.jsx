@@ -229,6 +229,7 @@ export function TheorySuggestTab({
   onRejectElements,
   autoFetch,
   workflowPhase,
+  workflowNextPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
   useDummy = false,
@@ -326,6 +327,7 @@ export function TheorySuggestTab({
           model={model}
           disabled={suggestionsDisabled}
           workflowPhase={workflowPhase}
+          nextPhase={workflowNextPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
           needs={

@@ -77,10 +77,30 @@ const analyse = async () => {
 
 describe("asking for a review", () => {
   it("asks for nothing until the button is pressed", () => {
-    // Unlike the workflow tabs there is no autoFetch here, and there must not
-    // be: the run button carries the disclosure that this sends state to an LLM.
+    // Opened on its own — no workflow driving — the run button and its
+    // disclosure that this sends state to an LLM are the only way in.
     renderTab();
     expect(fetchProcessReview).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-fetch even when told to, if suggestions are disabled", () => {
+    renderTab({ autoFetch: true, suggestionsDisabled: true });
+    expect(fetchProcessReview).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-fetch a reading of a process too short to have one", () => {
+    // The workflow can reach its fifth iteration with a short log, and a review
+    // of a one-round process answers a question that has no answer yet. The
+    // gate that greys the button holds the auto-fetch too.
+    renderTab({ autoFetch: true, state: aState({ log: [{ round: 1 }] }) });
+    expect(fetchProcessReview).not.toHaveBeenCalled();
+  });
+
+  it("auto-fetches on arrival once there are rounds to read", async () => {
+    await act(async () => {
+      renderTab({ autoFetch: true });
+    });
+    expect(fetchProcessReview).toHaveBeenCalled();
   });
 
   it("is disabled until the process has some rounds behind it", () => {

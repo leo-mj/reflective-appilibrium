@@ -125,14 +125,25 @@ callers — `Graph` and `HistoryTab` — pass it in), `Legend`, and `generateSVG
 rather than a change to it. The domain note is in the root `CLAUDE.md`; what
 matters on this side:
 
-- **It is not a workflow phase.** Three things keep it out, and one alone is not
-  enough: it is absent from `WORKFLOW_NEXT_PHASE`/`WORKFLOW_PHASE_LABELS`;
-  `GraphPanel` passes it `autoFetch={false}` and withholds `workflowPhase`
-  (`autoFetch` is on for the *whole panel* whenever a workflow is running, so
-  passing it through would fire an LLM call at a user who merely switched tabs,
-  past the disclosure the run button carries); and `workflowUtils.test.js` pins
-  the absence. Its place last in `ASSIST_TABS` is deliberate — the five before it
-  are the workflow's phases, in run order.
+- **A stop between iterations, not a phase of one.** It stays out of
+  `WORKFLOW_NEXT_PHASE`, which is the iteration and only the iteration; it is in
+  `WORKFLOW_PHASE_LABELS`, because the next-phase button has to be able to
+  announce it. `nextWorkflowPhase` inserts it every `REVIEW_EVERY` iterations,
+  and is the only route to it. Its place last in `ASSIST_TABS` is deliberate —
+  the five before it are the iteration's phases, in run order, and this one runs
+  after all five.
+- **The round gate holds the auto-fetch, not only the button.** `autoFetch` is
+  on for the *whole panel* whenever a workflow is running, so this tab fires on
+  arrival like the other five; `state.log.length >= 2` is what stops it asking
+  for a reading of a process too short to have moved, which a reader looping
+  quickly can reach. Every phase carries a gate of this shape — Theories has the
+  same one on its principle count.
+- **The tab does not decide where the workflow goes next.** `REState` computes
+  `workflowNextPhase` and hands it down; `ProgressWorkflowBtn` takes it as
+  `nextPhase` and only looks up the label. It used to re-derive the destination
+  from `workflowPhase` plus a `hideNonEntailsRels` default of `true` its own
+  caller never passed, so the button already announced one phase while the press
+  went to another. Two routers is one too many.
 - **One review is carried as a one-element `suggestions` list.** That is the
   shape `useSuggestionWorkflow` consumes, and the fit is otherwise exact: a
   review *is* a suggestion the user accepts, rejects, or modifies. The sample
