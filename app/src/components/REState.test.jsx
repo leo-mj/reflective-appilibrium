@@ -8,6 +8,7 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 
 import REState from "./REState.jsx";
 import { SAMPLE_STATE, makeQuestionnaireState } from "../state.js";
+import { resetTourWidth } from "./tour/tourWidth.js";
 
 beforeEach(() => {
   const NoopObserver = class {
@@ -151,6 +152,23 @@ describe("the guided tour", () => {
     fireEvent.click(screen.getByText("Close tour"));
     expect(tourShown()).toBe(false);
     expect(tabBarShown()).toBe(true);
+  });
+
+  it("makes room for the column at whatever width the reader dragged it to", () => {
+    // Two numbers that must never disagree: the tour draws itself at the width
+    // and the app pads itself by it, so a wider tour that the app did not make
+    // room for would sit over the controls it is pointing at.
+    sessionStorage.setItem("startTour", "1");
+    const { container } = open();
+    const app = container.querySelector("main");
+    const before = parseInt(app.style.paddingLeft, 10);
+
+    fireEvent.keyDown(
+      screen.getByRole("separator", { name: "Resize tour column" }),
+      { key: "ArrowRight" },
+    );
+    expect(parseInt(app.style.paddingLeft, 10)).toBe(before + 16);
+    resetTourWidth();
   });
 
   it("can be replayed from the header's ? button", () => {
@@ -301,5 +319,50 @@ describe("questionnaire mode", () => {
     };
     open(makeQuestionnaireState(spec));
     expect(onAssistTab()).toBe(true);
+  });
+});
+
+describe("the central divider", () => {
+  afterEach(() => localStorage.removeItem("workspaceSplit"));
+
+  const divider = () => screen.queryByRole("separator", { name: "Resize panels" });
+  const textPanel = (container) =>
+    container.querySelector('[data-tutorial="text-panel"]');
+
+  it("stands between the two panels of the wide layout", () => {
+    open();
+    expect(divider()).toBeTruthy();
+  });
+
+  it("goes away with the panel on the far side of it", () => {
+    // A boundary with nothing beyond it is a line the reader cannot move.
+    open();
+    fireEvent.click(screen.getByLabelText("Full screen"));
+    expect(divider()).toBeNull();
+  });
+
+  it("is absent when narrow, where the panels are tabs rather than halves", () => {
+    const { innerWidth } = window;
+    window.innerWidth = 420;
+    try {
+      open();
+      expect(divider()).toBeNull();
+    } finally {
+      window.innerWidth = innerWidth;
+    }
+  });
+
+  it("opens the panels at the split the reader last dragged them to", () => {
+    localStorage.setItem("workspaceSplit", "0.65");
+    const { container } = open();
+    // Written as "65.000%" — the three places keep a float from arriving as
+    // 65.00000000000001% — and normalised by the CSS parser on the way in.
+    expect(textPanel(container).style.width).toBe("65%");
+  });
+
+  it("gives the text what the line leaves it, and the graph the rest", () => {
+    const { container } = open();
+    fireEvent.keyDown(divider(), { key: "ArrowRight" });
+    expect(textPanel(container).style.width).toBe("51%");
   });
 });

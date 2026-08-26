@@ -30,12 +30,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { C, typeTokens } from "../../constants/colors.js";
 import { LLM_ENABLED } from "../../config.js";
 import { buildTourSections } from "./tourSections.js";
-import { TOUR_W, TOUR_Z, sheetHeight } from "./tourZ.js";
-
-// Re-exported for the app around it, which pads itself by the column's width.
-export { TOUR_W };
+import { TOUR_Z, sheetHeight } from "./tourZ.js";
+import {
+  TOUR_MAX_W,
+  TOUR_MIN_W,
+  resetTourWidth,
+  setTourResizing,
+  setTourWidth,
+  storeTourWidth,
+  useTourWidth,
+} from "./tourWidth.js";
 
 const RING_PAD = 5;
+
+/** How far one arrow key moves the column's edge. */
+const KEY_STEP = 16;
 
 /** Gap left above the sheet when it scrolls a ringed control clear of it. */
 const REVEAL_PAD = 12;
@@ -190,6 +199,87 @@ function SheetHandle({ expanded, onToggle }) {
   );
 }
 
+/**
+ * The column's right edge, dragged to give the tour more of the screen or less.
+ *
+ * Unlike the sheet's handle this is a free drag, and for the mirror of the same
+ * reason: the graph beside a column reflows to a *width*, and a reader who wants
+ * the prose wider is doing exactly that on purpose. The two heights the sheet
+ * offers are what keeps a graph from re-fitting under a thumb that was only
+ * scrolling.
+ *
+ * Not painted at rest — the column's own border already says where it ends — so
+ * the resize cursor and the title are what announce it, as on the add bar's
+ * edges. `.resize-handle` in index.css is the hover and focus state.
+ *
+ * The width is not held here: the app outside pads itself by the same number,
+ * and the two have to agree. See {@link module:components/tour/tourWidth}.
+ */
+function ColumnResizer({ width }) {
+  /** Where the pointer went down, and how wide the column was then. */
+  const drag = useRef(null);
+
+  const nudge = (dx) => {
+    setTourWidth(width + dx);
+    storeTourWidth();
+  };
+
+  return (
+    <div
+      className="resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize tour column"
+      aria-valuenow={width}
+      aria-valuemin={TOUR_MIN_W}
+      aria-valuemax={TOUR_MAX_W}
+      tabIndex={0}
+      title="Drag to resize the tour — double-click to reset, or arrow keys"
+      style={{
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: 7,
+        background: C.dim,
+        cursor: "ew-resize",
+        touchAction: "none",
+        zIndex: 1,
+      }}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        // Or the pointer picks up the prose beside it instead.
+        e.preventDefault();
+        drag.current = { x: e.clientX, width };
+        setTourResizing(true);
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        if (!drag.current) return;
+        setTourWidth(drag.current.width + (e.clientX - drag.current.x));
+      }}
+      onPointerUp={(e) => {
+        if (!drag.current) return;
+        drag.current = null;
+        setTourResizing(false);
+        e.currentTarget.releasePointerCapture?.(e.pointerId);
+        storeTourWidth();
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        setTourResizing(false);
+      }}
+      onDoubleClick={resetTourWidth}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowLeft") nudge(-KEY_STEP);
+        else if (e.key === "ArrowRight") nudge(KEY_STEP);
+        else return;
+        e.preventDefault();
+      }}
+    />
+  );
+}
+
 const navBtn = (enabled) => ({
   background: "transparent",
   border: `1px solid ${C.border}`,
@@ -291,6 +381,10 @@ export function GuidedTour({
   onExpandChange,
 }) {
   const sheet = layout === "sheet";
+  // The column's width, which the reader may have dragged. Read from the shared
+  // store rather than held here: the app pads itself by the same number, and a
+  // tour wider than the room made for it covers what it is pointing at.
+  const width = useTourWidth();
   const sections = useMemo(
     () =>
       applicableSections(
@@ -441,8 +535,11 @@ export function GuidedTour({
       found.forEach((el) => revealAbove(el, top));
     }
     setRects(found.map((el) => el.getBoundingClientRect()));
+    // `width` is not read here but every rect depends on it: the app is padded
+    // by the column, so dragging its edge moves everything the ring is drawn
+    // around. Listed so the effect below re-measures as it moves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetKey, sheet, expanded]);
+  }, [targetKey, sheet, expanded, width]);
 
   useEffect(() => {
     if (!active) return;
@@ -560,7 +657,8 @@ export function GuidedTour({
         top: 0,
         left: 0,
         bottom: 0,
-        width: TOUR_W,
+        // The reader's, and shared with the app, which pads itself by it.
+        width,
         borderRight: `1px solid ${C.border}`,
         boxShadow: "4px 0 24px rgba(0,0,0,0.35)",
       };
@@ -650,8 +748,10 @@ export function GuidedTour({
           ...panelBox,
         }}
       >
-        {sheet && (
+        {sheet ? (
           <SheetHandle expanded={expanded} onToggle={setSheetExpanded} />
+        ) : (
+          <ColumnResizer width={width} />
         )}
         <div
           style={{

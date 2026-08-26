@@ -117,6 +117,51 @@ body {
   margin: 0;
 }
 
+/* The workspace's central divider — the boundary between the panel a tab is
+   about and whatever accompanies it, which the reader drags to give one of them
+   more of the row.
+
+   Unlike the add bar's handles this is drawn at rest, because it is the
+   boundary rather than a grip on one: the panels either side no longer rule
+   themselves off, so this hairline is the only thing marking where one ends.
+   Under the pointer it thickens and brightens, which is the whole of the hint
+   that it moves — that and the resize cursor.
+
+   The box around the line is wider than the line, so it can be hit; the line is
+   centred in it and stays put as it thickens, so the panels do not shift under
+   a hover. */
+.split-divider {
+  cursor: col-resize;
+}
+.split-divider-line {
+  width: 1px;
+  border-radius: 2px;
+  background: var(--c-border);
+  transition:
+    width 0.12s ease,
+    background-color 0.12s ease;
+}
+.split-divider:hover .split-divider-line {
+  width: 3px;
+  background: var(--c-dim);
+}
+/* Focus has to be visible on its own terms — a keyboard has no pointer to
+   explain the change — so it is the hover state plus a ring, and the outline
+   goes on the line rather than on the box, which is mostly empty space. */
+.split-divider:focus-visible {
+  outline: none;
+}
+.split-divider:focus-visible .split-divider-line {
+  width: 3px;
+  background: var(--c-dim);
+  box-shadow: 0 0 0 1px var(--c-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .split-divider-line {
+    transition: none;
+  }
+}
+
 /* Drag handles on the add bar's two movable edges.
 
    Invisible until the pointer is on one, or one has focus: a grip drawn

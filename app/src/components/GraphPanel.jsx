@@ -1,5 +1,8 @@
 /**
- * @fileoverview Right-side panel: renders the active tab content (graph, history, clusters, or AI workflows).
+ * @fileoverview Renders the active tab content (graph, history, clusters, or AI
+ * workflows). Which half of the row it lands in is `REState`'s call: in analyze
+ * mode it is the right-hand panel, beside the text; on an assist or simulate tab
+ * it is the left-hand one, with the companion graph or text beside it.
  * @module components/GraphPanel
  */
 

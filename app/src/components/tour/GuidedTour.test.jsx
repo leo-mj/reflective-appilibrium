@@ -12,7 +12,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import { GuidedTour } from "./GuidedTour.jsx";
-import { TOUR_Z, sheetHeight } from "./tourZ.js";
+import { TOUR_W, TOUR_Z, sheetHeight } from "./tourZ.js";
+import { TOUR_MIN_W, resetTourWidth } from "./tourWidth.js";
 import { SAMPLE_STATE } from "../../state.js";
 
 beforeEach(() => {
@@ -450,5 +451,65 @@ describe("sections the state cannot support", () => {
     expect(screen.queryByText(/Judgments — the concrete verdicts/)).toBeNull();
     expect(screen.getByText("Reflective equilibrium")).toBeTruthy();
     expect(screen.getByText(/Assist proposes, you decide/)).toBeTruthy();
+  });
+});
+
+// ─── The column's width ───────────────────────────────────────────────────────
+// The reader sizes it, and the app pads itself by whatever they chose — so the
+// number lives in a store both read rather than in either of them. jsdom lays
+// nothing out, so the drag itself is the browser's to test; what is held here is
+// which layout offers the handle, and what a keypress does to the column.
+describe("resizing the tour column", () => {
+  afterEach(() => {
+    cleanup();
+    resetTourWidth();
+  });
+
+  const grip = () =>
+    screen.queryByRole("separator", { name: "Resize tour column" });
+  const column = () => screen.getByRole("complementary", { name: "Guided tour" });
+
+  it("opens at the width it ships at", () => {
+    openTour();
+    expect(column().style.width).toBe(`${TOUR_W}px`);
+  });
+
+  it("offers a handle on the column's edge", () => {
+    openTour();
+    expect(grip()).toBeTruthy();
+  });
+
+  it("offers none on the sheet, which has two heights and a grabber instead", () => {
+    openTour({ layout: "sheet" });
+    expect(grip()).toBeNull();
+    expect(screen.getByLabelText("Expand the tour")).toBeTruthy();
+  });
+
+  it("widens from the keyboard and narrows again", () => {
+    openTour();
+    fireEvent.keyDown(grip(), { key: "ArrowRight" });
+    expect(column().style.width).toBe(`${TOUR_W + 16}px`);
+    fireEvent.keyDown(grip(), { key: "ArrowLeft" });
+    expect(column().style.width).toBe(`${TOUR_W}px`);
+  });
+
+  it("will not let the tour take the whole screen, or shrink to a margin", () => {
+    openTour();
+    for (let i = 0; i < 40; i++)
+      fireEvent.keyDown(grip(), { key: "ArrowLeft" });
+    expect(column().style.width).toBe(`${TOUR_MIN_W}px`);
+  });
+
+  it("double-click puts it back to the width it ships at", () => {
+    openTour();
+    fireEvent.keyDown(grip(), { key: "ArrowRight" });
+    fireEvent.doubleClick(grip());
+    expect(column().style.width).toBe(`${TOUR_W}px`);
+  });
+
+  it("remembers the width for the next tour", () => {
+    openTour();
+    fireEvent.keyDown(grip(), { key: "ArrowRight" });
+    expect(JSON.parse(localStorage.getItem("tourWidth"))).toBe(TOUR_W + 16);
   });
 });

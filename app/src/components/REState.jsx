@@ -4,6 +4,7 @@ import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
 import { useCoarseDims } from "../hooks/useCoarseDims.js";
+import { useSplitRatio } from "../hooks/useSplitRatio.js";
 import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { useAutosaveDraft } from "../hooks/useAutosaveDraft.js";
@@ -18,8 +19,9 @@ import {
 import { AppHeader } from "./AppHeader.jsx";
 import { TextPanel } from "./TextPanel.jsx";
 import { GraphPanel } from "./GraphPanel.jsx";
-import { GuidedTour, TOUR_W } from "./tour/GuidedTour.jsx";
+import { GuidedTour } from "./tour/GuidedTour.jsx";
 import { sheetHeight } from "./tour/tourZ.js";
+import { useTourResizing, useTourWidth } from "./tour/tourWidth.js";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { GroupModal } from "./user_edits/GroupModal.jsx";
 import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
@@ -168,6 +170,11 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const wideTour = isWide && tourActive;
   const narrowTour = !isWide && tourActive;
   const tourSheetH = narrowTour ? sheetHeight(dims.h, tourExpanded) : 0;
+  // Both from the tour's own store, so the room made for the column and the
+  // column itself can never disagree — see the sheet's height above, which is
+  // the same arrangement worked out from one function instead.
+  const tourWidth = useTourWidth();
+  const tourResizing = useTourResizing();
   const tourHidesChrome = wideTour && !tourChrome.chrome;
   // The add bar goes away with the rest of the chrome for the chapters that are
   // about reading the graph — except for the one section that is about adding
@@ -187,18 +194,28 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     (usesSidePanel
       ? assistSidePanel !== "none" && assistSidePanel !== "focus"
       : showText);
+  // Where the central divider sits, and how wide that leaves the panel on the
+  // fixed side of it. Which side that is differs by mode, and is the same thing
+  // the section below orders the two panels by.
+  const {
+    rowRef,
+    ratio: splitRatio,
+    panelWidth,
+    dividerProps,
+  } = useSplitRatio(usesSidePanel ? "right" : "left");
+
+  /** The workspace row, inside the app's own 16px padding. */
+  const rowW = dims.w - 32;
   // graphW must match the actual rendered width of the graph SVG so the force
-  // simulation centres nodes in the visible area.
+  // simulation centres nodes in the visible area — hence the divider's own
+  // width off the end, and the reader's split rather than an even one.
   // Focus mode keeps the same graphW as graph mode so switching between the two
   // doesn't restart the simulation and scramble node positions.
   const graphW = sideGraphIsFull
-    ? dims.w - 32
-    : usesSidePanel &&
-        (assistSidePanel === "graph" || assistSidePanel === "focus")
-      ? (dims.w - 44) / 2
-      : hasSidePanel
-        ? (dims.w - 32) / 2 - 12
-        : dims.w - 32;
+    ? rowW
+    : hasSidePanel || (usesSidePanel && assistSidePanel === "focus")
+      ? (1 - splitRatio) * rowW - 12
+      : rowW;
   // Coarsened first: a phone's viewport height changes on its own, when the URL
   // bar collapses on a scroll or the keyboard comes up, and every one of those
   // would otherwise restart the simulation and drift the nodes under a view
@@ -352,6 +369,42 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     verifyArguments,
   };
 
+  // The panel the tab is about: the graph, history or cluster view in analyze
+  // mode, the workflow panel on an assist or simulate tab. Bound here rather
+  // than written inline because the section below places it on either side of
+  // its companion depending on which of those two it is.
+  const mainPanel = (isWide || tab !== "text") && !sideGraphIsFull && (
+    <GraphPanel
+      {...graphPanelCommonProps}
+      tab={tab}
+      workflowPhase={workflowPhase}
+      onAdvanceWorkflow={advanceWorkflow}
+      nextPhaseIsEnabled={workflowNextPhaseEnabled}
+      isFullscreen={!showingTextPanel}
+      // The assist and simulate tabs hand their own graph the toggle above;
+      // here it is the text panel that folds away. When narrow the text is a
+      // tab of its own, with nothing beside it to reclaim.
+      onToggleFullscreen={
+        isWide && !usesSidePanel ? () => setShowText((s) => !s) : null
+      }
+      fullscreenHides="text panel"
+    />
+  );
+
+  // Only ever between two panels: a boundary with nothing on the far side of it
+  // is a line the reader cannot move and should not be looking for.
+  const showDivider =
+    isWide && !!mainPanel && (showingSideGraph || showingTextPanel);
+  // It carries the boundary itself, which is why neither panel draws one on the
+  // edge they share: two lines twelve pixels apart read as a gutter with
+  // something wrong in it. The span inside is the line; the box around it is
+  // what the pointer has to hit. See {@link module:hooks/useSplitRatio}.
+  const divider = showDivider && (
+    <div {...dividerProps}>
+      <span className="split-divider-line" />
+    </div>
+  );
+
   return (
     // <main>, not <div>: this is the app's one main landmark, which lets
     // assistive tech skip straight to it. Purely semantic — a block container
@@ -371,11 +424,16 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         // The tour is fixed to one edge — the left on a wide screen, the bottom
         // on a narrow one. Padding the app by what it takes keeps everything it
         // points at, and the graph it is read against, out from under it.
-        paddingLeft: wideTour ? TOUR_W + 16 : 16,
+        paddingLeft: wideTour ? tourWidth + 16 : 16,
         paddingBottom: narrowTour ? tourSheetH + 16 : 16,
         opacity: ready ? 1 : 0,
-        transition:
-          "opacity 0.6s ease, padding-left 0.35s ease, padding-bottom 0.3s ease",
+        // The eased padding is for the tour appearing and going away. It is
+        // wrong for one being dragged: the column would follow the pointer with
+        // the app trailing a third of a second behind it, which reads as the
+        // two having come apart.
+        transition: tourResizing
+          ? "opacity 0.6s ease"
+          : "opacity 0.6s ease, padding-left 0.35s ease, padding-bottom 0.3s ease",
       }}
     >
       {!LLM_ENABLED && (
@@ -440,23 +498,37 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
       />
 
       <section
+        ref={rowRef}
         aria-label="Reflective equilibrium workspace"
         style={{
           flex: 1,
           minHeight: 0,
           display: "flex",
           flexDirection: isWide ? "row" : "column",
-          gap: 12,
+          // The divider stands in for the gap rather than sitting inside one:
+          // an easier target to hit must not cost the panels any width, and a
+          // draggable line with dead space either side of it is a line the
+          // pointer keeps missing.
+          gap: showDivider ? 0 : 12,
         }}
       >
+        {/* Order matters, and it is the one thing that differs between the two
+            modes. Analyze reads left to right — the text beside the graph. An
+            assist or simulate tab is the thing being worked in, so it is
+            anchored to the left edge and whatever accompanies it, graph or
+            text, sits to its right; that keeps the tab still while the header's
+            Graph/Text switch changes what is beside it. `usesSidePanel` is the
+            same flag the companion panel itself is chosen by. */}
+        {usesSidePanel && mainPanel}
+        {usesSidePanel && divider}
         {isWide && showingSideGraph && (
           <div
             style={{
-              width: sideGraphIsFull ? "100%" : "50%",
+              width: sideGraphIsFull ? "100%" : panelWidth,
               flexShrink: 0,
-              ...(sideGraphIsFull
-                ? {}
-                : { borderRight: `1px solid ${C.border}`, paddingRight: 12 }),
+              // No border on the shared edge: the divider beside it is the
+              // boundary, and draws it.
+              ...(sideGraphIsFull ? {} : { paddingLeft: 12 }),
               minHeight: 0,
               display: "flex",
               flexDirection: "column",
@@ -479,24 +551,15 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
             />
           </div>
         )}
-        {showingTextPanel && <TextPanel {...textPanelProps} />}
-        {(isWide || tab !== "text") && !sideGraphIsFull && (
-          <GraphPanel
-            {...graphPanelCommonProps}
-            tab={tab}
-            workflowPhase={workflowPhase}
-            onAdvanceWorkflow={advanceWorkflow}
-            nextPhaseIsEnabled={workflowNextPhaseEnabled}
-            isFullscreen={!showingTextPanel}
-            // The assist and simulate tabs hand their own graph the toggle
-            // above; here it is the text panel that folds away. When narrow the
-            // text is a tab of its own, with nothing beside it to reclaim.
-            onToggleFullscreen={
-              isWide && !usesSidePanel ? () => setShowText((s) => !s) : null
-            }
-            fullscreenHides="text panel"
+        {showingTextPanel && (
+          <TextPanel
+            {...textPanelProps}
+            side={usesSidePanel ? "right" : "left"}
+            width={panelWidth}
           />
         )}
+        {!usesSidePanel && divider}
+        {!usesSidePanel && mainPanel}
       </section>
 
       {isWide && !isAssistTab && !isSimulateTab && showAddBar && (

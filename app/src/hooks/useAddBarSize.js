@@ -18,6 +18,7 @@
 import { useRef, useState } from "react";
 
 import { C } from "../constants/colors.js";
+import { readPref, writePref } from "../utils/storedPref.js";
 
 const KEY = "addBarSize";
 
@@ -33,27 +34,17 @@ const KEY_STEP = 16;
 /** The default: `null` on both axes, meaning "whatever the stylesheet says". */
 const UNSET = { height: null, width: null };
 
-/** localStorage throws in private-mode Safari; a remembered size is not worth a crash. */
+/** Either axis may be missing, and a stored value from another version may be anything. */
 function readStored() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    if (!raw || typeof raw !== "object") return UNSET;
-    return {
-      height: Number.isFinite(raw.height) ? raw.height : null,
-      width: Number.isFinite(raw.width) ? raw.width : null,
-    };
-  } catch {
-    return UNSET;
-  }
+  const raw = readPref(KEY, null);
+  if (!raw || typeof raw !== "object") return UNSET;
+  return {
+    height: Number.isFinite(raw.height) ? raw.height : null,
+    width: Number.isFinite(raw.width) ? raw.width : null,
+  };
 }
 
-function store(size) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(size));
-  } catch {
-    /* a preference is not worth failing over */
-  }
-}
+const store = (size) => writePref(KEY, size);
 
 const clampHeight = (h) =>
   Math.max(
@@ -86,10 +77,32 @@ const HANDLE_BASE = {
 };
 
 const HANDLE_STYLE = {
-  height: { ...HANDLE_BASE, top: 0, left: 0, right: 0, height: 6, cursor: "ns-resize" },
-  width: { ...HANDLE_BASE, top: 0, right: 0, bottom: 0, width: 6, cursor: "ew-resize" },
+  height: {
+    ...HANDLE_BASE,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 6,
+    cursor: "ns-resize",
+  },
+  width: {
+    ...HANDLE_BASE,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 6,
+    cursor: "ew-resize",
+  },
   // Over the other two where they meet, so the corner gives both axes at once.
-  both: { ...HANDLE_BASE, top: 0, right: 0, width: 14, height: 14, zIndex: 3, cursor: "nesw-resize" },
+  both: {
+    ...HANDLE_BASE,
+    top: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    zIndex: 3,
+    cursor: "nesw-resize",
+  },
 };
 
 const HANDLE_LABEL = {
@@ -149,7 +162,11 @@ export function useAddBarSize(enabled) {
             "aria-orientation": axes.y ? "horizontal" : "vertical",
             "aria-label": HANDLE_LABEL[axis],
             "aria-valuenow": Math.round(
-              value ?? ref.current?.getBoundingClientRect()[axes.y ? "height" : "width"] ?? 0,
+              value ??
+                ref.current?.getBoundingClientRect()[
+                  axes.y ? "height" : "width"
+                ] ??
+                0,
             ),
             "aria-valuemin": axes.y ? MIN_HEIGHT : MIN_WIDTH,
             // Stated rather than left to the role's default of 100, which every
@@ -198,7 +215,12 @@ export function useAddBarSize(enabled) {
         store(UNSET);
       },
       onKeyDown: (e) => {
-        const step = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
+        const step = {
+          ArrowUp: [0, -1],
+          ArrowDown: [0, 1],
+          ArrowLeft: [-1, 0],
+          ArrowRight: [1, 0],
+        }[e.key];
         if (!step) return;
         const [sx, sy] = step;
         // Each edge answers only for the axis it moves, so an arrow the other

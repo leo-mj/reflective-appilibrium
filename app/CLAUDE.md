@@ -317,6 +317,59 @@ selection dims the rest of the graph.
 
 Tabs: Graph (D3 force-directed), Text, History (slider, 3.2s/round). Node positions stable via shared force simulation on all elements including withdrawn.
 
+## Panels the reader sizes
+
+Two things in the wide layout are dragged rather than styled, and both remember
+where they were left (`utils/storedPref.js` — localStorage that cannot throw,
+since private-mode Safari denies it outright).
+
+**The central divider** — `hooks/useSplitRatio.js`. **The ratio is the line's
+position from the left edge of the row, not a panel's share of it.** The two
+modes put the flexible panel on opposite sides — analyze reads text-then-graph,
+an assist tab anchors its own panel left and puts the companion right of it — so
+a ratio meaning "the fixed panel's width" would jump when the reader changed
+tabs. `panelWidth` goes on whichever panel carries an explicit width; the other
+takes what is left with `flex: 1`.
+
+Three things hang together and must stay that way. The divider **is** the
+boundary: neither panel draws a border on the edge they share, or there are two
+lines twelve pixels apart. It **replaces** the row's flex gap rather than sitting
+in one (`gap: showDivider ? 0 : 12`), so a target wide enough to hit costs the
+panels nothing. And `graphW` — which feeds the force simulation, not the CSS —
+follows the ratio: a canvas centring its nodes for half a row it no longer has
+puts them off-screen. `useCoarseDims` is what keeps that from re-laying-out the
+graph on every frame of a drag.
+
+**The add bar's two edges** — `hooks/useAddBarSize.js`, sizes in px on both axes,
+top edge and right edge plus the corner. The phone sheet passes `enabled: false`:
+there the bar is already most of the screen.
+
+**The tour's column** — `tour/tourWidth.js`, and the one of the three that is a
+*module-level store* rather than a hook's own state, for the reason `useTheme`
+is one: the tour draws itself at this width and `REState` pads the app by it,
+and those two are nowhere near each other in the tree. A column at 520 with the
+app making room for 460 sits over the controls it is pointing at. `TOUR_W` in
+`tourZ.js` is now only the width it opens at.
+
+Two things the store carries besides the number. `setTourResizing` is read by the
+app's eased `padding-left`, which is right for a tour appearing and wrong for one
+being dragged — the column would follow the pointer with the app a third of a
+second behind it. And `width` is in `measureRing`'s dependencies in
+`GuidedTour.jsx` although nothing there reads it: the app is padded by the
+column, so dragging its edge moves everything the spotlight is drawn around.
+
+**Only the column.** The narrow layout's sheet keeps its two heights and its
+grabber — `TOUR_SHEET` in `tourZ.js` — because the graph beside it reflows to
+whatever is left, and a free drag would have it re-fitting under a thumb that
+was only trying to scroll. That is a decision, not a gap.
+
+Both are `role="separator"` splitters with `tabIndex`, arrow-key steps and
+double-click to reset — a drag handle no keyboard can reach is a control half the
+readers do not have. The divider reports percentages, which is the range the role
+already assumes; the add bar reports pixels and so must state `aria-valuemax`
+itself. The geometry is in the hooks, the hover and focus states in `index.css`
+(`.split-divider`, `.resize-handle`), because those are pseudo-classes.
+
 ## Guided tour
 
 One script, two layouts. `tour/tourSections.js` is the whole tour — an ordered

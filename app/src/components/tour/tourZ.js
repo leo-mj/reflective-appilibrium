@@ -12,9 +12,12 @@
 export const TOUR_Z = { dim: 910, menu: 916, ring: 917, card: 920 };
 
 /**
- * Width of the wide tour's column. The app is padded by this much while the
- * tour is open, and anything that centres itself on the viewport rather than on
- * the app — a modal — has to shift by half of it to stay clear.
+ * Width the wide tour's column opens at, and the width its handle resets to.
+ * The app is padded by whatever it is *currently* at while the tour is open,
+ * and anything that centres itself on the viewport rather than on the app — a
+ * modal — has to shift by half of that to stay clear. The current one lives in
+ * {@link module:components/tour/tourWidth}, since the reader can drag it; this
+ * is only where it starts.
  */
 export const TOUR_W = 460;
 
