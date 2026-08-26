@@ -1,7 +1,11 @@
 /**
- * @fileoverview Shared <option> groups for the relation-type pickers.
+ * @fileoverview The rows a relation-type picker offers.
  * @module components/user_edits/RelationTypeOptions
  */
+
+/** @import { DropdownOption } from './Dropdown.jsx' */
+
+import { RELATION_GLOSS } from "../../constants/glosses.js";
 
 const DIALECTICAL = [
   ["supports", "supports"],
@@ -23,27 +27,25 @@ const capitalize = (s) => s[0].toUpperCase() + s.slice(1);
  * four. `jointly_entails`/`jointly_precludes` are absent by design: they need
  * more than one premise, so they come from the argument panels instead.
  *
- * @param {Object}  props
- * @param {boolean} [props.capitalized] - Title-case labels, to match modal styling.
+ * Each carries its one-line gloss as the row's `detail` — six terms of art
+ * offered as bare words, of which "undermines" and "depends on" are the pair no
+ * one guesses from the label. See {@link module:constants/glosses}.
+ *
+ * @param {Object}  [options]
+ * @param {boolean} [options.capitalized] - Title-case labels, to match modal styling.
+ * @returns {DropdownOption[]}
  */
-export function RelationTypeOptions({ capitalized = false }) {
-  const label = (text) => (capitalized ? capitalize(text) : text);
-  return (
-    <>
-      <optgroup label="Dialectical">
-        {DIALECTICAL.map(([value, text]) => (
-          <option key={value} value={value}>
-            {label(text)}
-          </option>
-        ))}
-      </optgroup>
-      <optgroup label="Argument">
-        {ARGUMENT.map(([value, text]) => (
-          <option key={value} value={value}>
-            {label(text)}
-          </option>
-        ))}
-      </optgroup>
-    </>
-  );
+export function relationTypeOptions({ capitalized = false } = {}) {
+  const row =
+    (group) =>
+    ([value, text]) => ({
+      value,
+      label: capitalized ? capitalize(text) : text,
+      detail: RELATION_GLOSS[value],
+      group,
+    });
+  return [
+    ...DIALECTICAL.map(row("Dialectical")),
+    ...ARGUMENT.map(row("Argument")),
+  ];
 }

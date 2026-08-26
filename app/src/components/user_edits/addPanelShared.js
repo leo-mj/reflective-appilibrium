@@ -61,24 +61,28 @@ export const PANEL_STYLE = {
  *
  * - `compact` — the strip's default, for the element tab, where the statement
  *   below the controls is the thing being written and they are its trimmings.
- * - `prominent` — the link tabs on a wide screen. There the pickers *are* the
- *   content: an argument is its premises and its conclusion, and the box under
- *   them holds an optional note. At the compact size they were dwarfed by it.
+ * - `prominent` — the link tabs on a wide screen. Set at 12px, below the
+ *   element tab's own 14: an earlier version had these at 17 on the reasoning
+ *   that the pickers *are* the content of a link tab, and at that size a row of
+ *   them — two premises, a type and a conclusion — was a band of oversized
+ *   controls across the foot of the window. What each one holds is now in the
+ *   row of its open list rather than in the size of its trigger, so the trigger
+ *   can go back to being small.
  * - `roomy` — the phone sheet, where everything is worked with a thumb.
  */
 export const SIZES = {
   compact: { padding: "3px 6px", fontSize: 14 },
-  prominent: { padding: "7px 12px", fontSize: 17, minHeight: 40 },
+  prominent: { padding: "3px 8px", fontSize: 12, minHeight: 26 },
   roomy: { padding: "8px 12px", fontSize: 16, minHeight: 44 },
 };
 
 const GHOST_SIZES = {
   compact: { padding: "3px 7px", fontSize: 11 },
-  prominent: { padding: "7px 12px", fontSize: 14, minHeight: 40 },
+  prominent: { padding: "3px 8px", fontSize: 12, minHeight: 26 },
   roomy: { padding: "8px 12px", fontSize: 13, minHeight: 40 },
 };
 
-const ARROW_SIZES = { compact: 11, prominent: 15, roomy: 14 };
+const ARROW_SIZES = { compact: 11, prominent: 12, roomy: 14 };
 
 export const ghostBtn = (size) => ({
   background: "transparent",
@@ -104,21 +108,20 @@ export const arrowStyle = (size) => ({
 export const fieldStyle = (size) => ({ ...SELECT_STYLE, ...SIZES[size] });
 
 /**
- * The shared box for an actual `<select>`, which needs two things the others
- * must not borrow: the chevron, and the room on the right to draw it in.
+ * The shared box for a picker, which needs one thing the other fields must not
+ * borrow: room on the right for the chevron
+ * {@link module:components/user_edits/Dropdown} draws over it.
+ *
+ * `appearance: none` is left in although the control underneath is a button
+ * now: a button carries its own platform styling on WebKit too, and the same
+ * line is what takes it off.
  *
  * @param {keyof SIZES} size
  */
 export const selectStyle = (size) => ({
   ...fieldStyle(size),
-  // WebKit renders a select at whatever height its own control wants and
-  // ignores min-height and vertical padding on it, so a picker asked to match
-  // the things beside it simply did not. Dropping the native appearance is what
-  // gives the box back — at the cost of the arrow it drew, hence the one
-  // painted on the right by Picker.
   appearance: "none",
   WebkitAppearance: "none",
-  // Room on the right for the chevron Picker lays over it.
   paddingRight: 28,
 });
 
@@ -141,7 +144,9 @@ export const pickerWidth = (chars) => ({ minWidth: `calc(${chars}ch + 46px)` });
  * shown — and set at a size someone is meant to read rather than notice.
  */
 export const complaintStyle = (size) => ({
-  fontSize: size === "compact" ? 12 : 14,
+  // The phone's is the only one set larger: on a wide screen it has to sit in a
+  // row of 12px controls without shouting over them.
+  fontSize: size === "roomy" ? 14 : 12,
   color: C.conflicts,
 });
 

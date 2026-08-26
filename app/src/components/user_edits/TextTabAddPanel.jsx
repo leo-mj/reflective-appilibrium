@@ -17,6 +17,7 @@
 import { useState } from "react";
 
 import { C } from "../../constants/colors.js";
+import { ARGUMENT_GLOSS } from "../../constants/glosses.js";
 import { inkWeight } from "../../constants/palettes.js";
 import { useAddBarSize } from "../../hooks/useAddBarSize.js";
 import { usePalette } from "../../hooks/useTheme.js";
@@ -30,8 +31,9 @@ import {
   newArgumentId,
   sortElementIds,
 } from "../../utils/stateUtils.js";
-import { ElementOptions } from "./ElementOptions.jsx";
-import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
+import { Dropdown } from "./Dropdown.jsx";
+import { elementOptions, elementTypeOptions } from "./ElementOptions.jsx";
+import { relationTypeOptions } from "./RelationTypeOptions.jsx";
 import {
   ACCENT_MARKER,
   ADD_BAR_MIN_HEIGHT,
@@ -45,7 +47,7 @@ import {
   pickerWidth,
   selectStyle,
 } from "./addPanelShared.js";
-import { Field, Picker } from "./addPanelPrimitives.jsx";
+import { Field } from "./addPanelPrimitives.jsx";
 
 // Origin is deliberately not among them: it is who is adding rather than part
 // of the element being written, and so is kept across a clear, an add and a tab
@@ -55,6 +57,15 @@ const ELEMENT_DEFAULTS = {
   confidence: 0.67,
   text: "",
 };
+
+// The three lists that do not depend on what is on the board, built once. Each
+// row carries its gloss as the detail the picker draws beside the label.
+const TYPE_OPTIONS = elementTypeOptions();
+const RELATION_ROWS = relationTypeOptions();
+const ARGUMENT_ROWS = [
+  { value: "entails", label: "entails", detail: ARGUMENT_GLOSS.entails },
+  { value: "precludes", label: "precludes", detail: ARGUMENT_GLOSS.precludes },
+];
 
 /**
  * @param {Object}      props
@@ -106,6 +117,8 @@ export function AddBar({
   const box = fieldStyle(size);
   /** Width for an element picker: the longest id it can offer, suffix and all. */
   const idLayout = pickerWidth(idOptionChars(elements));
+  /** The rows every element picker in the bar offers — id, and what it says. */
+  const elementRows = elementOptions(elements);
   const showRelations = !hideNonEntailsRels;
   // Origin and confidence, folded away on a phone. Kept across submissions
   // rather than reset with the form: someone who opened them once is filling
@@ -500,25 +513,25 @@ export function AddBar({
         >
           {tab === "element" ? (
             <>
-              <Picker
-                aria-label="Element type"
+              {/* The three are the domain's own terms, and a first-time reader
+                  has no way to tell a principle from a theory by the word
+                  alone; the gloss rides in the row beside each. */}
+              <Dropdown
+                label="Element type"
                 value={elementForm.type}
-                onChange={(e) => setEl("type", e.target.value)}
+                onChange={(v) => setEl("type", v)}
+                options={TYPE_OPTIONS}
                 style={sel}
-                // 9 for "Principle", the longest of the three. Roomy shares the
-                // line with Details, the pair filling the row — growing from
-                // their content widths rather than from nothing, since `flex: 1`
-                // would start both at zero and split the row evenly, which cut
-                // "Judgment" off halfway.
+                // 9 for "Principle", the longest of the three. Roomy shares
+                // the line with Details, the pair filling the row — growing
+                // from their content widths rather than from nothing, since
+                // `flex: 1` would start both at zero and split the row evenly,
+                // which cut "Judgment" off halfway.
                 layout={{
                   ...pickerWidth(9),
                   ...(roomy ? { flex: "1 1 auto" } : null),
                 }}
-              >
-                <option value="judgment">Judgment</option>
-                <option value="principle">Principle</option>
-                <option value="theory">Theory</option>
-              </Picker>
+              />
               {/* Both of these carry a working default, so on a phone they are
                   detail rather than something to fill in: the statement is what
                   the reader came to type. Folded away by default there, and
@@ -632,37 +645,35 @@ export function AddBar({
             </>
           ) : tab === "relation" ? (
             <>
-              <Picker
-                aria-label="Relation from"
+              <Dropdown
+                label="Relation from"
                 value={relationForm.from}
-                onChange={(e) => setRel("from", e.target.value)}
+                onChange={(v) => setRel("from", v)}
+                options={elementRows}
                 style={linkSel}
                 layout={idLayout}
-              >
-                <ElementOptions elements={elements} />
-              </Picker>
+              />
               <span style={arrow}>→</span>
-              <Picker
-                aria-label="Relation type"
+              <Dropdown
+                label="Relation type"
                 value={relationForm.type}
-                onChange={(e) => setRel("type", e.target.value)}
-                // The colour goes on the select, so the chevron takes it too.
+                onChange={(v) => setRel("type", v)}
+                options={RELATION_ROWS}
+                // The colour goes on the trigger, so the chevron and the list's
+                // own labels take it too.
                 style={{ ...linkSel, color: C[relationForm.type] }}
                 // 10 for "undermines" and "depends on", the longest offered.
                 layout={pickerWidth(10)}
-              >
-                <RelationTypeOptions />
-              </Picker>
+              />
               <span style={arrow}>→</span>
-              <Picker
-                aria-label="Relation to"
+              <Dropdown
+                label="Relation to"
                 value={relationForm.to}
-                onChange={(e) => setRel("to", e.target.value)}
+                onChange={(v) => setRel("to", v)}
+                options={elementRows}
                 style={linkSel}
                 layout={idLayout}
-              >
-                <ElementOptions elements={elements} />
-              </Picker>
+              />
               {tooFewElements ? (
                 needsTwo
               ) : relationForm.from === relationForm.to ? (
@@ -680,15 +691,14 @@ export function AddBar({
                   key={i}
                   style={{ display: "flex", alignItems: "center", gap: 4 }}
                 >
-                  <Picker
-                    aria-label={`Premise ${i + 1}`}
+                  <Dropdown
+                    label={`Premise ${i + 1}`}
                     value={premise}
-                    onChange={(e) => setPremise(i, e.target.value)}
+                    onChange={(v) => setPremise(i, v)}
+                    options={elementRows}
                     style={linkSel}
                     layout={idLayout}
-                  >
-                    <ElementOptions elements={elements} />
-                  </Picker>
+                  />
                   {premises.length > 1 && (
                     <button
                       onClick={() => removePremise(i)}
@@ -714,33 +724,29 @@ export function AddBar({
               >
                 + premise
               </button>
-              <Picker
-                aria-label="Argument type"
+              <Dropdown
+                label="Argument type"
                 value={negated ? "precludes" : "entails"}
-                onChange={(e) =>
-                  setArg("negated", e.target.value === "precludes")
-                }
-                // The colour goes on the select, so the chevron takes it too.
+                onChange={(v) => setArg("negated", v === "precludes")}
+                options={ARGUMENT_ROWS}
+                // The colour goes on the trigger, so the chevron and the list's
+                // own labels take it too.
                 style={{
                   ...linkSel,
                   color: negated ? C.precludes : C.entails,
                 }}
                 // 9 for "precludes".
                 layout={pickerWidth(9)}
-              >
-                <option value="entails">entails</option>
-                <option value="precludes">precludes</option>
-              </Picker>
+              />
               <span style={arrow}>→</span>
-              <Picker
-                aria-label="Conclusion"
+              <Dropdown
+                label="Conclusion"
                 value={conclusion}
-                onChange={(e) => setArg("conclusion", e.target.value)}
+                onChange={(v) => setArg("conclusion", v)}
+                options={elementRows}
                 style={linkSel}
                 layout={idLayout}
-              >
-                <ElementOptions elements={elements} />
-              </Picker>
+              />
               {tooFewElements ? (
                 needsTwo
               ) : duplicatePremises || conclusionIsPremise ? (

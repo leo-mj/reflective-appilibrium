@@ -9,8 +9,12 @@ import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
-import { ElementOptions } from "./ElementOptions.jsx";
-import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
+import { Dropdown } from "./Dropdown.jsx";
+import { elementOptions } from "./ElementOptions.jsx";
+import { relationTypeOptions } from "./RelationTypeOptions.jsx";
+
+/** Title-cased here, to match the modal's own wording. */
+const RELATION_ROWS = relationTypeOptions({ capitalized: true });
 
 /**
  * @typedef {Object} AddRelationFormData
@@ -33,25 +37,28 @@ export function AddRelationForm({ form, setForm, elements }) {
   const set = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
   const selfLoop = form.from === form.to;
+  const rows = elementOptions(elements);
   return (
     <>
       <FormField label="From">
-        <select
+        <Dropdown
+          label="From"
           value={form.from}
-          onChange={(e) => set("from", e.target.value)}
+          onChange={(v) => set("from", v)}
+          options={rows}
           style={INPUT_STYLE}
-        >
-          <ElementOptions elements={elements} />
-        </select>
+          layout={{ width: "100%" }}
+        />
       </FormField>
       <FormField label="To">
-        <select
+        <Dropdown
+          label="To"
           value={form.to}
-          onChange={(e) => set("to", e.target.value)}
+          onChange={(v) => set("to", v)}
+          options={rows}
           style={INPUT_STYLE}
-        >
-          <ElementOptions elements={elements} />
-        </select>
+          layout={{ width: "100%" }}
+        />
         {selfLoop && (
           <div style={{ fontSize: 10, color: C.conflicts, marginTop: 4 }}>
             From and To must be different.
@@ -59,13 +66,14 @@ export function AddRelationForm({ form, setForm, elements }) {
         )}
       </FormField>
       <FormField label="Relation type">
-        <select
+        <Dropdown
+          label="Relation type"
           value={form.type}
-          onChange={(e) => set("type", e.target.value)}
+          onChange={(v) => set("type", v)}
+          options={RELATION_ROWS}
           style={INPUT_STYLE}
-        >
-          <RelationTypeOptions capitalized />
-        </select>
+          layout={{ width: "100%" }}
+        />
       </FormField>
       <FormField label="Explanation">
         <textarea

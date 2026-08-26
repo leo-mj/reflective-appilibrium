@@ -9,6 +9,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import { MobileAddButton } from "./MobileAddButton.jsx";
+import { choose } from "../user_edits/dropdownTestUtils.js";
 
 afterEach(cleanup);
 
@@ -66,14 +67,8 @@ describe("MobileAddButton", () => {
 
     fireEvent.click(screen.getByText("Argument"));
     fireEvent.click(screen.getByText("+ premise"));
-    ["J1", "J2"].forEach((id, i) =>
-      fireEvent.change(screen.getByLabelText(`Premise ${i + 1}`), {
-        target: { value: id },
-      }),
-    );
-    fireEvent.change(screen.getByLabelText("Conclusion"), {
-      target: { value: "P1" },
-    });
+    ["J1", "J2"].forEach((id, i) => choose(`Premise ${i + 1}`, id));
+    choose("Conclusion", "P1");
     // The button reads "Add" and names its target in its accessible name.
     fireEvent.click(screen.getByRole("button", { name: "Add argument" }));
 

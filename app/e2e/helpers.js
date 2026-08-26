@@ -139,6 +139,26 @@ export async function ensureAddTab(page, tab) {
 }
 
 /**
+ * Choose a value in one of the add pickers.
+ *
+ * They are listboxes of our own rather than `<select>`s — a native list cannot
+ * show what an id stands for, which is the one thing these have to say — so
+ * `selectOption` does not reach them. The row is found by the value behind its
+ * label rather than by the label, since a withdrawn element reads "J2
+ * (withdrawn)" and the modals title-case their relation types.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} label - The picker's accessible name.
+ * @param {string} value
+ */
+export async function pick(page, label, value) {
+  const trigger = page.getByRole("combobox", { name: label });
+  await trigger.click();
+  await page.locator(`[role="option"][data-value="${value}"]`).click();
+  await expect(trigger).toHaveAttribute("data-value", value);
+}
+
+/**
  * Add one element through the add bar and wait for it to land.
  *
  * @param {import('@playwright/test').Page} page
@@ -147,7 +167,7 @@ export async function ensureAddTab(page, tab) {
  */
 export async function addElement(page, type, text) {
   await ensureAddTab(page, "Element");
-  await page.locator("select").first().selectOption(type);
+  await pick(page, "Element type", type);
   const ta = addBar(page);
   await ta.fill(text);
   await page.locator('button:text-is("Add")').click();

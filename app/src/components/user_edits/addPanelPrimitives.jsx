@@ -1,70 +1,18 @@
 /**
- * @fileoverview The two controls the add bar is built from.
+ * @fileoverview What is left of the add bar's own small parts.
  *
  * Split out of TextTabAddPanel, which had grown to hold three tab modes, three
- * sizes, and these. Their styling lives in addPanelShared.js alongside the rest
- * of the bar's sizing.
+ * sizes, and these. Its styling lives in addPanelShared.js alongside the rest of
+ * the bar's sizing.
+ *
+ * The pickers used to live here too, as a `<select>` with a chevron drawn over
+ * it. They are {@link module:components/user_edits/Dropdown} now, for the reason
+ * that file opens with: a native list cannot show what an id stands for.
  *
  * @module components/user_edits/addPanelPrimitives
  */
 
 import { C } from "../../constants/colors.js";
-
-/**
- * The chevron a select draws for itself, drawn by us instead — see
- * {@link module:components/user_edits/addPanelShared.selectStyle} for why we
- * take it over.
- *
- * Laid over the picker rather than painted into its background, so that it
- * inherits the picker's own colour: a background image would have to name one,
- * and a data URI cannot see the CSS variables the rest of the bar is coloured
- * from — it would be a fixed grey in both themes, and grey on the relation-type
- * picker, which colours its text by the relation.
- */
-const chevronStyle = {
-  position: "absolute",
-  right: 10,
-  top: "50%",
-  transform: "translateY(-50%)",
-  fontSize: 10,
-  lineHeight: 1,
-  // Colour comes from the picker; the arrow is not meant to shout as loudly.
-  opacity: 0.6,
-  // The picker is what should answer a click anywhere in its box.
-  pointerEvents: "none",
-};
-
-/**
- * A picker: a `<select>` with the chevron over it. Anything that positions the
- * picker — a width, a share of a row — goes on the wrapper, since the wrapper
- * is what the surrounding layout now sees; the select fills it.
- *
- * @param {Object} props
- * @param {Object} props.style - The select's own box, from `selectStyle`.
- * @param {Object} [props.layout] - Passed to the wrapper: flex, width, and the
- *   like. The select is stretched to whatever it settles at.
- */
-export function Picker({ style, layout, children, ...props }) {
-  return (
-    <span
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        // The chevron reads `currentColor`, so the colour the select is drawn
-        // in has to reach it — and it is the wrapper the arrow sits in.
-        color: style.color,
-        ...layout,
-      }}
-    >
-      <select {...props} style={{ ...style, width: "100%" }}>
-        {children}
-      </select>
-      <span aria-hidden="true" style={chevronStyle}>
-        ▾
-      </span>
-    </span>
-  );
-}
 
 /**
  * A control with its caption — above it where the bar is roomy, beside it in

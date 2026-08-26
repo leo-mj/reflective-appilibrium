@@ -9,6 +9,13 @@ import { vi, describe, it, expect, beforeAll, afterEach } from "vitest";
 import { render, fireEvent, cleanup } from "@testing-library/react";
 
 import { Graph } from "./Graph.jsx";
+import {
+  choose,
+  openPicker,
+  pickerValues,
+  pickers,
+  rowsOf,
+} from "./user_edits/dropdownTestUtils.js";
 
 beforeAll(() => {
   // jsdom implements neither, and the graph needs both to mount and be clicked.
@@ -150,10 +157,13 @@ function button(container, label) {
   );
 }
 
-/** Every <select> in the open modal, in document order. */
+/** Every picker in the open modal, in document order. */
 function modalSelects(container) {
-  return [...container.querySelectorAll("select")];
+  return pickers(container);
 }
+
+/** What those pickers are showing — an id each, the labels being ids. */
+const modalValues = (container) => pickerValues(container);
 
 describe("half-written forms", () => {
   /** Opens a dialog from the graph's own toolbar. */
@@ -220,7 +230,7 @@ describe("half-written forms", () => {
     // Ctrl-clicking two nodes is a fresh instruction, not a resumption.
     const { container, svg } = setup();
     open(container, "Add relation");
-    fireEvent.change(modalSelects(container)[0], { target: { value: "P1" } });
+    choose("From", "P1");
     fireEvent.click(button(container, "Cancel"));
 
     // Picking the ends on the canvas, then confirming, reopens the dialog.
@@ -228,7 +238,7 @@ describe("half-written forms", () => {
     clickNode(svg, "P1", { ctrl: true });
     fireEvent.click(button(container, "Add relation"));
 
-    expect(modalSelects(container)[0].value).toBe("J1");
+    expect(modalValues(container)[0]).toBe("J1");
   });
 });
 
@@ -248,8 +258,7 @@ describe("ctrl+click argument building", () => {
     fireEvent.click(confirm);
 
     // Premise selects come first, conclusion last.
-    const selects = modalSelects(container);
-    expect(selects.map((s) => s.value)).toEqual(["J1", "J2", "P1"]);
+    expect(modalValues(container)).toEqual(["J1", "J2", "P1"]);
   });
 
   it("records the withdrawn premise in the saved relations", () => {
@@ -287,11 +296,7 @@ describe("ctrl+click argument building", () => {
     clickNode(svg, "P1", { ctrl: true });
     fireEvent.click(button(container, "Add argument"));
 
-    expect(modalSelects(container).map((s) => s.value)).toEqual([
-      "J1",
-      "P2",
-      "P1",
-    ]);
+    expect(modalValues(container)).toEqual(["J1", "P2", "P1"]);
   });
 
   it("labels the elements that are not currently in play", () => {
@@ -301,12 +306,15 @@ describe("ctrl+click argument building", () => {
     clickNode(svg, "P1", { ctrl: true });
     fireEvent.click(button(container, "Add relation"));
 
-    const [from] = modalSelects(container);
-    expect([...from.options].map((o) => o.textContent)).toEqual([
-      "J1",
-      "J2 (withdrawn)",
-      "P1",
-      "P2 (rejected)",
+    // The note is a column of its own at the right of the row, not a suffix
+    // on the id — see STATUS_STYLE in Dropdown.
+    expect(
+      rowsOf(openPicker("From")).map(([label, , status]) => [label, status]),
+    ).toEqual([
+      ["J1", undefined],
+      ["J2", "withdrawn"],
+      ["P1", undefined],
+      ["P2", "rejected"],
     ]);
   });
 });
@@ -339,16 +347,18 @@ describe("ctrl+click relation building", () => {
     clickNode(svg, "J2", { ctrl: true }); // withdrawn
     fireEvent.click(button(container, "Add relation"));
 
-    const [from, to, type] = modalSelects(container);
-    expect(from.value).toBe("J1");
-    expect(to.value).toBe("J2");
-    expect([...type.options].map((o) => o.value)).toEqual([
-      "supports",
-      "conflicts",
-      "undermines",
-      "depends",
-      "entails",
-      "precludes",
+    const [from, to] = modalValues(container);
+    expect(from).toBe("J1");
+    expect(to).toBe("J2");
+    expect(
+      rowsOf(openPicker("Relation type")).map(([label]) => label),
+    ).toEqual([
+      "Supports",
+      "Conflicts",
+      "Undermines",
+      "Depends on",
+      "Entails",
+      "Precludes",
     ]);
   });
 
@@ -358,9 +368,7 @@ describe("ctrl+click relation building", () => {
     clickNode(svg, "J1");
     clickNode(svg, "P1", { ctrl: true });
     fireEvent.click(button(container, "Add relation"));
-    if (type) {
-      fireEvent.change(modalSelects(container)[2], { target: { value: type } });
-    }
+    if (type) choose("Relation type", type);
     fireEvent.click(button(container, "Save"));
   }
 

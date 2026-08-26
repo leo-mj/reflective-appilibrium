@@ -9,6 +9,7 @@ import {
   ensureAddTab,
   addBar,
   park,
+  pick,
 } from "./helpers.js";
 
 test.describe("Element lifecycle", () => {
@@ -50,11 +51,13 @@ test.describe("Element lifecycle", () => {
     await addElement(page, "principle", "Promises must always be kept.");
 
     await ensureAddTab(page, "Argument");
-    await expect(page.locator('select[aria-label="Premise 1"]')).toBeVisible();
+    await expect(
+      page.getByRole("combobox", { name: "Premise 1" }),
+    ).toBeVisible();
 
-    await page.locator('select[aria-label="Premise 1"]').selectOption("P1");
-    await page.locator('select[aria-label="Argument type"]').selectOption("entails");
-    await page.locator('select[aria-label="Conclusion"]').selectOption("J1");
+    await pick(page, "Premise 1", "P1");
+    await pick(page, "Argument type", "entails");
+    await pick(page, "Conclusion", "J1");
     await addBar(page).fill("Universal promise-keeping yields this verdict.");
     await page.locator('button:text-is("Add")').click();
     await park(page);

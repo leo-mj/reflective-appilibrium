@@ -12,6 +12,14 @@ import {
   AddRelationPanel,
 } from "./WorkflowAddPanels.jsx";
 import { ADD_BAR_MIN_HEIGHT } from "./addPanelShared.js";
+import {
+  choose,
+  labelsOf,
+  openPicker,
+  pickerValues,
+  pickers,
+  rowsOf,
+} from "./dropdownTestUtils.js";
 import { AddBar } from "./TextTabAddPanel.jsx";
 import { C } from "../../constants/colors.js";
 import { PALETTES } from "../../constants/palettes.js";
@@ -25,22 +33,25 @@ const ELEMENTS = [
   { id: "P2", type: "principle", status: "rejected", text: "d" },
 ];
 
-const selects = (c) => [...c.querySelectorAll("select")];
-const optionText = (select) => [...select.options].map((o) => o.textContent);
 const button = (c, label) =>
   [...c.querySelectorAll("button")].find((b) => b.textContent.trim() === label);
 
 describe("AddArgumentPanel", () => {
   it("offers every linkable element, flagging those out of play", () => {
-    const { container } = render(
-      <AddArgumentPanel elements={ELEMENTS} onAddRelation={() => {}} />,
-    );
-    expect(optionText(selects(container)[0])).toEqual([
-      "J1 (withdrawn)",
-      "J2",
-      "P1",
-      "P2 (rejected)",
+    render(<AddArgumentPanel elements={ELEMENTS} onAddRelation={() => {}} />);
+    // The flag is its own column at the right of the row, not a suffix on the
+    // id — see STATUS_STYLE in Dropdown.
+    expect(rowsOf(openPicker("Premise 1"))).toEqual([
+      ["J1", "a", "withdrawn"],
+      ["J2", "b"],
+      ["P1", "c"],
+      ["P2", "d", "rejected"],
     ]);
+  });
+
+  it("draws each element's statement beside its id", () => {
+    render(<AddArgumentPanel elements={ELEMENTS} onAddRelation={() => {}} />);
+    expect(rowsOf(openPicker("Premise 1"))).toContainEqual(["J2", "b"]);
   });
 
   it("opens on elements that are in play", () => {
@@ -48,7 +59,7 @@ describe("AddArgumentPanel", () => {
       <AddArgumentPanel elements={ELEMENTS} onAddRelation={() => {}} />,
     );
     // Premise then conclusion — J1 is withdrawn, so it is skipped for defaults.
-    expect(selects(container).map((s) => s.value)).toEqual(["J2", "P1"]);
+    expect(pickerValues(container)).toEqual(["J2", "P1"]);
   });
 
   it("submits one relation per premise under a shared argumentId", () => {
@@ -82,15 +93,12 @@ describe("AddArgumentPanel", () => {
 
 describe("AddRelationPanel", () => {
   it("offers the argument types alongside the dialectical ones", () => {
-    const { container } = render(
-      <AddRelationPanel elements={ELEMENTS} onAddRelation={() => {}} />,
-    );
-    const type = selects(container)[1];
-    expect([...type.options].map((o) => o.value)).toEqual([
+    render(<AddRelationPanel elements={ELEMENTS} onAddRelation={() => {}} />);
+    expect(labelsOf(openPicker("Relation type"))).toEqual([
       "supports",
       "conflicts",
       "undermines",
-      "depends",
+      "depends on",
       "entails",
       "precludes",
     ]);
@@ -100,9 +108,12 @@ describe("AddRelationPanel", () => {
     const { container } = render(
       <AddRelationPanel elements={ELEMENTS} onAddRelation={() => {}} />,
     );
-    const [from] = selects(container);
-    expect(from.value).toBe("J2");
-    expect(optionText(from)).toContain("J1 (withdrawn)");
+    expect(pickerValues(container)[0]).toBe("J2");
+    expect(rowsOf(openPicker("Relation from"))).toContainEqual([
+      "J1",
+      "a",
+      "withdrawn",
+    ]);
   });
 
   it("submits the chosen endpoints and type", () => {
@@ -110,9 +121,8 @@ describe("AddRelationPanel", () => {
     const { container } = render(
       <AddRelationPanel elements={ELEMENTS} onAddRelation={onAddRelation} />,
     );
-    const [from, type] = selects(container);
-    fireEvent.change(from, { target: { value: "J1" } });
-    fireEvent.change(type, { target: { value: "entails" } });
+    choose("Relation from", "J1");
+    choose("Relation type", "entails");
     fireEvent.click(button(container, "Add relation"));
 
     expect(onAddRelation).toHaveBeenCalledWith(
@@ -121,37 +131,41 @@ describe("AddRelationPanel", () => {
   });
 });
 
-// A <select> with no accessible name is announced as "combo box" and nothing
+// A picker with no accessible name is announced as "combo box" and nothing
 // else, which is axe's `critical` impact and the one defect class on these
 // panels that assistive tech cannot work around. Asserted per panel rather than
 // through the app-wide sweep because AddArgumentPanel renders a *variable*
-// number of premise selects, and a name shared between two of them reads as one
+// number of premise pickers, and a name shared between two of them reads as one
 // control repeated — which a "has a name" check on a single instance misses.
 describe("every control on the add panels is named", () => {
   const named = (el) =>
     (el.getAttribute("aria-label") ?? el.getAttribute("title") ?? "").trim();
   const unnamed = (container) =>
-    [...container.querySelectorAll("select, input, textarea")]
+    [
+      ...container.querySelectorAll(
+        'input, textarea, [role="combobox"]',
+      ),
+    ]
       .filter((el) => !/[A-Za-z]{3,}/.test(named(el) || el.placeholder || ""))
       .map((el) => el.outerHTML.slice(0, 80));
 
-  it("names both selects on AddArgumentPanel, premises distinctly", () => {
+  it("names both pickers on AddArgumentPanel, premises distinctly", () => {
     const { container } = render(
       <AddArgumentPanel elements={ELEMENTS} onAddRelation={() => {}} />,
     );
     expect(unnamed(container)).toEqual([]);
     fireEvent.click(button(container, "+ premise"));
-    const names = selects(container).map(named);
+    const names = pickers(container).map(named);
     expect(names).toEqual(["Premise 1", "Premise 2", "Conclusion"]);
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it("names all three selects on AddRelationPanel", () => {
+  it("names all three pickers on AddRelationPanel", () => {
     const { container } = render(
       <AddRelationPanel elements={ELEMENTS} onAddRelation={() => {}} />,
     );
     expect(unnamed(container)).toEqual([]);
-    expect(selects(container).map(named)).toEqual([
+    expect(pickers(container).map(named)).toEqual([
       "Relation from",
       "Relation type",
       "Relation to",

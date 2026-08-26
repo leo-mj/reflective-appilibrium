@@ -120,7 +120,10 @@ export function Tooltip({ text, children, delay = 400 }) {
       if (touching.current) return;
       show(e.currentTarget, delay);
     },
-    onMouseLeave(e) { child.props.onMouseLeave?.(e); hide(); },
+    onMouseLeave(e) {
+      child.props.onMouseLeave?.(e);
+      hide();
+    },
     // Pointer events only handle touch here. A mouse is left to the hover
     // handlers above, where a click has never dismissed the tooltip and should
     // not start doing so.
@@ -170,38 +173,39 @@ export function Tooltip({ text, children, delay = 400 }) {
   return (
     <>
       {trigger}
-      {pos && createPortal(
-        <div
-          style={{
-            position: "fixed",
-            top: pos.top,
-            // Placed by transform from the left edge rather than by `left: cx`.
-            // A fixed box with `left` set is laid out in what remains of the
-            // window to its right, so a trigger near the right edge — the ☰
-            // menu, every time — was squeezed to a column of one-word lines
-            // however much room `maxWidth` gave it. From 0 the whole window is
-            // available, and `max-content` keeps short text on one line.
-            left: 0,
-            transform: `translateX(${cx}px) translateX(-50%)`,
-            width: "max-content",
-            background: C.panel,
-            border: `1px solid ${C.border}`,
-            borderRadius: 6,
-            padding: "5px 9px",
-            fontSize: 11,
-            color: C.text,
-            maxWidth: MAX_W,
-            pointerEvents: "none",
-            zIndex: 1000,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-            lineHeight: 1.45,
-            textAlign: "center",
-          }}
-        >
-          {text}
-        </div>,
-        document.body,
-      )}
+      {pos &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: pos.top,
+              // Placed by transform from the left edge rather than by `left: cx`.
+              // A fixed box with `left` set is laid out in what remains of the
+              // window to its right, so a trigger near the right edge — the ☰
+              // menu, every time — was squeezed to a column of one-word lines
+              // however much room `maxWidth` gave it. From 0 the whole window is
+              // available, and `max-content` keeps short text on one line.
+              left: 0,
+              transform: `translateX(${cx}px) translateX(-50%)`,
+              width: "max-content",
+              background: C.panel,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              padding: "5px 9px",
+              fontSize: 11,
+              color: C.text,
+              maxWidth: MAX_W,
+              pointerEvents: "none",
+              zIndex: 1000,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+              lineHeight: 1.45,
+              textAlign: "center",
+            }}
+          >
+            {text}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

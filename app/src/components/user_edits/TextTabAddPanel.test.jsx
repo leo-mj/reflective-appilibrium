@@ -8,10 +8,27 @@
 // The rest is what the bar offers: arguments in place of relations wherever the
 // graph is showing arguments only, and arguments of more than one premise.
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  within,
+} from "@testing-library/react";
 
 import { C } from "../../constants/colors.js";
+import { ARGUMENT_GLOSS, RELATION_GLOSS } from "../../constants/glosses.js";
 import { PALETTES } from "../../constants/palettes.js";
+import {
+  choose,
+  labelsOf,
+  openPicker,
+  picker,
+  pickerValue,
+  pickerValues,
+  rowsOf,
+  selectedRow,
+} from "./dropdownTestUtils.js";
 import { AddBar } from "./TextTabAddPanel.jsx";
 
 afterEach(cleanup);
@@ -44,10 +61,10 @@ function activeTab(container) {
     : "relation";
 }
 
-/** The from/to select values, in document order. */
+/** The from/to picker values, in document order. */
 function relationEndpoints(container) {
-  const selects = [...container.querySelectorAll("select")];
-  return { from: selects[0].value, to: selects[2].value };
+  const values = pickerValues(container);
+  return { from: values[0], to: values[2] };
 }
 
 describe("AddBar graph-selection sync", () => {
@@ -141,8 +158,8 @@ describe("what the bar offers", () => {
       ctrlTo: "P1",
     });
     expect(activeTab(container)).toBe("argument");
-    expect(screen.getByLabelText("Premise 1").value).toBe("J2");
-    expect(screen.getByLabelText("Conclusion").value).toBe("P1");
+    expect(pickerValue("Premise 1")).toBe("J2");
+    expect(pickerValue("Conclusion")).toBe("P1");
   });
 
   it("keeps the reader on the argument tab when the setting flips under them", () => {
@@ -536,22 +553,26 @@ describe("how wide the pickers are", () => {
   });
 });
 
-describe("how prominent the pickers are", () => {
-  const fontOf = (label) =>
-    parseInt(screen.getByLabelText(label).style.fontSize, 10);
+describe("how big the pickers are", () => {
+  // By role, not by label: an open list carries the picker's name too, so
+  // `getByLabelText` matches two things once one has been opened.
+  const fontOf = (label) => parseInt(picker(label).style.fontSize, 10);
 
-  it("draws the link tabs' pickers larger than the element tab's in the strip", () => {
-    // On a link tab the pickers are the content — an argument is its premises
-    // and its conclusion — and the optional note below them was dwarfing them.
+  // An earlier version drew these at 17, on the reasoning that the pickers
+  // *are* the content of a link tab. A row of them at that size — two premises,
+  // a type and a conclusion — was a band of oversized controls across the foot
+  // of the window, and what each one holds is now in the row of its open list
+  // rather than in the size of its trigger.
+  it("keeps the link tabs' pickers small in the strip", () => {
     renderBar();
-    const element = fontOf("Element type");
 
     fireEvent.click(screen.getByText("Relation"));
-    expect(fontOf("Relation from")).toBeGreaterThan(element);
+    expect(fontOf("Relation from")).toBe(12);
+    expect(fontOf("Relation type")).toBe(12);
 
     fireEvent.click(screen.getByText("Argument"));
-    expect(fontOf("Premise 1")).toBeGreaterThan(element);
-    expect(fontOf("Conclusion")).toBeGreaterThan(element);
+    expect(fontOf("Premise 1")).toBe(12);
+    expect(fontOf("Conclusion")).toBe(12);
   });
 
   it("draws them all alike on a phone, which has room for one size", () => {
@@ -560,6 +581,22 @@ describe("how prominent the pickers are", () => {
 
     fireEvent.click(screen.getByText("Argument"));
     expect(fontOf("Premise 1")).toBe(element);
+  });
+
+  // Whichever bar it belongs to: a list set in the page's own font was a step
+  // up from the trigger that opened it, and read as a different control rather
+  // than as its contents.
+  it("opens a link tab's list at the trigger's own size", () => {
+    renderBar();
+    fireEvent.click(screen.getByText("Argument"));
+    expect(openPicker("Premise 1").style.fontSize).toBe("12px");
+  });
+
+  it("opens the element tab's list at its own, larger trigger's size", () => {
+    renderBar();
+    expect(openPicker("Element type").style.fontSize).toBe(
+      `${fontOf("Element type")}px`,
+    );
   });
 });
 
@@ -596,14 +633,8 @@ describe("adding an argument", () => {
     premiseIds
       .slice(1)
       .forEach(() => fireEvent.click(screen.getByText("+ premise")));
-    premiseIds.forEach((id, i) =>
-      fireEvent.change(screen.getByLabelText(`Premise ${i + 1}`), {
-        target: { value: id },
-      }),
-    );
-    fireEvent.change(screen.getByLabelText("Conclusion"), {
-      target: { value: "P1" },
-    });
+    premiseIds.forEach((id, i) => choose(`Premise ${i + 1}`, id));
+    choose("Conclusion", "P1");
     // By role: the button reads "Add" and carries its target in the name.
     fireEvent.click(screen.getByRole("button", { name: "Add argument" }));
   };
@@ -633,12 +664,8 @@ describe("adding an argument", () => {
   it("will not add one whose conclusion is also a premise", () => {
     renderBar({ hideNonEntailsRels: true });
     fireEvent.click(screen.getByText("Argument"));
-    fireEvent.change(screen.getByLabelText("Premise 1"), {
-      target: { value: "P1" },
-    });
-    fireEvent.change(screen.getByLabelText("Conclusion"), {
-      target: { value: "P1" },
-    });
+    choose("Premise 1", "P1");
+    choose("Conclusion", "P1");
     expect(screen.getByRole("button", { name: "Add argument" }).disabled).toBe(
       true,
     );
@@ -757,5 +784,230 @@ describe("AddBar resizing", () => {
     const { container } = renderBar();
     expect(bar(container).style.height).toBe("240px");
     expect(bar(container).style.width).toBe("500px");
+  });
+});
+
+// ─── What a picker says ───────────────────────────────────────────────────────
+// Every picker in the bar offers terms of art and bare ids, neither of which
+// says what it means. The statement rides in the row — which is the whole reason
+// the list is ours to draw rather than the browser's — and no tooltip anywhere
+// repeats it.
+describe("AddBar picker glosses", () => {
+  const WITH_TEXT = [
+    { id: "J1", type: "judgment", status: "active", text: "Waste is wrong." },
+    { id: "P1", type: "principle", status: "active", text: "Minimise harm." },
+    {
+      id: "J2",
+      type: "judgment",
+      status: "withdrawn",
+      text: "Distance discounts.",
+    },
+  ];
+
+  describe("in the open list, where the statement is drawn beside the id", () => {
+    it("puts the statement in the row, not behind a hover", () => {
+      renderBar({ elements: WITH_TEXT, selected: "J1" });
+      expect(rowsOf(openPicker("Relation from"))).toEqual([
+        ["J1", "Waste is wrong."],
+        ["J2", "Distance discounts.", "withdrawn"],
+        ["P1", "Minimise harm."],
+      ]);
+    });
+
+    it("holds the status out at the right rather than onto the id", () => {
+      // Run together as "J2 (withdrawn)" it pushed every statement in the list
+      // out of line with its neighbours, and read as part of the name.
+      renderBar({ elements: WITH_TEXT, selected: "J1" });
+      const list = openPicker("Relation from");
+      expect(labelsOf(list)).toEqual(["J1", "J2", "P1"]);
+      const [, withdrawn] = within(list).getAllByRole("option");
+      const note = withdrawn.lastElementChild;
+      expect(note.textContent).toBe("withdrawn");
+      // Right-hand side, and smaller than the statement beside it. Both sizes
+      // are in `em`, so the whole row follows whichever bar it belongs to.
+      expect(note.style.marginLeft).toBe("auto");
+      expect(note.style.textAlign).toBe("right");
+      expect(parseFloat(note.style.fontSize)).toBeLessThan(1);
+      expect(note.style.fontSize.endsWith("em")).toBe(true);
+    });
+
+    it("carries the status onto the closed picker, drawn the same way", () => {
+      renderBar({ elements: WITH_TEXT, selected: "J2" });
+      const trigger = picker("Relation from");
+      // The value stays the bare id; the note is a note.
+      expect(trigger.dataset.value).toBe("J2");
+      expect(trigger.lastElementChild.textContent).toBe("withdrawn");
+    });
+
+    it("glosses each relation type, and groups the two families", () => {
+      renderBar({ elements: WITH_TEXT, selected: "J1" });
+      const list = openPicker("Relation type");
+      expect(rowsOf(list)).toContainEqual([
+        "undermines",
+        RELATION_GLOSS.undermines,
+      ]);
+      expect(
+        [...list.querySelectorAll('[role="group"]')].map((g) =>
+          g.getAttribute("aria-label"),
+        ),
+      ).toEqual(["Dialectical", "Argument"]);
+    });
+
+    // Judgment, Principle and Theory are words the reader has met on the tabs,
+    // in the legend and on the nodes. A sentence apiece under a picker offering
+    // three of them is noise where the words are doing the work.
+    it("leaves the element types unglossed", () => {
+      renderBar({ elements: WITH_TEXT });
+      expect(rowsOf(openPicker("Element type"))).toEqual([
+        ["Judgment", ""],
+        ["Principle", ""],
+        ["Theory", ""],
+      ]);
+    });
+
+    it("glosses an argument in terms of its premises, not From and To", () => {
+      renderBar({ elements: WITH_TEXT, hideNonEntailsRels: true });
+      fireEvent.click(screen.getByText("Argument"));
+      expect(rowsOf(openPicker("Argument type"))).toEqual([
+        ["entails", ARGUMENT_GLOSS.entails],
+        ["precludes", ARGUMENT_GLOSS.precludes],
+      ]);
+    });
+
+    it("draws the label alone for an element with no statement", () => {
+      // ELEMENTS carries ids and nothing else.
+      renderBar({ selected: "J1" });
+      expect(rowsOf(openPicker("Relation from"))).toEqual([
+        ["J1", ""],
+        ["J2", ""],
+        ["P1", ""],
+      ]);
+    });
+
+    // The rows say it already, and a tooltip over an open list — or repeating
+    // the row the reader has just chosen — is the pile-up this replaced.
+    it("offers no tooltip anywhere, open or closed", () => {
+      renderBar({ elements: WITH_TEXT, selected: "J1" });
+      for (const p of document.querySelectorAll('[role="combobox"]')) {
+        fireEvent.mouseOver(p);
+        expect(p.title).toBe("");
+      }
+      openPicker("Relation from");
+      expect(
+        [...document.body.querySelectorAll("div")].filter(
+          (d) => d.style.position === "fixed" && !d.getAttribute("role"),
+        ),
+      ).toEqual([]);
+    });
+  });
+});
+
+// ─── The listbox itself ───────────────────────────────────────────────────────
+// A control of our own has to answer for what the browser's did for free.
+describe("AddBar picker behaviour", () => {
+  const WITH_TEXT = [
+    { id: "J1", type: "judgment", status: "active", text: "Waste is wrong." },
+    { id: "P1", type: "principle", status: "active", text: "Minimise harm." },
+    { id: "J2", type: "judgment", status: "active", text: "Distance counts." },
+  ];
+
+  it("opens and closes from the trigger", () => {
+    renderBar({ elements: WITH_TEXT, selected: "J1" });
+    const trigger = picker("Relation from");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  // Two different things that have to be legible at once: `active` is where the
+  // pointer or the keyboard is resting, `selected` is what the picker holds. On
+  // opening they are the same row, and moving off it must not lose the second.
+  it("marks the row it is holding with a tick and an accent, not weight alone", () => {
+    renderBar({ elements: WITH_TEXT, selected: "J1" });
+    const list = openPicker("Relation from");
+    const row = selectedRow(list);
+    expect(row.dataset.value).toBe("J1");
+    expect(row.style.boxShadow).toContain("inset");
+    // The tick sits in a gutter every row reserves, so the labels stay in one
+    // column; it is hidden from the reading order, aria-selected saying it.
+    const gutter = row.firstElementChild;
+    expect(gutter.textContent).toBe("\u2713");
+    expect(gutter.getAttribute("aria-hidden")).toBe("true");
+    expect(
+      [...list.querySelectorAll('[role="option"]')].map(
+        (o) => o.firstElementChild.textContent,
+      ),
+    ).toEqual(["\u2713", "", ""]);
+  });
+
+  it("keeps the tick on the held row once the keyboard moves off it", () => {
+    renderBar({ elements: WITH_TEXT, selected: "J1" });
+    const trigger = picker("Relation from");
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const list = screen.getByRole("listbox", { name: "Relation from" });
+    const [held, moved] = [...list.querySelectorAll('[role="option"]')];
+    expect(held.firstElementChild.textContent).toBe("\u2713");
+    expect(moved.dataset.active).toBe("true");
+    expect(moved.firstElementChild.textContent).toBe("");
+  });
+
+  it("marks the row the value is on, and moves the value on a click", () => {
+    renderBar({ elements: WITH_TEXT, selected: "J1" });
+    const list = openPicker("Relation from");
+    const rows = [...list.querySelectorAll('[role="option"]')];
+    expect(rows.map((r) => r.getAttribute("aria-selected"))).toEqual([
+      "true",
+      "false",
+      "false",
+    ]);
+    fireEvent.click(rows[2]);
+    expect(pickerValue("Relation from")).toBe("P1");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("walks the list with the arrow keys and commits on Enter", () => {
+    renderBar({ elements: WITH_TEXT, selected: "J1" });
+    const trigger = picker("Relation from");
+    fireEvent.keyDown(trigger, { key: "ArrowDown" }); // opens, on J1
+    fireEvent.keyDown(trigger, { key: "ArrowDown" }); // J2
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    expect(pickerValue("Relation from")).toBe("J2");
+  });
+
+  it("closes on Escape without moving the value", () => {
+    renderBar({ elements: WITH_TEXT, selected: "J1" });
+    const trigger = picker("Relation from");
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyDown(trigger, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(pickerValue("Relation from")).toBe("J1");
+  });
+
+  it("jumps to a row by typing, the habit worth keeping from a select", () => {
+    renderBar({ elements: WITH_TEXT, selected: "J1" });
+    const trigger = picker("Relation from");
+    // Closed, typing moves the value outright — as the native control did.
+    fireEvent.keyDown(trigger, { key: "p" });
+    expect(pickerValue("Relation from")).toBe("P1");
+  });
+
+  it("closes when something else is pressed", () => {
+    renderBar({ elements: WITH_TEXT, selected: "J1" });
+    openPicker("Relation from");
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("announces the row the keyboard is on, the focus never leaving", () => {
+    renderBar({ elements: WITH_TEXT, selected: "J1" });
+    const trigger = picker("Relation from");
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const active = trigger.getAttribute("aria-activedescendant");
+    expect(document.getElementById(active).textContent).toContain("J2");
   });
 });

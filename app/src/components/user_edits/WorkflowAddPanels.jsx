@@ -24,15 +24,21 @@ import {
   newArgumentId,
 } from "../../utils/stateUtils.js";
 import { Tooltip } from "../Tooltip.jsx";
-import { ElementOptions } from "./ElementOptions.jsx";
-import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
+import { Dropdown } from "./Dropdown.jsx";
+import { elementOptions } from "./ElementOptions.jsx";
+import { relationTypeOptions } from "./RelationTypeOptions.jsx";
 import {
   ACCENT_MARKER,
   SELECT_STYLE,
   PANEL_STYLE,
+  idOptionChars,
   makeRelationDefaults,
+  pickerWidth,
 } from "./addPanelShared.js";
 import { Field } from "./addPanelPrimitives.jsx";
+
+/** The six relation types, with their glosses. The same list every time. */
+const RELATION_ROWS = relationTypeOptions();
 
 /**
  * What all three panels' add buttons wear.
@@ -279,6 +285,15 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
     !conclusionClash;
   const addStyle = useAddButtonStyle(canSubmit);
 
+  /** The rows both pickers offer — the id, and what it says. */
+  const rows = elementOptions(elements);
+  /**
+   * Held at the width of the longest id it could hold rather than the one it
+   * holds now. A picker draws its own trigger, so without this it would resize
+   * every time the value changed — and the row of them shuffle sideways with it.
+   */
+  const idLayout = pickerWidth(idOptionChars(elements));
+
   const relationType =
     mode === "entails"
       ? premises.length === 1
@@ -348,17 +363,17 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
         >
           {premises.map((p, i) => (
             <div key={i} style={{ display: "flex", gap: 4 }}>
-              <select
-                value={p}
+              <Dropdown
                 // Numbered, because there may be several: "Premise" alone would
                 // give every one of them the same name, which is what a screen
                 // reader user hears as one control repeated.
-                aria-label={`Premise ${i + 1}`}
-                onChange={(e) => setPremise(i, e.target.value)}
+                label={`Premise ${i + 1}`}
+                value={p}
+                onChange={(v) => setPremise(i, v)}
+                options={rows}
                 style={SELECT_STYLE}
-              >
-                <ElementOptions elements={elements} />
-              </select>
+                layout={idLayout}
+              />
               {premises.length > 1 && (
                 <button onClick={() => removePremise(i)} style={ghostBtn}>
                   ✕
@@ -403,14 +418,14 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
           </button>
         </Tooltip>
 
-        <select
+        <Dropdown
+          label="Conclusion"
           value={conclusion}
-          aria-label="Conclusion"
-          onChange={(e) => setConclusion(e.target.value)}
-          style={{ ...SELECT_STYLE, alignSelf: "center" }}
-        >
-          <ElementOptions elements={elements} />
-        </select>
+          onChange={setConclusion}
+          options={rows}
+          style={SELECT_STYLE}
+          layout={{ ...idLayout, alignSelf: "center" }}
+        />
       </div>
       <textarea
         value={explanation}
@@ -455,6 +470,10 @@ export function AddRelationPanel({ elements, onAddRelation }) {
   const ids = elements.map((e) => e.id).sort(sortElementIds);
   const canSubmit = form.from && form.to && form.from !== form.to;
   const addStyle = useAddButtonStyle(canSubmit);
+  /** The rows the two endpoint pickers offer — the id, and what it says. */
+  const rows = elementOptions(elements);
+  /** Held at the longest id it could hold; see AddArgumentPanel's. */
+  const idLayout = pickerWidth(idOptionChars(elements));
   const handleSubmit = () => {
     onAddRelation(form);
     setForm(makeRelationDefaults(elements));
@@ -478,36 +497,37 @@ export function AddRelationPanel({ elements, onAddRelation }) {
         >
           Add relation
         </button>
-        <select
+        <Dropdown
+          label="Relation from"
           value={form.from}
-          aria-label="Relation from"
-          onChange={(e) => set("from", e.target.value)}
+          onChange={(v) => set("from", v)}
+          options={rows}
           style={SELECT_STYLE}
-        >
-          <ElementOptions elements={elements} />
-        </select>
+          layout={idLayout}
+        />
         <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
           →
         </span>
-        <select
+        <Dropdown
+          label="Relation type"
           value={form.type}
-          aria-label="Relation type"
-          onChange={(e) => set("type", e.target.value)}
+          onChange={(v) => set("type", v)}
+          options={RELATION_ROWS}
           style={{ ...SELECT_STYLE, color: C[form.type] }}
-        >
-          <RelationTypeOptions />
-        </select>
+          // 10 for "undermines" and "depends on", the longest offered.
+          layout={pickerWidth(10)}
+        />
         <span style={{ color: C.dim, fontSize: 11, fontWeight: "bold" }}>
           →
         </span>
-        <select
+        <Dropdown
+          label="Relation to"
           value={form.to}
-          aria-label="Relation to"
-          onChange={(e) => set("to", e.target.value)}
+          onChange={(v) => set("to", v)}
+          options={rows}
           style={SELECT_STYLE}
-        >
-          <ElementOptions elements={elements} />
-        </select>
+          layout={idLayout}
+        />
         {form.from === form.to && ids.length >= 2 && (
           <span style={{ fontSize: 10, color: C.conflicts }}>From ≠ To</span>
         )}

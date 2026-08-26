@@ -12,6 +12,11 @@ import {
 } from "../../utils/lastOrigin.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
 import { ConfidenceInput } from "./ConfidenceInput.jsx";
+import { Dropdown } from "./Dropdown.jsx";
+import { elementTypeOptions } from "./ElementOptions.jsx";
+
+/** The modal has the width to write theories out in full; the strip does not. */
+const TYPE_OPTIONS = elementTypeOptions("Background Theory");
 
 /**
  * The origin is whatever the reader last filled the field in with, here and in
@@ -50,15 +55,14 @@ export function AddElementForm({ form, setForm }) {
   return (
     <>
       <FormField label="Type">
-        <select
+        <Dropdown
+          label="Type"
           value={form.type}
-          onChange={(e) => set("type", e.target.value)}
+          onChange={(v) => set("type", v)}
+          options={TYPE_OPTIONS}
           style={INPUT_STYLE}
-        >
-          <option value="judgment">Judgment</option>
-          <option value="principle">Principle</option>
-          <option value="theory">Background Theory</option>
-        </select>
+          layout={{ width: "100%" }}
+        />
       </FormField>
       <ConfidenceInput
         value={form.confidence}

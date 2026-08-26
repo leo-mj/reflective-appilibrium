@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
-import { ElementOptions } from "./ElementOptions.jsx";
+import { Dropdown } from "./Dropdown.jsx";
+import { elementOptions } from "./ElementOptions.jsx";
 import { sortElementIds, defaultPickerIds } from "../../utils/stateUtils.js";
 
 const ghostBtn = {
@@ -95,6 +96,7 @@ export function AddArgumentModal({
   const hasEmpty = premises.some((p) => !p) || !conclusion;
   const isValid =
     premises.length >= 1 && !hasDuplicates && !conclusionClash && !hasEmpty;
+  const rows = elementOptions(elements);
 
   return (
     <ModalShell
@@ -113,17 +115,17 @@ export function AddArgumentModal({
               key={p}
               style={{ display: "flex", gap: 6, alignItems: "center" }}
             >
-              <select
-                value={p}
+              <Dropdown
                 // FormField's <label> is a sibling with no htmlFor, so it names
                 // nothing; and several premises would share one name in any
                 // case. Numbered and explicit here.
-                aria-label={`Premise ${i + 1}`}
-                onChange={(e) => setPremise(i, e.target.value)}
-                style={{ ...INPUT_STYLE, flex: 1 }}
-              >
-                <ElementOptions elements={elements} />
-              </select>
+                label={`Premise ${i + 1}`}
+                value={p}
+                onChange={(v) => setPremise(i, v)}
+                options={rows}
+                style={INPUT_STYLE}
+                layout={{ flex: 1 }}
+              />
               {premises.length > 1 && (
                 <button onClick={() => removePremise(i)} style={ghostBtn}>
                   ✕
@@ -177,14 +179,14 @@ export function AddArgumentModal({
       </FormField>
 
       <FormField label="Conclusion">
-        <select
+        <Dropdown
+          label="Conclusion"
           value={conclusion}
-          aria-label="Conclusion"
-          onChange={(e) => setConclusion(e.target.value)}
+          onChange={setConclusion}
+          options={rows}
           style={INPUT_STYLE}
-        >
-          <ElementOptions elements={elements} />
-        </select>
+          layout={{ width: "100%" }}
+        />
       </FormField>
 
       <FormField label="Explanation (optional)">
