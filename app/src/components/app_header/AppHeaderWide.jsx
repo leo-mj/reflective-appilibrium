@@ -560,7 +560,7 @@ export function AppHeaderWide({
             paddingBottom: 2,
           }}
         >
-          <Tooltip text="AI proposes judgments, principles and arguments.">
+          <Tooltip text="AI proposes judgments, principles, background theories and arguments, and reviews the process.">
             <button
               data-tutorial="meta-assist"
               style={metaTabBtn(metaTab === "assist")}

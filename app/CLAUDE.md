@@ -423,6 +423,35 @@ the widths is the *route* to a control, never the substance:
 `tourSections.test.js` holds both layouts to the same chapters and the same
 paragraph counts, so dropping a paragraph rather than rewording it fails.
 
+**A section that shows something on the canvas names the tab it is read on.**
+`forLayout` fills `tab: "graph"` in for any section carrying `focus`, `select`,
+`argument` or `quote` and not naming one itself, so the rule cannot be forgotten
+on a new section. Trusting the tab the tour happens to open over works only from
+the home page's Tutorial button, where the app lands on the graph; from the ?
+button — or scrolling backwards out of the Assist chapter, which does change
+tabs — the graph chapters were being read against an Assist panel, describing
+nodes that were nowhere on screen. An explicit `tab` still wins, which is what
+lets the narrow layout read the text section on its own tab.
+
+**A section's `focus` is framed against the canvas it actually has.**
+`focusFraming(dims)` in `utils/graphHelpers.js` derives the padding and the zoom
+cap from the shorter axis, because the 200px margin and the 1.5× cap that were
+written for a desktop canvas both break on the phone's graph strip — a couple of
+hundred pixels tall, once the tour's sheet has the bottom of the screen. `fitView`
+now also refuses to spend more than half an axis on margins and floors the zoom
+at `usePan`'s own `ZOOM_MIN`: `extent - padding` reaching zero drew nothing, and
+going negative mirrored the graph and blew it up to several times the strip.
+`resetView` takes what it is handed without clamping, so the clamp has to be here.
+
+**The AI chapter stops at two Assist tabs and not at the other four.** The cycle
+section names the iteration's phases — and is pinned to `WORKFLOW_NEXT_PHASE`'s
+order, so a new phase that never reaches the tour fails a test — while Theories
+and Review get a section each, being the two a reader misreads without one: a
+theory carries references whose verification state claims much less than it
+looks like it claims, and Review is not a phase of the iteration at all. Both
+ring `tab-<key>`, which is why the narrow menu's Assist entries carry the same
+`data-tutorial` ids the wide tab bar gives them.
+
 ## LLM integration
 
 - LLM response must include a fenced ` ```re-state ``` ` block; parser extracts it

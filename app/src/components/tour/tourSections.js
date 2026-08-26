@@ -265,7 +265,15 @@ function graphSections() {
   ];
 }
 
-/** Chapter 3 — where the AI is, and what it is and is not allowed to do. */
+/**
+ * Chapter 3 — where the AI is, and what it is and is not allowed to do.
+ *
+ * Two of the six Assist tabs get a section of their own, and the other four do
+ * not, because the cycle section already says what those four are for. Theories
+ * and Review are the two a reader would otherwise misread: a theory suggestion
+ * carries references whose verification state means something particular, and
+ * Review is not a phase of the iteration at all.
+ */
 function assistSections(cycle, llmEnabled) {
   return [
     {
@@ -273,7 +281,7 @@ function assistSections(cycle, llmEnabled) {
       chapter: "Where AI comes in",
       title: "Assist proposes, you decide",
       body: [
-        "The Assist section is the part that uses a large language model: it reads your position and proposes candidates — questions to draw out judgments, principles that would systematise them, arguments hiding between elements you already hold.",
+        "The Assist section is the part that uses a large language model: it reads your position and proposes candidates — questions to draw out judgments, principles that would systematise them, background theories that bear on both, and arguments hiding between elements you already hold.",
         "PLEASE NOTE: AI-generated statements within this app do not necessarily express the views of the Institute for Ethics in Technology.",
         "Each AI-suggestion arrives as a proposal with an accept and a reject button. Nothing enters your position until you put it there, and anything you accept you can edit first.",
         llmEnabled
@@ -291,10 +299,10 @@ function assistSections(cycle, llmEnabled) {
       title: `The Workflow cycle: ${cycle}`,
       body: [
         byLayout(
-          "The three Assist tabs are one iteration of the process: draw out judgments, find principles that cover them, and detect the arguments between them.",
-          "The three Assist views are one iteration of the process: draw out judgments, find principles that cover them, and detect the arguments between them.",
+          "Each Assist tab is one phase of a single iteration: draw out judgments, find principles that cover them, bring in the background theories both rest on, and detect the arguments running between them.",
+          "Each Assist view is one phase of a single iteration: draw out judgments, find principles that cover them, bring in the background theories both rest on, and detect the arguments running between them.",
         ),
-        "This helps you build out your views and spot both where they hangs together well and where the problems lie.",
+        "This helps you build out your views and spot both where they hang together well and where the problems lie.",
         byLayout(
           "Start Workflow runs the iteration for you, tab by tab, and loops. Each iteration is meant to leave your position a little more coherent than it found it.",
           "Start Workflow runs the iteration for you, view by view, and loops. Each iteration is meant to leave your position a little more coherent than it found it.",
@@ -303,6 +311,19 @@ function assistSections(cycle, llmEnabled) {
       ],
       target: "btn-workflow",
       tab: "elicitJudgments",
+      chrome: true,
+      narrow: { menu: true },
+    },
+    {
+      id: "process-review",
+      title: "Review — a reading of the process",
+      body: [
+        "Review is the one Assist tab whose output is not a change to the graph. It reads the process itself and reports in five parts: the arc your position has travelled, what is surprising in it, coherence that was available and not taken, and how you have been working — adding rather than revising, accepting suggestions as written rather than rewording them first.",
+        "The workflow stops here every fifth time round the loop, and the reviews accumulate. Each new one is given the earlier ones and asked what has moved since, and whether an opportunity a previous review named was ever taken.",
+        "Accepting or discarding one advances no round and writes nothing to the log — a review is a reading of the record, not an entry in it — so there is no cost to running one in the middle of a process.",
+      ],
+      target: "tab-processReview",
+      tab: "processReview",
       chrome: true,
       narrow: { menu: true },
     },
@@ -409,13 +430,31 @@ function forLayout(sections, isNarrow) {
     .filter((s) => !s.only || s.only === layout)
     .map(({ narrow: override, ...section }) => {
       const resolved = isNarrow ? { ...section, ...override } : section;
+      const tab = resolved.tab ?? (showsGraph(resolved) ? "graph" : undefined);
       return {
         ...resolved,
+        ...(tab ? { tab } : {}),
         title: pick(resolved.title),
         body: resolved.body.map(pick),
       };
     });
 }
+
+/**
+ * Whether a section shows the reader something on the canvas — a framing, a
+ * selection, an argument lit up, or an element quoted as a card.
+ *
+ * Such a section is read on the Graph tab, and has to say so rather than trust
+ * the tab it finds. A tour only ever opened from the home page's Tutorial
+ * button could: the app lands on the graph and the opening chapters never move
+ * off it. Started from the ? button — or scrolled backwards out of the Assist
+ * chapter, which does change tabs — those chapters were being read against
+ * whatever panel happened to be open, describing nodes that were not on screen.
+ *
+ * `tab` on the section still wins, which is what lets the narrow layout read
+ * the text section on its own tab.
+ */
+const showsGraph = (s) => !!(s.focus || s.select || s.argument || s.quote);
 
 /**
  * Builds the tour.
@@ -441,9 +480,12 @@ export function buildTourSections({
   topic,
   narrow = false,
 }) {
+  // The iteration's phases, in the order `WORKFLOW_NEXT_PHASE` runs them. The
+  // review is deliberately absent: it is a stop between iterations, not one of
+  // them, which is the whole of what its own section says.
   const cycle = hideNonEntailsRels
-    ? "judgments → principles → arguments"
-    : "judgments → principles → relations → arguments";
+    ? "judgments → principles → theories → arguments"
+    : "judgments → principles → theories → arguments → relations";
   return forLayout(
     [
       ...openingSections(topic),

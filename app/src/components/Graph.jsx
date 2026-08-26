@@ -22,6 +22,7 @@ import { useGraphClick } from "../hooks/useGraphClick.js";
 import {
   elementRadius,
   fitView,
+  focusFraming,
   getNeighbours,
   parallelEdgeOffsets,
   groupJointArguments,
@@ -607,10 +608,14 @@ export function Graph({
   const focusKey = focus?.key;
   useEffect(() => {
     if (!focusKey) return;
-    const view = fitView(positions, focus.ids ?? null, dims, {
-      padding: focus.ids ? 200 : 96,
-      maxZoom: focus.ids ? 1.5 : 1,
-    });
+    const view = fitView(
+      positions,
+      focus.ids ?? null,
+      dims,
+      // A named set is framed as tightly as this canvas can stand; the whole
+      // graph takes fitView's own defaults.
+      focus.ids ? focusFraming(dims) : { padding: 96, maxZoom: 1 },
+    );
     if (view) resetView(view.pan, view.zoom);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey, dims.w, dims.h, ready]);

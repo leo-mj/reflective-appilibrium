@@ -218,6 +218,9 @@ export function AppHeaderNarrow({
             {ASSIST_TABS.filter(isTabVisible).map((t) => (
               <button
                 key={t}
+                // Same id the wide tab bar gives the same tab, so the guided
+                // tour can ring an Assist view here without a second route.
+                data-tutorial={`tab-${t}`}
                 onClick={close(() => setTab(t))}
                 style={menuBtn(tab === t)}
               >

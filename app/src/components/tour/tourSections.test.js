@@ -17,6 +17,8 @@ const build = (overrides = {}) =>
   });
 
 const ids = (sections) => sections.map((s) => s.id);
+/** Sections that show the reader something on the canvas. */
+const showsGraph = (s) => !!(s.focus || s.select || s.argument || s.quote);
 const textOf = (section) =>
   [section.chapter, section.title, ...section.body].filter(Boolean).join(" ");
 
@@ -227,6 +229,58 @@ describe("what the tour claims", () => {
     expect(find(false)).toMatch(/demo|not enabled|no backend/i);
   });
 
+  it("names every phase the workflow actually runs, in the order it runs them", () => {
+    // The cycle line is the only place the tour states the iteration, so a
+    // phase missing from it is a phase the reader is never told about.
+    const title = (opts) => build(opts).find((s) => s.id === "cycle").title;
+    expect(title({ hideNonEntailsRels: true })).toContain(
+      "judgments → principles → theories → arguments",
+    );
+    expect(title({ hideNonEntailsRels: false })).toContain(
+      "judgments → principles → theories → arguments → relations",
+    );
+    // Review runs between iterations rather than inside one, so it is not part
+    // of the cycle the line names.
+    expect(title({ hideNonEntailsRels: false })).not.toMatch(/review/i);
+  });
+
+  it("stops at the two Assist tabs a reader would otherwise misread", () => {
+    const sections = build();
+    const order = ids(sections);
+    const theories = sections.find((s) => s.id === "theories-tab");
+    const review = sections.find((s) => s.id === "process-review");
+
+    // Both are reached by opening the tab, and both belong to the AI chapter.
+    expect(theories.tab).toBe("suggestTheories");
+    expect(theories.target).toBe("tab-suggestTheories");
+    expect(review.tab).toBe("processReview");
+    expect(review.target).toBe("tab-processReview");
+    expect(order.indexOf("theories-tab")).toBeGreaterThan(
+      order.indexOf("assist"),
+    );
+    expect(order.indexOf("process-review")).toBeLessThan(
+      order.indexOf("analyze"),
+    );
+  });
+
+  it("keeps both caveats a theory suggestion needs", () => {
+    // The independence constraint is what makes the equilibrium wide, and a
+    // Crossref verdict claims far less than it looks like it claims.
+    const theories = textOf(build().find((s) => s.id === "theories-tab"));
+    expect(theories).toMatch(/do not run through/i);
+    expect(theories).toMatch(/crossref/i);
+    expect(theories).toMatch(/never that it says what the theory claims/i);
+  });
+
+  it("says a review is a reading of the process, not a move in it", () => {
+    // Recorded as a change, a review would alter the record it describes —
+    // which is also why passing through one mid-process is safe.
+    const review = textOf(build().find((s) => s.id === "process-review"));
+    expect(review).toMatch(/not one of the iteration's phases/i);
+    expect(review).toMatch(/every fifth/i);
+    expect(review).toMatch(/advances no round/i);
+  });
+
   it("names the cycle after the relation modes that are switched on", () => {
     const armed = build({ hideNonEntailsRels: false }).find(
       (s) => s.id === "cycle",
@@ -247,6 +301,36 @@ describe("what the app is doing while a section is read", () => {
     // The tab bar comes back once and stays: flickering it on and off between
     // sections would move the graph under the reader.
     expect(firstWithChrome).toBeGreaterThan(lastWithout);
+  });
+
+  it("never reads a section about the canvas on whatever tab it finds", () => {
+    // Started from the ? button rather than from the home page's Tutorial, the
+    // tour opens over whatever tab the reader was on — and scrolling back out
+    // of the Assist chapter lands on one of those tabs too. A section that
+    // frames, selects or quotes has to name the tab it is read on.
+    [build(), build({ narrow: true })].forEach((sections) => {
+      sections
+        .filter(showsGraph)
+        .forEach((s) => expect(s.tab, `${s.id} names no tab`).toBeTruthy());
+    });
+  });
+
+  it("opens the graph for the chapters that walk the demo graph", () => {
+    [build(), build({ narrow: true })].forEach((sections) => {
+      sections
+        .slice(0, ids(sections).indexOf("assist"))
+        .filter(showsGraph)
+        .forEach((s) =>
+          expect(s.tab, `${s.id} frames the graph on ${s.tab}`).toBe("graph"),
+        );
+    });
+  });
+
+  it("still lets a section name a tab of its own", () => {
+    const thin = build({ narrow: true }).find((s) => s.id === "text");
+    expect(thin.tab).toBe("text");
+    const assist = build().find((s) => s.id === "assist");
+    expect(assist.tab).toBe("elicitJudgments");
   });
 
   it("asks for the panel it rings, where the ring is not on a control", () => {

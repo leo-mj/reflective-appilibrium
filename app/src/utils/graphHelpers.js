@@ -184,11 +184,19 @@ export function getNeighbours(selectedId, visRels) {
  * @param {{ w: number, h: number }} dims - Container pixel dimensions.
  * @param {Object} [options]
  * @param {number} [options.padding=96] - Total px subtracted per axis before fitting.
+ *   Never more than half an axis, however large it is asked to be — see below.
  * @param {number} [options.maxZoom=1]  - Upper zoom bound.
+ * @param {number} [options.minZoom=0.2] - Lower zoom bound, matching `usePan`'s
+ *   own floor: `resetView` takes whatever it is handed without clamping it.
  * @returns {{ pan: { x: number, y: number }, zoom: number } | null} Null when
  *   nothing to fit, or the container has no size yet.
  */
-export function fitView(positions, ids, dims, { padding = 96, maxZoom = 1 } = {}) {
+export function fitView(
+  positions,
+  ids,
+  dims,
+  { padding = 96, maxZoom = 1, minZoom = 0.2 } = {},
+) {
   if (!positions) return null;
   const keys = ids ?? Object.keys(positions);
   const pts = keys.map((id) => positions[id]).filter(Boolean);
@@ -206,10 +214,17 @@ export function fitView(positions, ids, dims, { padding = 96, maxZoom = 1 } = {}
   const boxW = maxX - minX || 1;
   const boxH = maxY - minY || 1;
 
-  const zoom = Math.min(
-    (dims.w - padding) / boxW,
-    (dims.h - padding) / boxH,
-    maxZoom,
+  // Padding is in screen pixels and is chosen for a canvas the size of a
+  // window. The phone's graph strip under the tour's sheet is a couple of
+  // hundred pixels tall, which a 200px margin eats whole: `extent - padding`
+  // came out at zero — nothing visible — or below it, and a negative zoom
+  // flips the graph and blows it up to several times the viewport. So margins
+  // never take more than half an axis, and the zoom is floored as well.
+  const usable = (extent) => Math.max(extent - padding, extent / 2);
+
+  const zoom = Math.max(
+    Math.min(usable(dims.w) / boxW, usable(dims.h) / boxH, maxZoom),
+    minZoom,
   );
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
@@ -217,6 +232,31 @@ export function fitView(positions, ids, dims, { padding = 96, maxZoom = 1 } = {}
   return {
     pan: { x: dims.w / 2 - cx * zoom, y: dims.h / 2 - cy * zoom },
     zoom,
+  };
+}
+
+/**
+ * How the guided tour frames the handful of elements a section names.
+ *
+ * Both numbers follow the *shorter* axis of the canvas, because both were
+ * chosen for one the size of a desktop window and neither survives the phone's
+ * graph strip — a couple of hundred pixels of it, once the tour's sheet has the
+ * bottom of the screen. A fixed 200px margin is that whole strip, and a 1.5×
+ * cap on a section naming a single node fills it with one circle at a
+ * magnification the reader has no way to read as "this is one node".
+ *
+ * So the cap reaches 1.5 only on a canvas with 600px to give on both axes, and
+ * a phone gets 1× — where a judgment is around a third of the strip's height,
+ * which is what "zoomed to this element" should look like.
+ *
+ * @param {{ w: number, h: number }} dims - Container pixel dimensions.
+ * @returns {{ padding: number, maxZoom: number }} For {@link fitView}.
+ */
+export function focusFraming(dims) {
+  const short = Math.min(dims?.w || 0, dims?.h || 0);
+  return {
+    padding: Math.min(200, short * 0.35),
+    maxZoom: Math.max(1, Math.min(1.5, short / 400)),
   };
 }
 

@@ -3,6 +3,8 @@ import {
   computeJunction,
   distToQuadBezier,
   distToSegment,
+  fitView,
+  focusFraming,
   groupJointArguments,
   hitRadius,
   nodeRadius,
@@ -266,5 +268,70 @@ describe("distToQuadBezier", () => {
     const coarse = distToQuadBezier(5, 5.2, 0, 0, 5, 10, 10, 0, 2);
     const fine = distToQuadBezier(5, 5.2, 0, 0, 5, 10, 10, 0, 64);
     expect(fine).toBeLessThanOrEqual(coarse);
+  });
+});
+
+// ─── Viewport fitting ─────────────────────────────────────────────────────────
+
+describe("fitView", () => {
+  const POSITIONS = { A: { x: 0, y: 0 }, B: { x: 400, y: 300 } };
+  // The phone's graph strip once the tour's sheet has the bottom of the screen.
+  const STRIP = { w: 390, h: 200 };
+
+  it("centres what it is asked to fit", () => {
+    const { pan, zoom } = fitView(POSITIONS, null, { w: 1000, h: 800 });
+    expect(500 - 200 * zoom).toBeCloseTo(pan.x, 5);
+    expect(400 - 150 * zoom).toBeCloseTo(pan.y, 5);
+  });
+
+  it("never flips or explodes when the padding is bigger than the viewport", () => {
+    // 200px of margin is the whole of a phone's graph strip. Subtracting it
+    // outright gave a zoom of zero, or a negative one — which mirrors the
+    // graph and blows it up to several times the strip it is drawn in.
+    const { zoom } = fitView(POSITIONS, ["A"], STRIP, {
+      padding: 200,
+      maxZoom: 1.5,
+    });
+    expect(zoom).toBeGreaterThan(0);
+    expect(zoom).toBeLessThanOrEqual(1.5);
+  });
+
+  it("keeps a set of nodes inside the strip it is framed in", () => {
+    const { zoom } = fitView(POSITIONS, ["A", "B"], STRIP, { padding: 200 });
+    // 300 world units of height have to fit in 200px, whatever the margin.
+    expect(300 * zoom).toBeLessThanOrEqual(STRIP.h);
+  });
+
+  it("floors the zoom where usePan does, since resetView does not clamp", () => {
+    const far = { A: { x: 0, y: 0 }, B: { x: 100000, y: 0 } };
+    expect(fitView(far, null, STRIP).zoom).toBe(0.2);
+  });
+
+  it("returns nothing to fit against a container with no size", () => {
+    expect(fitView(POSITIONS, null, { w: 0, h: 0 })).toBeNull();
+    expect(fitView(null, null, STRIP)).toBeNull();
+  });
+});
+
+describe("focusFraming", () => {
+  it("caps a phone's graph strip at 1×, so one node is not the whole view", () => {
+    const { maxZoom, padding } = focusFraming({ w: 390, h: 200 });
+    expect(maxZoom).toBe(1);
+    expect(padding).toBeLessThan(200);
+  });
+
+  it("frames as tightly as before on a canvas with the room for it", () => {
+    expect(focusFraming({ w: 1200, h: 900 })).toEqual({
+      padding: 200,
+      maxZoom: 1.5,
+    });
+  });
+
+  it("leaves the shorter axis something to draw in, at any size", () => {
+    [40, 120, 200, 400, 900].forEach((h) => {
+      const { padding, maxZoom } = focusFraming({ w: 800, h });
+      expect(padding).toBeLessThan(h);
+      expect(maxZoom).toBeGreaterThanOrEqual(1);
+    });
   });
 });
