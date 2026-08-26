@@ -4,13 +4,15 @@
 // linkable is selectable, including withdrawn and rejected elements, but a form
 // opens on something in play.
 import { vi, describe, it, expect, afterEach } from "vitest";
-import { render, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import {
   AddArgumentPanel,
   AddElementPanel,
   AddRelationPanel,
 } from "./WorkflowAddPanels.jsx";
+import { ADD_BAR_MIN_HEIGHT } from "./addPanelShared.js";
+import { AddBar } from "./TextTabAddPanel.jsx";
 import { C } from "../../constants/colors.js";
 import { PALETTES } from "../../constants/palettes.js";
 
@@ -154,6 +156,150 @@ describe("every control on the add panels is named", () => {
       "Relation type",
       "Relation to",
     ]);
+  });
+});
+
+// The panel's origin and confidence controls are the add bar's, caption and
+// placement included: three unlabelled letters and two unlabelled boxes say
+// nothing about what they set, and a reader who has met them under the text
+// panel should not have to work them out again in an assist tab.
+describe("the element panel's fields carry the bar's captions", () => {
+  const renderPanel = () =>
+    render(<AddElementPanel elementType="judgment" onAddElement={() => {}} />)
+      .container;
+  const caption = (container, text) =>
+    [...container.querySelectorAll("span")].find(
+      (s) => s.textContent === text && !s.querySelector("input"),
+    );
+
+  it("captions both groups", () => {
+    const container = renderPanel();
+    expect(caption(container, "By")).toBeTruthy();
+    expect(caption(container, "Confidence")).toBeTruthy();
+  });
+
+  it("keeps each caption with its own control", () => {
+    const container = renderPanel();
+    const field = (text) => caption(container, text).parentElement;
+    expect(field("By").querySelector("input").getAttribute("aria-label")).toBe(
+      "Origin",
+    );
+    expect(
+      [...field("Confidence").querySelectorAll("button")].map((b) =>
+        b.textContent.trim(),
+      ),
+    ).toEqual(["L", "M", "H"]);
+  });
+
+  it("holds the pair against the far end, apart from the add button", () => {
+    // What the element is filed under, rather than part of writing it — the
+    // same reasoning, and the same margin, as the bar's own pair.
+    const container = renderPanel();
+    const pair = caption(container, "By").parentElement.parentElement;
+    expect(pair.style.marginLeft).toBe("auto");
+  });
+});
+
+// ─── One bar, one height ──────────────────────────────────────────────────────
+// The panel at the foot of an assist tab and the strip under the text panel are
+// the same control in two places, so they start at one height and are dragged
+// together: a reader who has made the statement box taller has said how tall
+// they want that box, not how tall they want it on this tab. jsdom lays nothing
+// out, so what these hold is the wiring — the floor, the stored key, and which
+// edges each of them offers.
+describe("every add bar is one bar", () => {
+  afterEach(() => localStorage.removeItem("addBarSize"));
+
+  const PANELS = [
+    ["element", AddElementPanel, "Add judgment"],
+    ["relation", AddRelationPanel, "Add relation"],
+    ["argument", AddArgumentPanel, "Add argument"],
+  ];
+
+  const renderPanel = (Panel) =>
+    render(
+      <Panel
+        elementType="judgment"
+        elements={ELEMENTS}
+        onAddElement={() => {}}
+        onAddRelation={() => {}}
+      />,
+    ).container.firstChild;
+
+  const renderStrip = () =>
+    render(
+      <AddBar
+        elements={ELEMENTS}
+        onAddElement={() => {}}
+        onAddRelation={() => {}}
+        selected={null}
+        ctrlTo={null}
+      />,
+    ).container.querySelector('[data-tutorial="add-bar"]');
+
+  it.each(PANELS)("%s — starts at the strip's own floor", (_n, Panel) => {
+    // Not merely equal to a number written here: equal to what the strip is
+    // rendering, which is the pair that drifted to 14vh and 16vh.
+    const panel = renderPanel(Panel);
+    cleanup();
+    expect(panel.style.minHeight).toBe(ADD_BAR_MIN_HEIGHT);
+    expect(renderStrip().style.minHeight).toBe(ADD_BAR_MIN_HEIGHT);
+  });
+
+  it.each(PANELS)("%s — opens at the height the strip was left at", (_n, P) => {
+    localStorage.setItem(
+      "addBarSize",
+      JSON.stringify({ height: 240, width: 500 }),
+    );
+    const panel = renderPanel(P);
+    expect(panel.style.height).toBe("240px");
+    // The width is not the panel's to take: it is as wide as the column the
+    // central divider has left it.
+    expect(panel.style.width).toBe("");
+  });
+
+  it.each(PANELS)("%s — offers the top edge and no other", (_n, Panel) => {
+    renderPanel(Panel);
+    expect(
+      screen.getByRole("separator", { name: "Resize add bar height" }),
+    ).toBeTruthy();
+    expect(screen.queryAllByRole("separator")).toHaveLength(1);
+  });
+
+  it("writes what it was dragged to where every bar reads it", () => {
+    localStorage.setItem(
+      "addBarSize",
+      JSON.stringify({ height: 240, width: 500 }),
+    );
+    renderPanel(AddElementPanel);
+    fireEvent.keyDown(
+      screen.getByRole("separator", { name: "Resize add bar height" }),
+      { key: "ArrowUp" },
+    );
+    const stored = JSON.parse(localStorage.getItem("addBarSize"));
+    expect(stored.height).toBeGreaterThan(0);
+    // Untouched: an axis this bar does not offer is not one it may reset.
+    expect(stored.width).toBe(500);
+
+    cleanup();
+    expect(renderStrip().style.height).toBe(`${stored.height}px`);
+  });
+
+  it("double-click drops the height without dropping the strip's width", () => {
+    localStorage.setItem(
+      "addBarSize",
+      JSON.stringify({ height: 240, width: 500 }),
+    );
+    const panel = renderPanel(AddElementPanel);
+    fireEvent.doubleClick(
+      screen.getByRole("separator", { name: "Resize add bar height" }),
+    );
+
+    expect(panel.style.height).toBe("");
+    expect(JSON.parse(localStorage.getItem("addBarSize"))).toEqual({
+      height: null,
+      width: 500,
+    });
   });
 });
 

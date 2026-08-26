@@ -21,6 +21,11 @@ import { inkWeight } from "../../constants/palettes.js";
 import { useAddBarSize } from "../../hooks/useAddBarSize.js";
 import { usePalette } from "../../hooks/useTheme.js";
 import {
+  originOrDefault,
+  setLastOrigin,
+  useLastOrigin,
+} from "../../utils/lastOrigin.js";
+import {
   argumentRelationType,
   newArgumentId,
   sortElementIds,
@@ -29,6 +34,7 @@ import { ElementOptions } from "./ElementOptions.jsx";
 import { RelationTypeOptions } from "./RelationTypeOptions.jsx";
 import {
   ACCENT_MARKER,
+  ADD_BAR_MIN_HEIGHT,
   arrowStyle,
   complaintStyle,
   fieldStyle,
@@ -41,10 +47,12 @@ import {
 } from "./addPanelShared.js";
 import { Field, Picker } from "./addPanelPrimitives.jsx";
 
+// Origin is deliberately not among them: it is who is adding rather than part
+// of the element being written, and so is kept across a clear, an add and a tab
+// change alike. See {@link module:utils/lastOrigin}.
 const ELEMENT_DEFAULTS = {
   type: "judgment",
   confidence: 0.67,
-  origin: "user",
   text: "",
 };
 
@@ -111,6 +119,7 @@ export function AddBar({
   const [generation, setGeneration] = useState(0);
   const [activeTab, setActiveTab] = useState("element");
   const [elementForm, setElementForm] = useState(ELEMENT_DEFAULTS);
+  const origin = useLastOrigin();
   const [relationForm, setRelationForm] = useState(() =>
     makeRelationDefaults(elements),
   );
@@ -228,7 +237,7 @@ export function AddBar({
 
   const handleSubmit = () => {
     if (tab === "element") {
-      onAddElement(elementForm);
+      onAddElement({ ...elementForm, origin: originOrDefault(origin) });
     } else if (tab === "relation") {
       onAddRelation(relationForm);
     } else {
@@ -337,7 +346,8 @@ export function AddBar({
         // The strip's own share is a floor rather than a size: the text field
         // takes whatever the controls leave over, and anyone who wants more of
         // it drags the bar's top edge. See {@link module:hooks/useAddBarSize}.
-        minHeight: roomy ? "46dvh" : "16vh",
+        // The floor is the assist panels' too — one add bar, one height.
+        minHeight: roomy ? "46dvh" : ADD_BAR_MIN_HEIGHT,
         flexShrink: 0,
         borderTop: `1px solid ${C.border}`,
         background: C.panel,
@@ -550,8 +560,8 @@ export function AddBar({
                   <Field label="By" roomy={roomy}>
                     <input
                       aria-label="Origin"
-                      value={elementForm.origin}
-                      onChange={(e) => setEl("origin", e.target.value)}
+                      value={origin}
+                      onChange={(e) => setLastOrigin(e.target.value)}
                       placeholder="Origin"
                       style={{ ...box, width: roomy ? 118 : 90 }}
                     />

@@ -361,6 +361,18 @@ graph on every frame of a drag.
 top edge and right edge plus the corner. The phone sheet passes `enabled: false`:
 there the bar is already most of the screen.
 
+**Every add bar is one bar, at one height.** The strip under the text panel and
+the panel at the foot of an assist tab (`user_edits/WorkflowAddPanels.jsx`, whose
+`Panel` shell is the whole of it) start at the same floor —
+`ADD_BAR_MIN_HEIGHT`, one constant rather than the 16vh and 14vh they had drifted
+to — and read the same stored height, so dragging one drags them all. Only one is
+ever mounted at a time, since `REState` hides the strip on an assist tab; that is
+what makes reading the store at mount enough. **The width is not shared**: the
+strip spans the window and can give width back, an assist panel is as wide as the
+column the divider has left it, so the panels pass `axes: "height"` and a
+height-only bar leaves the stored width alone — a double-click there resets its
+own axis only.
+
 **The tour's column** — `tour/tourWidth.js`, and the one of the three that is a
 *module-level store* rather than a hook's own state, for the reason `useTheme`
 is one: the tour draws itself at this width and `REState` pads the app by it,

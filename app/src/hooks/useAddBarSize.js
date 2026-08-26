@@ -1,12 +1,25 @@
 /**
- * @fileoverview The wide layout's add bar, sized by the reader rather than by
- * the stylesheet.
+ * @fileoverview An add bar, sized by the reader rather than by the stylesheet.
  *
  * The bar holds three different forms and the one text field they share, and no
  * single size suits all of them: someone writing out a judgment wants the field
  * tall, someone chaining premises wants the row wide and the field out of the
  * way. So both axes are draggable, and the size is remembered — a bar that
  * sprang back to its default on every reload would not be worth dragging.
+ *
+ * **Every add bar is one bar, at one height.** The strip under the text panel
+ * and the panel at the foot of an assist tab are the same control in two
+ * places — an add button, its fields, and a statement box — and a reader who
+ * has dragged one taller has said how tall they want that control, not how tall
+ * they want it *here*. So the height goes in one stored key and every bar reads
+ * it. Only one of them is ever mounted at a time (`REState` hides the strip on
+ * an assist tab), which is why reading the store at mount is enough to keep
+ * them in step; two of them on screen at once would want a shared store.
+ *
+ * The width is the exception, and `axes` is how a bar says so: the strip spans
+ * the window and can give width back, while an assist panel is as wide as the
+ * column the divider has left it. A height-only bar keeps its hands off the
+ * stored width rather than resetting it — see `onDoubleClick`.
  *
  * The phone sheet is not resizable and does not call this: there the bar is
  * already most of the screen, and the two axes it could give are the two the
@@ -114,9 +127,14 @@ const HANDLE_LABEL = {
 /**
  * @param {boolean} enabled - False for the phone sheet, which keeps its own
  *   sizing; the hook then hands back styles that change nothing and no handles.
+ * @param {Object} [options]
+ * @param {"both"|"height"} [options.axes] - Which axes this bar owns. `"height"`
+ *   is for a bar whose width is not its own to give — an assist tab's panel,
+ *   which is as wide as the column it sits in.
  * @returns {{ ref: React.RefObject, sizeStyle: Object, handleProps: (axis: "height"|"width"|"both") => Object|null }}
  */
-export function useAddBarSize(enabled) {
+export function useAddBarSize(enabled, { axes: owns = "both" } = {}) {
+  const ownsWidth = owns === "both";
   const ref = useRef(null);
   const [size, setSize] = useState(enabled ? readStored : UNSET);
   /** Mirrors `size`, so a drag can persist what it ended on without an effect. */
@@ -143,7 +161,7 @@ export function useAddBarSize(enabled) {
   };
 
   const handleProps = (axis) => {
-    if (!enabled) return null;
+    if (!enabled || (!ownsWidth && axis !== "height")) return null;
     const axes = AXES[axis];
     const value = axes.x && !axes.y ? size.width : size.height;
     return {
@@ -208,11 +226,14 @@ export function useAddBarSize(enabled) {
       },
       // Both axes at once, whichever handle it lands on: a bar left at some
       // size that no longer suits is one thing, not two, and hunting for the
-      // second handle to finish undoing it is the annoying half.
+      // second handle to finish undoing it is the annoying half. Both of the
+      // ones this bar owns, that is — a panel with no width of its own to give
+      // must not throw away the width the strip was left at.
       onDoubleClick: () => {
-        latest.current = UNSET;
-        setSize(UNSET);
-        store(UNSET);
+        const next = ownsWidth ? UNSET : { ...latest.current, height: null };
+        latest.current = next;
+        setSize(next);
+        store(next);
       },
       onKeyDown: (e) => {
         const step = {
@@ -237,8 +258,19 @@ export function useAddBarSize(enabled) {
     ref,
     sizeStyle: {
       position: "relative",
-      ...(size.height ? { height: size.height, minHeight: 0 } : null),
-      ...(size.width
+      ...(size.height
+        ? {
+            height: size.height,
+            minHeight: 0,
+            // What `maxWidth` is to a remembered width: a height dragged out on
+            // a tall window, or in the strip that has the whole of one, must
+            // not swallow the shorter window or the assist column it is read
+            // back into. In CSS rather than clamped here, so it answers a
+            // window being resized rather than only a re-render.
+            maxHeight: `${Math.round(MAX_HEIGHT_FRACTION * 100)}dvh`,
+          }
+        : null),
+      ...(ownsWidth && size.width
         ? // Anchored at the left edge, which is where the panel it belongs to
           // starts. maxWidth guards a width remembered from a wider window.
           { width: size.width, maxWidth: "100%", alignSelf: "flex-start" }

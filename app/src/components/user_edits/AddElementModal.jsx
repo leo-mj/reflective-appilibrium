@@ -5,14 +5,26 @@
 
 import { useState, useEffect } from "react";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
+import {
+  lastOrigin,
+  originOrDefault,
+  setLastOrigin,
+} from "../../utils/lastOrigin.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
 import { ConfidenceInput } from "./ConfidenceInput.jsx";
 
-/** @param {'judgment'|'principle'|'theory'} type */
+/**
+ * The origin is whatever the reader last filled the field in with, here and in
+ * the two add panels alike — see {@link module:utils/lastOrigin}. Clear puts the
+ * form back to these, and so leaves it standing rather than blanking it: it is
+ * who is adding, not part of the element being written.
+ *
+ * @param {'judgment'|'principle'|'theory'} type
+ */
 const defaults = (type) => ({
   type,
   confidence: 0.67,
-  origin: "user",
+  origin: lastOrigin(),
   text: "",
 });
 
@@ -56,7 +68,12 @@ export function AddElementForm({ form, setForm }) {
         <input
           type="text"
           value={form.origin}
-          onChange={(e) => set("origin", e.target.value)}
+          // Reported outward as well as kept here, so the next form to open on
+          // any surface starts where this one was left.
+          onChange={(e) => {
+            set("origin", e.target.value);
+            setLastOrigin(e.target.value);
+          }}
           style={INPUT_STYLE}
         />
       </FormField>
@@ -113,7 +130,7 @@ export function AddElementModal({
       title="Add element"
       subtitle={`Will be added in Round ${currentRound + 1}`}
       onCancel={onCancel}
-      onSave={() => onSave(form)}
+      onSave={() => onSave({ ...form, origin: originOrDefault(form.origin) })}
       onClear={() => setForm(defaults(initialType))}
       saveDisabled={!form.text.trim()}
     >

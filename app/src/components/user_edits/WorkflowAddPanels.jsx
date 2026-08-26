@@ -11,7 +11,13 @@ import { useState } from "react";
 
 import { C } from "../../constants/colors.js";
 import { inkWeight } from "../../constants/palettes.js";
+import { useAddBarSize } from "../../hooks/useAddBarSize.js";
 import { usePalette } from "../../hooks/useTheme.js";
+import {
+  originOrDefault,
+  setLastOrigin,
+  useLastOrigin,
+} from "../../utils/lastOrigin.js";
 import {
   sortElementIds,
   defaultPickerIds,
@@ -26,6 +32,7 @@ import {
   PANEL_STYLE,
   makeRelationDefaults,
 } from "./addPanelShared.js";
+import { Field } from "./addPanelPrimitives.jsx";
 
 /**
  * What all three panels' add buttons wear.
@@ -63,6 +70,28 @@ function useAddButtonStyle(canSubmit) {
 
 
 /**
+ * The box all three panels are drawn in, and the top edge that sizes it.
+ *
+ * The height is the add bar's own, read from and written back to the one key
+ * every bar shares, so a panel dragged taller in one assist tab is that tall in
+ * the next one and in the strip under the text panel — see
+ * {@link module:hooks/useAddBarSize}. The width is not offered: a panel is as
+ * wide as the column the central divider has left it, which is dragged there
+ * rather than here.
+ */
+function Panel({ children }) {
+  const { ref, sizeStyle, handleProps } = useAddBarSize(true, {
+    axes: "height",
+  });
+  return (
+    <div ref={ref} style={{ ...PANEL_STYLE, ...sizeStyle }}>
+      <div {...handleProps("height")} />
+      {children}
+    </div>
+  );
+}
+
+/**
  * Minimal add-element panel for use inside an assist tab.
  * The element type is fixed.
  *
@@ -71,21 +100,26 @@ function useAddButtonStyle(canSubmit) {
  * @param {function} props.onAddElement
  */
 export function AddElementPanel({ elementType, onAddElement }) {
-  const [form, setForm] = useState({
-    confidence: 0.67,
-    origin: "user",
-    text: "",
-  });
+  const [form, setForm] = useState({ confidence: 0.67, text: "" });
+  // Not part of the form, and so not cleared with it: the origin is who is
+  // adding, which does not change between one element and the next, while the
+  // statement and its confidence are the element itself. See
+  // {@link module:utils/lastOrigin}.
+  const origin = useLastOrigin();
   const set = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
   const canSubmit = form.text.trim().length > 0;
   const addStyle = useAddButtonStyle(canSubmit);
   const handleSubmit = () => {
-    onAddElement({ type: elementType, ...form });
-    setForm({ confidence: 0.67, origin: "user", text: "" });
+    onAddElement({
+      type: elementType,
+      ...form,
+      origin: originOrDefault(origin),
+    });
+    setForm({ confidence: 0.67, text: "" });
   };
   return (
-    <div style={PANEL_STYLE}>
+    <Panel>
       <div
         style={{
           display: "flex",
@@ -103,51 +137,77 @@ export function AddElementPanel({ elementType, onAddElement }) {
         >
           Add {elementType}
         </button>
-        {[
-          { l: "L", v: 0.33, name: "Low" },
-          { l: "M", v: 0.67, name: "Moderate" },
-          { l: "H", v: 1.0, name: "High" },
-        ].map(({ l, v, name }) => (
-          <button
-            key={l}
-            type="button"
-            onClick={() => set("confidence", v)}
-            aria-label={`${name} confidence`}
-            title={`${name} confidence`}
-            aria-pressed={Math.abs(form.confidence - v) < 0.01}
-            style={{
-              ...SELECT_STYLE,
-              padding: "3px 7px",
-              background:
-                Math.abs(form.confidence - v) < 0.01 ? C.border : "transparent",
-              fontWeight:
-                Math.abs(form.confidence - v) < 0.01 ? "bold" : "normal",
-              cursor: "pointer",
-            }}
-          >
-            {l}
-          </button>
-        ))}
-        <input
-          type="number"
-          min={0}
-          max={1}
-          step={0.05}
-          aria-label="Confidence, 0 to 1"
-          value={form.confidence}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (!Number.isNaN(v))
-              set("confidence", Math.max(0, Math.min(1, v)));
+        {/* Captioned and placed exactly as the add bar's pair is: an unlabelled
+            box beside three unlabelled letters says nothing about what either
+            sets, and a reader who has met them in the analyze bar should not
+            have to work them out again here. Held against the far end for the
+            bar's reason too — they are what the element is filed under, rather
+            than part of writing it. */}
+        <span
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            flexWrap: "wrap",
+            marginLeft: "auto",
           }}
-          style={{ ...SELECT_STYLE, width: 55 }}
-        />
-        <input
-          value={form.origin}
-          onChange={(e) => set("origin", e.target.value)}
-          placeholder="Origin"
-          style={{ ...SELECT_STYLE, width: 90 }}
-        />
+        >
+          <Field label="By">
+            <input
+              aria-label="Origin"
+              value={origin}
+              onChange={(e) => setLastOrigin(e.target.value)}
+              placeholder="Origin"
+              style={{ ...SELECT_STYLE, width: 90 }}
+            />
+          </Field>
+          <Field label="Confidence">
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              {[
+                { l: "L", v: 0.33, name: "Low" },
+                { l: "M", v: 0.67, name: "Moderate" },
+                { l: "H", v: 1.0, name: "High" },
+              ].map(({ l, v, name }) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => set("confidence", v)}
+                  aria-label={`${name} confidence`}
+                  title={`${name} confidence`}
+                  aria-pressed={Math.abs(form.confidence - v) < 0.01}
+                  style={{
+                    ...SELECT_STYLE,
+                    padding: "3px 7px",
+                    background:
+                      Math.abs(form.confidence - v) < 0.01
+                        ? C.border
+                        : "transparent",
+                    fontWeight:
+                      Math.abs(form.confidence - v) < 0.01 ? "bold" : "normal",
+                    cursor: "pointer",
+                  }}
+                >
+                  {l}
+                </button>
+              ))}
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                aria-label="Confidence, 0 to 1"
+                title="Or any value between 0 and 1"
+                value={form.confidence}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!Number.isNaN(v))
+                    set("confidence", Math.max(0, Math.min(1, v)));
+                }}
+                style={{ ...SELECT_STYLE, width: 55 }}
+              />
+            </span>
+          </Field>
+        </span>
       </div>
       <textarea
         value={form.text}
@@ -174,7 +234,7 @@ export function AddElementPanel({ elementType, onAddElement }) {
           outline: "none",
         }}
       />
-    </div>
+    </Panel>
   );
 }
 
@@ -259,7 +319,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
   };
 
   return (
-    <div style={PANEL_STYLE}>
+    <Panel>
       <div
         style={{
           display: "flex",
@@ -377,7 +437,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
           outline: "none",
         }}
       />
-    </div>
+    </Panel>
   );
 }
 
@@ -400,7 +460,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
     setForm(makeRelationDefaults(elements));
   };
   return (
-    <div style={PANEL_STYLE}>
+    <Panel>
       <div
         style={{
           display: "flex",
@@ -477,6 +537,6 @@ export function AddRelationPanel({ elements, onAddRelation }) {
           outline: "none",
         }}
       />
-    </div>
+    </Panel>
   );
 }

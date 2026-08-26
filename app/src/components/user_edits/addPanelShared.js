@@ -23,6 +23,20 @@ export const SELECT_STYLE = {
  */
 export const ACCENT_MARKER = { "data-accent": "graph" };
 
+/**
+ * The height every add bar starts at, wherever it is drawn — the strip under
+ * the text panel and the panel at the foot of an assist tab alike. One
+ * constant, because they are one control in two places: the two were 16vh and
+ * 14vh, which is close enough to look like a rendering fault rather than a
+ * decision when a reader moves between the tabs.
+ *
+ * A floor rather than a size. The statement box takes whatever the controls
+ * above it leave over, and anyone who wants more of it drags the top edge —
+ * see {@link module:hooks/useAddBarSize}, which is where the dragged height
+ * lives and which every bar reads from the same key.
+ */
+export const ADD_BAR_MIN_HEIGHT = "16vh";
+
 export const PANEL_STYLE = {
   flexShrink: 0,
   borderTop: `1px solid ${C.border}`,
@@ -30,7 +44,7 @@ export const PANEL_STYLE = {
   display: "flex",
   flexDirection: "column",
   padding: "8px 16px",
-  minHeight: "14vh",
+  minHeight: ADD_BAR_MIN_HEIGHT,
 };
 
 // ─── Sizing ───────────────────────────────────────────────────────────────────
