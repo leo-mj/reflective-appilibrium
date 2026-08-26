@@ -24,6 +24,7 @@ const CTX = {
   onReinstate: () => {},
   onReinstateRel: () => {},
   badgeColor: () => "#888",
+  badgeFill: () => "#444",
   badgeTextColor: () => "#ccc",
   pCovers: {},
   search: "",
@@ -231,5 +232,65 @@ describe("an element that belongs to a group", () => {
       container.querySelector('[aria-label="Select group Duties"]'),
     );
     expect(onSelect.mock.calls[0][0](null)).toBe("G1");
+  });
+});
+
+describe("ElementCard sources", () => {
+  const aBook = (over = {}) => ({
+    type: "book",
+    authors: ["Parfit, D."],
+    year: "1984",
+    title: "Reasons and persons",
+    container: "",
+    editors: [],
+    publisher: "Oxford University Press",
+    volume: "",
+    issue: "",
+    pages: "",
+    doi: "",
+    ...over,
+  });
+
+  it("shows the reference an accepted theory was attributed to", () => {
+    // Without this the citation is invisible between accepting a suggestion and
+    // exporting it, which is most of the time the user spends with it.
+    const { container } = renderIn(
+      <ElementCard e={el({ type: "theory", sources: [aBook()] })} dim={false} />,
+    );
+    expect(container.textContent).toContain(
+      "Parfit, D. (1984). Reasons and persons. Oxford University Press.",
+    );
+  });
+
+  it("labels them as AI-generated, with the caveat on hover", () => {
+    const { getByText } = renderIn(
+      <ElementCard e={el({ type: "theory", sources: [aBook()] })} dim={false} />,
+    );
+    const label = getByText("Sources (AI-generated):");
+    // A Crossref match establishes that a work exists, never that it says what
+    // the element claims — the gap where a confident-looking error hides.
+    expect(label.getAttribute("title")).toMatch(/not checked/i);
+  });
+
+  it("links a confirmed reference to its DOI", () => {
+    const { getByRole } = renderIn(
+      <ElementCard
+        e={el({ type: "theory", sources: [aBook({ doi: "10.1234/abc" })] })}
+        dim={false}
+      />,
+    );
+    expect(getByRole("link").getAttribute("href")).toBe("https://doi.org/10.1234/abc");
+  });
+
+  it("renders nothing for an element with no sources", () => {
+    const { container } = renderIn(<ElementCard e={el()} dim={false} />);
+    expect(container.textContent).not.toContain("Sources");
+  });
+
+  it("renders nothing for an element written before the field existed", () => {
+    const { container } = renderIn(
+      <ElementCard e={el({ sources: undefined })} dim={false} />,
+    );
+    expect(container.textContent).not.toContain("Sources");
   });
 });

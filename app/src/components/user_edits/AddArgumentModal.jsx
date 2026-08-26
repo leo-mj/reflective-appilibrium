@@ -115,6 +115,10 @@ export function AddArgumentModal({
             >
               <select
                 value={p}
+                // FormField's <label> is a sibling with no htmlFor, so it names
+                // nothing; and several premises would share one name in any
+                // case. Numbered and explicit here.
+                aria-label={`Premise ${i + 1}`}
                 onChange={(e) => setPremise(i, e.target.value)}
                 style={{ ...INPUT_STYLE, flex: 1 }}
               >
@@ -175,6 +179,7 @@ export function AddArgumentModal({
       <FormField label="Conclusion">
         <select
           value={conclusion}
+          aria-label="Conclusion"
           onChange={(e) => setConclusion(e.target.value)}
           style={INPUT_STYLE}
         >

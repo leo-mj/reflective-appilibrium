@@ -32,11 +32,16 @@ import { AddArgumentPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
+import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
 import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 
 const ACCENT = C.judgment.accent;
 /** The same accent where it is type rather than a shape — see index.css. */
 const ACCENT_TEXT = C.judgment.text;
+
+// The header strip carries the entails green — what this tab produces — while
+// the added-premise badges keep ACCENT: those are about the judgments being
+// added, not about the arrows the argument becomes. See useHeaderAccent.
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -316,6 +321,7 @@ export function DetectArgumentsTab({
   nextPhaseIsEnabled,
   hideNonEntailsRels,
 }) {
+  const header = useHeaderAccent("detectArguments");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -491,7 +497,10 @@ export function DetectArgumentsTab({
           }}
         >
           <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-            <span style={{ color: ACCENT_TEXT, fontWeight: "bold" }}>
+            <span
+              {...header.marker}
+              style={{ ...header.badge, color: header.ink, fontWeight: header.weight }}
+            >
               Detect Arguments
             </span>
             <span style={{ color: C.dim }}>
@@ -513,12 +522,13 @@ export function DetectArgumentsTab({
                 title={why}
                 style={{
                   background: "transparent",
-                  border: `1px solid ${disabled ? C.border : ACCENT}`,
-                  color: disabled ? C.dim : ACCENT_TEXT,
+                  ...(disabled ? {} : header.badge),
+                  border: `1px solid ${disabled ? C.border : header.accent}`,
+                  color: disabled ? C.dim : header.ink,
                   borderRadius: 6,
                   padding: "5px 12px",
                   fontSize: 12,
-                  fontWeight: "bold",
+                  fontWeight: disabled ? "bold" : header.weight,
                   cursor: disabled ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",

@@ -451,6 +451,9 @@ export function Graph({
 }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
+  // Needed here for the joint-argument renderer, which is a plain function and
+  // so cannot hook for itself.
+  const palette = usePalette();
   const [tooltip, setTooltip] = useState(null);
   // Clicking a node pins its tooltip open with the same actions the text tab
   // offers. It takes precedence over the hover tooltip until dismissed.
@@ -816,6 +819,7 @@ export function Graph({
               displayPositions,
               elementById,
               graphEdgeVisuals(rels[0], wIds, dimEdge, selectedArgRelSet, rels),
+              palette,
             )}
           </React.Fragment>
         ))}

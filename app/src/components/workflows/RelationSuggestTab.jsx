@@ -230,7 +230,7 @@ export function RelationSuggestTab({
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         <SuggestionToolbar
-          accent={C.supportsText}
+          tab="suggestRelations"
           title="Suggest Relations"
           actionLabel="Suggest"
           rerunLabel="Re-suggest"

@@ -272,6 +272,167 @@ Respond with valid JSON only, in exactly this format:
 If the existing principles already cover all judgments well, return {{"suggestions": []}}."""
 
 
+# ── Background theories ────────────────────────────────────────────────────────
+#
+# The task is to offer plausible theories, and nothing else.  The elements are in
+# the prompt as context for choosing well; the model is told not to annotate them,
+# because which relations hold is worked out in the relations step, and a theory
+# arriving pre-annotated would both duplicate that and put the model's reading of
+# the connection ahead of the user's.  Nothing downstream can enforce any of this
+# any more, so the instructions below are the whole of it.
+#
+# Three of them are load-bearing and easy to erode in an edit.
+#
+# What selects a theory is the strength of the reasons for it, plus its relevance
+# to *this* topic and *these* elements.  It is emphatically not what the position
+# already presupposes: that criterion is orthogonal to plausibility, so it would
+# rank a fringe commitment the user's principles happen to require above a
+# well-supported theory they do not — and a theory chosen that way adds no
+# justificatory weight, since all its credibility is borrowed from the position
+# it is meant to support.  That is narrow RE with a third node shape.
+#
+# And the instruction about disagreement is *non-suppression*, not balance.  A
+# quota for opposing theories platforms fringe positions for opposing rather than
+# for being well-supported.  The bias that actually needs correcting is the
+# opposite one: left alone, a model suppresses what disagrees with the user in
+# order to be agreeable.  Both halves of instruction 3 are load-bearing; dropping
+# either gives one of the two failures.
+
+
+def _source_lines() -> str:
+    """The citation half of the task, kept separate because it is anti-fabrication.
+
+    Every clause here exists to stop a plausible invention.  The permission to
+    return an empty list is the most important of them: requiring a citation per
+    suggestion is precisely how fabricated citations are produced, and plenty of
+    background theories — "persons persist over time in some meaningful sense" —
+    are common property that no single work owns.
+
+    No DOIs or URLs, for a sharper reason than brevity.  A fabricated
+    author-year-title fails loudly: the reader searches for it and finds nothing.
+    A fabricated DOI fails *quietly* — it resolves, often to a real but different
+    work, and a link that resolves reads as verification.  DOIs on suggestions
+    that survive are supplied afterwards by services/crossref.py, from Crossref.
+    """
+    return """\
+For each theory, list the works where it is developed, as bibliographic FIELDS \
+rather than a formatted reference — the application does the formatting.
+
+- "type" is "book", "chapter" (a chapter in an edited volume, which is also how \
+an encyclopedia entry is recorded), or "article" (in a journal).
+- "authors" are surname-first, as a reference list renders a single name: \
+"Parfit, D.", "van Inwagen, P.", "de Beauvoir, S.".
+- "editors" are initials-first — "E. N. Zalta" — because that is how they are \
+rendered in the "In ... (Ed.)" position. Editors are for "chapter" only.
+- Fill the fields the type needs: book -> publisher; chapter -> container (the \
+book's title), editors, publisher, pages; article -> container (the journal), \
+volume, issue, pages.
+- Give NO DOIs, NO URLs, no page references beyond a chapter or article range, \
+and no quotations.
+
+Return "sources": [] rather than naming a work you are not confident exists. An \
+uncited theory is perfectly acceptable; a wrong citation is not."""
+
+
+def build_theories_prompt(
+    topic: str,
+    judgments: list[REElement],
+    principles: list[REElement],
+    existing_theories: list[REElement],
+) -> str:
+    """Build the LLM prompt for background theory suggestion.
+
+    Existing theories are included so the model does not re-propose one the user
+    already holds, exactly as ``build_principles_prompt`` passes the principles
+    already recorded.
+    """
+    judgment_lines = "\n".join(f"  {e.id}: {e.text}" for e in judgments) or "  (none)"
+    principle_lines = "\n".join(f"  {e.id}: {e.text}" for e in principles) or "  (none)"
+    theory_lines = (
+        "\n".join(f"  {e.id}: {e.text}" for e in existing_theories) or "  (none)"
+    )
+
+    return f"""\
+You are assisting a wide reflective equilibrium (RE) analysis in ethics.
+Topic: "{topic}"
+
+{DATA_RULE}
+
+Judgments the user holds:
+{fence(judgment_lines)}
+
+Principles the user holds:
+{fence(principle_lines)}
+
+Background theories already recorded:
+{fence(theory_lines)}
+
+A background theory is a broader commitment — empirical, philosophical, or \
+meta-ethical — that bears on the plausibility of a principle or on the \
+reliability of a judgment. Examples: "Human beings possess a capacity for \
+rational autonomy"; "Moral intuitions are the product of evolutionary pressures \
+and may not track moral truth"; "Personal identity persists over time in virtue \
+of psychological continuity".
+
+Task: propose up to 5 background theories that bear on the position above.
+
+1. Select on the strength of the reasons for a theory. Propose theories there \
+are good reasons to hold, independently of this user's moral position. That a \
+theory is widely accepted may be a sign such reasons exist; it is not one of \
+them, and "many philosophers think so" is not a case for anything.
+2. Select on relevance — to the topic, and to these specific judgments and \
+principles. A well-supported theory about something else does not belong here.
+3. Do not filter by whether a theory agrees with the position. Where a \
+well-supported theory tells against it, that is among the most useful things you \
+can report. Equally, do not reach for opposition for its own sake: a theory \
+belongs here because the reasons for it are strong, never because it disagrees.
+4. State each theory so it can be evaluated on its own, independently of the \
+principle it bears on. A theory that cannot be assessed apart from the position \
+it grounds has not been stated as a background theory.
+5. Do not restate a principle at higher volume. "Wellbeing matters" is not a \
+background theory for a utilitarian principle; "wellbeing is the kind of thing \
+that can be aggregated across persons" is.
+6. Do NOT propose a theory merely because the position presupposes it. What the \
+user's principles require is not a measure of whether a theory is any good.
+
+The elements above are context for choosing well, not something to annotate. Do \
+NOT say how each theory relates to them: which relations hold is worked out \
+elsewhere, and a theory offered here is offered because it is worth taking \
+seriously.
+
+{_source_lines()}
+
+Do not rate, rank, or score the user's position; do not say which way they \
+should revise it; and do not declare a winner among competing theories. \
+Presenting a tension is the task. Resolving it is the user's.
+
+Respond with valid JSON only, in exactly this format:
+{{
+  "suggestions": [
+    {{
+      "text": "One-sentence statement of the background theory.",
+      "sources": [
+        {{
+          "type": "book",
+          "authors": ["Parfit, D."],
+          "year": "1984",
+          "title": "Reasons and persons",
+          "container": "",
+          "editors": [],
+          "publisher": "Oxford University Press",
+          "volume": "",
+          "issue": "",
+          "pages": ""
+        }}
+      ]
+    }}
+  ]
+}}
+
+If no well-supported theory is relevant to this position, return \
+{{"suggestions": []}}."""
+
+
 # ── Process review ─────────────────────────────────────────────────────────────
 #
 # The review prompt is the only one that reads the *shape* of the process rather

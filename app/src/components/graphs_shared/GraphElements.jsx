@@ -58,11 +58,15 @@ export function GraphEdge({
   hitArea = false,
   parallelOffset = 0,
 }) {
+  // Edge colours come from the palette, not from colors.js: high-contrast mode
+  // carries its own set. Withdrawn and rejected stay flat — those are states,
+  // not relation types, and read the same in either mode.
+  const palette = usePalette();
   const color = isRejected
     ? C.rejected
     : isWithdrawn
       ? C.withdrawn
-      : C[relation.type];
+      : palette.edges[relation.type];
   const { x1, y1, tipX, tipY, perpX, perpY } = arrowGeometry(
     sourcePos,
     targetPos,

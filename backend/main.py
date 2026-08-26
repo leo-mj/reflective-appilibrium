@@ -28,6 +28,7 @@ from .routers import (
     review,
     sessions,
     simulate_rethon,
+    theories,
     arguments,
 )
 
@@ -87,6 +88,7 @@ app.include_router(
 app.include_router(
     simulate_rethon.router, dependencies=_gated + [Depends(rate_limit_simulation)]
 )
+app.include_router(theories.router, dependencies=_gated)
 
 
 # ── Health ─────────────────────────────────────────────────────────────────────

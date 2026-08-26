@@ -245,6 +245,34 @@ export function PrincipleIcon({ size = "2em" }) {
   );
 }
 
+/**
+ * Background theories. A diamond, because that is the shape a `T` node is drawn
+ * as on the canvas — the icon and the graph should agree about what a theory
+ * looks like. The lines inside echo PrincipleIcon's, so the two read as siblings.
+ */
+export function TheoryIcon({ size = "2em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <path
+        d="M256 48 L464 256 L256 464 L48 256 Z"
+        stroke="currentColor"
+        strokeWidth="24"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <g stroke="currentColor" strokeWidth="20" strokeLinecap="round">
+        <line x1="176" y1="224" x2="336" y2="224" />
+        <line x1="200" y1="288" x2="312" y2="288" />
+      </g>
+    </svg>
+  );
+}
+
 export function AddIcon({ size = "2em" }) {
   return (
     <svg

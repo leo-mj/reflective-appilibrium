@@ -11,6 +11,7 @@ import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import { usePlayback } from "../hooks/usePlayback.js";
+import { usePalette } from "../hooks/useTheme.js";
 import {
   elementsAtRound,
   asOfRound,
@@ -46,6 +47,8 @@ import { LogOverlay } from "./history/LogOverlay.jsx";
 export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEntailsRels }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
+  // For the joint-argument renderer, which is a plain function and cannot hook.
+  const palette = usePalette();
   const [tooltip, setTooltip] = useState(null);
   const logRef = useRef();
   const currentLogRef = useRef();
@@ -164,6 +167,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
                     positions,
                     elementById,
                     historyEdgeVisuals(rels[0], wIds, snappedRound, rels),
+                    palette,
                   )}
                 </React.Fragment>
               ))}

@@ -91,6 +91,28 @@ class Settings(BaseSettings):
 
     # ── Provider mechanics ────────────────────────────────────────────────────
 
+    # ── Reference checking ────────────────────────────────────────────────────
+
+    # Whether suggested references are checked against Crossref's public API.
+    # On by default and in every deployment: an outbound HTTPS call to a keyless
+    # public service works the same hosted, local and dev, which is the whole
+    # reason the check is Crossref rather than the user's own library. Turn it
+    # off for an air-gapped install, or a study whose protocol permits no
+    # outbound traffic beyond the LLM provider — references then read as "not
+    # checked", which is a distinct state from "not found".
+    crossref_enabled: bool = True
+    crossref_base_url: str = "https://api.crossref.org/works"
+    crossref_timeout_seconds: float = 8.0
+
+    # Self-identification for Crossref's "polite pool", which is more reliably
+    # served than the anonymous one.
+    #
+    # This is the *operator's* address, set deliberately here, and it defaults to
+    # empty so an unconfigured install stays anonymous. The address of whoever is
+    # using the app is never sent: their email is not ours to hand to a third
+    # party as a side effect of their asking for suggestions.
+    crossref_mailto: str = ""
+
     # Output cap for a single Anthropic completion, which the Messages API
     # requires explicitly.  Not sent to OpenAI-compatible providers, which do
     # not require it and would be newly constrained by it.  The relation and

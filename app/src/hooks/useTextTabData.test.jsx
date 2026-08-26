@@ -3,10 +3,12 @@
 // Selection is one id, and for an element that is the whole story. A group is
 // not: the panel holds no card called "G1", so reading the selection literally
 // left a selected group showing its own name over nothing at all.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 
 import { useTextTabData } from "./useTextTabData.js";
+import { PALETTES } from "../constants/palettes.js";
+import { inkOn } from "../constants/colors.js";
 
 const el = (id, type = "judgment") => ({
   id,
@@ -109,5 +111,35 @@ describe("selecting a group", () => {
     const d = read("G9");
     expect(d.selectedGroup).toBeNull();
     expect(d.selectedEls).toEqual([]);
+  });
+});
+
+// The id badge is drawn as the graph's own +J/+P/+T buttons are — the type's
+// `high` fill and the ink that fill takes — so it carries the node's colour in
+// whichever palette is in force. Before this, the fill and border followed the
+// palette but the ink came from a CSS variable that varies by theme and *not*
+// by contrast mode, which left a magenta principle node wearing a violet badge.
+describe("badge colours come from the palette in force", () => {
+  const TYPES = { J1: "judgment", P1: "principle", T1: "theory" };
+
+  afterEach(() => document.documentElement.removeAttribute("data-contrast"));
+
+  it.each(["default", "accessible"])("%s palette", (mode) => {
+    if (mode === "accessible")
+      document.documentElement.setAttribute("data-contrast", "high");
+    const d = read(null);
+    for (const [id, type] of Object.entries(TYPES)) {
+      const fill = PALETTES[mode][type].high;
+      expect(d.badgeFill(id), `${id} fill in ${mode}`).toBe(fill);
+      expect(d.badgeTextColor(id), `${id} ink in ${mode}`).toBe(inkOn(fill));
+    }
+  });
+
+  // The bug in one line: the two modes must not hand back the same ink for the
+  // same element, since their ramps are different colours.
+  it("moves the badge when the mode changes", () => {
+    const before = read(null).badgeFill("P1");
+    document.documentElement.setAttribute("data-contrast", "high");
+    expect(read(null).badgeFill("P1")).not.toBe(before);
   });
 });

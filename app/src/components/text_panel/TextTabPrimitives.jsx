@@ -150,10 +150,21 @@ export function SectionHeader({ title, onAdd, addLabel, collapsed, onToggle }) {
  * element from the text, and as a span it had no focus, answered no keypress,
  * and announced itself to a screen reader as a piece of text. `aria-pressed`
  * carries the selection, which was previously visible only as a colour.
+ *
+ * Filled with the type's own node colour and written in the ink that fill takes,
+ * exactly as the graph's `+J/+P/+T` buttons are — so a `P` badge and a principle
+ * node are the same colour in whichever mode is in force. It was a tinted chip
+ * before, and a tint cannot be: the ink then has to read against the *panel*,
+ * and the node ramps hold no tone dark enough to do that on the light one.
+ *
+ * Selection is a ring outside the border rather than a stronger tint, which a
+ * solid fill leaves no room for.
  */
 export function Badge({ id }) {
-  const { badgeColor, badgeTextColor, selected, onSelect } = useContext(Ctx);
-  const color = badgeColor(id);
+  const { badgeColor, badgeFill, badgeTextColor, selected, onSelect } =
+    useContext(Ctx);
+  const stroke = badgeColor(id);
+  const fill = badgeFill(id);
   const ink = badgeTextColor(id);
   const isSelected = selected === id;
   return (
@@ -173,9 +184,10 @@ export function Badge({ id }) {
         padding: "1px 7px",
         marginRight: "5px",
         borderRadius: 4,
-        background: isSelected ? color + "44" : color + "22",
+        background: fill,
         color: ink,
-        border: `1px solid ${isSelected ? color : color + "55"}`,
+        border: `1px solid ${stroke}`,
+        boxShadow: isSelected ? `0 0 0 2px ${stroke}` : "none",
         flexShrink: 0,
         lineHeight: 1.8,
         cursor: "pointer",

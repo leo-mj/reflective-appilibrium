@@ -83,6 +83,63 @@ graph.
 `state.groups` is absent from every state written before the feature existed —
 read it through `groupsOf(state)`, never directly.
 
+### Background theories
+
+Suggested by `components/workflows/TheorySuggestTab.jsx`, backed by
+`POST /api/theories/suggest`. Two things decide what gets proposed, and both are
+in the prompt rather than in a field the model fills in:
+
+1. **The strength of the reasons for the theory** — reasons that do not run
+   through this user's moral position. That is the independence constraint, and
+   it is what makes RE *wide*. Standing in the literature is a defeasible sign
+   such reasons exist; it is never a substitute for one.
+2. **Relevance** — to the topic, and to these judgments and principles. Enforced,
+   not merely asked for: a suggestion bearing on no active element is dropped.
+
+Two criteria it deliberately is **not**, both of which look plausible:
+
+- **Not presupposition.** "Surface what the position already presupposes" is
+  orthogonal to plausibility — it would rank a fringe commitment the user's
+  principles happen to require above a well-supported theory they do not, and a
+  theory chosen that way borrows all its credibility from the position it is
+  meant to support. That is narrow RE with a third node shape. `depends` remains
+  a legal *relation*; it is just never a reason to propose anything.
+- **Not balance.** The prompt must not require theories on both sides: a quota
+  for opposition platforms fringe positions for opposing rather than for being
+  well-supported. The instruction is *non-suppression* — do not filter by whether
+  a theory agrees — which corrects the real bias (a model suppressing what
+  disagrees with the user) without manufacturing controversy.
+
+A suggestion is a theory and the works it is developed in, and **says nothing
+about how it relates to the elements already on the board**. Which relations hold
+is the Relations tab's business; annotating them here would duplicate that tab
+and put the model's reading of a connection ahead of the user's. The elements
+reach the prompt as context for choosing well, and the prompt says explicitly not
+to comment on them — a model handed a list of principles otherwise volunteers how
+each theory bears on them.
+
+One consequence worth knowing: relevance was the criterion the router could
+enforce, by dropping a theory that bore on nothing. It is now a prompt
+instruction like the rest, so nothing downstream checks it.
+
+**Citations.** `sources` on the element holds bibliographic *fields*, and
+`app/src/utils/citation.js` does the APA 7 formatting — asking a model for
+formatted prose would make quality depend on its typography rather than on what
+it knows. They are optional by design: requiring one per suggestion is how
+fabricated citations are produced, and the prompt says so explicitly.
+
+`services/crossref.py` checks each one, and its three states must stay distinct:
+`matched` (confirmed, and carrying Crossref's DOI), `not_found` (checked,
+nothing confirmed), `unchecked` (could not look). **`not_found` is not evidence
+of fabrication** — Crossref does not index every philosophy monograph — and a
+**`matched` establishes only that the work exists**, never that it says what the
+element claims. Both caveats are load-bearing in the UI wording. The verdict is
+response-only; the DOI persists, so a stored reference carrying one is a
+reference that verified, and nothing goes stale.
+
+`sources` is absent from every element written before the feature existed, and
+from anything added by hand.
+
 ### Process reviews
 
 A **review** is an LLM reading of the process as a whole — `state.reviews`,
@@ -124,7 +181,7 @@ read it through `reviewsOf(state)`, never directly.
     participantArguments: Array,    // index arrays, last entry = conclusion
     furtherArguments: Array,
   },
-  elements: [{ id, type, status, confidence, origin, text, addedRound, ?history, ?previousText, ?revisedRound, ?reason, ?rejectedRound, ?questionnaireIndex }],
+  elements: [{ id, type, status, confidence, origin, text, addedRound, ?history, ?previousText, ?revisedRound, ?reason, ?rejectedRound, ?questionnaireIndex, ?sources }],
   relations: [{ from, to, type, explanation, addedRound, ?origin, ?status, ?history, ?argumentId, ?revisedRound }],
   coherence: { tensions: [], orphans: [], clusters: [] },
   ?groups: [{ id, label, members: [elementId], collapsed }],

@@ -10,7 +10,11 @@
    pushed light or dark far enough to be legible as text, and they have to be
    per-theme because the direction differs — #2563eb passes on the light panel
    (4.72:1) and fails on the dark one. Fills stay as they are; only foregrounds
-   use these. */
+   use these.
+
+   These are *not* what the assist tab headers use. Those take their graph
+   constant exactly, accepting that several are under AA in the default mode —
+   see `headerAccent` in constants/palettes.js. */
 :root {
   --c-bg: #0f172a;
   --c-panel: #1e293b;

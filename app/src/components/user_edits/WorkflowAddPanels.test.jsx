@@ -6,7 +6,12 @@
 import { vi, describe, it, expect, afterEach } from "vitest";
 import { render, fireEvent, cleanup } from "@testing-library/react";
 
-import { AddArgumentPanel, AddRelationPanel } from "./WorkflowAddPanels.jsx";
+import {
+  AddArgumentPanel,
+  AddElementPanel,
+  AddRelationPanel,
+} from "./WorkflowAddPanels.jsx";
+import { C, inkOn } from "../../constants/colors.js";
 
 afterEach(cleanup);
 
@@ -110,5 +115,74 @@ describe("AddRelationPanel", () => {
     expect(onAddRelation).toHaveBeenCalledWith(
       expect.objectContaining({ from: "J1", type: "entails" }),
     );
+  });
+});
+
+// A <select> with no accessible name is announced as "combo box" and nothing
+// else, which is axe's `critical` impact and the one defect class on these
+// panels that assistive tech cannot work around. Asserted per panel rather than
+// through the app-wide sweep because AddArgumentPanel renders a *variable*
+// number of premise selects, and a name shared between two of them reads as one
+// control repeated — which a "has a name" check on a single instance misses.
+describe("every control on the add panels is named", () => {
+  const named = (el) =>
+    (el.getAttribute("aria-label") ?? el.getAttribute("title") ?? "").trim();
+  const unnamed = (container) =>
+    [...container.querySelectorAll("select, input, textarea")]
+      .filter((el) => !/[A-Za-z]{3,}/.test(named(el) || el.placeholder || ""))
+      .map((el) => el.outerHTML.slice(0, 80));
+
+  it("names both selects on AddArgumentPanel, premises distinctly", () => {
+    const { container } = render(
+      <AddArgumentPanel elements={ELEMENTS} onAddRelation={() => {}} />,
+    );
+    expect(unnamed(container)).toEqual([]);
+    fireEvent.click(button(container, "+ premise"));
+    const names = selects(container).map(named);
+    expect(names).toEqual(["Premise 1", "Premise 2", "Conclusion"]);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("names all three selects on AddRelationPanel", () => {
+    const { container } = render(
+      <AddRelationPanel elements={ELEMENTS} onAddRelation={() => {}} />,
+    );
+    expect(unnamed(container)).toEqual([]);
+    expect(selects(container).map(named)).toEqual([
+      "Relation from",
+      "Relation type",
+      "Relation to",
+    ]);
+  });
+});
+
+// app/CLAUDE.md: the nodes are the exception to AA, a button is not. These three
+// named an ink by hand instead of asking, and white on the cyan is 2.43:1 — the
+// worst contrast in the app. The fill is untouched; only the ink is asked for.
+describe("the add buttons ask for their ink", () => {
+  // jsdom normalises an inline hex to rgb(), so the expectation is normalised
+  // the same way rather than the assertion being loosened to a substring.
+  const asRendered = (hex) => {
+    const probe = document.createElement("span");
+    probe.style.color = hex;
+    return probe.style.color;
+  };
+
+  it.each([
+    ["judgment", AddElementPanel, "Add judgment", C.supports],
+    ["relation", AddRelationPanel, "Add relation", C.supports],
+    ["argument", AddArgumentPanel, "Add argument", C.jointly_entails],
+  ])("%s", (_name, Panel, label, fill) => {
+    const { container } = render(
+      <Panel
+        elementType="judgment"
+        elements={ELEMENTS}
+        onAddElement={() => {}}
+        onAddRelation={() => {}}
+      />,
+    );
+    const el = button(container, label);
+    expect(el.style.color).toBe(asRendered(inkOn(fill)));
+    expect(el.style.color).not.toBe(asRendered(C.onFill));
   });
 });

@@ -20,6 +20,7 @@ import { relationTypeLabel, statusTag } from "../../utils/stateUtils.js";
 import { groupOfElement } from "../../utils/groupUtils.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
 import { Ctx } from "./TextTabContext.js";
+import { Citation, CITATION_CAVEAT } from "../Citation.jsx";
 import {
   MetaChip,
   Badge,
@@ -143,6 +144,21 @@ export function ElementCard({ e, dim }) {
       {e.previousText && (
         <div style={{ ...META_LABEL_STYLE, color: C.dim }}>
           Previously: "{e.previousText}"
+        </div>
+      )}
+      {/* Without this the reference is invisible between accepting a suggestion
+          and exporting it, which is most of the time the user spends with it.
+          The label is the same caveat the suggestion carried: the works were
+          named by a model, and a confirmed one exists without that confirming it
+          says what the element claims. */}
+      {e.sources?.length > 0 && (
+        <div style={{ ...META_LABEL_STYLE, color: C.dim }}>
+          <span title={CITATION_CAVEAT}>Sources (AI-generated):</span>
+          {e.sources.map((source, i) => (
+            <div key={i} style={{ paddingLeft: 8 }}>
+              <Citation source={source} />
+            </div>
+          ))}
         </div>
       )}
       {/* Kept on the element after reinstatement as history, but only shown

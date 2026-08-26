@@ -215,6 +215,7 @@ export function TextTab({
   const {
     pCovers,
     badgeColor,
+    badgeFill,
     badgeTextColor,
     displayEls,
     displayRels,
@@ -355,6 +356,7 @@ export function TextTab({
         onReinstate,
         onReinstateRel,
         badgeColor,
+        badgeFill,
         badgeTextColor,
         pCovers,
         search,

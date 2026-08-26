@@ -52,6 +52,33 @@ Saved: 2026-01-15 09:30:00 UTC
           "previousText": "Respect refusal of treatment."
         }
       ]
+    },
+    {
+      "id": "T1",
+      "type": "theory",
+      "status": "active",
+      "confidence": 0.67,
+      "origin": "gpt-4o",
+      "text": "Autonomy is grounded in a capacity for reflective self-governance rather than in the quality of the choices it produces.",
+      "addedRound": 4,
+      "negated": false,
+      "sources": [
+        {
+          "type": "book",
+          "authors": [
+            "Frankfurt, H. G."
+          ],
+          "year": "1988",
+          "title": "The importance of what we care about",
+          "container": "",
+          "editors": [],
+          "publisher": "Cambridge University Press",
+          "volume": "",
+          "issue": "",
+          "pages": "",
+          "doi": "10.1017/cbo9780511818172"
+        }
+      ]
     }
   ],
   "relations": [

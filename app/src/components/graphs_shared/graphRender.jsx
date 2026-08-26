@@ -225,16 +225,24 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
  * @param {PositionMap}         positions
  * @param {Map<string,REElement>} elementById
  * @param {Object}              visuals  - Output of `graphEdgeVisuals` for the group.
+ * @param {import('../../constants/palettes.js').Palette} palette - Passed rather
+ *   than hooked: this is a plain function, and its caller already holds one.
  * @returns {React.ReactElement|null}
  */
-export function renderJointArgument(rels, positions, elementById, visuals) {
+export function renderJointArgument(
+  rels,
+  positions,
+  elementById,
+  visuals,
+  palette,
+) {
   const conclusionId = rels[0].to;
   const conclusionEl = elementById.get(conclusionId);
   const conclusionPos = positions[conclusionId];
   if (!conclusionPos || !conclusionEl) return null;
 
   const { isWithdrawn, opacity, strokeWidth = 2, transition } = visuals;
-  const color = isWithdrawn ? C.withdrawn : C[rels[0].type];
+  const color = isWithdrawn ? C.withdrawn : palette.edges[rels[0].type];
 
   const premises = rels
     .map((r) => ({ r, el: elementById.get(r.from), pos: positions[r.from] }))
@@ -335,8 +343,10 @@ export function renderNode(
   const position = positions[element.id];
   if (!position) return null;
   const { children = null, ...nodeProps } = visuals;
+  // `key` is deliberately *not* in here. React 19 warns when a key arrives
+  // through a spread, because a spread key is indistinguishable from a data
+  // prop at the call site; it is passed explicitly on each element below.
   const shared = {
-    key: element.id,
     element,
     position,
     cursor: isDragging ? "grabbing" : "pointer",
@@ -351,6 +361,7 @@ export function renderNode(
     // what the factory returns, and neither is a state a group can be in.
     return (
       <GraphGroupNode
+        key={element.id}
         {...shared}
         radius={elementRadius(element)}
         opacity={nodeProps.opacity}
@@ -361,7 +372,7 @@ export function renderNode(
     );
   }
   return (
-    <GraphNode {...shared} {...nodeProps}>
+    <GraphNode key={element.id} {...shared} {...nodeProps}>
       {children}
     </GraphNode>
   );

@@ -37,6 +37,7 @@ function setup({ coherence = COHERENCE, clusters = CLUSTERS } = {}) {
         selected: null,
         onSelect: () => {},
         badgeColor: () => "#888",
+        badgeFill: () => "#444",
         badgeTextColor: () => "#888",
         search: "",
         isWide: true,

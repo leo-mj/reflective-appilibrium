@@ -226,3 +226,83 @@ describe("buildMarkdown process reviews", () => {
     expect(parsed.reviews[0].id).toBe("rev-1");
   });
 });
+
+describe("buildMarkdown element sources", () => {
+  const aBook = (over = {}) => ({
+    type: "book",
+    authors: ["Parfit, D."],
+    year: "1984",
+    title: "Reasons and persons",
+    container: "",
+    editors: [],
+    publisher: "Oxford University Press",
+    volume: "",
+    issue: "",
+    pages: "",
+    doi: "",
+    ...over,
+  });
+
+  const cited = (sources) =>
+    makeState({
+      elements: [
+        {
+          id: "T1",
+          type: "theory",
+          status: "active",
+          confidence: 0.67,
+          origin: "claude-fable-5",
+          text: "A theory",
+          addedRound: 4,
+          sources,
+        },
+      ],
+    });
+
+  it("renders each reference in APA 7, with italics", () => {
+    const md = elementsBlock(buildMarkdown(cited([aBook()]), {}));
+    expect(md).toContain(
+      "Parfit, D. (1984). *Reasons and persons*. Oxford University Press.",
+    );
+  });
+
+  it("labels them as AI-generated and unverified", () => {
+    // The label travels with the data: an exported document is the artefact
+    // someone might cite *from*, so a caveat that lived only in the UI would
+    // evaporate at the moment it started to matter.
+    const md = elementsBlock(buildMarkdown(cited([aBook()]), {}));
+    expect(md).toContain("*Sources (AI-generated, unverified):*");
+  });
+
+  it("appends the resolver URL when Crossref confirmed the work", () => {
+    const md = elementsBlock(
+      buildMarkdown(cited([aBook({ doi: "10.1093/019824908x.001.0001" })]), {}),
+    );
+    expect(md).toContain("https://doi.org/10.1093/019824908x.001.0001");
+  });
+
+  it("writes nothing for an element with no sources", () => {
+    const md = elementsBlock(buildMarkdown(makeState(), {}));
+    expect(md).not.toContain("Sources");
+  });
+
+  it("writes nothing for a state saved before the field existed", () => {
+    const md = elementsBlock(buildMarkdown(cited(undefined), {}));
+    expect(md).not.toContain("Sources");
+  });
+
+  it("escapes reference text without defusing its own emphasis", () => {
+    // `esc` escapes `*`, so it has to be applied per run rather than to the
+    // finished string — otherwise every marker the formatter added is neutered.
+    const md = elementsBlock(
+      buildMarkdown(cited([aBook({ title: "Reasons & persons" })]), {}),
+    );
+    expect(md).toContain("*Reasons &amp; persons*");
+  });
+
+  it("carries the sources into the machine-readable block for re-import", () => {
+    const md = buildMarkdown(cited([aBook()]), {});
+    const parsed = JSON.parse(md.split("```re-state\n")[1].split("\n```")[0]);
+    expect(parsed.elements[0].sources[0].title).toBe("Reasons and persons");
+  });
+});

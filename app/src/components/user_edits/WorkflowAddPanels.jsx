@@ -9,7 +9,7 @@
 
 import { useState } from "react";
 
-import { C } from "../../constants/colors.js";
+import { C, inkOn } from "../../constants/colors.js";
 import {
   sortElementIds,
   defaultPickerIds,
@@ -26,7 +26,7 @@ import { SELECT_STYLE, PANEL_STYLE, makeRelationDefaults } from "./addPanelShare
  * The element type is fixed.
  *
  * @param {Object}   props
- * @param {"judgment"|"principle"} props.elementType
+ * @param {"judgment"|"principle"|"theory"} props.elementType
  * @param {function} props.onAddElement
  */
 export function AddElementPanel({ elementType, onAddElement }) {
@@ -64,7 +64,11 @@ export function AddElementPanel({ elementType, onAddElement }) {
             cursor: canSubmit ? "pointer" : "default",
             border: "none",
             background: C.supports,
-            color: C.onFill,
+            // The fill is untouched; only which of the two inks goes on it is
+            // asked rather than assumed. White on the cyan is 2.43:1 — worse
+            // than any node — and app/CLAUDE.md already draws the line: the
+            // nodes are the exception to AA, a button is not.
+            color: inkOn(C.supports),
             opacity: canSubmit ? 1 : 0.4,
           }}
         >
@@ -246,7 +250,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
             cursor: canSubmit ? "pointer" : "default",
             border: "none",
             background: mode === "entails" ? C.jointly_entails : C.jointly_precludes,
-            color: C.onFill,
+            color: inkOn(mode === "entails" ? C.jointly_entails : C.jointly_precludes),
             opacity: canSubmit ? 1 : 0.4,
             flexShrink: 0,
             alignSelf: "center",
@@ -267,6 +271,10 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
             <div key={i} style={{ display: "flex", gap: 4 }}>
               <select
                 value={p}
+                // Numbered, because there may be several: "Premise" alone would
+                // give every one of them the same name, which is what a screen
+                // reader user hears as one control repeated.
+                aria-label={`Premise ${i + 1}`}
                 onChange={(e) => setPremise(i, e.target.value)}
                 style={SELECT_STYLE}
               >
@@ -318,6 +326,7 @@ export function AddArgumentPanel({ elements, onAddRelation }) {
 
         <select
           value={conclusion}
+          aria-label="Conclusion"
           onChange={(e) => setConclusion(e.target.value)}
           style={{ ...SELECT_STYLE, alignSelf: "center" }}
         >
@@ -392,7 +401,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
             cursor: canSubmit ? "pointer" : "default",
             border: "none",
             background: C.supports,
-            color: C.onFill,
+            color: inkOn(C.supports),
             opacity: canSubmit ? 1 : 0.4,
           }}
         >
@@ -400,6 +409,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
         </button>
         <select
           value={form.from}
+          aria-label="Relation from"
           onChange={(e) => set("from", e.target.value)}
           style={SELECT_STYLE}
         >
@@ -410,6 +420,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
         </span>
         <select
           value={form.type}
+          aria-label="Relation type"
           onChange={(e) => set("type", e.target.value)}
           style={{ ...SELECT_STYLE, color: C[form.type] }}
         >
@@ -420,6 +431,7 @@ export function AddRelationPanel({ elements, onAddRelation }) {
         </span>
         <select
           value={form.to}
+          aria-label="Relation to"
           onChange={(e) => set("to", e.target.value)}
           style={SELECT_STYLE}
         >

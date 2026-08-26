@@ -85,6 +85,11 @@ const DetectArgumentsTab = lazy(() =>
   })),
 );
 
+const TheorySuggestTab = lazy(() =>
+  import("./workflows/TheorySuggestTab.jsx").then((m) => ({
+    default: m.TheorySuggestTab,
+  })),
+);
 const ProcessReviewTab = lazy(() =>
   import("./workflows/ProcessReviewTab.jsx").then((m) => ({
     default: m.ProcessReviewTab,
@@ -307,6 +312,22 @@ export function GraphPanel({
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
+            />
+          </Suspense>
+        )}
+        {tab === "suggestTheories" && (
+          <Suspense fallback={null}>
+            {/* `autoFetch={false}` and no `workflowPhase`, for the same reasons
+                spelled out on the review tab below: theories are an assist tab
+                and not a workflow phase, and a tab switch must not spend an LLM
+                call — nor a round of Crossref lookups — on its own. */}
+            <TheorySuggestTab
+              state={state}
+              onAddElement={onAddElement}
+              onRejectElements={onRejectElements}
+              autoFetch={false}
+              useDummy={useDummyAssist}
+              suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
         )}

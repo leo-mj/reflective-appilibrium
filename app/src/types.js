@@ -86,6 +86,32 @@ export {};
 // ─── Domain objects ───────────────────────────────────────────────────────────
 
 /**
+ * A work an element is attributed to, held as bibliographic fields rather than
+ * as a formatted reference — `utils/citation.js` does the APA 7 formatting.
+ *
+ * These are supplied by the model that proposed the element and are **not
+ * verified to say what the suggestion claims**; only that the work exists, and
+ * only when `doi` is set. That field is filled by the backend from Crossref and
+ * never by the model, so its presence is what records that the reference was
+ * confirmed. Its absence means nothing either way: Crossref does not index every
+ * philosophy monograph.
+ *
+ * @typedef {Object}   RESource
+ * @property {'book'|'chapter'|'article'} type - `chapter` also covers an entry in
+ *   an edited reference work.
+ * @property {string[]} authors   - Surname-first, e.g. `"Parfit, D."`.
+ * @property {string}   year      - `"1984"`, `"n.d."`, `"in press"`.
+ * @property {string}   title     - Of the work, or of the chapter or article.
+ * @property {string}   [container] - Book title for a chapter, journal for an article.
+ * @property {string[]} [editors] - Initials-first, e.g. `"E. N. Zalta"`. Chapters only.
+ * @property {string}   [publisher]
+ * @property {string}   [volume]
+ * @property {string}   [issue]
+ * @property {string}   [pages]
+ * @property {string}   [doi]     - From Crossref only. See above.
+ */
+
+/**
  * A single moral element: judgment, principle, or background theory.
  *
  * @typedef {Object} REElement
@@ -111,6 +137,9 @@ export {};
  *   from older saved states. New writes record a `history` event instead.
  * @property {number}          [rejectedRound]  - Round in which element was rejected (rejected only).
  * @property {boolean}         [negated]        - True when this element appears as a negated sentence in a rethon position (simulation only; defaults to false).
+ * @property {RESource[]}      [sources]        - Works this element is attributed to.
+ *   Absent on every element written before the theory suggestion tab existed, and on
+ *   anything the user added by hand.
  */
 
 /**

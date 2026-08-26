@@ -105,6 +105,16 @@ describe("the phase maps", () => {
     expect(Object.values(WORKFLOW_NEXT_PHASE)).not.toContain("processReview");
   });
 
+  it("leaves suggestTheories out of the workflow", () => {
+    // Same reasoning as review, plus one of its own: the four phases loop to
+    // build the position, and background theories enter later in the process.
+    // Absence from both maps is also what stops a tab switch spending an LLM
+    // call and a round of Crossref lookups on its own.
+    expect(WORKFLOW_NEXT_PHASE).not.toHaveProperty("suggestTheories");
+    expect(WORKFLOW_PHASE_LABELS).not.toHaveProperty("suggestTheories");
+    expect(Object.values(WORKFLOW_NEXT_PHASE)).not.toContain("suggestTheories");
+  });
+
   it("keeps the loop closed over exactly the phases it labels", () => {
     // A phase named in one map and not the other is a phase the workflow either
     // cannot leave or cannot announce.

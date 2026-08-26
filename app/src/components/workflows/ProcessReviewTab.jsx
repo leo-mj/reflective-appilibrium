@@ -373,7 +373,7 @@ export function ProcessReviewTab({
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         <SuggestionToolbar
-          accent={C.text}
+          tab="processReview"
           title="Review Process"
           actionLabel="Analyse"
           rerunLabel="Analyse again"

@@ -13,6 +13,7 @@ import {
   findMergeCandidates,
 } from "./clusterUtils.js";
 import { buildPrincipleCovers } from "./textTabHelpers.js";
+import { citationMarkdown } from "./citation.js";
 import { sortElementIds, historyOf, reviewsOf } from "./stateUtils.js";
 import { groupsOf } from "./groupUtils.js";
 import { generateGraphSVG, svgToDataUrl } from "./generateSVG.js";
@@ -59,6 +60,27 @@ function historyEntries(item) {
   });
 }
 
+/**
+ * The works an element is attributed to, in APA 7.
+ *
+ * The label carries the provenance, and does so here rather than only on screen:
+ * an exported document is the artefact someone might go on to cite *from*, so a
+ * caveat that lived in the UI alone would evaporate at exactly the moment it
+ * started to matter. What it can honestly say is narrow — these were named by a
+ * model, and a Crossref match (the DOI) establishes that a work exists, never
+ * that it says what the element claims.
+ */
+function sourcesLines(el) {
+  if (!el.sources?.length) return "";
+  const refs = el.sources
+    // `esc` escapes `*` and `_`, so it is passed *into* the formatter to be
+    // applied per run — escaping the finished string would put a backslash in
+    // front of every emphasis marker the formatter had just added.
+    .map((s) => `\n> ${citationMarkdown(s, esc)}`)
+    .join("");
+  return `\n\n*Sources (AI-generated, unverified):*${refs}`;
+}
+
 function elementsSection(elements, type, label, pCovers) {
   const els = elements.filter((e) => e.type === type);
   if (!els.length) return "";
@@ -76,7 +98,8 @@ function elementsSection(elements, type, label, pCovers) {
       .map((line) => `\n> ${line}`)
       .join("");
     lines.push(
-      `**${el.id}** · ${el.confidence}${statusTag}\n${bodyText}${covers}${trail}\n`,
+      `**${el.id}** · ${el.confidence}${statusTag}\n${bodyText}${covers}${trail}` +
+        `${sourcesLines(el)}\n`,
     );
   }
   return lines.join("\n");

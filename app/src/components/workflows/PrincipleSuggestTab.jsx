@@ -252,7 +252,7 @@ export function PrincipleSuggestTab({
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         <SuggestionToolbar
-          accent={C.principle.text}
+          tab="suggestPrinciples"
           title="Suggest Principles"
           actionLabel="Suggest"
           rerunLabel="Re-suggest"

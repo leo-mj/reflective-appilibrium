@@ -9,7 +9,7 @@ these models; the import security logic mirrors importMarkdown.js.
 from __future__ import annotations
 
 from typing import Annotated, List, Literal, Optional, Union
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 
 # ── Element ────────────────────────────────────────────────────────────────────
@@ -46,6 +46,59 @@ class REHistoryEvent(BaseModel):
 # ``LEGACY_CONFIDENCE`` in app/src/utils/importMarkdown.js) and the user adjusts
 # it on acceptance.  This is the same default the manual add-element panels use.
 DEFAULT_CONFIDENCE: float = 0.67
+
+
+# ── Source ─────────────────────────────────────────────────────────────────────
+
+# The three reference kinds a philosophy bibliography is made of. An entry in an
+# online reference work — a Stanford Encyclopedia article, the common fourth case
+# — is structurally a chapter in an edited volume and takes that type.
+CitationType = Literal["book", "chapter", "article"]
+
+
+class RESource(BaseModel):
+    """A work an element is attributed to, as bibliographic data rather than prose.
+
+    The model that proposes an element supplies these fields; the *formatting* is
+    the app's, in app/src/utils/citation.js.  Asking a model for a formatted APA
+    reference would make output quality depend on its typography rather than on
+    what it knows — a small local model punctuates worse than a large one while
+    knowing the same works — and a formatted string cannot be validated per type,
+    rendered with italics, or restyled later without re-prompting.
+
+    Which fields are required depends on ``type``; the theories router drops a
+    source that lacks its own (book → publisher, chapter → container + publisher,
+    article → container), since such a source can be neither rendered nor matched.
+    """
+
+    type: CitationType
+    # Surname-first, as APA renders a single name: "Parfit, D.", "van Inwagen, P.",
+    # "de Beauvoir, S.". The form of a name is data, and language-specific; the
+    # punctuation of a *list* of them ("&", the ellipsis at 21+) is style, and
+    # belongs to the formatter.
+    authors: list[Annotated[str, StringConstraints(max_length=200)]] = Field(
+        default_factory=list, max_length=25
+    )
+    year: str = Field(default="", max_length=12)  # "1984", "n.d.", "in press"
+    title: str = Field(default="", max_length=400)  # of the chapter/article, for those
+    container: str = Field(default="", max_length=300)  # book title | journal name
+    # Initials-first — "E. N. Zalta" — because APA inverts editor names in the
+    # "In … (Ed.)" position. Two name conventions in one model is APA's rule, not
+    # an inconsistency here; the prompt states both.
+    editors: list[Annotated[str, StringConstraints(max_length=200)]] = Field(
+        default_factory=list, max_length=10
+    )
+    publisher: str = Field(default="", max_length=200)  # book | chapter
+    volume: str = Field(default="", max_length=20)  # article
+    issue: str = Field(default="", max_length=20)  # article
+    pages: str = Field(default="", max_length=30)  # chapter | article
+    # Filled by the backend from Crossref, never by the model: it is absent from
+    # THEORIES_SCHEMA, so there is no field for a model to put one in. A DOI on a
+    # reference is therefore always one that verified, which is what makes showing
+    # it correct APA rather than a liability — see services/crossref.py.
+    doi: str = Field(default="", max_length=200)
+
+    model_config = {"extra": "forbid"}
 
 
 class REElement(BaseModel):
@@ -88,6 +141,12 @@ class REElement(BaseModel):
     # The round-by-round record. The scalar *_round fields above are the older
     # single-event shape, still read from saved states; new writes use this.
     history: Optional[list[REHistoryEvent]] = Field(None, max_length=1_000)
+
+    # Works this element is attributed to. Populated by the theory suggestion tab,
+    # but not restricted to theories: nothing about a citation is specific to type
+    # ``T``, and a field that silently works for one element type only is a trap
+    # for whatever wants to cite a principle next.
+    sources: Optional[list[RESource]] = Field(None, max_length=20)
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 

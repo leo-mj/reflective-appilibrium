@@ -18,7 +18,7 @@ The same documents are used as Anthropic tool ``input_schema``, which does not
 impose those rules but accepts schemas that follow them.
 """
 
-from ..models.re_state import RelationType
+from ..models.re_state import CitationType, RelationType
 from .llm import ResponseSchema
 from typing import get_args
 
@@ -150,6 +150,113 @@ PRINCIPLES_SCHEMA = ResponseSchema(
                         },
                     },
                     "required": ["text", "covers", "explanation"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["suggestions"],
+        "additionalProperties": False,
+    },
+)
+
+
+# Bibliographic fields, never a formatted reference: formatting is not knowledge,
+# and asking for it makes output quality depend on a model's typography rather
+# than on what it knows.  app/src/utils/citation.js renders these.
+#
+# There is deliberately **no `doi` property**, and no `url`.  A DOI is the field
+# a model fabricates most readily — rigid format, high entropy, trivial to
+# imitate, impossible to check by eye — and a fabricated one fails quietly by
+# resolving to a real but different work.  Leaving it out of the schema means
+# there is nowhere for a model to put one; DOIs on surviving references come from
+# Crossref, in services/crossref.py.  Do not add it back.
+_SOURCE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": list(get_args(CitationType)),
+            "description": (
+                "'chapter' also covers an entry in an edited reference work."
+            ),
+        },
+        "authors": {
+            "type": "array",
+            "description": "Surname-first, e.g. 'Parfit, D.'.",
+            "items": {"type": "string"},
+        },
+        "year": {"type": "string", "description": "e.g. '1984', 'n.d.', 'in press'."},
+        "title": {
+            "type": "string",
+            "description": "Title of the work, or of the chapter or article.",
+        },
+        "container": {
+            "type": "string",
+            "description": (
+                "Book title for a chapter, journal name for an article, "
+                "empty for a book."
+            ),
+        },
+        "editors": {
+            "type": "array",
+            "description": "Initials-first, e.g. 'E. N. Zalta'. Chapters only.",
+            "items": {"type": "string"},
+        },
+        "publisher": {"type": "string", "description": "Books and chapters."},
+        "volume": {"type": "string", "description": "Articles."},
+        "issue": {"type": "string", "description": "Articles."},
+        "pages": {"type": "string", "description": "Chapters and articles."},
+    },
+    # Strict mode requires every property here, so an inapplicable field is an
+    # empty string or array rather than an absent key.
+    "required": [
+        "type",
+        "authors",
+        "year",
+        "title",
+        "container",
+        "editors",
+        "publisher",
+        "volume",
+        "issue",
+        "pages",
+    ],
+    "additionalProperties": False,
+}
+
+
+THEORIES_SCHEMA = ResponseSchema(
+    name="record_theories",
+    description=(
+        "Record background theories that bear on the given moral position, with "
+        "the works they are developed in."
+    ),
+    schema={
+        "type": "object",
+        "properties": {
+            "suggestions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {
+                            "type": "string",
+                            "description": (
+                                "One-sentence statement of the background theory, "
+                                "stated so it can be assessed on its own."
+                            ),
+                        },
+                        "sources": {
+                            "type": "array",
+                            "description": (
+                                "Works where the theory is developed. Return an "
+                                "empty array rather than naming a work you are not "
+                                "confident exists."
+                            ),
+                            "items": _SOURCE_SCHEMA,
+                        },
+                    },
+                    "required": ["text", "sources"],
                     "additionalProperties": False,
                 },
             }

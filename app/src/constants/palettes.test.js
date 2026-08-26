@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PALETTES, resolvePalette, inkWeight } from "./palettes.js";
+import { PALETTES, resolvePalette, inkWeight, headerAccent } from "./palettes.js";
 import { getColors } from "./colors.js";
 
 /**
@@ -159,6 +159,77 @@ describe("the default palette's known limit", () => {
       // Amber is the one type white does not clear even at full confidence.
       const floor = type === "theory" ? 3 : 4.5;
       expect(ratio, `${type} @ 1 (${fill})`).toBeGreaterThanOrEqual(floor);
+    }
+  });
+});
+
+// ─── Assist tab headers ───────────────────────────────────────────────────────
+
+describe("headerAccent", () => {
+  const ASSIST_TABS = [
+    "questionnaire",
+    "elicitJudgments",
+    "suggestPrinciples",
+    "detectArguments",
+    "suggestRelations",
+    "suggestTheories",
+    "processReview",
+  ];
+
+  it("gives every tab that produces something its graph constant, exactly", () => {
+    // Exactly, not a legibility-tuned variant: a header that is nearly the
+    // constant is a different colour from the nodes it names.
+    const p = PALETTES.default;
+    expect(headerAccent(p, "elicitJudgments").fill).toBe(p.judgment.high);
+    expect(headerAccent(p, "suggestPrinciples").fill).toBe(p.principle.high);
+    expect(headerAccent(p, "suggestTheories").fill).toBe(p.theory.high);
+    expect(headerAccent(p, "detectArguments").fill).toBe(p.edges.entails);
+    expect(headerAccent(p, "suggestRelations").fill).toBe(p.edges.supports);
+    expect(headerAccent(p, "questionnaire").fill).toBe(p.judgment.high);
+  });
+
+  it("follows the palette in force", () => {
+    expect(headerAccent(PALETTES.accessible, "suggestPrinciples").fill).toBe(
+      PALETTES.accessible.principle.high,
+    );
+    expect(headerAccent(PALETTES.accessible, "detectArguments").fill).toBe(
+      PALETTES.accessible.edges.entails,
+    );
+  });
+
+  it("gives an element tab the palette's own node ink", () => {
+    // The point of the high-contrast badge: it is drawn the way the node is
+    // drawn, down to the ink the node id is written in.
+    for (const mode of Object.values(PALETTES)) {
+      expect(headerAccent(mode, "suggestTheories").ink).toBe(mode.ink);
+    }
+  });
+
+  it("returns nothing for a tab that names no element or relation", () => {
+    // Review is prose about the whole process. It borrows no colour, and — the
+    // bug this pins — no badge: it once got one with the panel's own text colour
+    // on it, which in the light theme is near-black on near-black.
+    expect(headerAccent(PALETTES.default, "processReview")).toBeNull();
+    expect(headerAccent(PALETTES.accessible, "processReview")).toBeNull();
+  });
+
+  it("answers for every assist tab without throwing", () => {
+    for (const tab of ASSIST_TABS) {
+      const got = headerAccent(PALETTES.accessible, tab);
+      expect(got === null || typeof got.fill === "string").toBe(true);
+    }
+  });
+
+  it("writes every high-contrast badge in an ink that clears AA on it", () => {
+    // What makes the badge the compliant path. The default mode is deliberately
+    // not held to this — see the note at the top of this file.
+    for (const tab of ASSIST_TABS) {
+      const got = headerAccent(PALETTES.accessible, tab);
+      if (!got) continue;
+      expect(
+        contrast(got.fill, got.ink),
+        `${tab}: ${got.ink} on ${got.fill}`,
+      ).toBeGreaterThanOrEqual(4.5);
     }
   });
 });

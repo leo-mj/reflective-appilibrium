@@ -14,9 +14,16 @@
  * - jointly_entails   → green (`#16a34a`), filled arrowhead
  * - jointly_precludes → rose  (`#e11d48`), filled arrowhead
  *
- * Node fills are *not* here — they vary by viewing mode and live in
- * {@link module:constants/palettes}. What stays here is everything that does not:
- * edges, states, surfaces, and the per-type foreground tones.
+ * Those hexes are the **default mode's** relation colours, and the values above
+ * are duplicated as `PALETTES.default.edges` — which is what the graph actually
+ * draws with, since high-contrast mode carries a second set. They stay here
+ * because `C.supports` and `C.conflicts` do double duty as general UI accents,
+ * the teal of a primary button and the orange of a reject, and those must not
+ * move when the graph's palette does. **Anything drawing a relation should read
+ * `palette.edges[type]`, not these.**
+ *
+ * Node fills are likewise not here. What stays is everything a viewing mode does
+ * not touch: states, surfaces, and the per-type foreground tones.
  *
  * - withdrawn → uniform grey at reduced opacity
  * - rejected  → rose at reduced opacity
@@ -163,10 +170,19 @@ const TYPE_TOKENS = {
  * @param {import('./palettes.js').Palette} [palette] - From `usePalette()`.
  * @returns {{text: string, low?: string, high?: string, stroke?: string}}
  *
+ * `text` is a CSS variable that varies by **theme only**. It is for prose that
+ * names a type — a heading, a sentence about judgments — never for anything sat
+ * beside a node or a node-coloured chip, because in high-contrast mode it stays
+ * on the default ramp while everything around it moves. The text panel's id
+ * badge made exactly that mistake: tint and border followed the palette, the ink
+ * did not, and a magenta principle node ended up with a violet badge.
+ *
  * @example
  * const p = usePalette();
  * <rect fill={typeTokens(el.type, p).high} />
- * <span style={{ color: typeTokens(el.type).text }}>{el.id}</span>
+ * // A chip that has to match the node: take the fill and ask for its ink.
+ * const fill = typeTokens(el.type, p).high;
+ * <span style={{ background: fill, color: inkOn(fill) }}>{el.id}</span>
  */
 export function typeTokens(type, palette) {
   const known = TYPE_TOKENS[type] ? type : "judgment";

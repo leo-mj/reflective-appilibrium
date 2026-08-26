@@ -1329,3 +1329,99 @@ describe("importStateFromFile — groups", () => {
     ).rejects.toThrow(/groups\[0\]\.collapsed/);
   });
 });
+
+describe("importStateFromFile — element sources", () => {
+  const aBook = (overrides = {}) => ({
+    type: "book",
+    authors: ["Parfit, D."],
+    year: "1984",
+    title: "Reasons and persons",
+    container: "",
+    editors: [],
+    publisher: "Oxford University Press",
+    volume: "",
+    issue: "",
+    pages: "",
+    doi: "10.1093/019824908x.001.0001",
+    ...overrides,
+  });
+
+  const importWith = (sources) =>
+    importStateFromFile(
+      makeFile(
+        wrapInMarkdown({
+          ...MINIMAL_STATE,
+          elements: [
+            {
+              id: "T1",
+              type: "theory",
+              status: "active",
+              confidence: 0.67,
+              origin: "gpt-4o",
+              text: "A background theory",
+              addedRound: 1,
+              sources,
+            },
+          ],
+        }),
+      ),
+    );
+
+  it("has no sources key on an element written before the feature", async () => {
+    const state = await importWith(undefined);
+    expect(state.elements[0]).not.toHaveProperty("sources");
+  });
+
+  it("round-trips a reference, its DOI included", async () => {
+    // The DOI is the one field the model never supplies — it comes from
+    // Crossref — so it is the one most easily lost on the way through.
+    const state = await importWith([aBook()]);
+    expect(state.elements[0].sources).toEqual([aBook()]);
+  });
+
+  it("keeps several references in order", async () => {
+    const state = await importWith([aBook(), aBook({ title: "On what matters" })]);
+    expect(state.elements[0].sources.map((s) => s.title)).toEqual([
+      "Reasons and persons",
+      "On what matters",
+    ]);
+  });
+
+  it("defaults the fields a type does not use", async () => {
+    const state = await importWith([
+      { type: "book", authors: ["Parfit, D."], title: "Reasons and persons" },
+    ]);
+    expect(state.elements[0].sources[0]).toMatchObject({
+      year: "",
+      container: "",
+      editors: [],
+      doi: "",
+    });
+  });
+
+  it("rejects a reference type the formatter cannot render", async () => {
+    await expect(importWith([aBook({ type: "webpage" })])).rejects.toThrow(
+      /sources\[0\]\.type/,
+    );
+  });
+
+  it("rejects an oversized field rather than truncating it", async () => {
+    await expect(importWith([aBook({ title: "x".repeat(401) })])).rejects.toThrow(
+      /sources\[0\]\.title/,
+    );
+  });
+
+  it("rejects more references than the backend model would accept", async () => {
+    // A state the backend refuses must not be accepted here, or a session saves
+    // and then fails to load.
+    await expect(importWith(Array.from({ length: 21 }, () => aBook()))).rejects.toThrow(
+      /sources/,
+    );
+  });
+
+  it("rejects a malformed author list", async () => {
+    await expect(importWith([aBook({ authors: [7] })])).rejects.toThrow(
+      /sources\[0\]\.authors\[0\]/,
+    );
+  });
+});

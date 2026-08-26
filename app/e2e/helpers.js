@@ -378,13 +378,38 @@ export async function openMenu(page) {
  *   about how the panel signals de-emphasis rather than a fault in whatever view
  *   happens to be rendering the card. Narrow by construction: only contrast,
  *   only under a faded ancestor, so a failure anywhere else still fails.
+ * @param {boolean} [opts.ignoreGraphAccents]  Drop colour-contrast findings on
+ *   `[data-accent="graph"]` — the assist tab headers, which take their element or
+ *   relation colour from the graph exactly. Several of those are under AA as
+ *   12px type in the default mode, and that is the same decision the node ramp
+ *   already embodies: the default palette is judged by eye and high-contrast mode
+ *   is the compliant path. **Pass this only when auditing the default mode.** In
+ *   high-contrast mode the headers sit on a chip and must clear AA like anything
+ *   else, which is what `a11y.spec.js` holds them to.
  */
-export async function axeViolations(page, { ignoreDimmed = false } = {}) {
+export async function axeViolations(
+  page,
+  { ignoreDimmed = false, ignoreGraphAccents = false } = {},
+) {
   await page.addScriptTag({
     path: new URL("../node_modules/axe-core/axe.min.js", import.meta.url).pathname,
   });
-  return page.evaluate(async (ignoreDimmed) => {
+  return page.evaluate(async ({ ignoreDimmed, ignoreGraphAccents }) => {
     const r = await window.axe.run(document, { resultTypes: ["violations"] });
+
+    const elementFor = (node) => {
+      const selector = Array.isArray(node.target[0])
+        ? node.target[0][0]
+        : node.target[0];
+      try {
+        return document.querySelector(selector);
+      } catch {
+        return null;
+      }
+    };
+
+    const isGraphAccent = (node) =>
+      Boolean(elementFor(node)?.closest('[data-accent="graph"]'));
 
     const isFaded = (node) => {
       const selector = Array.isArray(node.target[0])
@@ -406,8 +431,12 @@ export async function axeViolations(page, { ignoreDimmed = false } = {}) {
       .map((v) => ({
         ...v,
         nodes:
-          ignoreDimmed && v.id === "color-contrast"
-            ? v.nodes.filter((n) => !isFaded(n))
+          v.id === "color-contrast"
+            ? v.nodes.filter(
+                (n) =>
+                  !(ignoreDimmed && isFaded(n)) &&
+                  !(ignoreGraphAccents && isGraphAccent(n)),
+              )
             : v.nodes,
       }))
       // A rule whose every node was excluded is no longer a finding; leaving it
@@ -425,7 +454,7 @@ export async function axeViolations(page, { ignoreDimmed = false } = {}) {
           why: (n.any?.[0]?.message ?? n.all?.[0]?.message ?? "").replace(/\s+/g, " ").slice(0, 160),
         })),
       }));
-  }, ignoreDimmed);
+  }, { ignoreDimmed, ignoreGraphAccents });
 }
 
 /**

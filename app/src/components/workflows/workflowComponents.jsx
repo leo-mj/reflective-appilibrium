@@ -9,6 +9,7 @@ import { SpinnerIcon } from "../Icons.jsx";
 import { quickScore } from "../../utils/simulateRethonClient.js";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { suggestionsUnavailable } from "../../utils/disabledReason.js";
+import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
 
 /**
  * The header strip shared by the three suggestion tabs: a title with a running
@@ -20,9 +21,10 @@ import { suggestionsUnavailable } from "../../utils/disabledReason.js";
  * disabled — so those are the props, and everything else is here once.
  *
  * @param {Object}           props
- * @param {string}           props.accent      Colour for the title and button.
- *   Used only as a foreground, so callers pass a `text` variant from `C`,
- *   not the fill tone the graph draws that element type with.
+ * @param {string}           props.tab         The tab's key from `ASSIST_TABS`,
+ *   which is what its colour is derived from — see {@link useHeaderAccent}. A
+ *   key rather than a colour so that one place decides what a tab wears, and so
+ *   the high-contrast badge cannot be applied to some headers and not others.
  * @param {string}           props.title       e.g. "Suggest Principles".
  * @param {string}           props.actionLabel Button text before the first result.
  * @param {string}           props.rerunLabel  Button text once there is a result.
@@ -36,7 +38,7 @@ import { suggestionsUnavailable } from "../../utils/disabledReason.js";
  *   anything, e.g. "Add at least two elements first." Also disables the button.
  */
 export function SuggestionToolbar({
-  accent,
+  tab,
   title,
   actionLabel,
   rerunLabel,
@@ -53,6 +55,7 @@ export function SuggestionToolbar({
 }) {
   const isDisabled = loading || disabled || Boolean(needs);
   const why = suggestionsUnavailable({ loading, noBackend: disabled, needs });
+  const { accent, ink, weight, marker, badge } = useHeaderAccent(tab);
   return (
     <div
       style={{
@@ -64,7 +67,9 @@ export function SuggestionToolbar({
       }}
     >
       <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-        <span style={{ color: accent, fontWeight: "bold" }}>{title}</span>
+        <span {...marker} style={{ ...badge, color: ink, fontWeight: weight }}>
+          {title}
+        </span>
         {suggestionCount !== null && (
           <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
         )}
@@ -76,14 +81,18 @@ export function SuggestionToolbar({
             onClick={onRun}
             disabled={isDisabled}
             title={why}
+            {...(isDisabled ? {} : marker)}
             style={{
               background: "transparent",
+              // The badge goes on the button too: it carries the same colour, so
+              // whatever makes the title legible has to make this legible.
+              ...(isDisabled ? {} : badge),
               border: `1px solid ${isDisabled ? C.border : accent}`,
-              color: isDisabled ? C.dim : accent,
+              color: isDisabled ? C.dim : ink,
               borderRadius: 6,
               padding: "5px 12px",
               fontSize: 12,
-              fontWeight: "bold",
+              fontWeight: isDisabled ? "bold" : weight,
               cursor: isDisabled ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",

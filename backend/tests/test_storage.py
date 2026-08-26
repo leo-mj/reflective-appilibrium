@@ -92,7 +92,13 @@ def test_fixture_carries_the_shapes_the_two_sides_disagreed_about():
     assert any(
         e.previous_text is None for e in state.elements
     ), "needs an unset optional field, the kind that used to serialise as null"
-    assert state.reviews, "needs a process review — the newest field across the seam"
+    assert state.reviews, "needs a process review — a late field across the seam"
+    cited = [e for e in state.elements if e.sources]
+    assert cited, "needs an element carrying sources — the newest field across the seam"
+    assert cited[0].sources[0].doi, (
+        "the source needs its Crossref DOI: it is the one citation field the model "
+        "never supplies, so it is the one most easily lost on the way through"
+    )
 
 
 def test_written_file_contains_no_explicit_nulls(store):

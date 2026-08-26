@@ -288,7 +288,7 @@ export function JudgmentElicitTab({
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         <SuggestionToolbar
-          accent={C.judgment.text}
+          tab="elicitJudgments"
           title="Elicit Judgments"
           actionLabel="Elicit"
           rerunLabel="Re-elicit"

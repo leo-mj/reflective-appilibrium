@@ -17,6 +17,102 @@ Tests: `npm test` (Vitest, jsdom) and `npm run test:e2e` (Playwright — see `e2
 - `src/state.js`, `types.js`, `config.js` — app state and config
 - `src/constants/colors.js` — `C` object with all viz colors
 
+## Background theories
+
+`TheorySuggestTab` — the fifth Assist tab, and the only element type that had no
+LLM path before it. The domain note is in the root `CLAUDE.md`; what matters on
+this side:
+
+- **Not a workflow phase**, kept out the same three ways as the review tab, plus
+  one reason of its own: a tab switch that auto-fetched would spend an LLM call
+  *and* a round of Crossref lookups.
+- **`utils/citation.js` is one ordering function with two renderers** —
+  `<Citation>` maps its runs to `<em>`, `citationMarkdown` wraps them in `*`. That
+  is what lets the export carry italics without a parser or model-supplied
+  markup, and what stops screen and export drifting apart. `esc` is passed *into*
+  `citationMarkdown` to be applied per run: escaping the finished string would
+  put a backslash in front of every emphasis marker it had just added.
+- **The card shows references with their verification state, and the element card
+  shows them again.** Without the second, the citation is invisible between
+  accepting a suggestion and exporting it — which is most of the time the user
+  spends with it.
+- **Modify allows removing a reference, never editing one.** A rewritten theory
+  can otherwise keep a citation that no longer supports what it says; editing in
+  place would invite correcting a fabricated reference into a plausible one.
+- **`verification` is stripped on accept and `doi` is kept.** A verdict goes
+  stale as Crossref indexes more; a DOI it yielded does not.
+- **A card is a theory and its references, and nothing about how either relates
+  to existing elements.** That is the Relations tab's job.
+- The sample fixture carries the verification states itself, since the demo build
+  has no backend and nothing is ever checked there. It also holds one suggestion
+  with no sources — a state that is otherwise never seen.
+
+### Header colours
+
+Every assist tab header wears **the graph constant for what its tab produces,
+exactly** — `headerAccent()` in `constants/palettes.js` is the single place that
+decides which, and `useHeaderAccent()` is how a tab asks. Judgments takes
+`judgment.high`, Arguments takes `edges.entails`, and so on; Review takes none,
+because prose about the whole process belongs to no type.
+
+**In the default mode several of those are under AA as 12px type** — the judgment
+blue reads 2.83:1 on the dark panel — and that is deliberate, by exactly the
+reasoning the node ramp already carries: the default palette is judged by eye and
+high-contrast mode is the compliant path. Do not "fix" them by nudging the hue;
+a header that is nearly the constant is a different colour from the nodes.
+
+**In high-contrast mode the header becomes a badge drawn the way the node is
+drawn**: filled with the constant, written in the ink that fill takes — the
+palette's own `ink` for an element type, `inkOn(fill)` for the two relation
+colours no node wears. A yellow Theories badge with black type reads as the same
+object as a yellow theory diamond with a black id on it, which no amount of tuned
+foreground colour ever quite does. In both themes rather than only the light one
+where contrast actually fails: a tab that changed shape when you switched theme
+would read as a rendering fault rather than as a property of the mode. The badge
+goes on the run button too, since it carries the same accent.
+
+An earlier version filled the badge with black instead and applied it to *every*
+header. Two things went wrong, both worth not repeating: the black ground made
+the badge a foreign object next to the nodes it names, and Review — which takes
+no graph colour — got a black chip carrying the panel's own text colour, which in
+the light theme is near-black on near-black. A tab that names no element or
+relation now takes **neither colour nor badge**, and `palettes.test.js` pins
+`headerAccent(…, "processReview") === null` in both palettes.
+
+**Weight follows the ink**, by `inkWeight()` and for the same reason node ids do:
+bold on the panel, where thin coloured type at 12px needs the weight to hold its
+colour, and normal on the badge, where the dark ink goes blobby with it. Dropping
+the bold does not move the AA threshold — 12px is below the large-text cutoff
+either way — so the badge still has to clear 4.5:1 on its own.
+
+`data-accent="graph"` marks the elements that carry a graph colour. The audit
+uses it both ways: `axeViolations(page, { ignoreGraphAccents: true })` excuses
+them in the default mode, and a dedicated test walks all five coloured tabs in
+both themes with high-contrast on and requires them to clear AA. That test
+reports "no header on this tab carries a graph accent" rather than passing when
+it finds nothing — which is what caught the lazy-chunk race it now waits out.
+
+The Arguments tab's added-premise badges keep the judgment blue: those are about
+the judgments being added, not the arrows the argument becomes.
+
+### Relation colours vary by mode
+
+`PALETTES.*.edges` holds them, and **anything drawing a relation must read
+`palette.edges[type]`** — `C.supports` and friends are still in colors.js because
+they double as general UI accents (a primary button's teal, a reject's orange)
+and must not move when the graph's palette does.
+
+The accessible set is the same six hues moved into the luminance band that is
+legible on both canvases *and* as type on the header chip: roughly 0.175–0.265,
+which is narrow. They are deliberately not all at one luminance, since that is
+the channel red-green deficiency leaves intact. What the set fixes is contrast,
+not hue separation — orange, yellow and green stay confusable, and what carries
+them apart is the redundancy already there: dash pattern and arrowhead.
+
+Five places draw an edge and all five take the palette: `ArrowDefs`,
+`GraphElements`, `graphRender.renderJointArgument` (a plain function, so its two
+callers — `Graph` and `HistoryTab` — pass it in), `Legend`, and `generateSVG`.
+
 ## Process review
 
 `ProcessReviewTab` — the one Assist tab whose output is prose *about* the graph
@@ -95,6 +191,25 @@ Two things deliberately do *not* use `palette.ink`: the graph's `+J/+P/+T`
 buttons and the questionnaire card's button. They are HTML, where axe enforces AA
 in the e2e audit, so they take `inkOn(fill)` instead. The nodes are the exception
 to AA; a button is not.
+
+**The text panel's id badge is a node.** `useTextTabData` gives it
+`typeTokens(type, palette).high` and `inkOn()` of that — the same two lines
+`Graph.jsx` uses for the `+J/+P/+T` buttons — so a `P` badge and a principle node
+are one colour in whichever mode is in force. It was a chip tinted with the
+node's `stroke` and written in `typeTokens(type).text`, and that ink is a CSS
+variable that varies by theme but **not** by contrast mode: in high-contrast the
+tint moved to the accessible ramp and the ink stayed on the default one, so a
+magenta node wore a violet badge. A tint cannot be fixed in place, either — its
+ink has to read against the *panel*, and neither ramp holds a tone dark enough to
+do that on the light one, which is why the badge is filled rather than re-tinted.
+
+**Any button on a filled ground asks `inkOn(fill)` rather than naming an ink.**
+The three add-panel buttons in `user_edits/WorkflowAddPanels.jsx` used to say
+`C.onFill`, and white on `C.supports` is 2.43:1 — the worst contrast in the app,
+and invisible precisely because the fill looks strong. Asking costs nothing and
+survives a re-tone; `WorkflowAddPanels.test.jsx` now pins all three. Note this
+changes no palette constant: the fill is untouched, only which of the two inks
+goes on it. Re-toning a *fill* to chase a ratio is the thing that is forbidden.
 
 ### Groups
 

@@ -31,6 +31,7 @@ function setup({ groups = GROUPS, ...handlers } = {}) {
     selected: null,
     onSelect: () => {},
     badgeColor: () => "#888",
+    badgeFill: () => "#444",
     badgeTextColor: () => "#888",
     search: "",
     isWide: true,

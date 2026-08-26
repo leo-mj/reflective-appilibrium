@@ -218,6 +218,42 @@ function validateQuestionnaireSpec(spec) {
 
 // ─── Object validators (whitelist only known fields) ──────────────────────────
 
+/** The reference kinds citation.js can render; anything else has no formatting. */
+const CITATION_TYPES = new Set(["book", "chapter", "article"]);
+
+/**
+ * One bibliographic record on an element, bounded field by field.
+ *
+ * The caps mirror `RESource` in backend/models/re_state.py: a state that the
+ * backend would refuse must not be accepted here, or a session saves and then
+ * fails to load.
+ */
+function validateSource(s, i, ctx) {
+  const at = `${ctx}.sources[${i}]`;
+  const type = str(s.type, `${at}.type`, 20);
+  if (!CITATION_TYPES.has(type))
+    throw new Error(`${at}.type "${type}" is not valid`);
+
+  const names = (list, field, cap) =>
+    arr(list ?? [], `${at}.${field}`, cap).map((n, j) =>
+      str(n, `${at}.${field}[${j}]`, 200),
+    );
+
+  return {
+    type,
+    authors: names(s.authors, "authors", 25),
+    year: str(s.year ?? "", `${at}.year`, 12),
+    title: str(s.title ?? "", `${at}.title`, 400),
+    container: str(s.container ?? "", `${at}.container`, 300),
+    editors: names(s.editors, "editors", 10),
+    publisher: str(s.publisher ?? "", `${at}.publisher`, 200),
+    volume: str(s.volume ?? "", `${at}.volume`, 20),
+    issue: str(s.issue ?? "", `${at}.issue`, 20),
+    pages: str(s.pages ?? "", `${at}.pages`, 30),
+    doi: str(s.doi ?? "", `${at}.doi`, 200),
+  };
+}
+
 function validateElement(e, i) {
   const ctx = `elements[${i}]`;
   const id = str(e.id, `${ctx}.id`, 10);
@@ -268,6 +304,10 @@ function validateElement(e, i) {
   if (e.negated != null) result.negated = bool(e.negated, `${ctx}.negated`);
   if (e.questionnaireIndex != null)
     result.questionnaireIndex = num(e.questionnaireIndex, `${ctx}.questionnaireIndex`);
+  if (e.sources != null)
+    result.sources = arr(e.sources, `${ctx}.sources`, 20).map((s, j) =>
+      validateSource(s, j, ctx),
+    );
 
   return result;
 }

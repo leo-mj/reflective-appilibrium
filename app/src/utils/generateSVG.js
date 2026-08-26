@@ -66,11 +66,13 @@ const THEME_STYLE =
   "@media(prefers-color-scheme:dark){svg{--c-dim:#94a3b8;--c-bg:#0f172a}}" +
   "</style>";
 
-function buildDefs() {
+function buildDefs(palette) {
   const markers = REL_TYPES.flatMap((t) =>
     [false, true].map((w) => {
       const id = `${M}a-${t}${w ? "-w" : ""}`;
-      const color = w ? C.withdrawn : C[t];
+      // Arrowheads take the palette's edge colour, like the lines they cap —
+      // an export made in high-contrast mode has to be the graph on screen.
+      const color = w ? C.withdrawn : palette.edges[t];
       const op = w ? 0.3 : 1;
       return (
         `<marker id="${id}" viewBox="0 -5 10 10" refX="10" refY="0" markerWidth="6" markerHeight="6" orient="auto">` +
@@ -83,7 +85,7 @@ function buildDefs() {
 
 // ─── Edge ─────────────────────────────────────────────────────────────────────
 
-function edgeSVG(r, byId, positions, ox, oy) {
+function edgeSVG(r, byId, positions, ox, oy, palette) {
   const sp = positions[r.from];
   const tp = positions[r.to];
   if (!sp || !tp) return "";
@@ -94,7 +96,7 @@ function edgeSVG(r, byId, positions, ox, oy) {
     elementRadius(byId[r.from]),
     elementRadius(byId[r.to]),
   );
-  const color = isW ? C.withdrawn : C[r.type];
+  const color = isW ? C.withdrawn : palette.edges[r.type];
   const op = isW ? 0.25 : 1;
   const dash = edgeDashArray(r.type);
   const marker = `${M}a-${r.type}${isW ? "-w" : ""}`;
@@ -258,9 +260,9 @@ export function generateGraphSVG(
 
   const lines = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" style="background:${C.bg};border-radius:8px">`,
-    `  ${buildDefs()}`,
+    `  ${buildDefs(palette)}`,
     ...hulls.map((hull) => hullSVG(hull, ox, oy)),
-    ...visRels.map((r) => edgeSVG(r, byId, visPositions, ox, oy)).filter(Boolean),
+    ...visRels.map((r) => edgeSVG(r, byId, visPositions, ox, oy, palette)).filter(Boolean),
     ...visEls
       .map((el) =>
         el.type === "group"

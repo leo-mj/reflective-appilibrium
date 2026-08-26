@@ -6,7 +6,7 @@
 /** @import { REState, RERelation } from '../types.js' */
 
 import { useMemo } from "react";
-import { C, getColors, typeTokens } from "../constants/colors.js";
+import { C, getColors, inkOn, typeTokens } from "../constants/colors.js";
 import { usePalette } from "./useTheme.js";
 import { getNeighbours } from "../utils/graphHelpers.js";
 import { groupsOf, selectionIds } from "../utils/groupUtils.js";
@@ -78,20 +78,33 @@ export function useTextTabData({
   );
   const badgeColor = (id) => colorById.get(id) ?? C.dim;
 
-  // The badge tints its background and border with the fill tone above, but
-  // writes the id in this one: the fill tone as 12px bold type measures 3.06:1
-  // against its own tinted background.
-  const textById = useMemo(
+  // The badge is drawn the way the graph's own +J/+P/+T buttons are drawn — the
+  // type's `high` fill with the ink that fill takes (Graph.jsx:97). Both come
+  // from the palette in force, so the badge carries the node's colour in every
+  // mode rather than only in the one its tones were picked for.
+  //
+  // It used to write the id in `typeTokens(type).text`, a CSS variable that
+  // varies by theme but *not* by contrast mode: in high-contrast the tint and
+  // border moved to the accessible ramp while the ink stayed on the default
+  // one, so a magenta principle node had a violet principle badge. Two of those
+  // six variables were not ramp values at all.
+  //
+  // `inkOn` rather than `palette.ink` because a badge is an HTML button, and
+  // app/CLAUDE.md draws that line: the nodes are the exception to AA, a button
+  // is not. `palette.ink` is white in the default mode, which the theory amber
+  // carries at only 3.19:1.
+  const badgeById = useMemo(
     () =>
       new Map(
-        state.elements.map((e) => [
-          e.id,
-          typeTokens(e.type).text,
-        ]),
+        state.elements.map((e) => {
+          const fill = typeTokens(e.type, palette).high;
+          return [e.id, { fill, ink: inkOn(fill) }];
+        }),
       ),
-    [state.elements],
+    [state.elements, palette],
   );
-  const badgeTextColor = (id) => textById.get(id) ?? C.dim;
+  const badgeFill = (id) => badgeById.get(id)?.fill ?? C.border;
+  const badgeTextColor = (id) => badgeById.get(id)?.ink ?? C.text;
 
   const displayEls = search
     ? visibleEls.filter((e) => matchesSearch(e, search))
@@ -190,6 +203,7 @@ export function useTextTabData({
     visRels,
     pCovers,
     badgeColor,
+    badgeFill,
     badgeTextColor,
     displayEls,
     displayRels,

@@ -12,17 +12,19 @@ import {
   JudgmentIcon,
   ReviewIcon,
   SimulateIcon,
+  TheoryIcon,
 } from "../components/Icons.jsx";
 
-// `processReview` sits last on purpose: the four tabs before it are the guided
-// workflow's phases, in the order it runs them, and it is not one of them —
-// see WORKFLOW_NEXT_PHASE in utils/workflowUtils.js, which it stays out of.
+// The guided workflow's four phases come first, in the order it runs them; the
+// two after them are Assist tabs that are deliberately *not* phases — see
+// WORKFLOW_NEXT_PHASE in utils/workflowUtils.js, which both stay out of.
 export const ASSIST_TABS = [
   "questionnaire",
   "elicitJudgments",
   "suggestPrinciples",
   "detectArguments",
   "suggestRelations",
+  "suggestTheories",
   "processReview",
 ];
 
@@ -55,6 +57,7 @@ export const TAB_ICONS = {
   suggestPrinciples: <PrincipleIcon />,
   elicitJudgments: <JudgmentIcon />,
   detectArguments: <SimulateIcon />,
+  suggestTheories: <TheoryIcon />,
   processReview: <ReviewIcon />,
   simulateRethon: <SimulateIcon />,
 };
@@ -68,6 +71,7 @@ export const TAB_LABELS = {
   suggestPrinciples: "Principles",
   detectArguments: "Arguments",
   suggestRelations: "Relations",
+  suggestTheories: "Theories",
   processReview: "Review",
   simulateRethon: "Simulate",
 };
@@ -88,6 +92,8 @@ export const TAB_TOOLTIPS = {
     "Run the formal rethon RE simulation on your active elements.",
   detectArguments:
     "AI detects logically valid arguments formed of existing elements and additional premises.",
+  suggestTheories:
+    "AI proposes well-supported background theories that bear on your topic and your current position — those that ground it, and those it is in tension with.",
   processReview:
     "AI reads your process so far and reports the major shifts across rounds.",
 };
