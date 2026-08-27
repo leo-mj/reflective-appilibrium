@@ -539,14 +539,20 @@ at `usePan`'s own `ZOOM_MIN`: `extent - padding` reaching zero drew nothing, and
 going negative mirrored the graph and blew it up to several times the strip.
 `resetView` takes what it is handed without clamping, so the clamp has to be here.
 
-**The AI chapter stops at two Assist tabs and not at the other four.** The cycle
+**The AI chapter stops at one Assist tab and not at the other five.** The cycle
 section names the iteration's phases — and is pinned to `WORKFLOW_NEXT_PHASE`'s
-order, so a new phase that never reaches the tour fails a test — while Theories
-and Review get a section each, being the two a reader misreads without one: a
-theory carries references whose verification state claims much less than it
-looks like it claims, and Review is not a phase of the iteration at all. Both
-ring `tab-<key>`, which is why the narrow menu's Assist entries carry the same
-`data-tutorial` ids the wide tab bar gives them.
+order, so a new phase that never reaches the tour fails a test — while Review
+gets a section of its own, being the one a reader misreads without one: it is
+not a phase of the iteration at all. It rings `tab-processReview`, which is why
+the narrow menu's Assist entries carry the same `data-tutorial` ids the wide tab
+bar gives them.
+
+Theories had a section here too and it was dropped deliberately. The two things
+a reader has to know about a suggestion — that a theory is proposed for reasons
+that do not run through their own position, and that a Crossref verdict claims
+much less than it looks like it claims — are worded on the tab itself, beside
+the references they are about, and pinned by `TheorySuggestTab.test.jsx`. A tour
+card would have said them once, minutes before the reader first sees one.
 
 ## LLM integration
 

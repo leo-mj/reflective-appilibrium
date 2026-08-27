@@ -173,11 +173,11 @@ function graphSections() {
     },
     {
       id: "theories",
-      title: "Background theories",
+      title: "From narrow to wide equilibrium - background theories",
       body: [
         "Diamonds are background theories. Background theories are not immediate judgments about the ethical question at hand nor ethical rules that structure them.",
         "Instead, they add further details that help inform arguments for and against judgments and principles. They can come from any domain of inquiry that is relevant for your ethical question, including metaphysics, epistemology, and social and natural sciences.",
-        "Invoking background theories on top of judgments and principles makes a reflective equilibrium 'wide' as opposed to 'narrow'",
+        "Invoking background theories on top of judgments and principles makes a reflective equilibrium 'wide' as opposed to 'narrow'.",
         "The two example theories below are the argument for P2 — the principle you just watched doing work above — and, being an argument, it can be attacked like one. Reaching down to this layer is what makes a reflective equilibrium wide.",
       ],
       quote: ["T1", "T2"],
@@ -268,11 +268,13 @@ function graphSections() {
 /**
  * Chapter 3 — where the AI is, and what it is and is not allowed to do.
  *
- * Two of the six Assist tabs get a section of their own, and the other four do
- * not, because the cycle section already says what those four are for. Theories
- * and Review are the two a reader would otherwise misread: a theory suggestion
- * carries references whose verification state means something particular, and
- * Review is not a phase of the iteration at all.
+ * One of the six Assist tabs gets a section of its own and the other five do
+ * not, because the cycle section already says what those five are for. Review
+ * is the one a reader would otherwise misread, not being a phase of the
+ * iteration at all. Theories had a section here and it was dropped: what a
+ * reader has to know about a suggestion — the independence constraint, and how
+ * little a Crossref verdict claims — is worded on the tab itself, next to the
+ * references it is about, which is where it is read rather than recalled.
  */
 function assistSections(cycle, llmEnabled) {
   return [

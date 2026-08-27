@@ -244,18 +244,20 @@ describe("what the tour claims", () => {
     expect(title({ hideNonEntailsRels: false })).not.toMatch(/review/i);
   });
 
-  it("stops at the two Assist tabs a reader would otherwise misread", () => {
+  it("stops at the one Assist tab a reader would otherwise misread", () => {
+    // Review is the only tab that gets a stop of its own. The cycle section
+    // already says what the five phases are for, and what a reader has to know
+    // about a theory suggestion — the independence constraint, and how little a
+    // Crossref verdict claims — is worded on the tab itself, where the
+    // references are (`TheorySuggestTab`, and the tests over its badges).
     const sections = build();
     const order = ids(sections);
-    const theories = sections.find((s) => s.id === "theories-tab");
     const review = sections.find((s) => s.id === "process-review");
 
-    // Both are reached by opening the tab, and both belong to the AI chapter.
-    expect(theories.tab).toBe("suggestTheories");
-    expect(theories.target).toBe("tab-suggestTheories");
+    // Reached by opening the tab, and part of the AI chapter.
     expect(review.tab).toBe("processReview");
     expect(review.target).toBe("tab-processReview");
-    expect(order.indexOf("theories-tab")).toBeGreaterThan(
+    expect(order.indexOf("process-review")).toBeGreaterThan(
       order.indexOf("assist"),
     );
     expect(order.indexOf("process-review")).toBeLessThan(
@@ -263,22 +265,13 @@ describe("what the tour claims", () => {
     );
   });
 
-  it("keeps both caveats a theory suggestion needs", () => {
-    // The independence constraint is what makes the equilibrium wide, and a
-    // Crossref verdict claims far less than it looks like it claims.
-    const theories = textOf(build().find((s) => s.id === "theories-tab"));
-    expect(theories).toMatch(/do not run through/i);
-    expect(theories).toMatch(/crossref/i);
-    expect(theories).toMatch(/never that it says what the theory claims/i);
-  });
-
   it("says a review is a reading of the process, not a move in it", () => {
     // Recorded as a change, a review would alter the record it describes —
     // which is also why passing through one mid-process is safe.
     const review = textOf(build().find((s) => s.id === "process-review"));
-    expect(review).toMatch(/not one of the iteration's phases/i);
     expect(review).toMatch(/every fifth/i);
     expect(review).toMatch(/advances no round/i);
+    expect(review).toMatch(/not an entry in it/i);
   });
 
   it("names the cycle after the relation modes that are switched on", () => {
