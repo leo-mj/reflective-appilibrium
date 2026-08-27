@@ -100,7 +100,7 @@ jobs:
       # Keyed on the lockfile, so a Playwright bump re-downloads and every other
       # run reuses the binary.
       - name: Cache Playwright browser
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('app/package-lock.json') }}
