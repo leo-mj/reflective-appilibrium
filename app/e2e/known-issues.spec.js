@@ -213,9 +213,10 @@ test.describe("Fixed defects", () => {
     expect(unnamed, `${unnamed} buttons still have no accessible name`).toBe(0);
   });
 
-  test("the confidence field in the workflow add panel is labelled", async ({ page }) => {
+  test("the confidence field in the add bar under an assist tab is labelled", async ({ page }) => {
     // Was: the numeric confidence input had no aria-label, while its own L/M/H
-    // siblings did (WorkflowAddPanels.jsx).
+    // siblings did. That was in the cut-down panel the assist tabs used to carry;
+    // they have the strip under them now, and this walks whatever is there.
     await gotoHome(page);
     await loadSample(page);
     await page.locator('button:text-is("Assist")').click();

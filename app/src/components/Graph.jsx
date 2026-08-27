@@ -417,8 +417,11 @@ function GraphModals({
  * @param {function(function): void} props.onSelectRel
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
- * @param {function}    [props.onCtrlSecondSelect] - Called with a node id when ctrl+click
- *   happens while another node is already selected. Used to fill the AddBar "to" field.
+ * @param {function}    [props.onCtrlChainSelect] - Called with the whole ctrl+click
+ *   chain — `[selected, ...the ones ctrl-clicked since]` — every time it grows.
+ *   The add bar fills its link forms from it, so the premises it is holding are
+ *   the ones {@link CtrlSelectionBar} is naming, read the same way round: the
+ *   last is the conclusion and the rest are the premises.
  * @param {boolean}     [props.ready] - When false, suppresses auto-fit until the force
  *   simulation has settled. Prevents fitting against initial clustered positions.
  * @param {{ key: number, ids: string[]|null }|null} [props.focus] - Frames a
@@ -439,7 +442,7 @@ export function Graph({
   onEditRequest,
   onWithdrawRequest,
   onReinstate,
-  onCtrlSecondSelect,
+  onCtrlChainSelect,
   onCreateGroup,
   onToggleGroup,
   onEditGroupRequest,
@@ -669,7 +672,14 @@ export function Graph({
           base: selected,
           nodes: prev.base === selected ? [...prev.nodes, id] : [id],
         }));
-        onCtrlSecondSelect?.(id);
+        // The whole chain rather than the node just added, so the add bar can
+        // hold what the chip is naming: three ctrl-clicks make a three-premise
+        // argument on the canvas, and the bar showing one premise and the last
+        // conclusion was a second, quieter reading of the same click.
+        // `ctrlArgNodes` is already the list for *this* `selected` — the guard
+        // above is what makes that so — hence the new chain without waiting for
+        // the state it was just handed.
+        onCtrlChainSelect?.([selected, ...ctrlArgNodes, id]);
       } else if (!selected) {
         onSelectRel(() => null);
         onSelect((prev) => (prev === id ? null : id));

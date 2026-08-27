@@ -1,14 +1,19 @@
 /**
  * @fileoverview The narrow screen's way in to adding: a floating + that opens
- * the same add bar the wide layout keeps permanently at the foot of the panel.
+ * the same add bar the wide layout keeps permanently at the foot of the window.
  *
  * It hosts {@link module:components/TextTabAddPanel} rather than dialogs of its
  * own, so the two layouts cannot drift. The element, relation and argument
  * tabs, the multi-premise argument builder, the validation, and the rule that
  * withholds the relation tab while the graph is showing arguments only all come
  * from there and are the same on both. What differs is only the container: a
- * sheet over the list rather than a bar beneath it, because at this width there
+ * sheet over the panel rather than a bar beneath it, because at this width there
  * is no room to show both the position and the form for adding to it.
+ *
+ * Two places open it: the text tab, and — carrying the tab's preset — an assist
+ * tab, which on a wide screen has the strip under it instead. It still lives in
+ * `text_panel/` because that is where the text tab's + was written, and the file
+ * has not moved since it grew a second caller.
  * @module components/text_panel/MobileAddButton
  */
 
@@ -25,12 +30,15 @@ import { AddBar } from "../user_edits/TextTabAddPanel.jsx";
  * @param {function}    props.onAddRelation
  * @param {boolean}     [props.hideNonEntailsRels] - Passed through: with plain
  *   relations hidden the bar offers arguments in their place.
+ * @param {Object}      [props.preset] - Passed through: what the tab this sits
+ *   under is about. See {@link module:constants/tabConstants.ADD_BAR_PRESETS}.
  */
 export function MobileAddButton({
   elements,
   onAddElement,
   onAddRelation,
   hideNonEntailsRels,
+  preset = null,
 }) {
   const [open, setOpen] = useState(false);
 
@@ -134,8 +142,9 @@ export function MobileAddButton({
                 onAddElement={onAddElement}
                 onAddRelation={onAddRelation}
                 selected={null}
-                ctrlTo={null}
+                ctrlChain={null}
                 hideNonEntailsRels={hideNonEntailsRels}
+                preset={preset}
               />
             </div>
           </div>

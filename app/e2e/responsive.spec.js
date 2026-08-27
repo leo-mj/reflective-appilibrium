@@ -34,7 +34,14 @@ test.describe("Narrow layout", () => {
     await page.locator('[data-tutorial="tab-detectArguments"]').first().click();
     await park(page);
 
-    const addPremise = page.locator('button:text-is("+ premise")');
+    // Narrow has no strip: the bar comes up as a sheet over the tab, and the
+    // tab's preset is what opens it on the argument form rather than the
+    // element one.
+    await page.locator('button[aria-label="Add to your position"]').click();
+    const sheet = page.getByRole("dialog", { name: "Add to your position" });
+    await expect(sheet).toBeVisible();
+
+    const addPremise = sheet.locator('button:text-is("+ premise")');
     await expect(addPremise).toBeVisible();
     for (let i = 0; i < 4; i++) {
       if (await addPremise.isDisabled()) break;
@@ -47,7 +54,7 @@ test.describe("Narrow layout", () => {
 
     await expectNoHorizontalScroll(page);
     // Nor down past the bottom of the screen, which is the other way a growing
-    // row goes wrong: the panel is capped and scrolls inside itself.
+    // row goes wrong: the sheet is capped and scrolls inside itself.
     const { scrollHeight, clientHeight } = await page.evaluate(() => ({
       scrollHeight: document.documentElement.scrollHeight,
       clientHeight: document.documentElement.clientHeight,

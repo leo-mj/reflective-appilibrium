@@ -81,7 +81,7 @@ export function AddArgumentModal({
 
   const addPremise = () =>
     setPremises((prev) => {
-      // In-play first, then anything else linkable — see AddArgumentPanel.
+      // In-play first, then anything else linkable — the add bar's rule too.
       const taken = new Set([...prev, conclusion]);
       const free = (list) => list.find((id) => !taken.has(id));
       return [...prev, free(seed) ?? free(ids) ?? ""];

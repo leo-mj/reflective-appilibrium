@@ -26,7 +26,6 @@
 import { useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchTheorySuggestions } from "../../utils/theoriesClient.js";
-import { AddElementPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import { llmOrigin } from "../../utils/stateUtils.js";
 import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
 import { Citation, CITATION_CAVEAT } from "../Citation.jsx";
@@ -393,7 +392,6 @@ export function TheorySuggestTab({
           />
         ))}
       </div>
-      <AddElementPanel elementType="theory" onAddElement={onAddElement} />
     </div>
   );
 }

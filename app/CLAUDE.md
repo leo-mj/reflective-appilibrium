@@ -229,24 +229,21 @@ inks reads on it; a control wearing a graph constant takes `palette.ink` and
 way the *fill* is untouched — re-toning one to chase a ratio is the thing that is
 forbidden.
 
-**Every add button is one button.** `AddBar`'s submit button, whichever of its
-tabs is lit, and the three panel buttons in `user_edits/WorkflowAddPanels.jsx`
-all wear `C.supports` and the palette's ink on it: white and bold in the default
-mode, black and unweighted in high-contrast, exactly as an assist tab's header
-badge is written. Adding a judgment from an assist tab is the same act as adding
-one from the bar, and the two looked like different acts while each coloured its
-own button. `useAddButtonStyle` is the whole of it on the panel side.
+**Every add button is one button** — which since the bar became the app's only
+add form is one button in the literal sense: `AddBar`'s submit, whichever of its
+tabs is lit. It wears `C.supports` and the palette's ink on it: white and bold in
+the default mode, black and unweighted in high-contrast, exactly as an assist
+tab's header badge is written. Adding a judgment from an assist tab is the same
+act as adding one from the bar, and the two looked like different acts while the
+assist tabs had panels that coloured their own.
 
-Two things this deliberately gives up. The argument panel's button no longer
-carries the entails/precludes colour — that colour is on the toggle beside it,
-which is what it is about. And white on that teal is 2.43:1 in the default mode,
-taken knowingly and by the same reasoning as the node ramp: judged by eye there,
-compliant in high-contrast, where the pair clears AAA. So every one of these
-buttons carries `ACCENT_MARKER` (`data-accent="graph"`, in `addPanelShared.js`),
-the editor and assist audits pass `ignoreGraphAccents` — default mode only, as
-everywhere — and the high-contrast e2e test picks them up for free, since it
-walks exactly that attribute. `TextTabAddPanel.test.jsx` and
-`WorkflowAddPanels.test.jsx` pin the fill, the ink and the weight per mode, which
+White on that teal is 2.43:1 in the default mode, taken knowingly and by the same
+reasoning as the node ramp: judged by eye there, compliant in high-contrast, where
+the pair clears AAA. So the bar's filled buttons carry `ACCENT_MARKER`
+(`data-accent="graph"`, in `addPanelShared.js`), the editor and assist audits pass
+`ignoreGraphAccents` — default mode only, as everywhere — and the high-contrast
+e2e test picks them up for free, since it walks exactly that attribute.
+`TextTabAddPanel.test.jsx` pins the fill, the ink and the weight per mode, which
 is what stops a hex being written back in; it has been written in by hand once in
 each direction already.
 
@@ -361,6 +358,19 @@ graph on every frame of a drag.
 top edge and right edge plus the corner. The phone sheet passes `enabled: false`:
 there the bar is already most of the screen.
 
+**Minimised is the third thing that hook stores**, with the height and the width
+because all three are one reader saying how much of the window the bar may have.
+Dragging it to its floor is not the same answer — the floor still leaves a bar,
+and someone reading a graph wants the strip gone rather than short. It survives a
+tab change and a reload; a bar that came back on its own would not be worth
+folding away. Two rules the collapsed strip is built on: it **hides the bar
+without clearing it**, so a half-written statement is still there on the way back;
+and the strip is **one target**, the whole line being the button rather than a
+24px chevron on a line, with the visible words as its accessible name (WCAG 2.5.3
+— an `aria-label` of its own would have broken exactly that). The chevron is
+`aria-hidden`, and the lit tab rides in the name, since which form is folded away
+is what decides whether to open it.
+
 **The bar is sized by its contents between two bounds, and the dragged height is
 the floor rather than the size.** Its controls grow — an argument taking on
 premises wraps its row two and three deep — and a bar pinned to a height its own
@@ -403,34 +413,61 @@ is a transform — so a horizontal scrollbar is always a row that has failed to
 wrap; `REState`'s `overflow-x: hidden` says so, but the fix is always the
 wrapping — and the field width above, which is the other way one appears.
 
-**The assist panels draw themselves for the layout they are in.** `usePanelSize`
-asks `useIsWide()` — the app's one definition of the wide layout, which `REState`
-now shares rather than re-deriving — and takes the add bar's `compact` sizes
-there and its `roomy` ones on a narrow screen, where the panel *is* the screen's
-controls and is worked with a thumb. At the wide sizes an argument's row was half
-a dozen targets under the 24px WCAG 2.5.8 asks for, on the layout with no pointer
-to hit them with. It is a hook rather than a prop because these panels are four
-components deep, and every tab between them and `REState` would have to carry a
-prop it has no other use for.
+**One add bar, under every tab.** `AddBar` is the app's only add form. The assist
+tabs used to carry a cut-down panel each — an element panel with the type fixed, a
+relation panel and an argument panel, all in a `WorkflowAddPanels.jsx` that no
+longer exists — which meant four forms for three kinds of thing, and they had
+drifted: the panels' `+ premise` fell back to the full element pool where the
+strip's did not, and the same two complaints were worded differently in each. What
+those panels knew that the bar did not is which kind of thing their tab was about,
+and that is a preset rather than a component.
 
-**Every add bar is one bar, at one height.** The strip under the text panel and
-the panel at the foot of an assist tab (`user_edits/WorkflowAddPanels.jsx`, whose
-`Panel` shell is the whole of it) start at the same floor —
-`ADD_BAR_MIN_HEIGHT`, one constant rather than the 16vh and 14vh they had drifted
-to — and read the same stored height, so dragging one drags them all. Only one is
-ever mounted at a time, since `REState` hides the strip on an assist tab; that is
-what makes reading the store at mount enough. **The width is not shared**: the
-strip spans the window and can give width back, an assist panel is as wide as the
-column the divider has left it, so the panels pass `axes: "height"` and a
-height-only bar leaves the stored width alone — a double-click there resets its
-own axis only.
+`ADD_BAR_PRESETS` in `constants/tabConstants.jsx` maps a tab to `{tab,
+elementType}`; `REState` hands the bar `ADD_BAR_PRESETS[tab] ?? null`, and the bar
+applies it exactly when the object's *identity* changes — the same
+adjust-during-render trackers the graph selection uses, and for a sharper reason:
+forced every render, neither the tab buttons nor the type picker could be moved
+off the preset at all. Hence frozen module constants rather than an object built
+at the call site. Applied before the selection, so ctrl-selecting in an assist
+tab's own graph still carries the bar to a link tab.
 
-The two argument forms are one form for the same reason, and draw their premises
-from one component — `PremisePickers` in `user_edits/addPanelPrimitives.jsx`.
-Every premise is a cell of the same width, which is what makes a run of them long
-enough to wrap come down in columns; and the run belongs to the row that holds
-the conclusion, not to a box of its own, since a box could only wrap inside
+The tabs with no entry — the analyze ones, Review, Questions and Simulate — hand
+it nothing and the bar keeps whatever it was left on. That is deliberate: there is
+nothing about reading a review or running a simulation that says what the reader is
+about to add, and a bar that snapped back to Element on the way past would undo
+work.
+
+**A ctrl+click chain is a whole argument, not its two ends.** The canvas
+accumulates `[selected, ...ctrlArgNodes]` and draws `P5, P4, P1 → J7` under it;
+`onCtrlChainSelect` hands the bar that same list, and the bar reads it the way the
+chip does — last is the conclusion, the rest are the premises. It used to be
+handed the newest id alone as `ctrlTo`, so the bar showed the first premise and
+the last conclusion: an argument nobody had picked, sitting under a chip naming
+the one they had. The relation form takes the two ends of the chain, a relation
+being binary — and the graph only offers one for a chain of two anyway. The
+identity rule from the preset applies here too: `REState` holds the array in
+state so a re-render is not a re-apply.
+
+**Narrow has no strip.** An add bar and a column of suggestions do not both fit on
+a phone, so `GraphPanel` puts `MobileAddButton` — the text tab's floating + — in
+the corner of an assist tab's body, carrying the same preset; the bar comes up as
+a `roomy` sheet over the tab. Gated on `ASSIST_TABS.includes(tab)` rather than
+`isAssistPanel`, which also covers Simulate: the one assist-side tab with nothing
+to add to.
+
+The bar's own height is dragged and stored once (`hooks/useAddBarSize.js`), which
+used to be an arrangement between two components reading one key and is now simply
+the one bar's height. It starts at `ADD_BAR_MIN_HEIGHT`. `PremisePickers` in
+`user_edits/addPanelPrimitives.jsx` still stands apart from the argument tab that
+uses it: every premise is a cell of the same width, which is what makes a run of
+them long enough to wrap come down in columns; and the run belongs to the row that
+holds the conclusion, not to a box of its own, since a box could only wrap inside
 itself.
+
+`useIsWide()` — the app's one definition of the wide layout — is what `REState` and
+`GraphPanel` both ask, rather than each re-deriving it; the bar itself takes
+`roomy` as a prop, since what makes it roomy is the sheet hosting it rather than
+the window.
 
 **The tour's column** — `tour/tourWidth.js`, and the one of the three that is a
 *module-level store* rather than a hook's own state, for the reason `useTheme`

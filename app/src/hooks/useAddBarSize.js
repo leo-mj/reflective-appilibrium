@@ -7,14 +7,11 @@
  * way. So both axes are draggable, and the size is remembered — a bar that
  * sprang back to its default on every reload would not be worth dragging.
  *
- * **Every add bar is one bar, at one height.** The strip under the text panel
- * and the panel at the foot of an assist tab are the same control in two
- * places — an add button, its fields, and a statement box — and a reader who
- * has dragged one taller has said how tall they want that control, not how tall
- * they want it *here*. So the height goes in one stored key and every bar reads
- * it. Only one of them is ever mounted at a time (`REState` hides the strip on
- * an assist tab), which is why reading the store at mount is enough to keep
- * them in step; two of them on screen at once would want a shared store.
+ * **One bar, one height.** The strip is drawn under every tab now, so this is
+ * simply that bar's size — it was an arrangement between two components reading
+ * one key while the assist tabs had panels of their own, and the key is all that
+ * survives of it. Reading the store at mount is enough because only one bar is
+ * ever mounted; two on screen at once would want a shared store.
  *
  * **A dragged height is a floor, not a size.** The bar is sized by its contents
  * between two bounds — that floor, and {@link HEIGHT_CAP} above it — because the
@@ -27,6 +24,13 @@
  * the window and can give width back, while an assist panel is as wide as the
  * column the divider has left it. A height-only bar keeps its hands off the
  * stored width rather than resetting it — see `onDoubleClick`.
+ *
+ * **Minimised is the third thing stored here**, and belongs with the other two
+ * for the same reason they belong together: all three are one reader saying how
+ * much of the window the bar may have. Dragging it to its floor is not the same
+ * answer — the floor still leaves a bar — and someone reading a graph wants the
+ * strip gone, not short. It survives a tab change and a reload, since a bar that
+ * came back on its own would not be worth folding away.
  *
  * The phone sheet is not resizable and does not call this: there the bar is
  * already most of the screen, and the two axes it could give are the two the
@@ -65,7 +69,7 @@ const KEY_STEP = 16;
 export const HEIGHT_CAP = `min(${Math.round(MAX_HEIGHT_FRACTION * 100)}dvh, 100%)`;
 
 /** The default: `null` on both axes, meaning "whatever the stylesheet says". */
-const UNSET = { height: null, width: null };
+const UNSET = { height: null, width: null, collapsed: false };
 
 /** Either axis may be missing, and a stored value from another version may be anything. */
 function readStored() {
@@ -74,6 +78,10 @@ function readStored() {
   return {
     height: Number.isFinite(raw.height) ? raw.height : null,
     width: Number.isFinite(raw.width) ? raw.width : null,
+    // Absent from every size written before the bar could be minimised, and
+    // `=== true` rather than truthy so anything else stored there opens the bar
+    // rather than hiding it — the failure that cannot be undone from the UI.
+    collapsed: raw.collapsed === true,
   };
 }
 
@@ -151,7 +159,8 @@ const HANDLE_LABEL = {
  * @param {"both"|"height"} [options.axes] - Which axes this bar owns. `"height"`
  *   is for a bar whose width is not its own to give — an assist tab's panel,
  *   which is as wide as the column it sits in.
- * @returns {{ ref: React.RefObject, sizeStyle: Object, handleProps: (axis: "height"|"width"|"both") => Object|null }}
+ * @returns {{ ref: React.RefObject, sizeStyle: Object, collapsed: boolean,
+ *   toggleCollapsed: function, handleProps: (axis: "height"|"width"|"both") => Object|null }}
  */
 export function useAddBarSize(enabled, { axes: owns = "both" } = {}) {
   const ownsWidth = owns === "both";
@@ -250,7 +259,14 @@ export function useAddBarSize(enabled, { axes: owns = "both" } = {}) {
       // ones this bar owns, that is — a panel with no width of its own to give
       // must not throw away the width the strip was left at.
       onDoubleClick: () => {
-        const next = ownsWidth ? UNSET : { ...latest.current, height: null };
+        // The axes only. Minimised is not a size the bar was dragged to, and
+        // the handle is not reachable while it is — but spelling it out keeps
+        // the reset from ever being the thing that reopens the bar.
+        const next = {
+          ...latest.current,
+          height: null,
+          ...(ownsWidth ? { width: null } : null),
+        };
         latest.current = next;
         setSize(next);
         store(next);
@@ -274,8 +290,21 @@ export function useAddBarSize(enabled, { axes: owns = "both" } = {}) {
     };
   };
 
+  const collapsed = enabled && size.collapsed;
+
   return {
     ref,
+    collapsed,
+    /**
+     * Fold the bar away to its own handle, or bring it back. Stored with the
+     * height and the width because it is the same question — how much of the
+     * window this reader wants the bar to have — and stored at all because a bar
+     * that reopened on every tab change would not be worth minimising.
+     */
+    toggleCollapsed: () => {
+      commit({ collapsed: !latest.current.collapsed });
+      store(latest.current);
+    },
     sizeStyle: {
       position: "relative",
       ...(enabled

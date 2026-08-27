@@ -14,7 +14,6 @@ import {
   nextElementId,
   argumentRelationType,
   argumentPostulateExplanation,
-  linkableElements,
   newArgumentId,
   withUserEdit,
   llmOrigin,
@@ -28,7 +27,6 @@ import {
   ErrorBanner,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
-import { AddArgumentPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { ProgressWorkflowBtn, ToolbarStrip } from "./workflowComponents.jsx";
@@ -634,10 +632,6 @@ export function DetectArgumentsTab({
           </>
         )}
       </div>
-      <AddArgumentPanel
-        elements={linkableElements(state.elements)}
-        onAddRelation={onAddRelation}
-      />
     </div>
   );
 }

@@ -44,9 +44,12 @@ export function useWindowSize() {
  * Both axes, because the wide layout is two panels side by side *above* an add
  * bar: a short window has no more room for that than a narrow one.
  *
- * A hook rather than a prop threaded down: the add panels at the foot of the
- * assist tabs are four components deep, and every tab between them and `REState`
- * would have to carry a prop it has no other use for.
+ * A hook rather than a constant so that a resize is a re-render. `REState` is
+ * the only caller now — the assist tabs' own add panels used to ask it too, from
+ * four components down, and the strip that replaced them is placed by `REState`
+ * itself — but it stays exported and stays the definition: a second comparison
+ * written out somewhere else is how the layout and what is drawn for it come to
+ * disagree.
  *
  * @returns {boolean}
  */

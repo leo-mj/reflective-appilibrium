@@ -9,7 +9,11 @@ import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { useAutosaveDraft } from "../hooks/useAutosaveDraft.js";
 import { useBackendCapabilities } from "../hooks/useBackendCapabilities.js";
-import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
+import {
+  ADD_BAR_PRESETS,
+  ASSIST_TABS,
+  SIMULATE_TABS,
+} from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
 import { saveSession } from "../utils/sessionsClient.js";
 import {
@@ -42,7 +46,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [assistSidePanel, setAssistSidePanel] = useState("graph");
   const [historyRound, setHistoryRound] = useState(0);
   const [workflowPhase, setWorkflowPhase] = useState(null);
-  const [addBarCtrlTo, setAddBarCtrlTo] = useState(null);
+  const [addBarCtrlChain, setAddBarCtrlChain] = useState(null);
   const [workflowLoops, setWorkflowLoops] = useState(0);
   const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
   const [verifyArguments, setVerifyArguments] = useState(true);
@@ -164,9 +168,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   }, [handleUndo, handleRedo]);
 
   const dims = useWindowSize();
-  // Through the hook rather than the comparison, so the add panels — which ask
-  // it themselves, being too deep to be handed a prop — cannot draw themselves
-  // for one layout while this puts them in the other.
+  // Through the hook rather than a comparison written out here: it is the app's
+  // one definition of the wide layout, and what decides both whether the strip
+  // is drawn and whether an assist tab carries the narrow layout's + instead.
   const isWide = useIsWide();
   // The same tour either way; what differs is where the screen has room for it.
   // Wide reads it down a column beside the graph, narrow along a sheet under
@@ -369,7 +373,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onRoundChange: setHistoryRound,
     focus: graphFocus,
     isWide,
-    onCtrlSecondSelect: setAddBarCtrlTo,
+    onCtrlChainSelect: setAddBarCtrlChain,
     onCreateGroup: handleCreateGroup,
     onToggleGroup: handleToggleGroup,
     onUngroup: handleUngroup,
@@ -572,7 +576,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
               workflowNextPhase={null}
               onAdvanceWorkflow={null}
               nextPhaseIsEnabled={false}
-              onCtrlSecondSelect={setAddBarCtrlTo}
+              onCtrlChainSelect={setAddBarCtrlChain}
               isFullscreen={sideGraphIsFull}
               onToggleFullscreen={() =>
                 setAssistSidePanel(sideGraphIsFull ? "graph" : "graphFull")
@@ -594,14 +598,23 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         {!usesSidePanel && mainPanel}
       </section>
 
-      {isWide && !isAssistTab && !isSimulateTab && showAddBar && (
+      {/* Under every tab, not only the analyze ones. The assist tabs used to
+          carry a cut-down panel each, so the way in by hand changed shape — and
+          moved — at every step of the workflow; one strip that stays put across
+          a tab change is both tidier and the fuller form. What the panels knew
+          and the strip did not is which kind of thing their tab was about, and
+          that is what the preset carries. Simulate is handed none: like the
+          analyze tabs it has no view on what is about to be added, so the bar
+          keeps whatever it was left on. */}
+      {isWide && showAddBar && (
         <AddBar
           elements={linkableElements(state.elements)}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
           selected={selected}
-          ctrlTo={addBarCtrlTo}
+          ctrlChain={addBarCtrlChain}
           hideNonEntailsRels={hideNonEntailsRels}
+          preset={ADD_BAR_PRESETS[tab] ?? null}
         />
       )}
 

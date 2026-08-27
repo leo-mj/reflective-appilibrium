@@ -29,6 +29,7 @@ import {
   rowsOf,
   selectedRow,
 } from "./dropdownTestUtils.js";
+import { ADD_BAR_PRESETS } from "../../constants/tabConstants.jsx";
 import { AddBar } from "./TextTabAddPanel.jsx";
 import { ADD_BAR_MIN_HEIGHT } from "./addPanelShared.js";
 import { HEIGHT_CAP } from "../../hooks/useAddBarSize.js";
@@ -44,6 +45,19 @@ const ELEMENTS = [
   { id: "P1", type: "principle", status: "active" },
 ];
 
+/**
+ * The presets the app actually hands the bar, under the names of what they are
+ * for. Taken from the map rather than written out here, so a tab that stops
+ * pointing at the right form fails a test rather than passing a copy of itself.
+ */
+const PRESETS = {
+  judgment: ADD_BAR_PRESETS.elicitJudgments,
+  principle: ADD_BAR_PRESETS.suggestPrinciples,
+  theory: ADD_BAR_PRESETS.suggestTheories,
+  argument: ADD_BAR_PRESETS.detectArguments,
+  relation: ADD_BAR_PRESETS.suggestRelations,
+};
+
 function renderBar(props = {}) {
   return render(
     <AddBar
@@ -51,7 +65,7 @@ function renderBar(props = {}) {
       onAddElement={() => {}}
       onAddRelation={() => {}}
       selected={null}
-      ctrlTo={null}
+      ctrlChain={null}
       {...props}
     />,
   );
@@ -86,7 +100,7 @@ describe("AddBar graph-selection sync", () => {
         onAddElement={() => {}}
         onAddRelation={() => {}}
         selected="J2"
-        ctrlTo={null}
+        ctrlChain={null}
       />,
     );
     expect(activeTab(container)).toBe("relation");
@@ -99,10 +113,65 @@ describe("AddBar graph-selection sync", () => {
     expect(relationEndpoints(container).from).toBe("P1");
   });
 
-  it("fills 'to' from a ctrl-selected second node", () => {
-    const { container } = renderBar({ selected: "J1", ctrlTo: "P1" });
+  it("fills both ends from a ctrl-selected pair", () => {
+    const { container } = renderBar({
+      selected: "J1",
+      ctrlChain: ["J1", "P1"],
+    });
     expect(activeTab(container)).toBe("relation");
     expect(relationEndpoints(container)).toEqual({ from: "J1", to: "P1" });
+  });
+
+  // The canvas draws `P5, P4, P1 → J7` under a three-click chain and offers to
+  // add exactly that argument. The bar used to be handed the newest id alone,
+  // so it showed the first premise and the last conclusion — an argument nobody
+  // had picked, sitting under the chip naming the one they had.
+  it("holds the whole ctrl+click chain as an argument", () => {
+    const { container } = renderBar({
+      elements: [
+        ...ELEMENTS,
+        { id: "P2", type: "principle", status: "active" },
+      ],
+      hideNonEntailsRels: true,
+      selected: "P1",
+      ctrlChain: ["P1", "J1", "P2", "J2"],
+    });
+    expect(activeTab(container)).toBe("argument");
+    expect(pickerValue("Premise 1")).toBe("P1");
+    expect(pickerValue("Premise 2")).toBe("J1");
+    expect(pickerValue("Premise 3")).toBe("P2");
+    // The last is the conclusion, which is how the graph's own chip reads it.
+    expect(pickerValue("Conclusion")).toBe("J2");
+  });
+
+  it("takes the two ends of a longer chain as the relation", () => {
+    // A relation is binary, so a chain of more than two has no reading here
+    // beyond its ends — and the graph only offers a relation for a chain of two.
+    renderBar({ selected: "P1", ctrlChain: ["P1", "J1", "J2"] });
+    expect(pickerValue("Relation from")).toBe("P1");
+    expect(pickerValue("Relation to")).toBe("J2");
+  });
+
+  it("drops the premises a shorter chain leaves behind", () => {
+    // Ctrl-clicking three and then starting again on two must not leave the
+    // third premise standing from the chain before.
+    const props = {
+      elements: ELEMENTS,
+      onAddElement: () => {},
+      onAddRelation: () => {},
+      hideNonEntailsRels: true,
+      selected: "P1",
+    };
+    const { rerender } = renderBar({
+      ...props,
+      ctrlChain: ["P1", "J1", "J2"],
+    });
+    expect(pickerValue("Premise 2")).toBe("J1");
+
+    rerender(<AddBar {...props} ctrlChain={["P1", "J2"]} />);
+    expect(pickerValue("Premise 1")).toBe("P1");
+    expect(screen.queryByRole("combobox", { name: "Premise 2" })).toBeNull();
+    expect(pickerValue("Conclusion")).toBe("J2");
   });
 
   it("re-applies the same id after the selection is cleared", () => {
@@ -110,7 +179,7 @@ describe("AddBar graph-selection sync", () => {
       elements: ELEMENTS,
       onAddElement: () => {},
       onAddRelation: () => {},
-      ctrlTo: null,
+      ctrlChain: null,
     };
     const { container, rerender } = renderBar({ selected: "J2" });
     expect(relationEndpoints(container).from).toBe("J2");
@@ -133,7 +202,7 @@ describe("AddBar graph-selection sync", () => {
       elements: ELEMENTS,
       onAddElement: () => {},
       onAddRelation: () => {},
-      ctrlTo: null,
+      ctrlChain: null,
     };
     const { container, rerender } = renderBar({ selected: "J2" });
     rerender(<AddBar {...props} selected={null} />);
@@ -160,7 +229,7 @@ describe("what the bar offers", () => {
     const { container } = renderBar({
       hideNonEntailsRels: true,
       selected: "J2",
-      ctrlTo: "P1",
+      ctrlChain: ["J2", "P1"],
     });
     expect(activeTab(container)).toBe("argument");
     expect(pickerValue("Premise 1")).toBe("J2");
@@ -173,7 +242,7 @@ describe("what the bar offers", () => {
       onAddElement: () => {},
       onAddRelation: () => {},
       selected: null,
-      ctrlTo: null,
+      ctrlChain: null,
     };
     const { container, rerender } = renderBar({ hideNonEntailsRels: false });
     fireEvent.click(screen.getByText("Relation"));
@@ -184,6 +253,139 @@ describe("what the bar offers", () => {
     // …and back again, rather than having been thrown off the tab for good.
     rerender(<AddBar {...props} hideNonEntailsRels={false} />);
     expect(activeTab(container)).toBe("relation");
+  });
+});
+
+// One bar under every tab, and the tab it is under says what is about to be
+// added — which is all that is left of the three cut-down panels the assist
+// tabs used to carry. Applied on the preset *changing*, by the same trackers the
+// graph selection above uses, so these cover the two cases an effect would get
+// wrong: a preset present at mount, and one that has to leave the reader alone
+// once they have moved off it.
+describe("what the tab under it says the bar is for", () => {
+  const ELEMENT_TYPE = () => pickerValue("Element type");
+
+  it("opens on the tab its preset names", () => {
+    expect(activeTab(renderBar({ preset: PRESETS.argument }).container)).toBe(
+      "argument",
+    );
+    cleanup();
+    expect(activeTab(renderBar({ preset: PRESETS.relation }).container)).toBe(
+      "relation",
+    );
+  });
+
+  it("fills the element type in from it", () => {
+    renderBar({ preset: PRESETS.theory });
+    expect(ELEMENT_TYPE()).toBe("theory");
+  });
+
+  it("leaves the bar alone where the tab has no view", () => {
+    // The analyze tabs and Simulate hand it nothing, and a bar left on the
+    // argument tab stays there rather than snapping back to Element.
+    const { container, rerender } = renderBar({ preset: PRESETS.argument });
+    rerender(
+      <AddBar
+        elements={ELEMENTS}
+        onAddElement={() => {}}
+        onAddRelation={() => {}}
+        selected={null}
+        ctrlChain={null}
+        preset={null}
+      />,
+    );
+    expect(activeTab(container)).toBe("argument");
+  });
+
+  it("is where the bar starts, not where it is held", () => {
+    // The preset picks the tab and the type; the pickers are still the
+    // reader's. Re-rendered with the same preset it must not snap back — which
+    // is why the presets are constants rather than objects built per render.
+    const { container, rerender } = renderBar({ preset: PRESETS.principle });
+    choose("Element type", "judgment");
+    rerender(
+      <AddBar
+        elements={ELEMENTS}
+        onAddElement={() => {}}
+        onAddRelation={() => {}}
+        selected={null}
+        ctrlChain={null}
+        preset={PRESETS.principle}
+      />,
+    );
+    expect(ELEMENT_TYPE()).toBe("judgment");
+    expect(activeTab(container)).toBe("element");
+  });
+
+  it("takes hold again on the way back to that tab", () => {
+    const { rerender } = renderBar({ preset: PRESETS.principle });
+    choose("Element type", "judgment");
+    const at = (preset) =>
+      rerender(
+        <AddBar
+          elements={ELEMENTS}
+          onAddElement={() => {}}
+          onAddRelation={() => {}}
+          selected={null}
+          ctrlChain={null}
+          preset={preset}
+        />,
+      );
+    at(null); // away to an analyze tab
+    at(PRESETS.principle); // and back
+    expect(ELEMENT_TYPE()).toBe("principle");
+  });
+
+  it("gives way to a node picked in the tab's own graph", () => {
+    // An assist tab has a graph beside it, and ctrl-selecting there is the
+    // reader saying what they want now — later than their arriving on the tab.
+    const { container } = renderBar({
+      preset: PRESETS.judgment,
+      selected: "J1",
+      ctrlChain: ["J1", "P1"],
+    });
+    expect(activeTab(container)).toBe("relation");
+  });
+});
+
+// jsdom lays nothing out, so what these hold is the wiring that lets an
+// argument's row come down a line rather than widen the bar past the window:
+// that it may wrap, that it may shrink, and that the premises and the
+// conclusion are in one row rather than in groups that wrap independently.
+// The assist tabs' own argument panel is gone; this is the form they use now.
+describe("the argument tab's controls wrap rather than widen the bar", () => {
+  /** The cell one picker sits in: the wrapper the layout is set on, boxed. */
+  const cell = (name) => picker(name).parentElement.parentElement;
+  const renderArgumentTab = () => {
+    const { container } = renderBar();
+    fireEvent.click(screen.getByText("Argument"));
+    return container;
+  };
+
+  it("puts the whole argument in one wrapping, shrinkable row", () => {
+    renderArgumentTab();
+    const row = cell("Premise 1").parentElement;
+    expect(row.style.flexWrap).toBe("wrap");
+    // Without this the row is held at its contents' width and cannot wrap at
+    // all, whatever `flexWrap` says.
+    expect(row.style.minWidth).toBe("0px");
+  });
+
+  it("keeps the premises and the conclusion in that same row", () => {
+    renderArgumentTab();
+    fireEvent.click(screen.getByText("+ premise"));
+    const row = cell("Premise 1").parentElement;
+    expect(cell("Premise 2").parentElement).toBe(row);
+    // One box shallower: a premise is boxed with the button that drops it and
+    // the + after it, the conclusion stands alone in the row itself.
+    expect(cell("Conclusion")).toBe(row);
+  });
+
+  it("joins the premises with +, each carrying the button that drops it", () => {
+    renderArgumentTab();
+    fireEvent.click(screen.getByText("+ premise"));
+    expect(cell("Premise 1").lastChild.textContent).toBe("+");
+    expect(cell("Premise 2").lastChild.textContent).toBe("✕");
   });
 });
 
@@ -219,6 +421,15 @@ describe("the roomy layout", () => {
     renderBar();
     expect(minHeight(screen.getByText("Element"))).toBe(0);
     expect(minHeight(screen.getByText(/^Add$/))).toBe(0);
+  });
+
+  it("holds the strip's own smallest control to the WCAG floor", () => {
+    // The premise buttons are the smallest thing in the app, and the pointer
+    // layout still has to clear 24px — WCAG 2.5.8. The phone's copy wants more
+    // than that minimum rather than the minimum, which the test above pins.
+    renderBar();
+    fireEvent.click(screen.getByText("Argument"));
+    expect(minHeight(screen.getByText("+ premise"))).toBeGreaterThanOrEqual(24);
   });
 });
 
@@ -546,7 +757,7 @@ describe("how wide the pickers are", () => {
         onAddElement={() => {}}
         onAddRelation={() => {}}
         selected={null}
-        ctrlTo={null}
+        ctrlChain={null}
       />,
     );
     fireEvent.click(screen.getByText("Relation"));
@@ -784,6 +995,9 @@ describe("AddBar resizing", () => {
     expect(JSON.parse(localStorage.getItem("addBarSize"))).toEqual({
       height: null,
       width: null,
+      // Untouched: minimised is not an axis, and a reset that reopened the bar
+      // would be the one thing the reader cannot have asked for here.
+      collapsed: false,
     });
   });
 
@@ -824,6 +1038,112 @@ describe("AddBar resizing", () => {
     const { container } = renderBar();
     expect(parseInt(container.querySelector("textarea").style.minHeight, 10))
       .toBeGreaterThan(0);
+  });
+});
+
+// Dragging the bar to its floor still leaves a bar, and someone reading a graph
+// wants the strip gone rather than short. So it folds away to its own handle,
+// and stays folded — a bar that came back on its own would not be worth
+// minimising. The state lives with the height and the width, all three being one
+// reader saying how much of the window the bar may have.
+describe("minimising the bar", () => {
+  afterEach(() => localStorage.removeItem("addBarSize"));
+
+  const bar = (container) => container.querySelector('[data-tutorial="add-bar"]');
+  const minimise = () =>
+    screen.getByRole("button", { name: "Minimise the add bar" });
+  const restore = () =>
+    screen.getByRole("button", { name: /^Show the add bar/ });
+
+  it("folds the form away, leaving the way back", () => {
+    const { container } = renderBar();
+    fireEvent.click(minimise());
+
+    expect(container.querySelector("textarea")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Add / })).toBeNull();
+    expect(restore()).toBeTruthy();
+    // Still the bar the tour rings, so the ring has something to point at.
+    expect(bar(container)).toBeTruthy();
+  });
+
+  it("says which tab it was left on, so the reader knows what is folded", () => {
+    renderBar();
+    fireEvent.click(screen.getByText("Argument"));
+    fireEvent.click(minimise());
+    // In the button's own name, not beside it: the strip is one target, and
+    // what it says is what a screen reader reads out.
+    expect(restore().textContent).toContain("argument");
+  });
+
+  it("is one target across the whole strip, not a chevron to aim at", () => {
+    const { container } = renderBar();
+    fireEvent.click(minimise());
+    // The bar has exactly one thing in it, and that thing is the button.
+    expect(bar(container).children).toHaveLength(1);
+    expect(bar(container).firstChild).toBe(restore());
+  });
+
+  it("keeps the chevron in the corner it was pressed in", () => {
+    // The pair only reads as one switch while it holds still — a control that
+    // crosses to the other end of the bar when used is one to find again.
+    const { container } = renderBar();
+    const wasAtEnd = minimise().parentElement.lastChild;
+    expect(wasAtEnd).toBe(minimise());
+
+    fireEvent.click(minimise());
+    const chevron = restore().lastElementChild;
+    expect(chevron.textContent).toBe("▴");
+    // Held out to the same edge, and not part of the name a reader hears.
+    expect(chevron.style.marginLeft).toBe("auto");
+    expect(chevron.getAttribute("aria-hidden")).toBe("true");
+    expect(bar(container).textContent).not.toContain("▾");
+  });
+
+  it("gives the form back with its contents", () => {
+    const { container } = renderBar();
+    fireEvent.change(container.querySelector("textarea"), {
+      target: { value: "Torturing is wrong." },
+    });
+    fireEvent.click(minimise());
+    fireEvent.click(restore());
+
+    // Hidden, not cleared: minimising is about the room the bar takes, and a
+    // half-written statement thrown away by it would be the reader's work.
+    expect(container.querySelector("textarea").value).toBe(
+      "Torturing is wrong.",
+    );
+  });
+
+  it("takes no height and offers no handle while it is folded", () => {
+    const { container } = renderBar();
+    fireEvent.click(minimise());
+    expect(bar(container).style.minHeight).toBe("");
+    expect(bar(container).style.maxHeight).toBe("");
+    // Nothing to size, and the top edge is the only way back in.
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
+  });
+
+  it("stays folded across a remount, and is stored with the size", () => {
+    renderBar();
+    fireEvent.click(minimise());
+    expect(JSON.parse(localStorage.getItem("addBarSize")).collapsed).toBe(true);
+
+    cleanup();
+    renderBar();
+    expect(restore()).toBeTruthy();
+  });
+
+  it("opens for a size stored before the bar could be folded", () => {
+    localStorage.setItem("addBarSize", JSON.stringify({ height: 240 }));
+    const { container } = renderBar();
+    expect(container.querySelector("textarea")).toBeTruthy();
+  });
+
+  it("is not offered on the phone sheet, which is closed rather than folded", () => {
+    renderBar({ roomy: true });
+    expect(
+      screen.queryByRole("button", { name: "Minimise the add bar" }),
+    ).toBeNull();
   });
 });
 

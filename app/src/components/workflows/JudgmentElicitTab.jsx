@@ -11,7 +11,6 @@
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
-import { AddElementPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import { llmOrigin } from "../../utils/stateUtils.js";
 import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
 import { useScoreBaseline } from "../../hooks/useScoreBaseline.js";
@@ -337,7 +336,6 @@ export function JudgmentElicitTab({
           />
         ))}
       </div>
-      <AddElementPanel elementType="judgment" onAddElement={onAddElement} />
     </div>
   );
 }

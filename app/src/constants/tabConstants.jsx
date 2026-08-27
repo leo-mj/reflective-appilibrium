@@ -31,6 +31,37 @@ export const ASSIST_TABS = [
 export const SIMULATE_TABS = ["simulateRethon"];
 
 /**
+ * What the add bar opens on, for the tabs that have an answer.
+ *
+ * The bar is one control shown under every tab rather than a strip in analyze
+ * mode and a panel per assist tab — the assist tabs used to carry three cut-down
+ * panels of their own, which is what these presets replace. A tab that is about
+ * principles is a tab whose add bar should be ready to add a principle; the
+ * picker is still there, so this is where it starts rather than what it may be.
+ *
+ * Frozen module constants, and looked up by tab rather than built at the call
+ * site, because the bar applies a preset when the *identity* of the one it is
+ * handed changes — see {@link module:components/TextTabAddPanel.AddBar}. An
+ * object built inline would be a new one every render, and the bar would reset
+ * under the reader's hands each time.
+ *
+ * The tabs missing from this map — the analyze ones, Review, Questions, and
+ * Simulate — hand it nothing, and the bar keeps whatever it was left on. That is
+ * the analyze behaviour, and there is nothing about reading a review or running
+ * a simulation that says what the reader is about to add.
+ */
+export const ADD_BAR_PRESETS = {
+  elicitJudgments: Object.freeze({ tab: "element", elementType: "judgment" }),
+  suggestPrinciples: Object.freeze({
+    tab: "element",
+    elementType: "principle",
+  }),
+  suggestTheories: Object.freeze({ tab: "element", elementType: "theory" }),
+  detectArguments: Object.freeze({ tab: "argument" }),
+  suggestRelations: Object.freeze({ tab: "relation" }),
+};
+
+/**
  * Whether a sub-tab is on offer, given the current model and relation filter.
  *
  * Both header layouts must agree on this. The wide bar and the narrow menu are

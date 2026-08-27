@@ -47,14 +47,22 @@ test.describe("Assist workflow", () => {
     await expect.poll(async () => (await analyzeCounts(page)).J).toBe(before + 1);
   });
 
-  test("the add-judgment button stays disabled until there is text", async ({ page }) => {
+  test("the add bar arrives on the tab set to add a judgment", async ({ page }) => {
+    // One strip under every tab now, rather than a cut-down panel per assist
+    // tab — so what says this one is for judgments is the type it opens on.
     await page.getByRole("button", { name: /Start Workflow/ }).click();
     await expect(page.locator("text=/Elicit Judgments/").first()).toBeVisible();
 
-    const add = page.locator('button:text-is("Add judgment")');
+    const bar = page.locator('[data-tutorial="add-bar"]');
+    await expect(bar).toBeVisible();
+    await expect(bar.getByRole("combobox", { name: "Element type" })).toHaveText(
+      /Judgment/,
+    );
+
+    const add = bar.getByRole("button", { name: "Add element" });
     await expect(add).toBeDisabled();
 
-    await page.locator('textarea[placeholder*="Enter statement"]').first().fill("A typed judgment.");
+    await bar.locator('textarea[placeholder*="Enter statement"]').fill("A typed judgment.");
     await expect(add).toBeEnabled();
   });
 });

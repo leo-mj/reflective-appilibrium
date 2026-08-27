@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 //
-// The origin field is filled in once and then left alone. Three forms offer it —
-// the add bar under the text panel, an assist tab's own panel, and the graph's
-// modal — and each of them used to hold its own copy, reset to "user" by a
-// clear, an add, or the unmount a tab change brings. Anyone whose answer was not
-// "user" retyped it for every element they added.
+// The origin field is filled in once and then left alone. Two forms offer it —
+// the add bar, which is under every tab, and the graph's modal — and each of
+// them used to hold its own copy, reset to "user" by a clear, an add, or the
+// unmount a tab change brought. Anyone whose answer was not "user" retyped it
+// for every element they added.
 //
-// So these cover the three ways it could be lost, per surface: an add, a switch
-// away and back, and the other surface disagreeing while both are on screen.
+// So these cover the ways it could be lost, per surface: an add, a move to
+// another tab, and the unmount the phone's sheet still brings.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
@@ -16,9 +16,9 @@ import {
   lastOrigin,
   setLastOrigin,
 } from "../../utils/lastOrigin.js";
+import { ADD_BAR_PRESETS } from "../../constants/tabConstants.jsx";
 import { AddElementModal } from "./AddElementModal.jsx";
 import { AddBar } from "./TextTabAddPanel.jsx";
-import { AddElementPanel } from "./WorkflowAddPanels.jsx";
 
 const ELEMENTS = [
   { id: "J1", type: "judgment", status: "active" },
@@ -42,7 +42,7 @@ describe("the add bar", () => {
         onAddElement={() => {}}
         onAddRelation={() => {}}
         selected={null}
-        ctrlTo={null}
+        ctrlChain={null}
         {...props}
       />,
     );
@@ -95,18 +95,30 @@ describe("the add bar", () => {
   });
 });
 
-describe("an assist tab's add panel", () => {
-  const renderPanel = (onAddElement = () => {}) =>
+describe("the bar under an assist tab", () => {
+  // The same bar, told by its preset what the tab is about — the assist tabs'
+  // own panels are gone. That takes one of the ways the origin could be lost
+  // with them: moving between assist tabs is a re-render now rather than an
+  // unmount, so the field cannot be reset by a remount. What is left is the
+  // add, which empties the form around it and must leave this standing.
+  const renderBar = (preset, onAddElement = () => {}) =>
     render(
-      <AddElementPanel elementType="judgment" onAddElement={onAddElement} />,
+      <AddBar
+        elements={ELEMENTS}
+        onAddElement={onAddElement}
+        onAddRelation={() => {}}
+        selected={null}
+        ctrlChain={null}
+        preset={preset}
+      />,
     );
 
   it("keeps what was typed across an add", () => {
     const onAddElement = vi.fn();
-    renderPanel(onAddElement);
+    renderBar(ADD_BAR_PRESETS.elicitJudgments, onAddElement);
     type("gpt-5");
     fireEvent.change(statement(), { target: { value: "Torturing is wrong." } });
-    fireEvent.click(screen.getByRole("button", { name: "Add judgment" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Add / }));
 
     expect(onAddElement.mock.calls[0][0]).toMatchObject({
       type: "judgment",
@@ -116,36 +128,30 @@ describe("an assist tab's add panel", () => {
     expect(originField().value).toBe("gpt-5");
   });
 
-  it("opens on what another tab's panel was left on", () => {
-    // Switching assist tabs unmounts one panel and mounts another.
-    const { unmount } = renderPanel();
+  it("carries it from one assist tab to the next", () => {
+    const { rerender } = renderBar(ADD_BAR_PRESETS.elicitJudgments);
     type("gpt-5");
-    unmount();
-    renderPanel();
+    rerender(
+      <AddBar
+        elements={ELEMENTS}
+        onAddElement={() => {}}
+        onAddRelation={() => {}}
+        selected={null}
+        ctrlChain={null}
+        preset={ADD_BAR_PRESETS.suggestPrinciples}
+      />,
+    );
     expect(originField().value).toBe("gpt-5");
   });
-});
 
-describe("the two surfaces on screen at once", () => {
-  it("agree, rather than one going stale under the other", () => {
-    render(
-      <>
-        <AddBar
-          elements={ELEMENTS}
-          onAddElement={() => {}}
-          onAddRelation={() => {}}
-          selected={null}
-          ctrlTo={null}
-        />
-        <AddElementPanel elementType="judgment" onAddElement={() => {}} />
-      </>,
-    );
-    const [bar, panel] = screen.getAllByLabelText("Origin");
-    fireEvent.change(bar, { target: { value: "P07" } });
-    expect(panel.value).toBe("P07");
-
-    fireEvent.change(panel, { target: { value: "P08" } });
-    expect(bar.value).toBe("P08");
+  it("survives the unmount the phone's sheet brings", () => {
+    // Narrow has no strip: the bar comes up as a sheet over the tab and goes
+    // again when it is closed, which is where the store still earns its keep.
+    const { unmount } = renderBar(ADD_BAR_PRESETS.elicitJudgments);
+    type("gpt-5");
+    unmount();
+    renderBar(ADD_BAR_PRESETS.suggestTheories);
+    expect(originField().value).toBe("gpt-5");
   });
 });
 

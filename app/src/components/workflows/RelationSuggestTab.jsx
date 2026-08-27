@@ -10,12 +10,7 @@
 import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchRelationSuggestions } from "../../utils/relationsClient.js";
-import { AddRelationPanel } from "../user_edits/WorkflowAddPanels.jsx";
-import {
-  llmOrigin,
-  relationTypeLabel,
-  linkableElements,
-} from "../../utils/stateUtils.js";
+import { llmOrigin, relationTypeLabel } from "../../utils/stateUtils.js";
 import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
 import {
   AcceptButton,
@@ -287,12 +282,6 @@ export function RelationSuggestTab({
           />
         ))}
       </div>
-      {/* Not `activeElements`: that gates what the model is asked about, while
-          the panel is the user's own hand-built relation. */}
-      <AddRelationPanel
-        elements={linkableElements(state.elements)}
-        onAddRelation={onAddRelation}
-      />
     </div>
   );
 }

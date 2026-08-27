@@ -3,12 +3,17 @@
  * Spans the full width at ~20vh, always visible — or, with `roomy`, laid out
  * for the phone sheet that hosts it there instead.
  *
+ * The app's only way in by hand, under every tab. The assist tabs used to carry
+ * three cut-down panels of their own — an element panel with the type fixed, a
+ * relation panel and an argument panel — which meant four forms for three kinds
+ * of thing, and they had already drifted apart in what `+ premise` picked and in
+ * how they worded their complaints. What those panels knew that this bar did not
+ * is which kind of thing the tab they sat under was about, and that is a preset
+ * rather than a component: see `ADD_BAR_PRESETS` and the `preset` prop below.
+ *
  * Which link tabs it offers follows the graph: with plain relations hidden —
  * the default — only arguments are on offer, since a relation added there would
  * be a change the view has nowhere to show.
- *
- * Workflow-tab panels (AddElementPanel, AddArgumentPanel, AddRelationPanel)
- * live in WorkflowAddPanels.jsx.
  * @module components/TextTabAddPanel
  */
 
@@ -28,6 +33,7 @@ import {
 } from "../../utils/lastOrigin.js";
 import {
   argumentRelationType,
+  defaultPickerIds,
   newArgumentId,
   sortElementIds,
 } from "../../utils/stateUtils.js";
@@ -39,6 +45,7 @@ import {
   ADD_BAR_MIN_HEIGHT,
   arrowStyle,
   complaintStyle,
+  EXPLANATION_STYLE,
   fieldStyle,
   ghostBtn,
   idOptionChars,
@@ -46,7 +53,6 @@ import {
   makeRelationDefaults,
   pickerWidth,
   selectStyle,
-  TEXT_FIELD_MIN_HEIGHT,
 } from "./addPanelShared.js";
 import { Field, PremisePickers } from "./addPanelPrimitives.jsx";
 
@@ -73,20 +79,32 @@ const ARGUMENT_ROWS = [
  * @param {REElement[]} props.elements   - Elements that may be referenced; see linkableElements.
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
+ * @param {string|null} [props.selected] - The node selected in the graph, which
+ *   fills the first end of a link.
+ * @param {string[]|null} [props.ctrlChain] - A ctrl+click chain in the graph,
+ *   read as the canvas reads it: the last is the conclusion and the rest are the
+ *   premises. So a bar handed `["P5","P4","P1","J7"]` is holding the argument
+ *   the graph's own chip is naming, rather than its two ends.
  * @param {boolean}     [props.hideNonEntailsRels] - When set, the graph is
  *   showing arguments only, so the bar offers those in place of relations:
  *   adding a link the view then hides is a change with nothing to show for it.
  * @param {boolean}     [props.roomy] - Lays the bar out for the phone sheet,
  *   which has height to spare and is worked with a thumb. See {@link ghostBtn}.
+ * @param {{tab: "element"|"relation"|"argument", elementType?: string}} [props.preset]
+ *   What the tab this bar is under is about, where it is about one of the three
+ *   things the bar adds. The bar opens on that tab with the type filled in.
+ *   Taken from {@link module:constants/tabConstants.ADD_BAR_PRESETS}, which is
+ *   also where the reason it must be a stable object is written down.
  */
 export function AddBar({
   elements,
   onAddElement,
   onAddRelation,
   selected,
-  ctrlTo,
+  ctrlChain,
   hideNonEntailsRels,
   roomy = false,
+  preset = null,
 }) {
   // The element tab's trimmings stay small; the link tabs' pickers are the
   // content and are drawn as such. The phone sizes everything alike, having
@@ -95,7 +113,13 @@ export function AddBar({
   const linkSize = roomy ? "roomy" : "prominent";
   // The strip is the reader's to size — the three tabs want different shapes of
   // it, and only they know which they are about to use. The sheet keeps its own.
-  const { ref: barRef, sizeStyle, handleProps } = useAddBarSize(!roomy);
+  const {
+    ref: barRef,
+    sizeStyle,
+    handleProps,
+    collapsed,
+    toggleCollapsed,
+  } = useAddBarSize(!roomy);
   // The bar's two filled buttons — Add, and whichever tab is lit — are written
   // in the palette's own ink rather than in an ink named here, so that they read
   // as the same object in either viewing mode: white and bold on the teal in the
@@ -105,8 +129,7 @@ export function AddBar({
   //
   // White on this teal is 2.43:1, which is the default palette's usual bargain
   // rather than an oversight here: it is judged by eye and high-contrast mode is
-  // the compliant path. See {@link ACCENT_MARKER}, and WorkflowAddPanels, whose
-  // three add buttons are drawn by the same rule.
+  // the compliant path. See {@link ACCENT_MARKER}.
   const palette = usePalette();
   const fillInk = palette.ink;
   const fillWeight = inkWeight(fillInk);
@@ -149,6 +172,26 @@ export function AddBar({
   /** The tab a graph selection fills in — the only kind of link on offer. */
   const linkTab = showRelations ? "relation" : "argument";
 
+  // The tab the bar is under says what is about to be added, where it has a
+  // view — see {@link module:constants/tabConstants.ADD_BAR_PRESETS}. Applied
+  // when the preset changes rather than on every render, by the same trackers
+  // the graph selection uses below and for a sharper reason: forced every
+  // render, neither the tab buttons nor the type picker could be moved off it
+  // at all. Changing means a different object, hence the frozen constants.
+  //
+  // Before the selection, so that a node picked in the assist tab's own graph
+  // still carries the bar over to a link tab: arriving on the tab is the older
+  // of the two events, and the reader's click is what happened since.
+  const [prevPreset, setPrevPreset] = useState(null);
+  if (preset !== prevPreset) {
+    setPrevPreset(preset);
+    if (preset) {
+      setActiveTab(preset.tab);
+      if (preset.elementType)
+        setElementForm((prev) => ({ ...prev, type: preset.elementType }));
+    }
+  }
+
   // Selecting a node in the graph, or ctrl-selecting a second one, pre-fills the
   // link forms. This adjusts state during render rather than in an effect so
   // the panel never paints a frame showing the stale tab, and so a selection
@@ -170,13 +213,31 @@ export function AddBar({
     }
   }
 
-  const [prevCtrlTo, setPrevCtrlTo] = useState(null);
-  if (ctrlTo !== prevCtrlTo) {
-    setPrevCtrlTo(ctrlTo);
-    if (ctrlTo) {
+  // A ctrl+click chain is the whole link, not its far end: the canvas draws
+  // `P5, P4, P1 → J7` under a three-click selection, and the bar is meant to be
+  // holding that argument — the same premises, in the same order. It used to be
+  // handed the newest id alone, which left the bar showing the first premise and
+  // the last conclusion, an argument nobody had asked for.
+  //
+  // Read the way the graph's own chip reads it: the last is the conclusion, the
+  // rest are the premises. The relation form takes the two ends of it, a
+  // relation being binary — and the graph only offers one for a chain of two.
+  const [prevChain, setPrevChain] = useState(null);
+  if (ctrlChain !== prevChain) {
+    setPrevChain(ctrlChain);
+    if (ctrlChain && ctrlChain.length > 1) {
+      const conclusion = ctrlChain.at(-1);
       setActiveTab((t) => (t === "element" ? linkTab : t));
-      setRelationForm((prev) => ({ ...prev, to: ctrlTo }));
-      setArgumentForm((prev) => ({ ...prev, conclusion: ctrlTo }));
+      setRelationForm((prev) => ({
+        ...prev,
+        from: ctrlChain[0],
+        to: conclusion,
+      }));
+      setArgumentForm((prev) => ({
+        ...prev,
+        premises: ctrlChain.slice(0, -1),
+        conclusion,
+      }));
     }
   }
 
@@ -196,8 +257,18 @@ export function AddBar({
       premises.map((p, j) => (j === i ? id : p)),
     );
   const addPremise = () => {
+    // In play first, then anything else linkable. The fallback matters where
+    // few elements are in play: the only free one may be withdrawn or rejected,
+    // and appending a duplicate would only disable the add button. This was the
+    // assist panel's rule and not the strip's, which is one of the two places
+    // the two argument forms had drifted — the strip reached the whole pool but
+    // would hand over a withdrawn element while an active one stood free.
     const taken = new Set([...premises, conclusion]);
-    setArg("premises", [...premises, ids.find((id) => !taken.has(id)) ?? ""]);
+    const free = (list) => list.find((id) => !taken.has(id));
+    setArg("premises", [
+      ...premises,
+      free(defaultPickerIds(elements)) ?? free(ids) ?? "",
+    ]);
   };
   const removePremise = (i) =>
     setArg(
@@ -345,6 +416,107 @@ export function AddBar({
       Clear
     </button>
   );
+
+  /**
+   * Folds the bar away. A chevron rather than a word: it stands at the end of a
+   * row of controls that are all about the form, and it is the one that is not.
+   *
+   * Not offered on the phone sheet, which is opened and dismissed rather than
+   * kept: a sheet minimised to a stub over the tab underneath would be a second,
+   * worse way of closing it.
+   */
+  const minimiseButton = (
+    <button
+      onClick={toggleCollapsed}
+      aria-expanded
+      aria-label="Minimise the add bar"
+      title="Fold the add bar away — whatever is above it takes the room"
+      style={{
+        ...ghostBtn(size),
+        flexShrink: 0,
+        // Squared off: picker padding around a single glyph leaves a sliver.
+        padding: "3px 8px",
+      }}
+    >
+      ▾
+    </button>
+  );
+
+  // Folded away: the bar gives its height back to whatever is above it and
+  // keeps one line, which is the whole way back. It says which tab is folded,
+  // since what the bar was left holding is still in there — minimising hides
+  // the bar, it does not clear it.
+  //
+  // Two things about the shape of it. **The chevron stays in the corner it was
+  // pressed in**: a control that moves to the far side of the bar when used is
+  // one the reader has to find again, and the pair reads as one switch only
+  // while it holds still. And **the line is the button** rather than a button on
+  // a line — a strip this wide holding a 24px chevron is a target to aim at —
+  // with the chevron inside it, wearing the same box the minimise button wears
+  // so that the corner looks the same too.
+  //
+  // No aria-label: the visible words are the accessible name, which is what
+  // WCAG 2.5.3 asks and what an aria-label of its own would have broken. The
+  // chevron is not part of the name, so it is hidden from it.
+  if (collapsed) {
+    return (
+      <div
+        ref={barRef}
+        data-tutorial="add-bar"
+        data-collapsed="true"
+        style={{
+          flexShrink: 0,
+          borderTop: `1px solid ${C.border}`,
+          background: C.panel,
+          display: "flex",
+        }}
+      >
+        <button
+          onClick={toggleCollapsed}
+          aria-expanded={false}
+          title="Bring the add bar back"
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            // The strip's own row, padded to the bar's own left and right edges
+            // so the chevron lands where the minimise button stood.
+            padding: "4px 16px",
+            minHeight: 32,
+            background: "transparent",
+            border: "none",
+            color: C.dim,
+            font: "inherit",
+            fontSize: 12,
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          Show the add bar
+          {/* Which tab it is folded on: the one thing worth knowing before
+              deciding to open it, and part of the name for the same reason. */}
+          <span style={{ opacity: 0.75 }}>· {tab}</span>
+          <span
+            aria-hidden="true"
+            style={{
+              ...ghostBtn(size),
+              padding: "3px 8px",
+              // Out to the corner the ▾ was in. Decoration inside the button
+              // rather than a button of its own: the whole line already answers
+              // a click, and a second target inside the first would only be a
+              // smaller way of doing the same thing.
+              marginLeft: "auto",
+              flexShrink: 0,
+              cursor: "inherit",
+            }}
+          >
+            ▴
+          </span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -741,6 +913,11 @@ export function AddBar({
             of the row is for, so it wants to be nowhere near the button that
             commits it — beside Add it read as a second way to submit. */}
         {!roomy && clearButton}
+        {/* And past Clear, at the very end. Clear is about the form; this is
+            about the bar, so it sits outside everything the form owns — and the
+            corner is where the reader already reaches to make the bar smaller,
+            the drag handle being the other thing there. */}
+        {!roomy && minimiseButton}
       </div>
 
       {/* ── Text / explanation ── */}
@@ -782,38 +959,21 @@ export function AddBar({
               : "Explanation (optional)…"
         }
         style={{
-          flex: 1,
-          // `flex: 1` alone gives it whatever the controls leave over, which on
-          // a phone is not much once the controls have wrapped onto three
-          // lines. The floor is what makes it a field worth typing into.
-          //
-          // The strip's floor used to be 0, so that a bar dragged short could
-          // squeeze the field rather than push its own bottom edge out of the
-          // panel. The bar grows upward now instead — see
-          // {@link module:hooks/useAddBarSize} — so the field can keep a floor
-          // of its own, and an argument that takes on a third premise moves the
-          // top edge up rather than eating the box below it.
-          minHeight: roomy ? 130 : TEXT_FIELD_MIN_HEIGHT,
-          marginTop: roomy ? 12 : 8,
-          resize: "none",
-          // Stretched rather than `width: 100%` — see `EXPLANATION_STYLE` in
-          // addPanelShared, which is this same field in the assist tabs'
-          // panels. Half a pixel of rounding there is a horizontal scrollbar
-          // across the whole bar.
-          alignSelf: "stretch",
-          minWidth: 0,
-          boxSizing: "border-box",
-          // A textarea wraps, so its default `auto` can only ever paint a
-          // horizontal scrollbar for a fraction of a pixel of rounding — see
-          // `EXPLANATION_STYLE`. Vertically it still scrolls.
-          overflowX: "hidden",
-          background: C.bg,
-          border: `1px solid ${C.border}`,
-          borderRadius: 4,
-          color: C.text,
-          padding: roomy ? "10px 12px" : "6px 10px",
-          fontSize: roomy ? 16 : 14,
-          outline: "none",
+          // The bar's one field, whichever tab is lit and wherever the bar is
+          // drawn — see {@link EXPLANATION_STYLE}, which is where its floor and
+          // the two rules that keep a scrollbar off the foot of the window are
+          // written down. The phone's copy is the same field with room to
+          // breathe: a sheet has the height for it, and a thumb needs the type
+          // bigger than a pointer does.
+          ...EXPLANATION_STYLE,
+          ...(roomy
+            ? {
+                minHeight: 130,
+                marginTop: 12,
+                padding: "10px 12px",
+                fontSize: 16,
+              }
+            : null),
         }}
       />
     </div>

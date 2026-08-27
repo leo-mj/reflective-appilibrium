@@ -15,7 +15,13 @@ import { ClusterTab } from "./ClusterTab.jsx";
 import { Legend } from "./graphs_shared/Legend.jsx";
 import { Tooltip } from "./Tooltip.jsx";
 import { ExpandIcon, CollapseIcon } from "./Icons.jsx";
-import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
+import {
+  ADD_BAR_PRESETS,
+  ASSIST_TABS,
+  SIMULATE_TABS,
+} from "../constants/tabConstants.jsx";
+import { linkableElements } from "../utils/stateUtils.js";
+import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 
 /**
  * Hands the whole row to the graph by folding away whatever sits beside it,
@@ -141,7 +147,7 @@ export function GraphPanel({
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
   hideNonEntailsRels,
-  onCtrlSecondSelect,
+  onCtrlChainSelect,
   onCreateGroup,
   onToggleGroup,
   onEditGroupRequest,
@@ -225,7 +231,32 @@ export function GraphPanel({
             Use sample data
           </label>
         )}
-      <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          marginTop: 4,
+          // For the narrow layout's floating +, which is anchored to the corner
+          // of whichever tab body is in here.
+          position: "relative",
+        }}
+      >
+        {/* An assist tab's way in by hand where there is no room for the strip.
+            The wide layout keeps that strip under every tab, this one cannot —
+            an add bar and a column of suggestions do not both fit on a phone —
+            so the bar comes up as a sheet over the tab instead, on the same
+            button the text tab uses and carrying the same preset the strip
+            would have had. Simulate is left out: it is the one assist-side tab
+            with nothing to add to. */}
+        {!isWide && ASSIST_TABS.includes(tab) && (
+          <MobileAddButton
+            elements={linkableElements(state.elements)}
+            onAddElement={onAddElement}
+            onAddRelation={onAddRelation}
+            hideNonEntailsRels={hideNonEntailsRels}
+            preset={ADD_BAR_PRESETS[tab] ?? null}
+          />
+        )}
         {tab === "graph" && (
           <Graph
             state={state}
@@ -240,7 +271,7 @@ export function GraphPanel({
             onEditRequest={onEditRequest}
             onWithdrawRequest={onWithdrawRequest}
             onReinstate={onReinstate}
-            onCtrlSecondSelect={onCtrlSecondSelect}
+            onCtrlChainSelect={onCtrlChainSelect}
             onCreateGroup={onCreateGroup}
             onToggleGroup={onToggleGroup}
             onEditGroupRequest={onEditGroupRequest}

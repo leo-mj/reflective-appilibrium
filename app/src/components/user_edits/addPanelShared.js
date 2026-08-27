@@ -24,31 +24,21 @@ export const SELECT_STYLE = {
 export const ACCENT_MARKER = { "data-accent": "graph" };
 
 /**
- * The height every add bar starts at, wherever it is drawn — the strip under
- * the text panel and the panel at the foot of an assist tab alike. One
- * constant, because they are one control in two places: the two were 16vh and
- * 14vh, which is close enough to look like a rendering fault rather than a
- * decision when a reader moves between the tabs.
+ * The height the add bar starts at.
  *
  * A floor rather than a size. The statement box takes whatever the controls
  * above it leave over, and anyone who wants more of it drags the top edge —
  * see {@link module:hooks/useAddBarSize}, which is where the dragged height
- * lives and which every bar reads from the same key.
+ * lives. One strip under every tab now, so a height dragged while adding a
+ * judgment is the height it still has on the arguments tab; it was two bars
+ * reading one key to get that, back when the assist tabs had panels of their
+ * own, and they had drifted to 16vh and 14vh — close enough to read as a
+ * rendering fault rather than a decision when a reader moved between them.
  */
 export const ADD_BAR_MIN_HEIGHT = "16vh";
 
-export const PANEL_STYLE = {
-  flexShrink: 0,
-  borderTop: `1px solid ${C.border}`,
-  background: C.panel,
-  display: "flex",
-  flexDirection: "column",
-  padding: "8px 16px",
-  minHeight: ADD_BAR_MIN_HEIGHT,
-};
-
 /**
- * The floor under every statement and explanation box, wherever a bar is drawn.
+ * The floor under the bar's statement and explanation box.
  *
  * `flex: 1` alone hands the field whatever the controls above it have left
  * over, which once an argument's premises have wrapped the row twice is
@@ -59,10 +49,11 @@ export const PANEL_STYLE = {
 export const TEXT_FIELD_MIN_HEIGHT = 44;
 
 /**
- * The explanation box the three assist-tab panels end with. One object rather
- * than three copies of it: they are the same field, and the floor above has to
- * be on all of them or the bar it sizes stops growing on the one it is missing
- * from.
+ * The box the bar ends with — the statement on the element tab, the explanation
+ * on the two link tabs, and the same field in the phone's sheet with the type
+ * and the padding turned up. One object because it is one field: it was three
+ * copies of it while the assist tabs had panels of their own, and each of the
+ * rules below had to be found and then fixed three times over.
  */
 export const EXPLANATION_STYLE = {
   flex: 1,
