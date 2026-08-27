@@ -13,3 +13,21 @@ repos:
     rev: v8.21.2
     hooks:
       - id: gitleaks
+
+  # The Vitest suite, run whole rather than per-file: the unit tests are fast
+  # (a few seconds) and cross-cutting, so a change under app/src can break a
+  # test file it does not name. Playwright is deliberately not here — it needs
+  # a browser and a built app, and CI covers it.
+  - repo: local
+    hooks:
+      - id: frontend-tests
+        name: frontend tests (vitest)
+        entry: npm --prefix app test
+        language: system
+        # Nothing is passed to vitest: the whole suite runs, and the filenames
+        # would be repo-relative paths it would read as a filter.
+        pass_filenames: false
+        # Only when the frontend itself changed. app/e2e/ is left out for the
+        # same reason Playwright is; the config files are in because they
+        # decide what the suite even runs.
+        files: ^app/(src/|vite\.config\.js|package(-lock)?\.json$)
