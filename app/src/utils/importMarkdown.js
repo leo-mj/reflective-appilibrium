@@ -19,6 +19,12 @@
 const MAX_FILE_SIZE = 500_000; // 500 KB
 const ELEMENT_TYPES = new Set(["judgment", "principle", "theory"]);
 const STATUSES = new Set(["active", "revised", "withdrawn", "rejected", "possible"]);
+const HISTORY_EVENT_TYPES = new Set([
+  "withdrawn",
+  "reinstated",
+  "revised",
+  "rejected",
+]);
 const LEGACY_CONFIDENCE = { high: 1.0, moderate: 0.67, low: 0.33 };
 const RELATION_TYPES = new Set([
   "supports",
@@ -59,6 +65,48 @@ function bool(v, field) {
   return v;
 }
 
+/**
+ * Validates a link target from an imported file.
+ *
+ * A questionnaire card's description is rendered into an anchor, so an
+ * unrestricted string here is the shape a `javascript:` or `data:` URL takes.
+ * Only ordinary web links get through.
+ */
+function href(v, field) {
+  const s = str(v, field, 500);
+  if (s && !/^https?:\/\//i.test(s))
+    throw new Error(`"${field}" must be an http(s) URL`);
+  return s;
+}
+
+/** Validates a per-item `history` list of round-stamped events. */
+function history(v, field) {
+  let prevRound = -Infinity;
+  return arr(v, field, 1_000).map((ev, i) => {
+    if (!ev || typeof ev !== "object" || Array.isArray(ev))
+      throw new Error(`"${field}[${i}]" must be an object`);
+    const type = str(ev.type, `${field}[${i}].type`, 20);
+    if (!HISTORY_EVENT_TYPES.has(type))
+      throw new Error(`"${field}[${i}].type" "${type}" is not valid`);
+    const round = num(ev.round, `${field}[${i}].round`);
+    // Every reader folds the list front to back, so order is load-bearing.
+    if (round < prevRound)
+      throw new Error(`"${field}[${i}].round" is out of chronological order`);
+    prevRound = round;
+
+    const result = { round, type };
+    if (ev.reason != null)
+      result.reason = str(ev.reason, `${field}[${i}].reason`, 2_000);
+    if (ev.previousText != null)
+      result.previousText = str(
+        ev.previousText,
+        `${field}[${i}].previousText`,
+        10_000,
+      );
+    return result;
+  });
+}
+
 // ─── Questionnaire spec validator ─────────────────────────────────────────────
 
 function validateQuestionnaireJudgment(j, ctx) {
@@ -85,7 +133,10 @@ function validateQuestionnaireSuggestion(s, i) {
   const ctx = `questionnaireSpec.suggestions[${i}]`;
   return {
     question: str(s.question, `${ctx}.question`, 1_000),
-    judgments: arr(s.judgments, `${ctx}.judgments`, 20).map((j, ji) =>
+    // 100, not 20: a shipped questionnaire has a question with 31 answers, so
+    // the old bound made its own sessions un-importable — and in the demo
+    // build, export/import is the only way to keep one.
+    judgments: arr(s.judgments, `${ctx}.judgments`, 100).map((j, ji) =>
       validateQuestionnaireJudgment(j, `${ctx}.judgments[${ji}]`),
     ),
   };
@@ -126,7 +177,7 @@ function validateQuestionnaireSpec(spec) {
       if (typeof item === "object" && item !== null && !Array.isArray(item))
         return {
           link: str(item.link ?? "", `questionnaireSpec.card.description[${i}].link`, 200),
-          href: str(item.href ?? "", `questionnaireSpec.card.description[${i}].href`, 500),
+          href: href(item.href ?? "", `questionnaireSpec.card.description[${i}].href`),
         };
       throw new Error(
         `questionnaireSpec.card.description[${i}] must be a string or link object`,
@@ -167,6 +218,42 @@ function validateQuestionnaireSpec(spec) {
 
 // ─── Object validators (whitelist only known fields) ──────────────────────────
 
+/** The reference kinds citation.js can render; anything else has no formatting. */
+const CITATION_TYPES = new Set(["book", "chapter", "article"]);
+
+/**
+ * One bibliographic record on an element, bounded field by field.
+ *
+ * The caps mirror `RESource` in backend/models/re_state.py: a state that the
+ * backend would refuse must not be accepted here, or a session saves and then
+ * fails to load.
+ */
+function validateSource(s, i, ctx) {
+  const at = `${ctx}.sources[${i}]`;
+  const type = str(s.type, `${at}.type`, 20);
+  if (!CITATION_TYPES.has(type))
+    throw new Error(`${at}.type "${type}" is not valid`);
+
+  const names = (list, field, cap) =>
+    arr(list ?? [], `${at}.${field}`, cap).map((n, j) =>
+      str(n, `${at}.${field}[${j}]`, 200),
+    );
+
+  return {
+    type,
+    authors: names(s.authors, "authors", 25),
+    year: str(s.year ?? "", `${at}.year`, 12),
+    title: str(s.title ?? "", `${at}.title`, 400),
+    container: str(s.container ?? "", `${at}.container`, 300),
+    editors: names(s.editors, "editors", 10),
+    publisher: str(s.publisher ?? "", `${at}.publisher`, 200),
+    volume: str(s.volume ?? "", `${at}.volume`, 20),
+    issue: str(s.issue ?? "", `${at}.issue`, 20),
+    pages: str(s.pages ?? "", `${at}.pages`, 30),
+    doi: str(s.doi ?? "", `${at}.doi`, 200),
+  };
+}
+
 function validateElement(e, i) {
   const ctx = `elements[${i}]`;
   const id = str(e.id, `${ctx}.id`, 10);
@@ -202,20 +289,25 @@ function validateElement(e, i) {
     addedRound: num(e.addedRound, `${ctx}.addedRound`),
   };
 
-  if (e.previousText !== undefined)
+  // `!= null`, not `!== undefined`: an optional field the writer chose to emit
+  // as explicit null means "absent", and must not be type-checked as present.
+  if (e.previousText != null)
     result.previousText = str(e.previousText, `${ctx}.previousText`, 10_000);
-  if (e.revisedRound !== undefined)
+  if (e.revisedRound != null)
     result.revisedRound = num(e.revisedRound, `${ctx}.revisedRound`);
-  if (e.reason !== undefined)
-    result.reason = str(e.reason, `${ctx}.reason`, 2_000);
-  if (e.withdrawnRound !== undefined)
+  if (e.reason != null) result.reason = str(e.reason, `${ctx}.reason`, 2_000);
+  if (e.withdrawnRound != null)
     result.withdrawnRound = num(e.withdrawnRound, `${ctx}.withdrawnRound`);
-  if (e.rejectedRound !== undefined)
+  if (e.history != null) result.history = history(e.history, `${ctx}.history`);
+  if (e.rejectedRound != null)
     result.rejectedRound = num(e.rejectedRound, `${ctx}.rejectedRound`);
-  if (e.negated !== undefined)
-    result.negated = bool(e.negated, `${ctx}.negated`);
-  if (e.questionnaireIndex !== undefined)
+  if (e.negated != null) result.negated = bool(e.negated, `${ctx}.negated`);
+  if (e.questionnaireIndex != null)
     result.questionnaireIndex = num(e.questionnaireIndex, `${ctx}.questionnaireIndex`);
+  if (e.sources != null)
+    result.sources = arr(e.sources, `${ctx}.sources`, 20).map((s, j) =>
+      validateSource(s, j, ctx),
+    );
 
   return result;
 }
@@ -234,21 +326,78 @@ function validateRelation(r, i) {
     addedRound: num(r.addedRound, `${ctx}.addedRound`),
   };
 
-  if (r.status !== undefined) {
+  if (r.status != null) {
     const s = str(r.status, `${ctx}.status`, 20);
     if (!STATUSES.has(s)) throw new Error(`${ctx}.status "${s}" is not valid`);
     result.status = s;
   }
-  if (r.revisedRound !== undefined)
+  if (r.revisedRound != null)
     result.revisedRound = num(r.revisedRound, `${ctx}.revisedRound`);
-  if (r.withdrawnRound !== undefined)
+  if (r.withdrawnRound != null)
     result.withdrawnRound = num(r.withdrawnRound, `${ctx}.withdrawnRound`);
-  if (r.rejectedRound !== undefined)
+  if (r.history != null) result.history = history(r.history, `${ctx}.history`);
+  if (r.rejectedRound != null)
     result.rejectedRound = num(r.rejectedRound, `${ctx}.rejectedRound`);
-  if (r.argumentId !== undefined)
+  if (r.argumentId != null)
     result.argumentId = str(r.argumentId, `${ctx}.argumentId`, 200);
 
   return result;
+}
+
+/**
+ * Validates one group, dropping members that are not elements of this state.
+ *
+ * Dropping rather than throwing: a group is a view convenience, and a file
+ * whose grouping has drifted from its element list is still a perfectly good
+ * RE process. Refusing to open it over a stale id would be the wrong trade.
+ *
+ * @param {unknown} g
+ * @param {number} i
+ * @param {Set<string>} elementIds
+ * @returns {import('../types.js').REGroup}
+ */
+function validateGroup(g, i, elementIds) {
+  const ctx = `groups[${i}]`;
+  if (!g || typeof g !== "object" || Array.isArray(g))
+    throw new Error(`${ctx} must be an object`);
+  const id = str(g.id, `${ctx}.id`, 20);
+  const members = arr(g.members ?? [], `${ctx}.members`, 1_000)
+    .map((m, j) => str(m, `${ctx}.members[${j}]`, 10))
+    .filter((m) => elementIds.has(m));
+  return {
+    id,
+    label: str(g.label ?? id, `${ctx}.label`, 200) || id,
+    members: [...new Set(members)],
+    collapsed: g.collapsed == null ? false : bool(g.collapsed, `${ctx}.collapsed`),
+  };
+}
+
+/**
+ * Validates one accepted process review.
+ *
+ * Unlike a group, a review is not dropped when something about it looks stale:
+ * it is a text the user accepted, and it stays readable however far the process
+ * has since moved past the round it names.
+ *
+ * @param {unknown} r
+ * @param {number} i
+ * @returns {import('../types.js').REReview}
+ */
+function validateReview(r, i) {
+  const ctx = `reviews[${i}]`;
+  if (!r || typeof r !== "object" || Array.isArray(r))
+    throw new Error(`${ctx} must be an object`);
+  return {
+    id: str(r.id, `${ctx}.id`, 100),
+    round: num(r.round, `${ctx}.round`),
+    headline: str(r.headline ?? "", `${ctx}.headline`, 1_000),
+    arc: str(r.arc ?? "", `${ctx}.arc`, 5_000),
+    surprises: str(r.surprises ?? "", `${ctx}.surprises`, 5_000),
+    missed: str(r.missed ?? "", `${ctx}.missed`, 5_000),
+    method: str(r.method ?? "", `${ctx}.method`, 5_000),
+    model: str(r.model ?? "", `${ctx}.model`, 200),
+    origin: str(r.origin ?? "", `${ctx}.origin`, 200),
+  };
 }
 
 function validateLogEntry(l, i) {
@@ -266,10 +415,14 @@ function validateLogEntry(l, i) {
  * Validates and whitelists a raw parsed object as a complete REState.
  * Throws a descriptive Error for any structural or type violation.
  *
+ * Exported for the localStorage draft store, which needs the same guarantee for
+ * the same reason: a draft written by an older version of the app is untrusted
+ * input by the time a newer one reads it back.
+ *
  * @param {unknown} raw
  * @returns {REState}
  */
-function validateState(raw) {
+export function validateState(raw) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw))
     throw new Error("State must be a JSON object");
 
@@ -293,6 +446,31 @@ function validateState(raw) {
     },
     log: arr(raw.log ?? [], "log", 1_000).map(validateLogEntry),
   };
+
+  // After `elements`, which it is checked against; and dropped entirely once it
+  // is down to one member, since a group of one is a group of none.
+  if (raw.groups !== undefined) {
+    const elementIds = new Set(result.elements.map((e) => e.id));
+    const groups = arr(raw.groups, "groups", 500)
+      .map((g, i) => validateGroup(g, i, elementIds))
+      .filter((g) => g.members.length > 1);
+    // An element in two groups would leave the projection with two nodes to
+    // draw it as; first claim wins.
+    const claimed = new Set();
+    result.groups = groups
+      .map((g) => {
+        const members = g.members.filter((m) => !claimed.has(m));
+        members.forEach((m) => claimed.add(m));
+        return { ...g, members };
+      })
+      .filter((g) => g.members.length > 1);
+  }
+
+  // Absent on every state written before reviews existed, so the key is added
+  // only when the file actually carries one — same contract as `groups`.
+  if (raw.reviews !== undefined) {
+    result.reviews = arr(raw.reviews, "reviews", 100).map(validateReview);
+  }
 
   if (raw.model !== undefined) {
     if (raw.model !== "questionnaire")

@@ -97,23 +97,3 @@ def test_principle_confidences_are_overridden(llm_client):
     assert [s["confidence"] for s in res.json()["suggestions"]] == [
         DEFAULT_CONFIDENCE
     ] * 2
-
-
-# ── matrix needs a pair to relate ─────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(
-    "elements, remaining",
-    [
-        ([el("J1"), el("J2", status="withdrawn")], 1),
-        ([el("T1", "theory"), el("T2", "theory")], 0),
-    ],
-    ids=["one-withdrawn", "both-theories"],
-)
-def test_matrix_rejects_when_filtering_leaves_too_few(llm_client, elements, remaining):
-    # MatrixRequest enforces min_length=2 on the submitted list, but the handler
-    # then drops withdrawn elements and theories. This used to be a 500.
-    client = llm_client({})
-    res = client.post("/api/matrix/analyze", json={"topic": "t", "elements": elements})
-    assert res.status_code == 422
-    assert str(remaining) in res.json()["detail"]

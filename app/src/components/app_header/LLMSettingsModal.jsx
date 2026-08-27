@@ -8,8 +8,12 @@
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { LLM_PROVIDERS } from "../../constants/llmProviders.js";
+import { BYOK_ENABLED } from "../../config.js";
 import { btn } from "./appHeaderStyles.js";
 import { getSessionUsage, clearSessionUsage } from "../../utils/openaiClient.js";
+
+/** Why the inert controls are inert, for hover and assistive technology. */
+const DEMO_REASON = "Unavailable in the demo — this build has no backend.";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -38,6 +42,11 @@ function getInitialModel(provider) {
  * @param {{ open: boolean, onClose: () => void }} props
  */
 export function LLMSettingsModal({ open, onClose }) {
+  // The demo build has no backend to relay a key to, but the modal is still
+  // shown so visitors can see what configuring a provider involves. Everything
+  // that would reach the network, or bank a key for a request that cannot be
+  // made, is inert.
+  const demo = !BYOK_ENABLED;
   const [provider, setProvider] = useState(getInitialProvider);
   const [model, setModel] = useState(() => getInitialModel(getInitialProvider()));
   const [apiKey, setApiKey] = useState("");
@@ -48,12 +57,13 @@ export function LLMSettingsModal({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return;
+    setUsage(getSessionUsage());
+    if (demo) return;
     fetch(`${BACKEND_URL}/api/llm/configured-providers`)
       .then((r) => r.json())
       .then((data) => setServerKeyUrls(new Set(data.base_urls)))
       .catch(() => {});
-    setUsage(getSessionUsage());
-  }, [open]);
+  }, [open, demo]);
 
   const hasSessionKey = Boolean(
     (() => {
@@ -69,6 +79,7 @@ export function LLMSettingsModal({ open, onClose }) {
   const effectiveApiKey = apiKey || provider.defaultApiKey || "";
   // Save is enabled if: last test succeeded OR a key is already saved (model-only change)
   const saveEnabled = testStatus?.ok || (hasSavedKey && testStatus === null);
+  const canSave = saveEnabled && !demo;
 
   function handleProviderChange(e) {
     const next = LLM_PROVIDERS.find((p) => p.id === e.target.value);
@@ -166,6 +177,7 @@ export function LLMSettingsModal({ open, onClose }) {
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
+          maxWidth: "calc(100vw - 32px)",
           zIndex: 201,
           background: C.panel,
           border: `1px solid ${C.border}`,
@@ -186,6 +198,25 @@ export function LLMSettingsModal({ open, onClose }) {
         >
           LLM Settings
         </div>
+
+        {demo && (
+          <div
+            style={{
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: C.text,
+              background: C.bg,
+              border: `1px solid ${C.theory.accent}`,
+              borderRadius: 4,
+              padding: "8px 10px",
+              marginBottom: 16,
+            }}
+          >
+            <strong style={{ color: C.theory.text }}>Demo only.</strong> This
+            build has no backend, so no key can be sent and nothing here is
+            saved. The form is shown to illustrate how a provider is configured.
+          </div>
+        )}
 
         {/* Provider */}
         <div style={fieldStyle}>
@@ -259,8 +290,18 @@ export function LLMSettingsModal({ open, onClose }) {
                 setApiKey(e.target.value);
                 setTestStatus(null);
               }}
-              placeholder={hasSavedKey ? "Enter new key to replace" : "sk-…"}
-              style={inputStyle}
+              disabled={demo}
+              placeholder={
+                demo
+                  ? "Unavailable in the demo"
+                  : hasSavedKey
+                    ? "Enter new key to replace"
+                    : "sk-…"
+              }
+              style={{
+                ...inputStyle,
+                ...(demo ? { opacity: 0.5, cursor: "not-allowed" } : {}),
+              }}
               autoComplete="off"
             />
           </div>
@@ -297,22 +338,24 @@ export function LLMSettingsModal({ open, onClose }) {
           </button>
           <button
             onClick={handleTest}
-            disabled={testing}
+            disabled={testing || demo}
+            title={demo ? DEMO_REASON : undefined}
             style={{
               ...btn(false),
-              opacity: testing ? 0.4 : 1,
+              opacity: testing || demo ? 0.4 : 1,
             }}
           >
             {testing ? "Testing…" : "Test connection"}
           </button>
           <button
             onClick={handleSave}
-            disabled={!saveEnabled}
+            disabled={!canSave}
+            title={demo ? DEMO_REASON : undefined}
             style={{
               ...btn(false),
-              opacity: saveEnabled ? 1 : 0.4,
-              color: saveEnabled ? C.supports : undefined,
-              borderColor: saveEnabled ? C.supports : undefined,
+              opacity: canSave ? 1 : 0.4,
+              color: canSave ? C.supports : undefined,
+              borderColor: canSave ? C.supports : undefined,
             }}
           >
             Save

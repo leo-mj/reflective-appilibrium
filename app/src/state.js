@@ -25,9 +25,10 @@ import { argumentRelationType } from "./utils/stateUtils.js";
 // ============================================================
 /**
  * Inline skeleton — swap the arrays below for real Claude output.
- * Every element must include `addedRound`.  Revised elements also need
- * `previousText` and `revisedRound`; withdrawn elements need `reason` and
- * `withdrawnRound`.
+ * Every element must include `addedRound`. Anything that has been revised,
+ * withdrawn, reinstated, or rejected carries a `history` list of round-stamped
+ * events; see {@link module:utils/stateUtils.historyOf}, which also still reads
+ * the older single-round fields.
  *
  * @type {REState}
  */
@@ -39,18 +40,27 @@ const _inlineState = {
     // { id: "J1", type: "judgment", status: "active", confidence: 1.0, origin: "user", text: "...", addedRound: 1 },
     // { id: "P1", type: "principle", status: "active", confidence: 0.67, origin: "user", text: "...", addedRound: 1 },
     // { id: "T1", type: "theory", status: "active", confidence: 1.0, origin: "llm", text: "...", addedRound: 5 },
-    // For revised elements, add: previousText: "...", revisedRound: N
-    // For withdrawn elements, add: reason: "...", withdrawnRound: N
+    // Revised elements also carry: previousText: "...", revisedRound: N
+    // Withdrawn elements also carry: reason: "..."
+    // History, on anything that has changed hands:
+    //   history: [{ round: 3, type: "revised", previousText: "..." },
+    //             { round: 5, type: "withdrawn", reason: "..." },
+    //             { round: 8, type: "reinstated" }]
   ],
   relations: [
     // { from: "J1", to: "P1", type: "supports", explanation: "...", addedRound: 1 },
-    // types: "supports", "conflicts", "undermines", "depends"
+    // types: "supports", "conflicts", "undermines", "depends",
+    //        "entails", "precludes", "jointly_entails", "jointly_precludes"
+    // Argument relations share an argumentId; relations take `history` too.
   ],
   coherence: {
     tensions: [],
     orphans: [],
     clusters: [],
   },
+  groups: [
+    // { id: "G1", label: "Group 1", members: ["J1", "J2"], collapsed: false }
+  ],
   log: [
     // { round: 1, findings: "...", options: "...", decision: "...", changes: "..." }
   ],

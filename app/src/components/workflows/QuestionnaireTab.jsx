@@ -6,8 +6,10 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
 
-const ACCENT = C.judgment.high;
+// The header takes the judgment colour exactly, like every other assist tab:
+// this one elicits judgments. See useHeaderAccent.
 
 function QuestionCard({ suggestion, elByIndex, onSelectAnswer }) {
   const selectedJudgment = suggestion.judgments.find(
@@ -92,6 +94,7 @@ function QuestionCard({ suggestion, elByIndex, onSelectAnswer }) {
  * @param {Function} props.onSelectAnswer  Called with (selectedId, siblingIds[])
  */
 export function QuestionnaireTab({ state, onSelectAnswer }) {
+  const header = useHeaderAccent("questionnaire");
   const participantQuestions = state.questionnaireSpec.suggestions.filter((s) =>
     s.question.startsWith("Q")
   );
@@ -116,7 +119,15 @@ export function QuestionnaireTab({ state, onSelectAnswer }) {
             padding: "10px 0 14px",
           }}
         >
-          <span style={{ color: ACCENT, fontWeight: "bold", fontSize: 12 }}>
+          <span
+            {...header.marker}
+            style={{
+              ...header.badge,
+              color: header.ink,
+              fontWeight: header.weight,
+              fontSize: 12,
+            }}
+          >
             {state.questionnaireSpec.name}
           </span>
           <span style={{ fontSize: 11, color: C.dim }}>

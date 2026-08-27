@@ -6,7 +6,233 @@
  * @module utils/stateUtils
  */
 
-/** @import { REElement, RERelation, RELogEntry } from '../types.js' */
+/** @import { REElement, RERelation, RELogEntry, REHistoryEvent, REState, REReview } from '../types.js' */
+
+// ─── Item history ─────────────────────────────────────────────────────────────
+//
+// Everything that has happened to an element or relation lives in one
+// chronological `history` list. The fields alongside it — `status`, `text`,
+// `previousText`, `reason` — are that list projected onto "now"; `asOfRound`
+// projects it onto any earlier round, which is what history playback needs.
+
+/** The wording payload field, holding element text or relation explanation. */
+const WORDING = "previousText";
+
+/**
+ * Rebuilds a history list from the scalar fields older states used: a single
+ * `withdrawnRound`/`reinstatedRound`, `revisedRound` with one `previousText`,
+ * `rejectedRound`, and the short-lived `withdrawals` interval list.
+ *
+ * @param {REElement|RERelation} item
+ * @returns {REHistoryEvent[]}
+ */
+function legacyHistory(item) {
+  const events = [];
+  if (item.revisedRound) {
+    events.push({
+      round: item.revisedRound,
+      type: "revised",
+      ...(item.previousText != null && { [WORDING]: item.previousText }),
+    });
+  }
+  if (item.rejectedRound)
+    events.push({ round: item.rejectedRound, type: "rejected" });
+
+  const periods = Array.isArray(item.withdrawals)
+    ? item.withdrawals
+    : item.withdrawnRound
+      ? [{ from: item.withdrawnRound, to: item.reinstatedRound }]
+      : [];
+  periods.forEach((p, i) => {
+    // `reason` described the most recent withdrawal only, so it belongs there.
+    const isLast = i === periods.length - 1;
+    events.push({
+      round: p.from,
+      type: "withdrawn",
+      ...(isLast && item.reason ? { reason: item.reason } : {}),
+    });
+    if (p.to != null) events.push({ round: p.to, type: "reinstated" });
+  });
+
+  return events.sort((a, b) => a.round - b.round);
+}
+
+/**
+ * An item's history, migrating older shapes on read so saved states keep working.
+ *
+ * @param {REElement|RERelation} item
+ * @returns {REHistoryEvent[]}
+ */
+export function historyOf(item) {
+  if (Array.isArray(item?.history)) return item.history;
+  return item ? legacyHistory(item) : [];
+}
+
+/**
+ * The item's history with `event` appended. Every action bumps the round first,
+ * so appending keeps the list ordered.
+ *
+ * @param {REElement|RERelation} item
+ * @param {REHistoryEvent} event
+ * @returns {REHistoryEvent[]}
+ */
+export function withEvent(item, event) {
+  return [...historyOf(item), event];
+}
+
+/**
+ * Folds history up to and including `round` into the fields it determines.
+ * Events are half-open in effect: an item withdrawn in round 3 and reinstated in
+ * round 6 was absent for 3, 4 and 5, and present again from 6.
+ *
+ * @param {REElement|RERelation} item
+ * @param {number} round
+ * @returns {{ status: string, previousText: string|undefined, reason: string|undefined, pendingWording: string|undefined }}
+ */
+function foldHistory(item, round) {
+  let status = "active";
+  let revised = false;
+  let previousText;
+  let reason;
+  // The wording restored by the first revision *after* `round` — i.e. what the
+  // item actually read at `round`.
+  let pendingWording;
+
+  for (const ev of historyOf(item)) {
+    if (ev.round > round) {
+      if (pendingWording === undefined && ev.type === "revised")
+        pendingWording = ev[WORDING];
+      continue;
+    }
+    switch (ev.type) {
+      case "withdrawn":
+        status = "withdrawn";
+        reason = ev.reason;
+        break;
+      case "rejected":
+        status = "rejected";
+        break;
+      case "reinstated":
+        status = revised ? "revised" : "active";
+        reason = undefined;
+        break;
+      case "revised":
+        revised = true;
+        previousText = ev[WORDING];
+        if (status === "active") status = "revised";
+        break;
+    }
+  }
+  return { status, previousText, reason, pendingWording };
+}
+
+/**
+ * Whether the item was withdrawn as of `round`.
+ *
+ * @param {REElement|RERelation} item
+ * @param {number} round
+ * @returns {boolean}
+ */
+export function isWithdrawnAt(item, round) {
+  return foldHistory(item, round).status === "withdrawn";
+}
+
+/**
+ * Whether the item is withdrawn right now.
+ *
+ * @param {REElement|RERelation} item
+ * @returns {boolean}
+ */
+export function isWithdrawnNow(item) {
+  const events = historyOf(item).filter(
+    (e) => e.type === "withdrawn" || e.type === "reinstated",
+  );
+  return events.at(-1)?.type === "withdrawn";
+}
+
+/**
+ * The item's wording as of `round` — its text, or a relation's explanation.
+ * Each revision stores the wording it replaced, so the text at some earlier
+ * round is the `previousText` of the first revision after it.
+ *
+ * @param {REElement|RERelation} item
+ * @param {number} round
+ * @returns {string}
+ */
+export function textAtRound(item, round) {
+  const { pendingWording } = foldHistory(item, round);
+  const current = item.text ?? item.explanation;
+  return pendingWording ?? current;
+}
+
+/** Statuses that name an event, and so can stand in as a tag on their own. */
+const DATED_STATUSES = new Set(["withdrawn", "rejected", "revised"]);
+
+/**
+ * The last thing that happened to the item, for labelling it in the UI.
+ *
+ * Read from history rather than from `status`, because `reinstated` is worth
+ * showing and is an event, not a status — an element back in play is plain
+ * `active`, which would otherwise leave no trace of its having returned.
+ *
+ * Bounded by `round` so history playback labels an item by the event in force
+ * then, not by a later one: withdrawn in round 2, reinstated in 4 and withdrawn
+ * again in 6 reads as withdrawn since 2 when viewing round 3.
+ *
+ * @param {REElement|RERelation} item
+ * @param {number} [round] - The round being viewed. Defaults to the whole history.
+ * @returns {{ type: string, round: number }|null} Null for an untouched item.
+ */
+export function statusTag(item, round = Infinity) {
+  let last = null;
+  for (const ev of historyOf(item)) {
+    if (ev.round > round) break;
+    last = ev;
+  }
+  if (last) return { type: last.type, round: last.round };
+  // Nothing recorded. A hand-written state may still carry a status that names
+  // an event, so label it — just without a round to date it by. In playback the
+  // status has already been projected back, so this cannot report a future one.
+  return DATED_STATUSES.has(item?.status) ? { type: item.status } : null;
+}
+
+/**
+ * The item as it stood at `round`: status, wording, and the withdrawal reason
+ * and previous wording that were showing then. Returns the same object when
+ * nothing differs, so React sees no spurious change.
+ *
+ * @template {REElement|RERelation} T
+ * @param {T} item
+ * @param {number} round
+ * @returns {T}
+ */
+export function asOfRound(item, round) {
+  const events = historyOf(item);
+  // Nothing recorded — `possible` and never-touched items keep what they have.
+  if (!events.length) return item;
+
+  const { status, previousText, reason, pendingWording } = foldHistory(
+    item,
+    round,
+  );
+  const wordingField = item.text !== undefined ? "text" : "explanation";
+  const wording = pendingWording ?? item[wordingField];
+
+  if (
+    status === item.status &&
+    wording === item[wordingField] &&
+    previousText === item.previousText &&
+    reason === item.reason
+  )
+    return item;
+
+  const next = { ...item, status, [wordingField]: wording };
+  if (previousText === undefined) delete next.previousText;
+  else next.previousText = previousText;
+  if (reason === undefined) delete next.reason;
+  else next.reason = reason;
+  return next;
+}
 
 // ─── Round filtering ──────────────────────────────────────────────────────────
 
@@ -26,11 +252,9 @@
  */
 export function elementsAtRound(elements, round) {
   const addedBy = (e) => (e.addedRound || 1) <= round;
-  const withdrawnBy = (e) =>
-    e.status === "withdrawn" && e.withdrawnRound && e.withdrawnRound <= round;
 
-  const active = elements.filter((e) => addedBy(e) && !withdrawnBy(e));
-  const withdrawn = elements.filter((e) => addedBy(e) && withdrawnBy(e));
+  const active = elements.filter((e) => addedBy(e) && !isWithdrawnAt(e, round));
+  const withdrawn = elements.filter((e) => addedBy(e) && isWithdrawnAt(e, round));
   return { active, withdrawn };
 }
 
@@ -107,11 +331,16 @@ export function stateAtRound(state, round) {
   return {
     ...state,
     round,
-    elements,
-    relations: state.relations.filter(
-      (r) =>
-        visIds.has(r.from) && visIds.has(r.to) && (r.addedRound || 1) <= round,
-    ),
+    // Items are projected back to `round`, so anything reading their fields
+    // directly — the text tab's strikethrough, its wording, the graph's edge
+    // styling — shows the state of play then rather than now.
+    elements: elements.map((e) => asOfRound(e, round)),
+    relations: state.relations
+      .filter(
+        (r) =>
+          visIds.has(r.from) && visIds.has(r.to) && (r.addedRound || 1) <= round,
+      )
+      .map((r) => asOfRound(r, round)),
   };
 }
 
@@ -150,6 +379,75 @@ export const ARGUMENT_RELATION_TYPES = new Set([
   "jointly_entails",
   "jointly_precludes",
 ]);
+
+/**
+ * Elements a new relation or argument may be built from — everything except
+ * `possible`, which the user has not affirmed yet.
+ *
+ * Withdrawn and rejected elements deliberately stay eligible: a new argument is
+ * how one earns a second look, and being referenced never changes an element's
+ * status. Reinstating it is a separate, explicit decision.
+ *
+ * @param {REElement[]} elements
+ * @returns {REElement[]}
+ */
+export function linkableElements(elements) {
+  return elements.filter((e) => e.status !== "possible");
+}
+
+/**
+ * Sorted ids to seed a picker's initial selection from. Every linkable element
+ * stays *selectable*, but a form should open on something currently in play
+ * rather than on whichever withdrawn element happens to sort first.
+ *
+ * @param {REElement[]} elements
+ * @returns {string[]}
+ */
+export function defaultPickerIds(elements) {
+  const inPlay = elements.filter(
+    (e) => e.status !== "withdrawn" && e.status !== "rejected",
+  );
+  return (inPlay.length ? inPlay : elements)
+    .map((e) => e.id)
+    .sort(sortElementIds);
+}
+
+/**
+ * Generates the id shared by every relation belonging to one argument. Joint
+ * arguments are grouped by it when rendering, selecting, and deleting.
+ *
+ * @returns {string}
+ */
+export function newArgumentId() {
+  return `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+}
+
+// ─── Process reviews ──────────────────────────────────────────────────────────
+
+/**
+ * The accepted process reviews, oldest first.
+ *
+ * Every state written before reviews existed lacks the field entirely, so read
+ * it through here rather than touching `state.reviews` — the same contract
+ * {@link module:utils/groupUtils.groupsOf} holds for groups.
+ *
+ * @param {REState} [state]
+ * @returns {REReview[]}
+ */
+export function reviewsOf(state) {
+  return state?.reviews ?? [];
+}
+
+/**
+ * Generates the id a saved review is keyed and deleted by. Two reviews can share
+ * a round — nothing stops a second run before the next change — so the round is
+ * not an identifier.
+ *
+ * @returns {string}
+ */
+export function newReviewId() {
+  return `rev-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+}
 
 /**
  * Returns the relation type for an argument based on premise count and

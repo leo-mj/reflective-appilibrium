@@ -4,6 +4,7 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { usePalette } from "../../hooks/useTheme.js";
 
 /**
  * Renders an SVG `<defs>` block containing `<marker>` arrowhead definitions
@@ -29,6 +30,10 @@ import { C } from "../../constants/colors.js";
  * @returns {React.ReactElement} An SVG `<defs>` element (no visible pixels).
  */
 export function ArrowDefs({ prefix }) {
+  // Arrowheads are the same colour as the line they cap, so they follow the
+  // palette's edge set rather than the flat constants in colors.js — otherwise
+  // high-contrast mode retunes every line and leaves the heads behind.
+  const palette = usePalette();
   return (
     <defs>
       {["supports", "conflicts", "undermines", "depends", "entails", "precludes", "jointly_entails", "jointly_precludes"].map((t) =>
@@ -45,7 +50,7 @@ export function ArrowDefs({ prefix }) {
           >
             <path
               d="M0,-5L10,0L0,5"
-              fill={w ? C.withdrawn : C[t]}
+              fill={w ? C.withdrawn : palette.edges[t]}
               opacity={w ? 0.3 : 1}
             />
           </marker>

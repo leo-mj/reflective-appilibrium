@@ -96,45 +96,6 @@ export function HistoryIcon({ size = "2em" }) {
   );
 }
 
-export function MatrixIcon({ size = "2em" }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 512 512">
-      <defs>
-        <linearGradient id="bgGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#2ec4b6" />
-          <stop offset="100%" stopColor="#7b2cbf" />
-        </linearGradient>
-      </defs>
-
-      {/* <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#bgGradient)" /> */}
-
-      <g
-        stroke="currentColor"
-        strokeWidth="8"
-        strokeLinecap="round"
-        fill="none"
-      >
-        <path d="M180 160 L150 160 L150 352 L180 352" />
-        <path d="M332 160 L362 160 L362 352 L332 352" />
-      </g>
-
-      <g fill="currentColor">
-        <circle cx="210" cy="200" r="14" />
-        <circle cx="256" cy="200" r="14" />
-        <circle cx="302" cy="200" r="14" />
-
-        <circle cx="210" cy="256" r="14" />
-        <circle cx="256" cy="256" r="14" />
-        <circle cx="302" cy="256" r="14" />
-
-        <circle cx="210" cy="312" r="14" />
-        <circle cx="256" cy="312" r="14" />
-        <circle cx="302" cy="312" r="14" />
-      </g>
-    </svg>
-  );
-}
-
 export function ClusterIcon({ size = "2em" }) {
   return (
     <svg
@@ -153,6 +114,41 @@ export function ClusterIcon({ size = "2em" }) {
         <circle cx="382" cy="210" r="26" />
         <circle cx="382" cy="302" r="26" />
         <circle cx="256" cy="256" r="26" />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * A magnifier over a written page: the process, read back.
+ *
+ * Deliberately not another node-and-edge glyph — the Review tab is the one place
+ * in the Assist group whose output is prose about the graph rather than a change
+ * to it, and the icon is the only thing saying so before the panel opens.
+ */
+export function ReviewIcon({ size = "2em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <g
+        stroke="currentColor"
+        strokeWidth="22"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      >
+        <path d="M112 64h198l90 90v200a30 30 0 0 1-30 30H112a30 30 0 0 1-30-30V94a30 30 0 0 1 30-30z" />
+        <polyline points="306,64 306,158 400,158" />
+        <line x1="140" y1="196" x2="240" y2="196" />
+        <line x1="140" y1="254" x2="210" y2="254" />
+      </g>
+      <g stroke="currentColor" strokeWidth="26" strokeLinecap="round" fill="none">
+        <circle cx="286" cy="316" r="72" />
+        <line x1="338" y1="368" x2="418" y2="448" />
       </g>
     </svg>
   );
@@ -249,6 +245,34 @@ export function PrincipleIcon({ size = "2em" }) {
   );
 }
 
+/**
+ * Background theories. A diamond, because that is the shape a `T` node is drawn
+ * as on the canvas — the icon and the graph should agree about what a theory
+ * looks like. The lines inside echo PrincipleIcon's, so the two read as siblings.
+ */
+export function TheoryIcon({ size = "2em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <path
+        d="M256 48 L464 256 L256 464 L48 256 Z"
+        stroke="currentColor"
+        strokeWidth="24"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <g stroke="currentColor" strokeWidth="20" strokeLinecap="round">
+        <line x1="176" y1="224" x2="336" y2="224" />
+        <line x1="200" y1="288" x2="312" y2="288" />
+      </g>
+    </svg>
+  );
+}
+
 export function AddIcon({ size = "2em" }) {
   return (
     <svg
@@ -338,6 +362,48 @@ export function ChatIcon({ size = "1em" }) {
       style={{ display: "block" }}
     >
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+/** A lid, a bin and two strokes: throw this away. */
+export function TrashIcon({ size = "1em" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      strokeLinejoin="round" style={{ display: "block" }}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
+
+/** Arrows pushing out to opposite corners: expand to fill. */
+export function ExpandIcon({ size = "1em" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      strokeLinejoin="round" style={{ display: "block" }}>
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
+/** The same arrows pulled back in: leave the expanded view. */
+export function CollapseIcon({ size = "1em" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      strokeLinejoin="round" style={{ display: "block" }}>
+      <polyline points="4 14 10 14 10 20" />
+      <polyline points="20 10 14 10 14 4" />
+      <line x1="14" y1="10" x2="21" y2="3" />
+      <line x1="3" y1="21" x2="10" y2="14" />
     </svg>
   );
 }

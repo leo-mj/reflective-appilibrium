@@ -3,7 +3,7 @@
  * @module components/app_header/AppHeaderNarrow
  */
 
-import { useState } from "react";
+import { cloneElement, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { useTheme } from "../../hooks/useTheme.js";
 import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
@@ -16,9 +16,27 @@ import {
   TAB_ICONS,
   TAB_LABELS,
 } from "../../constants/tabConstants.jsx";
-import { btn, menuIconStyle, menuDividerStyle } from "./appHeaderStyles.js";
+import {
+  btn,
+  menuIconStyle,
+  menuDividerStyle,
+  menuGroupStyle,
+  menuHeadingStyle,
+} from "./appHeaderStyles.js";
+import { MENU_HEADINGS, MENU_LABELS, MENU_TOOLTIPS } from "./menuText.js";
+import { MoonIcon, SearchIcon } from "./menuIcons.jsx";
+import { MenuToggle } from "./MenuToggle.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
+import { TOUR_Z } from "../tour/tourZ.js";
+
+/**
+ * What sits above the ☰ menu — the app's padding, the round, the topic — and so
+ * has to come off the height the menu is allowed. Deliberately generous: too
+ * much only makes the menu start scrolling a little early, while too little
+ * puts its last entry back off the bottom of the screen.
+ */
+const MENU_TOP_ALLOWANCE = 96;
 
 export function AppHeaderNarrow({
   round,
@@ -28,18 +46,19 @@ export function AppHeaderNarrow({
   menuOpen,
   setMenuOpen,
   ANALYZE_TABS,
-  showText,
-  setShowText,
-  metaTab,
+  isTabVisible,
   handleImportClick,
   onDownload,
   onSave,
+  canSaveToServer,
   saveLabel,
   saveColor,
   saveBusy,
   onHome,
   onUndo,
   canUndo,
+  onRedo,
+  canRedo,
   workflowPhase,
   workflowLoops,
   onStartWorkflow,
@@ -56,11 +75,18 @@ export function AppHeaderNarrow({
   weightsChanged,
   onWeightsChange,
   onResetWeights,
+  onStartStepper,
+  tourActive,
 }) {
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
-  const { isDark, toggle: toggleTheme } = useTheme();
+  const {
+    isDark,
+    accessible,
+    toggle: toggleTheme,
+    toggleAccessible,
+  } = useTheme();
 
   const llmSaved = (() => {
     if (!BYOK_ENABLED) return null;
@@ -82,48 +108,67 @@ export function AppHeaderNarrow({
     fn();
     setMenuOpen(false);
   };
+  // Every row puts its symbol in the same box so the labels all start at the
+  // same x. Tab icons default to 2em, which is wider than that box, so they are
+  // asked for the box's size instead.
+  const tabIcon = (t) => (
+    <span style={menuIconStyle}>
+      {cloneElement(TAB_ICONS[t], { size: 20 })}
+    </span>
+  );
 
   return (
     <div style={{ position: "relative", marginBottom: 6 }}>
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          // Top, not centre: the topic wraps to as many lines as it needs, and
+          // the menu button should stay put rather than drift down beside it.
+          alignItems: "flex-start",
           justifyContent: "space-between",
         }}
       >
-        <div style={{ minWidth: 0, overflow: "hidden" }}>
-          <div
+        <div data-tutorial="topic" style={{ minWidth: 0 }}>
+          <h1
             style={{
               fontSize: 14,
               fontWeight: "bold",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              margin: 0,
             }}
           >
             Round {round}
-          </div>
-          <TopicLabel topic={topic} style={{ fontSize: 12, color: C.dim }} />
+          </h1>
+          <TopicLabel
+            topic={topic}
+            style={{ fontSize: 12, color: C.dim }}
+            wrap
+          />
         </div>
         <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }}>
           <button
+            data-tutorial="btn-menu"
             onClick={() => setMenuOpen((m) => !m)}
+            aria-label="Menu"
+            aria-expanded={menuOpen}
             style={{ ...btn(menuOpen), border: `1px solid ${C.text}` }}
           >
             ☰
           </button>
         </div>
       </div>
-      {BYOK_ENABLED && (
-        <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
-      )}
+      <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
       {menuOpen && (
         <div
           style={{
             position: "absolute",
-            zIndex: 100,
+            // The tour walks this menu section by section, so while it runs the
+            // menu has to sit above the tour's dim rather than under it. The
+            // ring draws higher still, and dims everything it does not enclose.
+            zIndex: tourActive ? TOUR_Z.menu : 100,
             background: C.panel,
             border: `1px solid ${C.border}`,
             borderRadius: 6,
@@ -132,282 +177,60 @@ export function AppHeaderNarrow({
             flexDirection: "column",
             gap: 2,
             width: "100%",
+            // This menu is longer than a phone is tall, and `overflowY` has
+            // nothing to do until something bounds it — so the last entries ran
+            // off the bottom of the screen with no way to reach them. The tour
+            // needs them worse than anyone: it rings them one at a time, and
+            // scrolls this box to bring each one out from behind its sheet,
+            // whose height it publishes on <html> for exactly that.
+            maxHeight: `calc(100dvh - var(--tour-sheet-h, 0px) - ${MENU_TOP_ALLOWANCE}px)`,
+            overflowY: "auto",
             boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
           }}
         >
           <button onClick={close(onHome)} style={menuBtn()}>
-            <span style={menuIconStyle}>←</span>Home
+            <span style={menuIconStyle}>←</span>
+            {MENU_LABELS.home}
           </button>
-
+          <button
+            data-tutorial="menu-undo"
+            onClick={close(onUndo)}
+            disabled={!canUndo}
+            style={{ ...menuBtn(), opacity: canUndo ? 1 : 0.4 }}
+          >
+            <span style={menuIconStyle}>↩</span>Undo
+          </button>
+          <button
+            onClick={close(onRedo)}
+            disabled={!canRedo}
+            style={{ ...menuBtn(), opacity: canRedo ? 1 : 0.4 }}
+          >
+            <span style={menuIconStyle}>↪</span>Redo
+          </button>
+          {/* Same place the wide layout keeps its ? button — right after Undo.
+              Without it the tour had no entry point at this width at all. */}
+          <button onClick={close(onStartStepper)} style={menuBtn()}>
+            <span style={menuIconStyle}>?</span>Guided tour
+          </button>
           <div style={menuDividerStyle} />
-
-          {metaTab !== "assist" && (
-            <button
-              onClick={close(() => setShowText((s) => !s))}
-              style={menuBtn()}
-            >
-              <span style={menuIconStyle}>≡</span>
-              {showText ? "Hide text" : "Show text"}
-            </button>
-          )}
-
-          <button
-            onClick={close(() => setShowTabNav((s) => !s))}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ display: "block" }}
-              >
-                <circle cx="11" cy="11" r="7" />
-                <line x1="16.5" y1="16.5" x2="22" y2="22" />
-              </svg>
-            </span>
-            {showTabNav ? "Hide nav bar" : "Show nav bar"}
-          </button>
-
-          <button onClick={close(onExpandAll)} style={menuBtn()}>
-            <span style={menuIconStyle}>⇅</span>
-            {allExpanded ? "Minimize all toggles" : "Expand all toggles"}
-          </button>
-
-          <button
-            onClick={close(() => setHideNonEntailsRels((s) => !s))}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>→</span>
-            {hideNonEntailsRels ? "All relations" : "Arguments only"}
-          </button>
-
-          {BACKEND_ENABLED && (
-            <button
-              onClick={close(() => setVerifyArguments((s) => !s))}
-              style={menuBtn()}
-            >
-              <span style={menuIconStyle}>{verifyArguments ? "✓" : "✗"}</span>
-              Argument checker: {verifyArguments ? "on" : "off"}
-            </button>
-          )}
-
-          <div style={menuDividerStyle} />
-
-          <button
-            onClick={() => setWeightsOpen((o) => !o)}
-            style={{
-              ...menuBtn(),
-              color: weightsChanged ? C.principle.high : undefined,
-            }}
-          >
-            <span style={menuIconStyle}>⚖</span>
-            Model weights{weightsChanged ? " *" : ""}
-            <span style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}>
-              {weightsOpen ? "▲" : "▼"}
-            </span>
-          </button>
-          {weightsOpen && (
-            <div style={{ padding: "4px 8px 8px 8px" }}>
-              <WeightTriangle
-                weights={weights}
-                onChange={onWeightsChange}
-                weightsChanged={weightsChanged}
-              />
-              {weightsChanged && (
-                <button
-                  onClick={onResetWeights}
-                  style={{
-                    marginTop: 4,
-                    background: "transparent",
-                    border: `1px solid ${C.border}`,
-                    color: C.dim,
-                    borderRadius: 4,
-                    padding: "2px 8px",
-                    fontSize: 11,
-                    cursor: "pointer",
-                  }}
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          )}
-
-          <div style={menuDividerStyle} />
-
-          <button
-            onClick={() => {
-              setMenuOpen(false);
-              setFontOpen(true);
-            }}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>Aa</span>Select Font
-          </button>
-
-          <button
-            onClick={() => {
-              toggleTheme();
-              setMenuOpen(false);
-            }}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>
-              {isDark ? (
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ display: "block" }}
-                >
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="1" x2="12" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="23" />
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                  <line x1="1" y1="12" x2="3" y2="12" />
-                  <line x1="21" y1="12" x2="23" y2="12" />
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-              ) : (
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ display: "block" }}
-                >
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              )}
-            </span>
-            {isDark ? "Light mode" : "Dark mode"}
-          </button>
-
-          <div style={menuDividerStyle} />
-
-          <button
-            onClick={() => {
-              handleImportClick();
-              setMenuOpen(false);
-            }}
-            style={menuBtn()}
-          >
-            <span style={menuIconStyle}>↑</span>Import
-          </button>
-          <button
-            onClick={close(onDownload)}
-            style={{ ...menuBtn(), color: C.theory.high }}
-          >
-            <span style={menuIconStyle}>↓</span>Export
-          </button>
-
-          {BYOK_ENABLED && (
-            <>
-              <div style={menuDividerStyle} />
-              <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  setLlmOpen(true);
-                }}
-                style={menuBtn()}
-              >
-                <span style={menuIconStyle}>⚙</span>
-                {llmSaved ? `LLM: ${llmSaved.model}` : "LLM settings"}
-              </button>
-            </>
-          )}
-
-          <>
-            <div style={menuDividerStyle} />
-
-            <div
-              style={{
-                fontSize: 10,
-                color: C.dim,
-                fontWeight: "bold",
-                padding: "4px 4px 2px",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Assist
-            </div>
-            {ASSIST_TABS.map((t) => (
+          <div data-tutorial="menu-assist" style={menuGroupStyle}>
+            <div style={menuHeadingStyle}>Assist</div>
+            {ASSIST_TABS.filter(isTabVisible).map((t) => (
               <button
                 key={t}
+                // Same id the wide tab bar gives the same tab, so the guided
+                // tour can ring an Assist view here without a second route.
+                data-tutorial={`tab-${t}`}
                 onClick={close(() => setTab(t))}
                 style={menuBtn(tab === t)}
               >
-                {TAB_ICONS[t]}
+                {tabIcon(t)}
                 {TAB_LABELS[t]}
               </button>
             ))}
-
-            <div
-              style={{
-                fontSize: 10,
-                color: C.dim,
-                fontWeight: "bold",
-                padding: "4px 4px 2px",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Analyze
-            </div>
-            {ANALYZE_TABS.map((t) => (
-              <button
-                key={t}
-                onClick={close(() => setTab(t))}
-                style={menuBtn(tab === t)}
-              >
-                {TAB_ICONS[t]}
-                {TAB_LABELS[t]}
-              </button>
-            ))}
-
-            {BACKEND_ENABLED && (
-              <>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: C.dim,
-                    fontWeight: "bold",
-                    padding: "4px 4px 2px",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  Simulate
-                </div>
-                {SIMULATE_TABS.map((t) => (
-                  <button
-                    key={t}
-                    onClick={close(() => setTab(t))}
-                    style={menuBtn(tab === t)}
-                  >
-                    {TAB_ICONS[t]}
-                    {TAB_LABELS[t]}
-                  </button>
-                ))}
-              </>
-            )}
             {workflowPhase ? (
               <button
+                data-tutorial="btn-workflow"
                 onClick={close(onStopWorkflow)}
                 style={{
                   ...menuBtn(),
@@ -415,7 +238,7 @@ export function AppHeaderNarrow({
                   borderColor: C.conflicts,
                 }}
               >
-                ✕ Stop Workflow
+                <span style={menuIconStyle}>✕</span>Stop Workflow
                 <span style={{ marginLeft: 6, fontSize: 10, color: C.dim }}>
                   ({WORKFLOW_PHASE_LABELS[workflowPhase]}
                   {workflowLoops > 0 ? ` · Loop ${workflowLoops + 1}` : ""})
@@ -423,38 +246,225 @@ export function AppHeaderNarrow({
               </button>
             ) : (
               <button
+                data-tutorial="btn-workflow"
                 onClick={close(onStartWorkflow)}
                 style={{ ...menuBtn(), color: C.supports }}
               >
-                ▶ Start Workflow
+                <span style={menuIconStyle}>▶</span>Start Workflow
               </button>
             )}
-          </>
-
+          </div>
           <div style={menuDividerStyle} />
-
-          <button
-            onClick={close(onUndo)}
-            disabled={!canUndo}
-            style={{ ...menuBtn(), opacity: canUndo ? 1 : 0.4 }}
-          >
-            ↩ Undo
-          </button>
-          {BACKEND_ENABLED && (
+          <div data-tutorial="menu-analyze" style={menuGroupStyle}>
+            <div style={menuHeadingStyle}>Analyze</div>
+            {/* Text is a tab of its own at this width, not the side panel the
+                wide layout toggles, so it belongs beside the other views. */}
             <button
-              onClick={close(onSave)}
-              disabled={saveBusy}
-              title="Save session"
-              style={{
-                ...menuBtn(),
-                ...(saveColor
-                  ? { color: saveColor, borderColor: saveColor }
-                  : {}),
-              }}
+              onClick={close(() => setTab("text"))}
+              style={menuBtn(tab === "text")}
             >
-              {saveLabel}Save
+              <span style={menuIconStyle}>≡</span>
+              Text
             </button>
-          )}
+            {ANALYZE_TABS.filter(isTabVisible).map((t) => (
+              <button
+                key={t}
+                data-tutorial={`tab-${t}`}
+                onClick={close(() => setTab(t))}
+                style={menuBtn(tab === t)}
+              >
+                {tabIcon(t)}
+                {TAB_LABELS[t]}
+              </button>
+            ))}
+            {BACKEND_ENABLED && (
+              <>
+                <div style={menuHeadingStyle}>Simulate</div>
+                {SIMULATE_TABS.filter(isTabVisible).map((t) => (
+                  <button
+                    key={t}
+                    onClick={close(() => setTab(t))}
+                    style={menuBtn(tab === t)}
+                  >
+                    {tabIcon(t)}
+                    {TAB_LABELS[t]}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+          <div style={menuDividerStyle} />
+          {/* One wrapper, four blocks: the tour rings the settings as a whole,
+              and the headings inside it are the same ones, in the same order,
+              as the wide menu's — content first, the panel-deep rows last.
+              Nothing here closes the menu except the two rows that open a
+              modal: a toggle's switch is the only evidence it fired. */}
+          <div data-tutorial="menu-settings" style={menuGroupStyle}>
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.content}</div>
+            <MenuToggle
+              icon="→"
+              label={MENU_LABELS.relations}
+              tooltip={MENU_TOOLTIPS.relations}
+              on={!hideNonEntailsRels}
+              onToggle={() => setHideNonEntailsRels((s) => !s)}
+              style={menuBtn()}
+            />
+            {BACKEND_ENABLED && (
+              <MenuToggle
+                icon="⊨"
+                label={MENU_LABELS.checker}
+                tooltip={MENU_TOOLTIPS.checker}
+                on={verifyArguments}
+                onToggle={() => setVerifyArguments((s) => !s)}
+                style={menuBtn()}
+              />
+            )}
+
+            <div style={menuDividerStyle} />
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.model}</div>
+            <button
+              data-tutorial="btn-llm"
+              onClick={() => {
+                setMenuOpen(false);
+                setLlmOpen(true);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>⚙</span>
+              {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
+            </button>
+            {BACKEND_ENABLED && (
+              <>
+                <button
+                  onClick={() => setWeightsOpen((o) => !o)}
+                  aria-expanded={weightsOpen}
+                  style={{
+                    ...menuBtn(),
+                    color: weightsChanged ? C.principle.accent : undefined,
+                  }}
+                >
+                  <span style={menuIconStyle}>⚖</span>
+                  {MENU_LABELS.weights}
+                  {weightsChanged ? " *" : ""}
+                  <span
+                    style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}
+                  >
+                    {weightsOpen ? "▲" : "▼"}
+                  </span>
+                </button>
+                {weightsOpen && (
+                  <div style={{ padding: "4px 8px 8px 8px" }}>
+                    <WeightTriangle
+                      weights={weights}
+                      onChange={onWeightsChange}
+                      weightsChanged={weightsChanged}
+                    />
+                    {weightsChanged && (
+                      <button
+                        onClick={onResetWeights}
+                        style={{
+                          marginTop: 4,
+                          background: "transparent",
+                          border: `1px solid ${C.border}`,
+                          color: C.dim,
+                          borderRadius: 4,
+                          padding: "2px 8px",
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            <div style={menuDividerStyle} />
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.appearance}</div>
+            <MenuToggle
+              icon={<MoonIcon />}
+              label={MENU_LABELS.theme}
+              tooltip={MENU_TOOLTIPS.theme}
+              on={isDark}
+              onToggle={toggleTheme}
+              style={menuBtn()}
+            />
+            <MenuToggle
+              icon="◐"
+              label={MENU_LABELS.contrast}
+              tooltip={MENU_TOOLTIPS.contrast}
+              on={accessible}
+              onToggle={toggleAccessible}
+              style={menuBtn()}
+            />
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setFontOpen(true);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>Aa</span>
+              {MENU_LABELS.font}
+            </button>
+
+            <div style={menuDividerStyle} />
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.text}</div>
+            <MenuToggle
+              icon={<SearchIcon />}
+              label={MENU_LABELS.navBar}
+              tooltip={MENU_TOOLTIPS.navBar}
+              on={showTabNav}
+              onToggle={() => setShowTabNav((s) => !s)}
+              style={menuBtn()}
+            />
+            <MenuToggle
+              icon="⇅"
+              label={MENU_LABELS.cards}
+              tooltip={MENU_TOOLTIPS.cards}
+              on={allExpanded}
+              onToggle={onExpandAll}
+              style={menuBtn()}
+            />
+          </div>
+          <div style={menuDividerStyle} />
+          <div data-tutorial="menu-files" style={menuGroupStyle}>
+            <div style={menuHeadingStyle}>{MENU_HEADINGS.session}</div>
+            <button
+              onClick={() => {
+                handleImportClick();
+                setMenuOpen(false);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>↑</span>
+              {MENU_LABELS.import}
+            </button>
+            <button
+              onClick={close(onDownload)}
+              style={{ ...menuBtn(), color: C.theory.text }}
+            >
+              <span style={menuIconStyle}>↓</span>
+              {MENU_LABELS.export}
+            </button>
+            {BACKEND_ENABLED && canSaveToServer && (
+              <button
+                onClick={close(onSave)}
+                disabled={saveBusy}
+                style={{
+                  ...menuBtn(),
+                  ...(saveColor
+                    ? { color: saveColor, borderColor: saveColor }
+                    : {}),
+                }}
+              >
+                <span style={menuIconStyle}>{saveLabel}</span>
+                {MENU_LABELS.save}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

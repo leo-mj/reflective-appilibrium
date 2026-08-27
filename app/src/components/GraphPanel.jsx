@@ -1,22 +1,73 @@
 /**
- * @fileoverview Right-side panel: renders the active tab content (graph, history, clusters, or AI workflows).
+ * @fileoverview Renders the active tab content (graph, history, clusters, or AI
+ * workflows). Which half of the row it lands in is `REState`'s call: in analyze
+ * mode it is the right-hand panel, beside the text; on an assist or simulate tab
+ * it is the left-hand one, with the companion graph or text beside it.
  * @module components/GraphPanel
  */
 
 import { lazy, Suspense, useState } from "react";
-import { APP_ENV, LLM_ENABLED, MATRIX_ENABLED } from "../config.js";
+import { APP_ENV, LLM_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { Graph } from "./Graph.jsx";
 import { HistoryTab } from "./HistoryTab.jsx";
 import { ClusterTab } from "./ClusterTab.jsx";
 import { Legend } from "./graphs_shared/Legend.jsx";
-import { ASSIST_TABS, SIMULATE_TABS } from "../constants/tabConstants.jsx";
+import { Tooltip } from "./Tooltip.jsx";
+import { ExpandIcon, CollapseIcon } from "./Icons.jsx";
+import {
+  ADD_BAR_PRESETS,
+  ASSIST_TABS,
+  SIMULATE_TABS,
+} from "../constants/tabConstants.jsx";
+import { linkableElements } from "../utils/stateUtils.js";
+import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 
-const CoherenceMatrixTab = lazy(() =>
-  import("./CoherenceMatrixTab.jsx").then((m) => ({
-    default: m.CoherenceMatrixTab,
-  })),
-);
+/**
+ * Hands the whole row to the graph by folding away whatever sits beside it,
+ * and back again.
+ *
+ * This used to be a "Hide text" / "Show text" entry buried in the burger menu,
+ * where nobody looking at a cramped graph would think to find it — and where
+ * the only way back was to remember the same menu.
+ *
+ * @param {string} hides - What folds away, named for the tooltip. Which panel
+ *   that is depends on the tab: the text beside an analyze graph, the workflow
+ *   panel beside the assist and simulate graphs.
+ */
+function FullscreenButton({ isFullscreen, onClick, hides }) {
+  return (
+    <Tooltip
+      text={
+        isFullscreen
+          ? `Shrink the graph and bring the ${hides} back`
+          : `Give the graph the full width by hiding the ${hides}`
+      }
+    >
+      <button
+        onClick={onClick}
+        aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+        aria-pressed={isFullscreen}
+        style={{
+          flexShrink: 0,
+          width: 44,
+          height: 44,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 4,
+          border: `1px solid ${C.border}`,
+          background: C.panel,
+          color: C.dim,
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        {isFullscreen ? <CollapseIcon size={16} /> : <ExpandIcon size={16} />}
+      </button>
+    </Tooltip>
+  );
+}
 
 const JudgmentElicitTab = lazy(() =>
   import("./workflows/JudgmentElicitTab.jsx").then((m) => ({
@@ -43,6 +94,17 @@ const DetectArgumentsTab = lazy(() =>
   })),
 );
 
+const TheorySuggestTab = lazy(() =>
+  import("./workflows/TheorySuggestTab.jsx").then((m) => ({
+    default: m.TheorySuggestTab,
+  })),
+);
+const ProcessReviewTab = lazy(() =>
+  import("./workflows/ProcessReviewTab.jsx").then((m) => ({
+    default: m.ProcessReviewTab,
+  })),
+);
+
 const SimulateRethonTab = lazy(() =>
   import("./workflows/SimulateRethonTab.jsx").then((m) => ({
     default: m.SimulateRethonTab,
@@ -66,27 +128,42 @@ export function GraphPanel({
   selectedRel,
   onSelectRel,
   onAddElement,
+  onReviseElementText,
   onAddRelation,
   onDeleteRelationsByArgId,
   onQuestionnaireSelectAnswer,
   onScrollToRelations,
   onRejectElements,
   onRejectRelations,
+  onSaveReview,
+  onDiscardReview,
   onApplyRethonEquilibrium,
   equilibriumPreviewWithdrawnIds,
   onSetEquilibriumPreview,
   onRoundChange,
   isWide,
   workflowPhase,
+  workflowNextPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
   hideNonEntailsRels,
-  onCtrlSecondSelect,
+  onCtrlChainSelect,
+  onCreateGroup,
+  onToggleGroup,
+  onEditGroupRequest,
+  onUngroup,
+  onEditRequest,
+  onWithdrawRequest,
+  onReinstate,
   ready,
   isSample,
   recentlyAdded,
   weights,
   verifyArguments,
+  isFullscreen,
+  onToggleFullscreen,
+  fullscreenHides = "panel beside it",
+  focus,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
@@ -110,11 +187,24 @@ export function GraphPanel({
       }}
     >
       {!isAssistPanel && (
-        <Legend
-          hiddenLegendKeys={hiddenLegendKeys}
-          setHiddenLegendKeys={setHiddenLegendKeys}
-          hideNonEntailsRels={hideNonEntailsRels}
-        />
+        // One row: the legend takes what it needs and wraps, the full-screen
+        // toggle stays pinned to the right edge above the graph.
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Legend
+              hiddenLegendKeys={hiddenLegendKeys}
+              setHiddenLegendKeys={setHiddenLegendKeys}
+              hideNonEntailsRels={hideNonEntailsRels}
+            />
+          </div>
+          {onToggleFullscreen && (
+            <FullscreenButton
+              isFullscreen={isFullscreen}
+              onClick={onToggleFullscreen}
+              hides={fullscreenHides}
+            />
+          )}
+        </div>
       )}
       {APP_ENV === "dev" &&
         isAssistPanel &&
@@ -141,7 +231,32 @@ export function GraphPanel({
             Use sample data
           </label>
         )}
-      <div style={{ flex: 1, minHeight: 0, marginTop: 4 }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          marginTop: 4,
+          // For the narrow layout's floating +, which is anchored to the corner
+          // of whichever tab body is in here.
+          position: "relative",
+        }}
+      >
+        {/* An assist tab's way in by hand where there is no room for the strip.
+            The wide layout keeps that strip under every tab, this one cannot —
+            an add bar and a column of suggestions do not both fit on a phone —
+            so the bar comes up as a sheet over the tab instead, on the same
+            button the text tab uses and carrying the same preset the strip
+            would have had. Simulate is left out: it is the one assist-side tab
+            with nothing to add to. */}
+        {!isWide && ASSIST_TABS.includes(tab) && (
+          <MobileAddButton
+            elements={linkableElements(state.elements)}
+            onAddElement={onAddElement}
+            onAddRelation={onAddRelation}
+            hideNonEntailsRels={hideNonEntailsRels}
+            preset={ADD_BAR_PRESETS[tab] ?? null}
+          />
+        )}
         {tab === "graph" && (
           <Graph
             state={state}
@@ -153,11 +268,19 @@ export function GraphPanel({
             onSelectRel={onSelectRel}
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
-            onCtrlSecondSelect={onCtrlSecondSelect}
+            onEditRequest={onEditRequest}
+            onWithdrawRequest={onWithdrawRequest}
+            onReinstate={onReinstate}
+            onCtrlChainSelect={onCtrlChainSelect}
+            onCreateGroup={onCreateGroup}
+            onToggleGroup={onToggleGroup}
+            onEditGroupRequest={onEditGroupRequest}
+            onUngroup={onUngroup}
             ready={ready}
             recentlyAdded={recentlyAdded}
             hideNonEntailsRels={hideNonEntailsRels}
             equilibriumPreviewWithdrawnIds={equilibriumPreviewWithdrawnIds}
+            focus={focus}
           />
         )}
         {tab === "history" && (
@@ -176,14 +299,6 @@ export function GraphPanel({
             hideNonEntailsRels={hideNonEntailsRels}
           />
         )}
-        {MATRIX_ENABLED && tab === "matrix" && (
-          <Suspense fallback={null}>
-            <CoherenceMatrixTab
-              state={state}
-              suggestionsDisabled={suggestionsDisabled}
-            />
-          </Suspense>
-        )}
         {tab === "suggestRelations" && (
           <Suspense fallback={null}>
             <RelationSuggestTab
@@ -193,6 +308,7 @@ export function GraphPanel({
               onRejectRelations={onRejectRelations}
               autoFetch={autoFetch}
               workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
@@ -209,6 +325,7 @@ export function GraphPanel({
               onRejectElements={onRejectElements}
               autoFetch={autoFetch}
               workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
@@ -226,12 +343,51 @@ export function GraphPanel({
               onRejectElements={onRejectElements}
               autoFetch={autoFetch}
               workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={useDummyAssist}
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
+            />
+          </Suspense>
+        )}
+        {tab === "suggestTheories" && (
+          <Suspense fallback={null}>
+            <TheorySuggestTab
+              state={state}
+              onAddElement={onAddElement}
+              onRejectElements={onRejectElements}
+              autoFetch={autoFetch}
+              workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
+              useDummy={useDummyAssist}
+              suggestionsDisabled={suggestionsDisabled}
+            />
+          </Suspense>
+        )}
+        {tab === "processReview" && (
+          <Suspense fallback={null}>
+            {/* The workflow stops here every fifth iteration, so this tab takes
+                the same props the phases do. `workflowPhase` is what puts the
+                next-phase control in its toolbar; the tab's own round gate is
+                what keeps `autoFetch` from asking for a reading of a process
+                too short to have one. */}
+            <ProcessReviewTab
+              state={state}
+              onSaveReview={onSaveReview}
+              onDiscardReview={onDiscardReview}
+              autoFetch={autoFetch}
+              workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              nextPhaseIsEnabled={nextPhaseIsEnabled}
+              useDummy={useDummyAssist}
+              suggestionsAreSample={suggestionsAreSample}
+              suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
         )}
@@ -252,13 +408,14 @@ export function GraphPanel({
               useDummy={useDummyAssist}
               verifyArguments={verifyArguments}
               onAddElement={onAddElement}
+              onReviseElementText={onReviseElementText}
               onAddRelation={onAddRelation}
               onDeleteRelationsByArgId={onDeleteRelationsByArgId}
               autoFetch={autoFetch}
               workflowPhase={workflowPhase}
+              workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-              hideNonEntailsRels={hideNonEntailsRels}
             />
           </Suspense>
         )}

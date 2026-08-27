@@ -1,5 +1,5 @@
 /**
- * @fileoverview Confidence input: three preset buttons (Low / Mod / High) plus a
+ * @fileoverview Confidence input: three preset buttons (Low / Moderate / High) plus a
  * free-entry number field for values in [0, 1].
  * @module components/ConfidenceInput
  */
@@ -10,7 +10,7 @@ import { FormField } from "./ModalShell.jsx";
 
 const PRESETS = [
   { label: "Low", value: 0.33 },
-  { label: "Mod", value: 0.67 },
+  { label: "Moderate", value: 0.67 },
   { label: "High", value: 1.0 },
 ];
 
@@ -39,9 +39,9 @@ export function ConfidenceInput({ value, onChange }) {
                 padding: "4px 10px",
                 fontSize: 11,
                 borderRadius: 4,
-                border: `1px solid ${active ? C.judgment.high : C.border}`,
-                background: active ? C.judgment.high : C.bg,
-                color: active ? "#fff" : C.text,
+                border: `1px solid ${active ? C.judgment.accent : C.border}`,
+                background: active ? C.judgment.accent : C.bg,
+                color: active ? C.onFill : C.text,
                 cursor: "pointer",
                 flexShrink: 0,
               }}

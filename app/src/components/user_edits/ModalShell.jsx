@@ -38,6 +38,9 @@ export function FormField({ label, children }) {
  * @param {function(): void} props.onSave       - Called when the user clicks the save button.
  * @param {string}           [props.saveLabel]  - Label for the save button (default: `"Save"`).
  * @param {boolean}          [props.saveDisabled] - Disables the save button when `true`.
+ * @param {function(): void} [props.onClear]    - When given, a Clear button appears at
+ *   the far side of the footer from Save. Kept apart from it deliberately: it
+ *   throws away what Save would commit, and the two should not sit together.
  * @returns {React.ReactElement}
  */
 export function ModalShell({
@@ -46,6 +49,7 @@ export function ModalShell({
   children,
   onCancel,
   onSave,
+  onClear,
   saveLabel = "Save",
   saveDisabled = false,
 }) {
@@ -106,6 +110,24 @@ export function ModalShell({
             marginTop: 8,
           }}
         >
+          {onClear && (
+            <button
+              onClick={onClear}
+              title="Start this form over"
+              style={{
+                marginRight: "auto",
+                padding: "7px 18px",
+                borderRadius: 4,
+                border: `1px solid ${C.border}`,
+                background: "transparent",
+                color: C.dim,
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+            >
+              Clear
+            </button>
+          )}
           <button
             onClick={onCancel}
             style={{
@@ -128,7 +150,7 @@ export function ModalShell({
               borderRadius: 4,
               border: "none",
               background: saveDisabled ? C.border : C.supports,
-              color: "#fff",
+              color: C.onFill,
               cursor: saveDisabled ? "default" : "pointer",
               fontSize: 12,
               fontWeight: "bold",

@@ -148,6 +148,7 @@ export async function scorePerRound(state, local = true, weights = null) {
  * @returns {Promise<{withdrawal_deltas: Array}|null>}
  */
 export async function scoreChanges(state, local = true, weights = null) {
+  if (!BACKEND_ENABLED) return null;
   try {
     const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/score_changes`, {
       method: "POST",

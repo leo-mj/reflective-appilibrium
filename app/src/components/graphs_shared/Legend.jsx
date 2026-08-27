@@ -4,27 +4,36 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { usePalette } from "../../hooks/useTheme.js";
 import { Tooltip } from "../Tooltip.jsx";
 
 export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRels }) {
+  // The element swatches come from the palette in force, not from the fixed
+  // accent tones: a legend that keeps showing the default blue while the graph
+  // is drawn in the high-contrast one is worse than no legend.
+  const palette = usePalette();
   const items = [
-    { label: "Judgment", shape: "judgment-gradient", key: "J" },
-    { label: "Principle", shape: "roundrect", color: "#7c3aed", key: "P" },
-    { label: "Theory", shape: "diamond", color: "#d97706", key: "T" },
-    { label: "Withdrawn", shape: "circle", color: "#64748b", key: "withdrawn" },
-    { label: "Rejected", shape: "circle", color: "#fb7185", key: "rejected" },
+    { label: "Judgment", shape: "judgment-gradient", ramp: palette.judgment, key: "J" },
+    { label: "Principle", shape: "roundrect", color: palette.principle.high, key: "P" },
+    { label: "Theory", shape: "diamond", color: palette.theory.high, key: "T" },
+    { label: "Withdrawn", shape: "circle", color: C.withdrawn, key: "withdrawn" },
+    { label: "Rejected", shape: "circle", color: C.rejected, key: "rejected" },
   ];
+  // Lines follow the palette too, for the same reason: high-contrast mode
+  // retunes every relation colour, and a legend naming the old ones would be
+  // telling the reader something the canvas is not doing.
+  const e = palette.edges;
   const lines = [
     ...(!hideNonEntailsRels ? [
-      { label: "Supports", color: C.supports, dash: "", key: "supports" },
-      { label: "Conflicts", color: C.conflicts, dash: "8,4", key: "conflicts" },
-      { label: "Undermines", color: C.undermines, dash: "4,4", key: "undermines" },
-      { label: "Depends on", color: C.depends, dash: "", key: "depends" },
+      { label: "Supports", color: e.supports, dash: "", key: "supports" },
+      { label: "Conflicts", color: e.conflicts, dash: "8,4", key: "conflicts" },
+      { label: "Undermines", color: e.undermines, dash: "4,4", key: "undermines" },
+      { label: "Depends on", color: e.depends, dash: "", key: "depends" },
     ] : []),
-    { label: "Entails", color: C.entails, dash: "", key: "entails" },
-    { label: "Jointly Entails", color: C.jointly_entails, dash: "", key: "jointly_entails" },
-    { label: "Precludes", color: C.precludes, dash: "", key: "precludes" },
-    { label: "Jointly Precludes", color: C.jointly_precludes, dash: "", key: "jointly_precludes" },
+    { label: "Entails", color: e.entails, dash: "", key: "entails" },
+    { label: "Jointly Entails", color: e.jointly_entails, dash: "", key: "jointly_entails" },
+    { label: "Precludes", color: e.precludes, dash: "", key: "precludes" },
+    { label: "Jointly Precludes", color: e.jointly_precludes, dash: "", key: "jointly_precludes" },
   ];
 
   const hidden = (key) => hiddenLegendKeys?.has(key) ?? false;
@@ -73,8 +82,10 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRe
                   width: 22,
                   height: 10,
                   borderRadius: 5,
-                  background: "linear-gradient(to right, #93c5fd, #2563eb)",
-                  border: "1px solid #2563eb",
+                  // The whole confidence ramp in one swatch — which is what
+                  // makes it the judgment entry rather than a plain circle.
+                  background: `linear-gradient(to right, ${it.ramp.low}, ${it.ramp.high})`,
+                  border: `1px solid ${it.ramp.stroke}`,
                 }}
               />
             )}

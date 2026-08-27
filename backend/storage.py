@@ -86,7 +86,10 @@ def _slugify(topic: str) -> str:
 def _render_markdown(state: REState, saved_at: datetime) -> str:
     title = state.topic or "Untitled"
     ts = saved_at.strftime("%Y-%m-%d %H:%M:%S UTC")
-    json_str = state.model_dump_json(by_alias=True, indent=2)
+    # exclude_none is load-bearing, not tidiness: the frontend importer treats an
+    # optional field as absent, not empty, so an emitted "previousText": null
+    # fails its string check and the file will not re-import.
+    json_str = state.model_dump_json(by_alias=True, indent=2, exclude_none=True)
     return f"# {title}\n\nSaved: {ts}\n\n```re-state\n{json_str}\n```\n"
 
 

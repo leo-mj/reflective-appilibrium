@@ -11,6 +11,7 @@
 
 import { createPortal } from "react-dom";
 import { C } from "../../constants/colors.js";
+import { confidenceDetail } from "../../utils/confidenceLabel.js";
 
 /**
  * @typedef {Object} TooltipState
@@ -23,11 +24,18 @@ import { C } from "../../constants/colors.js";
  * Absolutely-positioned tooltip card rendered above a hovered graph node.
  * Returns `null` when `tooltip` is `null`.
  *
+ * Also serves the pseudo-element a collapsed group is drawn as, which has a
+ * member list where an element has a statement, and no confidence, origin or
+ * round of its own.
+ *
  * @param {Object}            props
  * @param {TooltipState|null} props.tooltip - Current tooltip data, or `null` to hide.
+ * @param {React.ReactNode}   [props.actions] - Buttons for a pinned tooltip. Their
+ *   presence is what makes the card interactive; a hover tooltip stays
+ *   click-through so it never swallows a click meant for the canvas.
  * @returns {React.ReactElement|null}
  */
-export function NodeTooltip({ tooltip }) {
+export function NodeTooltip({ tooltip, actions = null }) {
   if (!tooltip) return null;
   const { x, y, el } = tooltip;
   // Clamp x so the tooltip (maxWidth 300 → half = 150) stays within the viewport.
@@ -46,9 +54,14 @@ export function NodeTooltip({ tooltip }) {
         borderRadius: 6,
         padding: "8px 12px",
         maxWidth: 300,
-        pointerEvents: "none",
+        pointerEvents: actions ? "auto" : "none",
+        boxShadow: actions ? "0 2px 10px rgba(0,0,0,0.35)" : "none",
         zIndex: 10,
       }}
+      // The canvas clears the pin on any background click, so a click landing
+      // on the card itself must not bubble out to it.
+      onPointerDown={actions ? (e) => e.stopPropagation() : undefined}
+      onPointerUp={actions ? (e) => e.stopPropagation() : undefined}
     >
       <div
         style={{
@@ -58,12 +71,27 @@ export function NodeTooltip({ tooltip }) {
           marginBottom: 4,
         }}
       >
-        {el.id} ({el.type}) — {el.status}
+        {el.type === "group"
+          ? `${el.label} — group of ${el.memberIds.length}`
+          : `${el.id} (${el.type}) — ${el.status}`}
       </div>
-      <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.4 }}>
-        {el.text}
-      </div>
-      {el.previousText && (
+      {el.type === "group" ? (
+        // What the disc is standing in for. A collapsed group hides its members
+        // but keeps every relation they hold against the rest of the graph, so
+        // the one thing the card has to answer is which elements those are.
+        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>
+          {el.members.map((m) => (
+            <div key={m.id}>
+              <span style={{ color: C.text }}>{m.id}</span> {m.text}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.4 }}>
+          {el.text}
+        </div>
+      )}
+      {el.type !== "group" && el.previousText && (
         <div
           style={{
             color: C.revised,
@@ -75,7 +103,7 @@ export function NodeTooltip({ tooltip }) {
           Previously: {el.previousText}
         </div>
       )}
-      {el.reason && (
+      {el.type !== "group" && el.reason && (
         <div
           style={{
             color: C.withdrawnMark,
@@ -87,10 +115,27 @@ export function NodeTooltip({ tooltip }) {
           Withdrawn: {el.reason}
         </div>
       )}
-      <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
-        Confidence: {typeof el.confidence === "number" ? el.confidence.toFixed(2) : el.confidence} · Origin: {el.origin}
-        {el.addedRound && ` · Added: Round ${el.addedRound}`}
-      </div>
+      {el.type !== "group" && (
+        <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
+          {/* Already a hover surface, so the exact value goes inline rather than
+              behind a title nobody could reach. */}
+          Confidence: {confidenceDetail(el.confidence)} · Origin: {el.origin}
+          {el.addedRound && ` · Added: Round ${el.addedRound}`}
+        </div>
+      )}
+      {actions && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: 8,
+            paddingTop: 6,
+            borderTop: `1px solid ${C.border}`,
+          }}
+        >
+          {actions}
+        </div>
+      )}
     </div>,
     document.body,
   );

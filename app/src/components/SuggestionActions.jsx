@@ -183,12 +183,12 @@ export function ErrorBanner({ message }) {
   return (
     <div
       style={{
-        background: "#7c1d1d44",
-        border: "1px solid #dc2626",
+        background: C.dangerSurface,
+        border: `1px solid ${C.danger}`,
         borderRadius: 6,
         padding: "10px 14px",
         fontSize: 12,
-        color: "#fca5a5",
+        color: C.dangerInk,
         marginBottom: 14,
       }}
     >

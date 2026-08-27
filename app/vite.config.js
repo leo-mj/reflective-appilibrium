@@ -14,6 +14,10 @@ export default defineConfig(({ mode }) => ({
   plugins: [react()],
   test: {
     environment: "node",
+    // The e2e suite is Playwright's, and it needs a real browser. Vitest's
+    // default `include` would otherwise pick up e2e/*.spec.js and fail on the
+    // @playwright/test import.
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
     coverage: {
       provider: "v8",
       include: ["src/utils/**", "src/hooks/**"],

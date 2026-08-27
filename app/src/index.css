@@ -3,12 +3,37 @@
   font-family: inherit;
 }
 
+/* The element colours in constants/colors.js are chosen as *fills* — a blue
+   disc, a purple rectangle, an amber diamond — where a mid-tone reads fine
+   against either ground. Used as *type* the same mid-tones do not clear WCAG AA:
+   the judgment blue measures 2.83:1 on the dark panel. These are the same hues
+   pushed light or dark far enough to be legible as text, and they have to be
+   per-theme because the direction differs — #2563eb passes on the light panel
+   (4.72:1) and fails on the dark one. Fills stay as they are; only foregrounds
+   use these.
+
+   These are *not* what the assist tab headers use. Those take their graph
+   constant exactly, accepting that several are under AA in the default mode —
+   see `headerAccent` in constants/palettes.js. */
 :root {
   --c-bg: #0f172a;
   --c-panel: #1e293b;
   --c-border: #334155;
   --c-text: #e2e8f0;
   --c-dim: #94a3b8;
+  --c-judgment-text: #60a5fa; /* 5.75:1 on panel */
+  --c-principle-text: #c4b5fd; /* 7.92:1 on panel */
+  --c-theory-text: #fcd34d; /* 10.15:1 on panel */
+  --c-supports-text: #06b6d4; /* 6.03:1 on panel */
+  /* Cluster tints as labels. The fills they pair with are fixed hues; these are
+     the same hues lightened to stay readable as type. Four of the six fills
+     failed AA here. */
+  --c-cluster-0-text: #22d3ee;
+  --c-cluster-1-text: #c4b5fd;
+  --c-cluster-2-text: #fcd34d;
+  --c-cluster-3-text: #60a5fa;
+  --c-cluster-4-text: #4ade80;
+  --c-cluster-5-text: #f9a8d4;
 }
 
 [data-theme="light"] {
@@ -16,7 +41,21 @@
   --c-panel: #f1f5f9;
   --c-border: #e2e8f0;
   --c-text: #0f172a;
-  --c-dim: #64748b;
+  /* Slate-500 (#64748b) reads 4.28:1 on this ground — under AA for the 12–13px
+     body copy it is used for. Nudged one step darker to clear it. */
+  --c-dim: #5b6b80;
+  --c-judgment-text: #2563eb; /* 4.72:1 on panel */
+  --c-principle-text: #6d28d9; /* 6.49:1 on panel */
+  --c-theory-text: #854d0e; /* 6.25:1 on panel */
+  /* The edge teal is the one that swings furthest: #06b6d4 is fine on the dark
+     panel and 2.22:1 on this one. */
+  --c-supports-text: #0e7490; /* 4.89:1 on panel */
+  --c-cluster-0-text: #0e7490;
+  --c-cluster-1-text: #6d28d9;
+  --c-cluster-2-text: #854d0e;
+  --c-cluster-3-text: #2563eb;
+  --c-cluster-4-text: #15803d;
+  --c-cluster-5-text: #be185d;
 }
 
 @keyframes spin {
@@ -61,5 +100,123 @@ body {
   textarea,
   select {
     font-size: 16px !important;
+  }
+}
+
+/* A number field with its stepper arrows taken off. They cost more width than
+   they are worth on a control only a few characters wide — enough, at phone
+   sizes, to push the value they step out of the field. Needs a rule rather than
+   an inline style: the arrows are pseudo-elements. */
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* The workspace's central divider — the boundary between the panel a tab is
+   about and whatever accompanies it, which the reader drags to give one of them
+   more of the row.
+
+   Unlike the add bar's handles this is drawn at rest, because it is the
+   boundary rather than a grip on one: the panels either side no longer rule
+   themselves off, so this hairline is the only thing marking where one ends.
+   Under the pointer it thickens and brightens, which is the whole of the hint
+   that it moves — that and the resize cursor.
+
+   The box around the line is wider than the line, so it can be hit; the line is
+   centred in it and stays put as it thickens, so the panels do not shift under
+   a hover. */
+.split-divider {
+  cursor: col-resize;
+}
+.split-divider-line {
+  width: 1px;
+  border-radius: 2px;
+  background: var(--c-border);
+  transition:
+    width 0.12s ease,
+    background-color 0.12s ease;
+}
+.split-divider:hover .split-divider-line {
+  width: 3px;
+  background: var(--c-dim);
+}
+/* Focus has to be visible on its own terms — a keyboard has no pointer to
+   explain the change — so it is the hover state plus a ring, and the outline
+   goes on the line rather than on the box, which is mostly empty space. */
+.split-divider:focus-visible {
+  outline: none;
+}
+.split-divider:focus-visible .split-divider-line {
+  width: 3px;
+  background: var(--c-dim);
+  box-shadow: 0 0 0 1px var(--c-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .split-divider-line {
+    transition: none;
+  }
+}
+
+/* Drag handles on the add bar's two movable edges.
+
+   Invisible until the pointer is on one, or one has focus: a grip drawn
+   permanently along two edges of a bar that wide is a lot of furniture for
+   something used once and then left alone. The cursor over the edge is what
+   announces it — the same way a window's own edges do — and the title
+   attribute says the rest. The transition is what makes it read as a control
+   appearing rather than as a rendering artefact.
+
+   Kept as a rule rather than an inline style because :hover and :focus-visible
+   are pseudo-classes; the geometry stays in the hook, which is what knows which
+   edge each handle is. */
+.resize-handle {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.resize-handle:hover,
+.resize-handle:focus-visible {
+  opacity: 0.5;
+  outline: none;
+}
+/* Focus has to be visible on its own terms: the fade above is the same as the
+   hover state, and a keyboard has no pointer to explain it. */
+.resize-handle:focus-visible {
+  opacity: 0.9;
+  box-shadow: 0 0 0 1px var(--c-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .resize-handle {
+    transition: none;
+  }
+}
+
+/* Tap targets.
+
+   A thumb needs more room than a mouse pointer, so the panel's small inline
+   controls are grown — but only where they are actually thumbed. Keyed on the
+   input device rather than the viewport width, for two reasons: a phone held in
+   landscape is wider than 768px and still driven by a thumb, and a narrow
+   window on a desktop is still driven by a mouse and gains nothing from the
+   extra height. WCAG 2.2 asks 24px at AA, which these clear either way; this is
+   about comfort, not the floor. */
+@media (hover: none) and (pointer: coarse) {
+  .tap-target {
+    min-height: 36px;
+  }
+  /* Icon-only, so it needs the width more than the height: a "+" is about eight
+     pixels of glyph, and height alone would leave a tall thin sliver to aim at. */
+  .tap-target-square {
+    min-height: 36px;
+    min-width: 36px;
+  }
+  /* Element id badges sit in dense rows of metadata chips, so they take the
+     smallest height anything here is deliberately given rather than the full 36. */
+  .tap-target-sm {
+    min-height: 30px;
   }
 }

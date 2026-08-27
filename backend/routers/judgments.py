@@ -6,7 +6,6 @@ may elicit new moral judgments the user has not yet articulated.
 """
 
 import logging
-import json
 
 from typing import Annotated
 
@@ -14,10 +13,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from ..dependencies import get_llm_service
-from ..models.re_state import DEFAULT_CONFIDENCE, REElement, RELogEntry
+from ..models.re_state import Confidence, DEFAULT_CONFIDENCE, REElement, RELogEntry
 from ..services.llm import LLMService
 from ..services.prompts import build_judgments_prompt
 from ..services.response_schemas import JUDGMENTS_SCHEMA
+from .shared import LLMTaskResponse, parse_json_object
 
 router = APIRouter(prefix="/api/judgments", tags=["judgments"])
 logger = logging.getLogger(__name__)
@@ -37,9 +37,6 @@ class ElicitJudgmentsRequest(BaseModel):
     topic: str = Field(max_length=500)
     elements: list[REElement] = Field(default_factory=list, max_length=200)
     log: list[RELogEntry] = Field(default_factory=list, max_length=1_000)
-
-
-Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class JudgmentOption(BaseModel):
@@ -67,13 +64,10 @@ class JudgmentSuggestion(BaseModel):
     judgments: list[JudgmentOption] = Field(min_length=1, max_length=6)
 
 
-class ElicitJudgmentsResponse(BaseModel):
+class ElicitJudgmentsResponse(LLMTaskResponse):
     """Response from ``POST /api/judgments/elicit``."""
 
     suggestions: list[JudgmentSuggestion]
-    model: str
-    input_tokens: int = 0
-    output_tokens: int = 0
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
@@ -96,7 +90,7 @@ async def elicit_judgments(
         json_mode=True,
         json_schema=JUDGMENTS_SCHEMA,
     )
-    data = json.loads(result.text)
+    data = parse_json_object(result.text, llm.model)
     # Overwrite rather than trust: a model that scores its options despite the
     # prompt must not have those scores reach the user as if they were theirs.
     suggestions = [

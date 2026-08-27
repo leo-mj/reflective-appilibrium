@@ -22,26 +22,54 @@ export {};
  */
 
 /**
+ * One thing that happened to an element or relation, in a given round.
+ *
+ * Events are the record of how an item got to its current state: `status`,
+ * `text`, `previousText` and `reason` are the projection of this list onto
+ * "now", and {@link module:utils/stateUtils.asOfRound} projects it onto any
+ * earlier round for history playback.
+ *
+ * - `withdrawn`  — taken out of the equilibrium; carries `reason`
+ * - `reinstated` — an earlier withdrawal or rejection undone
+ * - `revised`    — text (or, for a relation, explanation) changed; carries the
+ *                  wording it had *before* this round, as `previousText`
+ * - `rejected`   — a suggestion the user declined
+ *
+ * @typedef {Object} REHistoryEvent
+ * @property {number} round
+ * @property {'withdrawn'|'reinstated'|'revised'|'rejected'} type
+ * @property {string} [reason]
+ * @property {string} [previousText]
+ */
+
+/**
  * Lifecycle status of an element.
  * - `active`    — currently in play
  * - `revised`   — text was changed in a later round; `previousText` and `revisedRound` are set
  * - `withdrawn` — removed from the equilibrium; `reason` and `withdrawnRound` are set
  * - `rejected`  — a declined LLM suggestion; `rejectedRound` is set
+ *
  * - `possible`  — pre-loaded but not yet affirmed by the user; invisible in graph and text tab
+ *
+ * Withdrawal and rejection are both reversible: reinstating returns an element to
+ * `active`, so a later argument can bring it back into play. `status` is the
+ * *current* state only — the round-by-round record lives in `history`.
  *
  * @typedef {'active'|'revised'|'withdrawn'|'rejected'|'possible'} ElementStatus
  */
 
 /**
  * How strongly the user holds an element, as a float in [0, 1].
- * Maps to node opacity and size in the graph via {@link module:constants/colors.confOp}
+ * Maps to node fill and size in the graph via {@link module:constants/colors.getColors}
  * and {@link module:utils/graphHelpers.nodeRadius}.
  *
  * @typedef {number} ConfidenceLevel
  */
 
 /**
- * The four directional relation types allowed between elements.
+ * The directional relation types allowed between elements, in two families: the
+ * dialectical four, then the inferential four that make up arguments (the set
+ * `ARGUMENT_RELATION_TYPES` in utils/stateUtils.js).
  * See `skill/re-relations-reference.md` for the full matrix of which pairs are legal.
  * - `supports`  — source provides a positive reason for target (teal arrow)
  * - `conflicts` — source and target are incompatible (orange dashed arrow)
@@ -56,6 +84,32 @@ export {};
  */
 
 // ─── Domain objects ───────────────────────────────────────────────────────────
+
+/**
+ * A work an element is attributed to, held as bibliographic fields rather than
+ * as a formatted reference — `utils/citation.js` does the APA 7 formatting.
+ *
+ * These are supplied by the model that proposed the element and are **not
+ * verified to say what the suggestion claims**; only that the work exists, and
+ * only when `doi` is set. That field is filled by the backend from Crossref and
+ * never by the model, so its presence is what records that the reference was
+ * confirmed. Its absence means nothing either way: Crossref does not index every
+ * philosophy monograph.
+ *
+ * @typedef {Object}   RESource
+ * @property {'book'|'chapter'|'article'} type - `chapter` also covers an entry in
+ *   an edited reference work.
+ * @property {string[]} authors   - Surname-first, e.g. `"Parfit, D."`.
+ * @property {string}   year      - `"1984"`, `"n.d."`, `"in press"`.
+ * @property {string}   title     - Of the work, or of the chapter or article.
+ * @property {string}   [container] - Book title for a chapter, journal for an article.
+ * @property {string[]} [editors] - Initials-first, e.g. `"E. N. Zalta"`. Chapters only.
+ * @property {string}   [publisher]
+ * @property {string}   [volume]
+ * @property {string}   [issue]
+ * @property {string}   [pages]
+ * @property {string}   [doi]     - From Crossref only. See above.
+ */
 
 /**
  * A single moral element: judgment, principle, or background theory.
@@ -77,9 +131,15 @@ export {};
  * @property {string}          [previousText]  - Original wording before revision (revised only).
  * @property {number}          [revisedRound]  - Round in which text was revised (revised only).
  * @property {string}          [reason]        - Explanation for withdrawal (withdrawn only).
- * @property {number}          [withdrawnRound] - Round in which element was withdrawn (withdrawn only).
+ * @property {REHistoryEvent[]} [history] - Everything that has happened to this element,
+ *   in round order. See {@link module:utils/stateUtils.historyOf}.
+ * @property {number}          [withdrawnRound] - Legacy single-round withdrawal, still read
+ *   from older saved states. New writes record a `history` event instead.
  * @property {number}          [rejectedRound]  - Round in which element was rejected (rejected only).
  * @property {boolean}         [negated]        - True when this element appears as a negated sentence in a rethon position (simulation only; defaults to false).
+ * @property {RESource[]}      [sources]        - Works this element is attributed to.
+ *   Absent on every element written before the theory suggestion tab existed, and on
+ *   anything the user added by hand.
  */
 
 /**
@@ -94,10 +154,13 @@ export {};
  * @property {string}        [origin]       - Who introduced it — see {@link REElement.origin} for the
  *                                           value convention. Absent on relations added before this
  *                                           field existed.
- * @property {string}        [argumentId]    - Set on `entails` relations only; all premises of the same detected argument share this ID.
+ * @property {string}        [argumentId]    - Set on the inferential relation types only; all premises of the same argument share this ID.
  * @property {ElementStatus} [status]        - Lifecycle status; absence or `"active"` means currently in play.
  * @property {number}        [revisedRound]  - Round in which this relation was last revised.
- * @property {number}        [withdrawnRound] - Round in which this relation was withdrawn.
+ * @property {REHistoryEvent[]} [history] - Everything that has happened to this relation,
+ *   tracked exactly as for elements.
+ * @property {number}        [withdrawnRound] - Legacy single-round withdrawal, still read
+ *   from older saved states.
  * @property {number}        [rejectedRound]  - Round in which this relation was rejected.
  */
 
@@ -111,6 +174,28 @@ export {};
  */
 
 /**
+ * A set of elements the user has bracketed together to tidy the graph.
+ *
+ * A view device, not part of the RE process: grouping does not advance the
+ * round, appear in the log, or enter the coherence analysis. It is distinct
+ * from the *coherent cluster* of {@link module:utils/clusterUtils}, which is
+ * computed from the relations rather than chosen.
+ *
+ * Collapsed, the group is drawn as one node and its members are not drawn at
+ * all. Relations between two members go with them; every relation crossing the
+ * group's boundary is kept and re-drawn against the group node.
+ *
+ * An element belongs to at most one group — {@link module:utils/groupUtils.createGroup}
+ * merges rather than nests.
+ *
+ * @typedef {Object} REGroup
+ * @property {string}   id        - `"G1"`, `"G2"`, …
+ * @property {string}   label     - What the hull and the chip call it.
+ * @property {string[]} members   - Element IDs.
+ * @property {boolean}  collapsed - Whether it is currently drawn as one node.
+ */
+
+/**
  * A single entry in the round-by-round audit log.
  *
  * @typedef {Object} RELogEntry
@@ -119,6 +204,29 @@ export {};
  * @property {string} options  - Adjustment options that were considered.
  * @property {string} decision - Which option the user chose.
  * @property {string} changes  - Summary of elements or relations added, revised, or withdrawn.
+ */
+
+/**
+ * One LLM reading of the process as a whole, as the user accepted it.
+ *
+ * A review is *about* the process rather than a move in it: accepting one does
+ * not advance the round or write a log entry, for the same reason the round it
+ * reports on must not change underneath it. Reviews accumulate rather than
+ * replace, oldest first, so the series reads as a commentary on the process's
+ * own development — a later review is given the earlier ones and asked to say
+ * what has moved since.
+ *
+ * @typedef {Object} REReview
+ * @property {string} id        - Unique, from {@link module:utils/stateUtils.newReviewId}.
+ * @property {number} round     - The round the process had reached when this was taken.
+ * @property {string} headline  - One sentence naming this review's through-line.
+ * @property {string} arc       - How the position moved across the rounds.
+ * @property {string} surprises - Where the process turned unexpectedly.
+ * @property {string} missed    - Coherence that was available and not taken.
+ * @property {string} method    - How the process was conducted, not what it concluded.
+ * @property {string} model     - The model that produced it, for the AI disclosure.
+ * @property {string} origin    - Provenance, per {@link REElement.origin} — the model
+ *   name, plus a user-edit marker when the review was modified before acceptance.
  */
 
 /**
@@ -134,6 +242,47 @@ export {};
  * @property {RERelation[]}  relations - All relations across all rounds.
  * @property {RECoherence}   coherence - Most recent coherence analysis.
  * @property {RELogEntry[]}  log       - Ordered list of round log entries.
+ * @property {REGroup[]}     [groups]  - The user's graph groups. Absent on every
+ *   state written before groups existed; read it through
+ *   {@link module:utils/groupUtils.groupsOf} rather than directly.
+ * @property {REReview[]}    [reviews] - Accepted process reviews, oldest first. Absent
+ *   on every state written before reviews existed; read it through
+ *   {@link module:utils/stateUtils.reviewsOf} rather than directly.
+ * @property {'questionnaire'} [model] - Present only in questionnaire mode, where the
+ *   elements and argument relations are pre-populated and the user works through
+ *   questions rather than building the graph themselves.
+ * @property {QuestionnaireSpec} [questionnaireSpec] - The questionnaire being worked
+ *   through. Present exactly when `model` is `"questionnaire"`.
+ */
+
+/**
+ * A pre-built argument graph a participant works through by answering questions.
+ *
+ * Specs live in `src/questionnaires/*.js` and are auto-discovered by
+ * {@link module:components/HomePage}. The arrays index a sentence pool: each inner
+ * array is one argument, its last entry the conclusion and the rest premises, with
+ * a negative number meaning the negation of that sentence.
+ *
+ * @typedef {Object} QuestionnaireSpec
+ * @property {string}   id    - Short identifier, used as the `origin` on generated elements.
+ * @property {string}   name
+ * @property {QuestionnaireCard} card
+ * @property {Array<{question: string, judgments: Array<{index: number, id: string, confidence: ConfidenceLevel, answer: string, text: string}>}>} suggestions
+ *   The questions and the answers offered for each. Questions whose text starts
+ *   with `"Q"` are the ones put to the participant.
+ * @property {number[][]} participantArguments - Arguments the participant's own answers activate.
+ * @property {number[][]} furtherArguments     - Arguments in the background graph.
+ */
+
+/**
+ * The home-page card that offers a questionnaire.
+ *
+ * @typedef {Object} QuestionnaireCard
+ * @property {string} title
+ * @property {string|Array<string|{link: string, href: string}>} description
+ *   Plain text, or a mixed list where objects render as inline links. Hrefs are
+ *   restricted to http(s) on import — see {@link module:utils/importMarkdown}.
+ * @property {string} buttonLabel
  */
 
 // ─── Utility / rendering types ────────────────────────────────────────────────

@@ -1,16 +1,22 @@
 /**
- * @fileoverview ClusterSection — collapsible cluster analysis section for TextTab.
+ * @fileoverview ClusterListing — the coherent-cluster half of the text panel's
+ * Coherence section.
+ *
+ * No header and no collapse of its own: tensions, orphans and clusters are all
+ * answers to "how do these commitments hang together", and splitting them
+ * across two sections asked the reader to know that a cluster is a coherence
+ * finding before they could find it.
+ *
  * @module components/TextTabClusterSection
  */
 
 /** @import { REState } from '../../types.js' */
 
 import { useContext, useMemo } from "react";
-import { C } from "../../constants/colors.js";
+import { C, clusterColor, clusterTextColor } from "../../constants/colors.js";
 import {
   findCrossClusterTensions,
   findMergeCandidates,
-  clusterColor,
 } from "../../utils/clusterUtils.js";
 import { sortElementIds } from "../../utils/stateUtils.js";
 import {
@@ -19,23 +25,14 @@ import {
   CLUSTER_CARD_STYLE,
 } from "../../constants/textTabStyles.js";
 import { Ctx } from "./TextTabContext.js";
-import { Badge, SectionHeader, Highlight } from "./TextTabCards.jsx";
+import { Badge, Highlight } from "./TextTabCards.jsx";
 
 /**
  * @param {Object}   props
  * @param {REState}  props.state
  * @param {Array}    props.clusters - Pre-computed coherent clusters from the parent.
- * @param {React.RefObject} props.clusterSectionRef
- * @param {boolean}  props.collapsed
- * @param {function} props.onToggle
  */
-export function ClusterSection({
-  state,
-  clusters,
-  clusterSectionRef,
-  collapsed,
-  onToggle,
-}) {
+export function ClusterListing({ state, clusters }) {
   const tensions = useMemo(
     () => findCrossClusterTensions(clusters, state),
     [clusters, state],
@@ -49,15 +46,21 @@ export function ClusterSection({
   if (!clusters.length) return null;
 
   return (
-    <div ref={clusterSectionRef}>
-      <SectionHeader
-        title={`Clusters (${clusters.length})`}
-        collapsed={collapsed}
-        onToggle={onToggle}
-      />
+    <>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: "bold",
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          color: C.dim,
+          marginBottom: 6,
+        }}
+      >
+        Clusters ({clusters.length})
+      </div>
 
-      {!collapsed &&
-        clusters.map((cluster, i) => {
+      {clusters.map((cluster, i) => {
           const color = clusterColor(i);
           const members = [...cluster.members].sort(sortElementIds);
           return (
@@ -76,8 +79,11 @@ export function ClusterSection({
                     fontWeight: "bold",
                     padding: "1px 7px",
                     borderRadius: 4,
+                    // Tint the chip with the cluster's fill, but write the
+                    // label in the text tone — the fills are fixed hues and
+                    // most of them fail AA as type on one theme or the other.
                     background: color + "22",
-                    color,
+                    color: clusterTextColor(i),
                     border: `1px solid ${color}55`,
                   }}
                 >
@@ -114,7 +120,7 @@ export function ClusterSection({
           );
         })}
 
-      {!collapsed && tensions.length > 0 && (
+      {tensions.length > 0 && (
         <>
           <div
             style={{
@@ -158,7 +164,7 @@ export function ClusterSection({
         </>
       )}
 
-      {!collapsed && merges.length > 0 && (
+      {merges.length > 0 && (
         <>
           <div
             style={{
@@ -196,6 +202,6 @@ export function ClusterSection({
           ))}
         </>
       )}
-    </div>
+    </>
   );
 }

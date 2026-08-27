@@ -9,12 +9,17 @@ import {
   nextElementId,
   makeDiff,
   makeLogEntry,
+  historyOf,
+  isWithdrawnNow,
+  withEvent,
   withUserEdit,
 } from "../utils/stateUtils.js";
 
 /**
  * @param {{ state, mutate, selected, setSelected, setSelectedRel, setRecentlyAdded, setRecentlyAddedRel }} deps
  */
+const RETHON_REASON = "Withdrawn by rethon equilibrium simulation.";
+
 export function useElementActions({
   state,
   mutate,
@@ -27,16 +32,33 @@ export function useElementActions({
   const [editingEl, setEditingEl] = useState(null);
   const [withdrawingId, setWithdrawingId] = useState(null);
 
+  /**
+   * Opens the revise modal on an element.
+   *
+   * Deliberately leaves the selection alone. Selection is the user's own
+   * pointer — clicking a node or a text card — and it dims everything it is not
+   * connected to; revising from a card three screens down the list would
+   * otherwise silently re-focus the graph on an element the user never picked.
+   *
+   * @param {string} elementId
+   */
   const handleEditRequest = (elementId) => {
-    setSelected(elementId);
     setEditingEl(state.elements.find((e) => e.id === elementId) ?? null);
   };
 
   const handleEditSave = (formData) => {
     const newRound = state.round + 1;
     const oldEl = editingEl;
-    // eslint-disable-next-line no-unused-vars
-    const { withdrawnRound, reason, ...oldElBase } = oldEl;
+    /* eslint-disable-next-line no-unused-vars */
+    const { withdrawnRound, reinstatedRound, withdrawals, reason, ...oldElBase } =
+      oldEl;
+    // Revising a withdrawn element brings it back, so record that too rather
+    // than silently dropping the withdrawal as the legacy fields did.
+    const history = [
+      ...historyOf(oldEl),
+      ...(isWithdrawnNow(oldEl) ? [{ round: newRound, type: "reinstated" }] : []),
+      { round: newRound, type: "revised", previousText: oldEl.text },
+    ];
     // If the text actually changed and the user didn't touch the Origin
     // field themselves, mark an LLM-authored origin as also user-edited
     // rather than silently keeping "llm" for text the user rewrote.
@@ -53,6 +75,7 @@ export function useElementActions({
       status: "revised",
       previousText: oldEl.text,
       revisedRound: newRound,
+      history,
     };
     const diffs = makeDiff(
       ["type", "confidence", "status", "origin", "text"],
@@ -76,6 +99,60 @@ export function useElementActions({
     setEditingEl(null);
   };
 
+  /**
+   * Reword one existing element in place, without going through the edit modal.
+   *
+   * Detect Arguments needs this: a user reviewing a reconstruction may find that
+   * an existing premise has to be reworded before the argument goes through, and
+   * that edit has to land on the element already in the state rather than create
+   * a new one. Records the same bookkeeping as `handleEditSave` — previousText,
+   * revisedRound, and a user-edited origin — so a rewording reached this way is
+   * indistinguishable in the history from one made in the editor.
+   *
+   * @param {string} elementId
+   * @param {string} newText
+   */
+  const handleReviseElementText = (elementId, newText) => {
+    const oldEl = state.elements.find((e) => e.id === elementId);
+    if (!oldEl || newText === oldEl.text) return;
+    const newRound = state.round + 1;
+    mutate((prev) => ({
+      ...prev,
+      round: newRound,
+      elements: prev.elements.map((e) =>
+        e.id === elementId
+          ? {
+              ...e,
+              text: newText,
+              origin: withUserEdit(e.origin),
+              status: "revised",
+              previousText: e.text,
+              revisedRound: newRound,
+              // Withdrawn premises are selectable when reconstructing an
+              // argument, so this can land on one. Bring it back first, exactly
+              // as handleEditSave does, or the withdrawal stays open in history
+              // while the status says otherwise.
+              history: withEvent(
+                isWithdrawnNow(e)
+                  ? { ...e, history: withEvent(e, { round: newRound, type: "reinstated" }) }
+                  : e,
+                { round: newRound, type: "revised", previousText: e.text },
+              ),
+            }
+          : e,
+      ),
+      log: [
+        ...prev.log,
+        makeLogEntry(
+          newRound,
+          `${elementId} was reworded by the user while accepting an argument.`,
+          "Changes applied",
+          makeDiff(["text"], oldEl, { text: newText }).join("; "),
+        ),
+      ],
+    }));
+  };
+
   const handleWithdrawRequest = (elementId) => {
     setWithdrawingId(elementId);
   };
@@ -90,7 +167,7 @@ export function useElementActions({
           ? {
               ...e,
               status: "withdrawn",
-              withdrawnRound: newRound,
+              history: withEvent(e, { round: newRound, type: "withdrawn", reason: reason ?? "" }),
               reason: reason ?? "",
               previousText: undefined,
               revisedRound: undefined,
@@ -132,12 +209,60 @@ export function useElementActions({
     setRecentlyAddedRel(null);
   };
 
+  /**
+   * Brings a withdrawn or rejected element back into play — the counterpart to
+   * withdrawing and rejecting, and what makes an argument built on such an
+   * element worth building.
+   *
+   * Recorded as an event rather than by erasing the withdrawal, so history
+   * playback still shows the element as absent for the rounds it was gone, and
+   * any number of withdraw/reinstate cycles survives.
+   *
+   * @param {string} elementId
+   */
+  const handleReinstateElement = (elementId) => {
+    const el = state.elements.find((e) => e.id === elementId);
+    if (!el || !["withdrawn", "rejected"].includes(el.status)) return;
+    const newRound = state.round + 1;
+    const wasRejected = el.status === "rejected";
+    mutate((prev) => ({
+      ...prev,
+      round: newRound,
+      elements: prev.elements.map((e) =>
+        e.id === elementId
+          ? {
+              ...e,
+              status: "active",
+              reason: undefined,
+              history: withEvent(e, { round: newRound, type: "reinstated" }),
+            }
+          : e,
+      ),
+      log: [
+        ...prev.log,
+        makeLogEntry(
+          newRound,
+          `${elementId} was ${wasRejected ? "rejected" : "withdrawn"} earlier and has been reinstated by the user.`,
+          "Reinstated",
+          `${elementId}: status → active`,
+        ),
+      ],
+    }));
+  };
+
   const handleRejectElements = (formDatas) => {
     mutate((prev) => {
       let running = prev.elements;
       const newEls = formDatas.map((fd) => {
         const id = nextElementId(running, fd.type);
-        const el = { id, status: "rejected", addedRound: prev.round, rejectedRound: prev.round, ...fd };
+        const el = {
+          id,
+          status: "rejected",
+          addedRound: prev.round,
+          rejectedRound: prev.round,
+          history: [{ round: prev.round, type: "rejected" }],
+          ...fd,
+        };
         running = [...running, el];
         return el;
       });
@@ -168,8 +293,8 @@ export function useElementActions({
         return {
           ...e,
           status: "withdrawn",
-          withdrawnRound: newRound,
-          reason: "Withdrawn by rethon equilibrium simulation.",
+          history: withEvent(e, { round: newRound, type: "withdrawn", reason: RETHON_REASON }),
+          reason: RETHON_REASON,
         };
       }),
       log: [
@@ -191,8 +316,10 @@ export function useElementActions({
     setWithdrawingId,
     handleEditRequest,
     handleEditSave,
+    handleReviseElementText,
     handleWithdrawRequest,
     handleWithdrawConfirm,
+    handleReinstateElement,
     handleAddElement,
     handleRejectElements,
     handleApplyRethonEquilibrium,

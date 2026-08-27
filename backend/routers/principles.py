@@ -6,7 +6,6 @@ existing judgments in the RE state.
 """
 
 import logging
-import json
 
 from typing import Annotated
 
@@ -14,10 +13,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from ..dependencies import get_llm_service
-from ..models.re_state import DEFAULT_CONFIDENCE, REElement
+from ..models.re_state import Confidence, DEFAULT_CONFIDENCE, REElement
 from ..services.llm import LLMService
 from ..services.prompts import build_principles_prompt
 from ..services.response_schemas import PRINCIPLES_SCHEMA
+from .shared import LLMTaskResponse, active_elements, parse_json_object
 
 router = APIRouter(prefix="/api/principles", tags=["principles"])
 logger = logging.getLogger(__name__)
@@ -31,9 +31,6 @@ class SuggestPrinciplesRequest(BaseModel):
 
     topic: str = Field(max_length=500)
     elements: list[REElement] = Field(min_length=1, max_length=200)
-
-
-Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class PrincipleSuggestion(BaseModel):
@@ -51,13 +48,10 @@ class PrincipleSuggestion(BaseModel):
     explanation: str = Field(max_length=2_000)
 
 
-class SuggestPrinciplesResponse(BaseModel):
+class SuggestPrinciplesResponse(LLMTaskResponse):
     """Response from ``POST /api/principles/suggest``."""
 
     suggestions: list[PrincipleSuggestion]
-    model: str
-    input_tokens: int = 0
-    output_tokens: int = 0
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
@@ -69,7 +63,7 @@ async def suggest_principles(
     llm: Annotated[LLMService, Depends(get_llm_service)],
 ) -> SuggestPrinciplesResponse:
     """Ask the LLM to suggest new principles that systematise existing judgments and principles."""
-    active = [e for e in request.elements if e.status not in {"withdrawn", "rejected"}]
+    active = active_elements(request.elements)
     judgments = [e for e in active if e.type == "judgment"]
     existing_principles = [e for e in active if e.type == "principle"]
 
@@ -84,7 +78,7 @@ async def suggest_principles(
         json_mode=True,
         json_schema=PRINCIPLES_SCHEMA,
     )
-    data = json.loads(result.text)
+    data = parse_json_object(result.text, llm.model)
     # Overwrite rather than trust — see the judgments router for the rationale.
     suggestions = [
         PrincipleSuggestion.model_validate({**s, "confidence": DEFAULT_CONFIDENCE})

@@ -5,10 +5,73 @@
  * @module hooks/useREActions
  */
 
-import { useState, useRef } from "react";
+import { useState, useReducer } from "react";
 import { importStateFromFile } from "../utils/importMarkdown.js";
 import { useElementActions } from "./useElementActions.js";
+import { useGroupActions } from "./useGroupActions.js";
 import { useRelationActions } from "./useRelationActions.js";
+import { useReviewActions } from "./useReviewActions.js";
+
+/** How many past states undo can reach back through. */
+const MAX_UNDO = 20;
+
+/**
+ * The RE state, the states undo can return to, and the ones redo can return to.
+ *
+ * These are one value rather than a `useState` plus a `useRef` stack because
+ * React may run a reducer — or a `setState` updater — more than once for a
+ * single dispatch: StrictMode does it deliberately, and concurrent rendering
+ * does it whenever an in-progress render is discarded and restarted. Pushing
+ * onto a ref from inside an updater is therefore not safe; it used to record
+ * two entries per edit under the StrictMode that `main.jsx` enables, so an
+ * edit could survive being undone. A reducer is pure, so re-running it is
+ * indistinguishable from running it once.
+ *
+ * @typedef {Object} REHistory
+ * @property {import('../types.js').REState}   present
+ * @property {import('../types.js').REState[]} past    Newest first, capped at MAX_UNDO.
+ * @property {import('../types.js').REState[]} future  Nearest first; what undo took away.
+ */
+
+/**
+ * @param {REHistory} hist
+ * @param {{type: 'mutate', updater: Function} | {type: 'undo'} | {type: 'redo'} | {type: 'replace', state: Object}} action
+ * @returns {REHistory}
+ */
+function historyReducer(hist, action) {
+  switch (action.type) {
+    // A new edit abandons the redo branch: the states it led to describe a
+    // future that no longer follows from where the process now is.
+    case "mutate":
+      return {
+        present: action.updater(hist.present),
+        past: [hist.present, ...hist.past].slice(0, MAX_UNDO),
+        future: [],
+      };
+    case "undo": {
+      const [prev, ...rest] = hist.past;
+      return prev
+        ? { present: prev, past: rest, future: [hist.present, ...hist.future] }
+        : hist;
+    }
+    case "redo": {
+      const [next, ...rest] = hist.future;
+      return next
+        ? {
+            present: next,
+            past: [hist.present, ...hist.past].slice(0, MAX_UNDO),
+            future: rest,
+          }
+        : hist;
+    }
+    // A freshly imported state is a new process, not a step in this one, so
+    // neither undo nor redo may reach back across it.
+    case "replace":
+      return { present: action.state, past: [], future: [] };
+    default:
+      return hist;
+  }
+}
 
 /**
  * Owns the mutable RE state and all mutation handlers.
@@ -18,18 +81,18 @@ import { useRelationActions } from "./useRelationActions.js";
  * @param {import('../types.js').REState} initialState
  */
 export function useREActions(initialState) {
-  const [state, setState] = useState(initialState);
-  const undoStack = useRef([]);
-  const MAX_UNDO = 20;
-  const [undoCount, setUndoCount] = useState(0);
+  const [hist, dispatch] = useReducer(historyReducer, {
+    present: initialState,
+    past: [],
+    future: [],
+  });
+  const state = hist.present;
 
-  const mutate = (updater) => {
-    setState((prev) => {
-      undoStack.current = [prev, ...undoStack.current].slice(0, MAX_UNDO);
-      return updater(prev);
-    });
-    setUndoCount((n) => n + 1);
-  };
+  /**
+   * Apply a pure `(prev) => next` update, recording the previous state for undo.
+   * The updater must be free of side effects — see {@link REHistory}.
+   */
+  const mutate = (updater) => dispatch({ type: "mutate", updater });
 
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
@@ -49,16 +112,29 @@ export function useREActions(initialState) {
     setRecentlyAddedRel(null);
   };
 
-  const handleUndo = () => {
-    const prev = undoStack.current[0];
-    if (!prev) return;
-    undoStack.current = undoStack.current.slice(1);
-    setUndoCount((n) => n - 1);
-    setState(prev);
-    if (selected && !prev.elements.some((e) => e.id === selected)) setSelected(null);
-    if (selectedRel && !prev.relations.some((r) => r === selectedRel)) setSelectedRel(null);
+  /** Drop a selection that the state being moved to no longer contains. */
+  const reconcileSelection = (target) => {
+    if (selected && !target.elements.some((e) => e.id === selected))
+      setSelected(null);
+    if (selectedRel && !target.relations.some((r) => r === selectedRel))
+      setSelectedRel(null);
   };
-  const canUndo = undoCount > 0;
+
+  const handleUndo = () => {
+    const prev = hist.past[0];
+    if (!prev) return;
+    dispatch({ type: "undo" });
+    reconcileSelection(prev);
+  };
+  const canUndo = hist.past.length > 0;
+
+  const handleRedo = () => {
+    const next = hist.future[0];
+    if (!next) return;
+    dispatch({ type: "redo" });
+    reconcileSelection(next);
+  };
+  const canRedo = hist.future.length > 0;
 
   const elementActions = useElementActions({
     state,
@@ -69,6 +145,15 @@ export function useREActions(initialState) {
     setRecentlyAdded,
     setRecentlyAddedRel,
   });
+
+  const groupActions = useGroupActions({
+    state,
+    mutate,
+    setSelected,
+    setSelectedRel,
+  });
+
+  const reviewActions = useReviewActions({ state, mutate });
 
   const relationActions = useRelationActions({
     state,
@@ -82,9 +167,7 @@ export function useREActions(initialState) {
 
   const handleImportFile = async (file) => {
     const newState = await importStateFromFile(file);
-    undoStack.current = [];
-    setUndoCount(0);
-    setState(newState);
+    dispatch({ type: "replace", state: newState });
     setSelected(null);
     setSelectedRel(null);
   };
@@ -154,8 +237,12 @@ export function useREActions(initialState) {
     handleSelectRel,
     handleUndo,
     canUndo,
+    handleRedo,
+    canRedo,
     ...elementActions,
     ...relationActions,
+    ...groupActions,
+    ...reviewActions,
     handleImportFile,
     handleQuestionnaireSelectAnswer,
   };

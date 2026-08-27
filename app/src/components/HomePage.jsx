@@ -5,13 +5,15 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { C } from "../constants/colors.js";
-import { useTheme } from "../hooks/useTheme.js";
+import { C, inkOn } from "../constants/colors.js";
+import { useTheme, usePalette } from "../hooks/useTheme.js";
 import {
   fetchSessions,
   loadSession,
   deleteSession,
 } from "../utils/sessionsClient.js";
+import { clearDraft, isWorthResuming, loadDraft } from "../utils/draftStorage.js";
+import { useBackendCapabilities } from "../hooks/useBackendCapabilities.js";
 import { BACKEND_ENABLED } from "../config.js";
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -28,10 +30,13 @@ const CARD_STYLE = {
   minWidth: 0,
 };
 
+// Card titles are h2s under the page h1, so the browser's default heading
+// margins have to go — the cards space themselves.
 const TITLE_STYLE = {
   fontSize: 15,
   fontWeight: "bold",
   color: C.text,
+  margin: 0,
 };
 
 const DESC_STYLE = {
@@ -82,13 +87,16 @@ function NewProcessCard({ onStart }) {
 
   return (
     <div style={{ ...CARD_STYLE, minWidth: 300 }}>
-      <div style={TITLE_STYLE}>Start your own process</div>
+      <h2 style={TITLE_STYLE}>Start your own process</h2>
       <div style={DESC_STYLE}>
         Begin a new reflective equilibrium process from scratch. <br />
         Enter a topic and start adding your moral judgments and principles.
       </div>
+      {/* The placeholder is an example, not a label — it goes as soon as you
+          type, taking the only description of the field with it. */}
       <input
         style={INPUT_STYLE}
+        aria-label="Topic of your reflective equilibrium process"
         placeholder="e.g. obligations to future generations"
         value={topic}
         onChange={(e) => setTopic(e.target.value)}
@@ -99,7 +107,7 @@ function NewProcessCard({ onStart }) {
         style={{
           ...BTN_STYLE,
           background: trimmed ? C.supports : C.border,
-          color: trimmed ? "#fff" : C.dim,
+          color: trimmed ? C.onFill : C.dim,
           cursor: trimmed ? "pointer" : "not-allowed",
         }}
         disabled={!trimmed}
@@ -107,6 +115,64 @@ function NewProcessCard({ onStart }) {
       >
         Start
       </button>
+    </div>
+  );
+}
+
+/**
+ * Offers back the work in progress this browser last held.
+ *
+ * The state otherwise lives only in React, so a refresh or a closed tab ends
+ * the session — which is the whole story on a hosted instance and on the demo,
+ * where there is no server-side store to fall back on.
+ *
+ * @param {Object}   props
+ * @param {Object}   props.draft   From draftStorage.loadDraft().
+ * @param {Function} props.onResume
+ * @param {Function} props.onDiscard
+ */
+function ResumeCard({ draft, onResume, onDiscard }) {
+  const { state, savedAt } = draft;
+  const when = savedAt
+    ? new Date(savedAt).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+  return (
+    <div style={{ ...CARD_STYLE, minWidth: 300, borderColor: C.supports }}>
+      <h2 style={TITLE_STYLE}>Continue where you left off</h2>
+      <div style={DESC_STYLE}>
+        <strong style={{ color: C.text }}>{state.topic || "Untitled"}</strong>
+        <br />
+        Round {state.round} · {state.elements.length} element
+        {state.elements.length === 1 ? "" : "s"}
+        {when ? ` · saved ${when}` : ""}
+        <br />
+        Kept in this browser only. Export it to keep a copy elsewhere.
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          style={{ ...BTN_STYLE, background: C.supports, color: C.onFill }}
+          onClick={onResume}
+        >
+          Resume
+        </button>
+        <button
+          style={{
+            ...BTN_STYLE,
+            background: "transparent",
+            border: `1px solid ${C.border}`,
+            color: C.dim,
+          }}
+          onClick={onDiscard}
+        >
+          Discard
+        </button>
+      </div>
     </div>
   );
 }
@@ -120,7 +186,7 @@ function NewProcessCard({ onStart }) {
 function SampleProcessCard({ onLoad, onTour }) {
   return (
     <div style={{ ...CARD_STYLE, minWidth: 300 }}>
-      <div style={TITLE_STYLE}>Explore the demo</div>
+      <h2 style={TITLE_STYLE}>Explore the demo</h2>
       <div style={DESC_STYLE}>
         Browse a pre-built reflective equilibrium process on obligations to
         future generations. <br /> Explore the graph, review the element
@@ -130,8 +196,8 @@ function SampleProcessCard({ onLoad, onTour }) {
         <button
           style={{
             ...BTN_STYLE,
-            background: C.principle.high,
-            color: "#fff",
+            background: C.principle.accent,
+            color: C.onFill,
           }}
           onClick={onTour}
         >
@@ -141,8 +207,8 @@ function SampleProcessCard({ onLoad, onTour }) {
           style={{
             ...BTN_STYLE,
             background: "transparent",
-            border: `1px solid ${C.supports}`,
-            color: C.supports,
+            border: `1px solid ${C.supportsText}`,
+            color: C.supportsText,
           }}
           onClick={onLoad}
         >
@@ -166,7 +232,13 @@ function renderDescription(description) {
     typeof part === "string" ? (
       part
     ) : (
-      <a key={i} href={part.href} target="_blank" style={{ color: C.dim }}>
+      <a
+        key={i}
+        href={part.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: C.dim }}
+      >
         {part.link}
       </a>
     ),
@@ -174,12 +246,19 @@ function renderDescription(description) {
 }
 
 function QuestionnaireCard({ spec, onLoad }) {
+  const palette = usePalette();
   return (
     <div style={{ ...CARD_STYLE, minWidth: 300 }}>
-      <div style={TITLE_STYLE}>{spec.card.title}</div>
+      <h2 style={TITLE_STYLE}>{spec.card.title}</h2>
       <div style={DESC_STYLE}>{renderDescription(spec.card.description)}</div>
       <button
-        style={{ ...BTN_STYLE, background: C.theory.high, color: "#fff" }}
+        // Asked for rather than named: this ink was pinned dark once, and
+        // stayed pinned when the colour under it moved.
+        style={{
+          ...BTN_STYLE,
+          background: palette.theory.high,
+          color: inkOn(palette.theory.high),
+        }}
         onClick={onLoad}
       >
         {spec.card.buttonLabel}
@@ -291,7 +370,7 @@ function SessionsCard({ onLoad }) {
             padding: "4px 12px",
             fontSize: 11,
             background: loadingId === s.session_id ? C.border : C.supports,
-            color: "#fff",
+            color: C.onFill,
           }}
           disabled={loadingId === s.session_id || deletingId === s.session_id}
           onClick={() => handleLoad(s.session_id)}
@@ -326,7 +405,7 @@ function SessionsCard({ onLoad }) {
           justifyContent: "space-between",
         }}
       >
-        <div style={TITLE_STYLE}>Saved sessions</div>
+        <h2 style={TITLE_STYLE}>Saved sessions</h2>
         {sessions !== null && (
           <button
             style={{
@@ -367,10 +446,23 @@ export function HomePage({
   onLoadSession,
 }) {
   const { isDark, toggle: toggleTheme } = useTheme();
+  const capabilities = useBackendCapabilities();
+  // Read once on mount: the draft is written by the editor, so it cannot change
+  // while this page is on screen, and re-reading would fight the Discard button.
+  const [draft, setDraft] = useState(() => loadDraft());
+  const discardDraft = () => {
+    clearDraft();
+    setDraft(null);
+  };
   return (
-    <div
+    // <main>: the landing page's one main landmark. Semantic only — it lays out
+    // exactly as the div it replaces.
+    <main
       style={{
-        minHeight: "100vh",
+        // svh, not vh: the floor has to be the viewport at its smallest, with
+        // the phone's URL bar showing, or the page is born taller than the
+        // screen and scrolls when there is nothing below the fold to reach.
+        minHeight: "100svh",
         background: C.bg,
         color: C.text,
         display: "flex",
@@ -448,9 +540,9 @@ export function HomePage({
             style={{ width: 96, height: "auto" }}
           />
         </div>
-        <div style={{ fontSize: 28, fontWeight: "bold", marginBottom: 10 }}>
+        <h1 style={{ fontSize: 28, fontWeight: "bold", margin: "0 0 10px" }}>
           Reflective APPilibrium
-        </div>
+        </h1>
         <div
           style={{ fontSize: 13, color: C.dim, maxWidth: 480, lineHeight: 1.7 }}
         >
@@ -461,7 +553,8 @@ export function HomePage({
       </div>
 
       {/* Cards */}
-      <div
+      <section
+        aria-label="Start a process"
         style={{
           display: "flex",
           gap: 20,
@@ -470,6 +563,14 @@ export function HomePage({
           flexWrap: "wrap",
         }}
       >
+        {/* First, so returning to unfinished work is the first thing offered. */}
+        {isWorthResuming(draft) && (
+          <ResumeCard
+            draft={draft}
+            onResume={() => onLoadSession(draft.state)}
+            onDiscard={discardDraft}
+          />
+        )}
         <SampleProcessCard
           onLoad={onLoadSample}
           onTour={() => {
@@ -485,8 +586,12 @@ export function HomePage({
             onLoad={() => onLoadQuestionnaire(spec)}
           />
         ))}
-        {BACKEND_ENABLED && <SessionsCard onLoad={onLoadSession} />}
-      </div>
+        {/* Only when this backend actually stores sessions — a hosted instance
+            keeps nothing, so the card would list an empty 403. */}
+        {BACKEND_ENABLED && capabilities.sessions && (
+          <SessionsCard onLoad={onLoadSession} />
+        )}
+      </section>
       <div
         style={{
           ...DESC_STYLE,
@@ -496,18 +601,23 @@ export function HomePage({
           margin: "5em 0 5em 0",
         }}
       >
-        <img src="ieit_logo.svg" style={{ width: "15em" }} />
+        <img
+          src="ieit_logo.svg"
+          alt="Institute for Ethics in IT, TU Hamburg"
+          style={{ width: "15em" }}
+        />
         <span>
           By the{" "}
           <a
             href="https://www.tuhh.de/ethics/welcome"
             target="_blank"
+            rel="noopener noreferrer"
             style={{ color: C.dim }}
           >
             Institute for Ethics in Technology (TUHH)
           </a>
         </span>
       </div>
-    </div>
+    </main>
   );
 }

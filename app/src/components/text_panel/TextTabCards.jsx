@@ -7,14 +7,26 @@
 
 import { useContext } from "react";
 import { C } from "../../constants/colors.js";
-import { CARD_STYLE, META_LABEL_STYLE, CONTENT_FONT_SIZE } from "../../constants/textTabStyles.js";
-import { relationTypeLabel } from "../../utils/stateUtils.js";
+import {
+  CARD_STYLE,
+  META_LABEL_STYLE,
+  CONTENT_FONT_SIZE,
+  cardHeader,
+  cardIdentity,
+  cardChips,
+  cardActions,
+} from "../../constants/textTabStyles.js";
+import { relationTypeLabel, statusTag } from "../../utils/stateUtils.js";
+import { groupOfElement } from "../../utils/groupUtils.js";
+import { confidenceLabel } from "../../utils/confidenceLabel.js";
 import { Ctx } from "./TextTabContext.js";
+import { Citation, CITATION_CAVEAT } from "../Citation.jsx";
 import {
   MetaChip,
   Badge,
   StatusLabel,
   ActionButtons,
+  AddedRound,
   Highlight,
 } from "./TextTabPrimitives.jsx";
 
@@ -25,13 +37,22 @@ export { Highlight, Badge, SectionHeader, StatusLabel, ActionButtons, CoherenceG
 
 export function ElementCard({ e, dim }) {
   const {
+    state,
     pCovers,
+    groups,
     onEditRequest,
     onWithdrawRequest,
+    onReinstate,
+    onSelect,
     badgeColor,
     search,
     withdrawalDeltas,
+    isWide,
   } = useContext(Ctx);
+  // Which group holds it, if any. On the canvas a collapsed group is the reason
+  // an element is not drawn at all, so a card that said nothing about it left
+  // the panel and the graph looking like they disagreed.
+  const inGroup = groupOfElement(groups ?? [], e.id);
   const isW = e.status === "withdrawn";
   const isR = e.status === "rejected";
   const isActive = e.status === "active" || e.status === "revised";
@@ -47,31 +68,35 @@ export function ElementCard({ e, dim }) {
         paddingLeft: 10,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 6,
-          marginBottom: 5,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            flexWrap: "wrap",
-          }}
-        >
-          <Badge id={e.id} />
-          <MetaChip>
-            Confidence: {typeof e.confidence === "number" ? e.confidence.toFixed(2) : e.confidence}
+      <div style={{ ...cardHeader, gap: 6, marginBottom: 5 }}>
+        <Badge id={e.id} />
+        <div style={cardChips(isWide)}>
+          <MetaChip title={confidenceLabel(e.confidence).title}>
+            Confidence: {confidenceLabel(e.confidence).text}
           </MetaChip>
-          <StatusLabel status={e.status} />
           {e.origin && <MetaChip>Origin: {e.origin}</MetaChip>}
+          <AddedRound round={e.addedRound} />
+          <StatusLabel tag={statusTag(e, state.round)} />
           {pCovers[e.id]?.length > 0 && (
             <MetaChip>covers: {pCovers[e.id].join(", ")}</MetaChip>
+          )}
+          {inGroup && (
+            <button
+              type="button"
+              onClick={() =>
+                onSelect((prev) => (prev === inGroup.id ? null : inGroup.id))
+              }
+              aria-label={`Select group ${inGroup.label}`}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                display: "flex",
+              }}
+            >
+              <MetaChip>Group: {inGroup.label}</MetaChip>
+            </button>
           )}
           {withdrawalDelta != null &&
             (() => {
@@ -97,10 +122,14 @@ export function ElementCard({ e, dim }) {
               );
             })()}
         </div>
-        <ActionButtons
-          onRevise={() => onEditRequest(e.id)}
-          onWithdraw={!isW && !isR ? () => onWithdrawRequest(e.id) : null}
-        />
+        <div style={cardActions}>
+          <ActionButtons
+            compact={isWide}
+            onRevise={() => onEditRequest(e.id)}
+            onWithdraw={!isW && !isR ? () => onWithdrawRequest(e.id) : null}
+            onReinstate={isW || isR ? () => onReinstate(e.id) : null}
+          />
+        </div>
       </div>
       <div
         style={{
@@ -117,7 +146,24 @@ export function ElementCard({ e, dim }) {
           Previously: "{e.previousText}"
         </div>
       )}
-      {e.reason && (
+      {/* Without this the reference is invisible between accepting a suggestion
+          and exporting it, which is most of the time the user spends with it.
+          The label is the same caveat the suggestion carried: the works were
+          named by a model, and a confirmed one exists without that confirming it
+          says what the element claims. */}
+      {e.sources?.length > 0 && (
+        <div style={{ ...META_LABEL_STYLE, color: C.dim }}>
+          <span title={CITATION_CAVEAT}>Sources (AI-generated):</span>
+          {e.sources.map((source, i) => (
+            <div key={i} style={{ paddingLeft: 8 }}>
+              <Citation source={source} />
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Kept on the element after reinstatement as history, but only shown
+          while it is actually withdrawn. */}
+      {isW && e.reason && (
         <div style={{ ...META_LABEL_STYLE, color: C.dim }}>
           Withdrawn: {e.reason}
         </div>
@@ -136,8 +182,10 @@ export function ArgumentCard({ rels, dim }) {
     onSelect,
     onEditRelRequest,
     onWithdrawRelRequest,
+    onReinstateRel,
     badgeColor,
     search,
+    isWide,
   } = useContext(Ctx);
   const isSel = rels.some((r) => r === selectedRel);
   const conclusionId = rels[0].to;
@@ -148,14 +196,16 @@ export function ArgumentCard({ rels, dim }) {
       {rels.map((r) => (
         <div
           key={r.from}
+          // Deliberately swallows the badges inside it: the click bubbles up
+          // here and clears the element selection they just made, so pressing
+          // one in a relation row does nothing. The row is about the relation,
+          // and selecting one of its ends from here would say the wrong thing.
           onClick={() => {
             onSelectRel((prev) => (rels.includes(prev) ? null : r));
             onSelect(() => null);
           }}
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...cardHeader,
             gap: 5,
             cursor: "pointer",
             borderRadius: 4,
@@ -164,14 +214,7 @@ export function ArgumentCard({ rels, dim }) {
             background: isSel ? `${C.border}44` : "transparent",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              flexWrap: "wrap",
-            }}
-          >
+          <div style={cardIdentity}>
             <Badge id={r.from} />
             <span
               style={{
@@ -189,13 +232,19 @@ export function ArgumentCard({ rels, dim }) {
                 : "→ jointly entails →"}
             </span>
             <Badge id={r.to} />
-            <StatusLabel status={r.status} />
           </div>
-          <div onClick={(e) => e.stopPropagation()}>
+          <div style={cardChips(isWide)}>
+            <StatusLabel tag={statusTag(r, state.round)} />
+          </div>
+          <div onClick={(e) => e.stopPropagation()} style={cardActions}>
             <ActionButtons
+              compact={isWide}
               onRevise={() => onEditRelRequest(r)}
               onWithdraw={
                 r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null
+              }
+              onReinstate={
+                r.status === "withdrawn" ? () => onReinstateRel(r) : null
               }
             />
           </div>
@@ -268,11 +317,11 @@ export function ArgumentCard({ rels, dim }) {
           <Highlight text={rels[0].explanation} query={search} />
         </div>
       )}
-      {rels[0].origin && (
-        <div style={{ marginTop: 6 }}>
-          <MetaChip>Origin: {rels[0].origin}</MetaChip>
-        </div>
-      )}
+      <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {rels[0].origin && <MetaChip>Origin: {rels[0].origin}</MetaChip>}
+        {/* One round for the whole argument: its relations are added together. */}
+        <AddedRound round={rels[0].addedRound} />
+      </div>
     </div>
   );
 }
@@ -287,8 +336,10 @@ export function RelationCard({ r, dim }) {
     onSelect,
     onEditRelRequest,
     onWithdrawRelRequest,
+    onReinstateRel,
     badgeColor,
     search,
+    isWide,
   } = useContext(Ctx);
   const fromEl = state.elements.find((e) => e.id === r.from);
   const toEl = state.elements.find((e) => e.id === r.to);
@@ -296,14 +347,13 @@ export function RelationCard({ r, dim }) {
   return (
     <div style={{ ...CARD_STYLE, opacity: dim ? 0.4 : 1 }}>
       <div
+        // As in ArgumentCard above: the badges inside are inert here on purpose.
         onClick={() => {
           onSelectRel((prev) => (prev === r ? null : r));
           onSelect(() => null);
         }}
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          ...cardHeader,
           gap: 5,
           cursor: "pointer",
           borderRadius: 4,
@@ -312,27 +362,27 @@ export function RelationCard({ r, dim }) {
           background: isSel ? `${C.border}44` : "transparent",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            flexWrap: "wrap",
-          }}
-        >
+        <div style={cardIdentity}>
           <Badge id={r.from} />
           <span style={{ color: C[r.type], fontSize: 11, fontWeight: "bold" }}>
             → {relationTypeLabel(r.type)} →
           </span>
           <Badge id={r.to} />
-          <StatusLabel status={r.status} />
-          {r.origin && <MetaChip>Origin: {r.origin}</MetaChip>}
         </div>
-        <div onClick={(e) => e.stopPropagation()}>
+        <div style={cardChips(isWide)}>
+          {r.origin && <MetaChip>Origin: {r.origin}</MetaChip>}
+          <AddedRound round={r.addedRound} />
+          <StatusLabel tag={statusTag(r, state.round)} />
+        </div>
+        <div onClick={(e) => e.stopPropagation()} style={cardActions}>
           <ActionButtons
+            compact={isWide}
             onRevise={() => onEditRelRequest(r)}
             onWithdraw={
               r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null
+            }
+            onReinstate={
+              r.status === "withdrawn" ? () => onReinstateRel(r) : null
             }
           />
         </div>

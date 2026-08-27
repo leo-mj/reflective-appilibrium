@@ -6,9 +6,13 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { scoreChanges, scorePerRound } from "../utils/simulateRethonClient.js";
 import { RoundScoresChart } from "./graphs_shared/RoundScoresChart.jsx";
-import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
+import {
+  ARGUMENT_RELATION_TYPES,
+  linkableElements,
+} from "../utils/stateUtils.js";
 import { BACKEND_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
+import { groupsOf } from "../utils/groupUtils.js";
 import { useTextTabData } from "../hooks/useTextTabData.js";
 import { useActiveSection } from "../hooks/useActiveSection.js";
 import { Ctx } from "./text_panel/TextTabContext.js";
@@ -18,36 +22,59 @@ import {
   RelationCard,
   SectionHeader,
 } from "./text_panel/TextTabCards.jsx";
-import { HighlightedSection, SectionListing } from "./text_panel/TextTabSections.jsx";
-import { ClusterSection } from "./text_panel/TextTabClusterSection.jsx";
+import {
+  HighlightedSection,
+  SectionListing,
+} from "./text_panel/TextTabSections.jsx";
+import { GroupSection } from "./text_panel/TextTabGroupSection.jsx";
 import { NavBar } from "./text_panel/TextTabNavBar.jsx";
+import { HistoryRoundBanner } from "./text_panel/TextTabPrimitives.jsx";
 import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
 import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 
 // ─── Module-level constants ───────────────────────────────────────────────────
+/**
+ * Bottom padding on the scrolling list, in px.
+ *
+ * The "↑ Top" button floats over the list at `bottom: 10` and stands about 26px
+ * tall, so this has to exceed 36 for a card never to be laid out under it.
+ */
+const TOP_BUTTON_CLEARANCE = 48;
+
+/** How far down the list must be scrolled before "↑ Top" has anything to do. */
+const TOP_BUTTON_AT = 200;
+
 
 const DEFAULT_COLLAPSED_SECTIONS = {
-  judgments: true,
+  judgments: false,
   principles: true,
   theories: true,
   arguments: true,
   relations: true,
+  groups: true,
   coherence: true,
-  clusters: true,
   log: true,
 };
 
-/** Static nav config: keys and labels only. Counts/visibility computed at runtime. */
+/**
+ * Static nav config: keys and labels only. Counts/visibility computed at
+ * runtime. `name` spells out the abbreviated labels for the accessible name —
+ * "J" reads as the letter, which says nothing about where the pill goes.
+ */
 const NAV_SECTIONS = [
-  { key: "judgments", label: "J" },
-  { key: "principles", label: "P" },
-  { key: "theories", label: "T" },
-  { key: "arguments", label: "Arguments" },
-  { key: "relations", label: "Relations" },
-  // { key: "coherence", label: "Coherence" },
-  { key: "clusters", label: "Clusters" },
-  { key: "log", label: "Log" },
+  { key: "judgments", label: "J", name: "judgments" },
+  { key: "principles", label: "P", name: "principles" },
+  { key: "theories", label: "T", name: "theories" },
+  { key: "arguments", label: "A", name: "arguments" },
+  { key: "relations", label: "R", name: "relations" },
+  // The user's own filing, before the analysis of it.
+  { key: "groups", label: "G", name: "groups" },
+  // One pill, because it is one section: tensions, orphans and clusters are
+  // all answers to how the commitments hang together. It used to be two — "!"
+  // for the findings and "C" for the clusters — which split the question.
+  { key: "coherence", label: "C", name: "coherence" },
+  { key: "log", label: "L", name: "log" },
 ];
 
 // ─── TextTab ──────────────────────────────────────────────────────────────────
@@ -64,8 +91,14 @@ export function TextTab({
   onEditRelRequest,
   onWithdrawRequest,
   onWithdrawRelRequest,
+  onReinstate,
+  onReinstateRel,
   onAddElement,
   onAddRelation,
+  onToggleGroup,
+  onEditGroupRequest,
+  onUngroup,
+  onRemoveFromGroup,
   isWide,
   clusterSectionRef,
   scrollToRelationsKey,
@@ -77,15 +110,18 @@ export function TextTab({
   hideNonEntailsRels,
   weights,
   showZScores = false,
+  historyView = null,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
+  /** Whether the list is far enough down for "↑ Top" to be worth showing. */
+  const [scrolledDown, setScrolledDown] = useState(false);
   const scrollRef = useRef(null);
   const refJudgments = useRef(null);
   const refPrinciples = useRef(null);
   const refTheories = useRef(null);
   const refArguments = useRef(null);
   const refRelations = useRef(null);
-  const refCoherence = useRef(null);
+  const refGroups = useRef(null);
   const refLog = useRef(null);
 
   // ── State ───────────────────────────────────────────────────────────────
@@ -122,6 +158,7 @@ export function TextTab({
   );
 
   useEffect(() => {
+    if (!BACKEND_ENABLED) return;
     let cancelled = false;
     scoreChanges(state, true, weights).then((result) => {
       if (cancelled || !result) return;
@@ -178,14 +215,18 @@ export function TextTab({
   const {
     pCovers,
     badgeColor,
+    badgeFill,
+    badgeTextColor,
     displayEls,
     displayRels,
     highlightedIds,
-    selectedEl,
+    selectedEls,
+    selectedGroup,
     neighbourEls,
     restEls,
     hlRels,
     restRels,
+    coherence,
     hasCoherence,
     clusters,
     clusterCount,
@@ -200,19 +241,28 @@ export function TextTab({
     recentlyAdded,
     recentlyAddedRel,
     search,
+    hideNonEntailsRels,
   });
 
+  const groups = groupsOf(state);
+
   // ── Navigation ───────────────────────────────────────────────────────────
-  const sectionRefs = {
-    judgments: refJudgments,
-    principles: refPrinciples,
-    theories: refTheories,
-    arguments: refArguments,
-    relations: refRelations,
-    coherence: refCoherence,
-    clusters: clusterSectionRef,
-    log: refLog,
-  };
+  // Stable, so useActiveSection can key its scroll listener on it.
+  const sectionRefs = useMemo(
+    () => ({
+      judgments: refJudgments,
+      principles: refPrinciples,
+      theories: refTheories,
+      arguments: refArguments,
+      relations: refRelations,
+      groups: refGroups,
+      // The merged section is what the Clusters tab scrolls to, so it keeps
+      // the ref that used to be the clusters section's.
+      coherence: clusterSectionRef,
+      log: refLog,
+    }),
+    [clusterSectionRef],
+  );
 
   const navigateTo = (key) => {
     setCollapsed((prev) => ({ ...prev, [key]: false }));
@@ -229,12 +279,7 @@ export function TextTab({
       requestAnimationFrame(() => navigateTo("relations"));
   }, [scrollToRelationsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const activeSection = useActiveSection(sectionRefs, scrollRef, [
-    selected,
-    selectedRel,
-    clusterCount,
-    state.log.length,
-  ]);
+  const activeSection = useActiveSection(sectionRefs, scrollRef);
 
   // ── Nav bar items ─────────────────────────────────────────────────────────
   // Split relations into argument groups (entails/precludes with a shared
@@ -242,7 +287,8 @@ export function TextTab({
   const argIds = new Set();
   let plainRelCount = 0;
   for (const r of displayRels) {
-    if (ARGUMENT_RELATION_TYPES.has(r.type) && r.argumentId) argIds.add(r.argumentId);
+    if (ARGUMENT_RELATION_TYPES.has(r.type) && r.argumentId)
+      argIds.add(r.argumentId);
     else plainRelCount++;
   }
   const argumentCount = argIds.size;
@@ -272,15 +318,27 @@ export function TextTab({
         !highlightedIds &&
         (hideNonEntailsRels ? displayRels.length > 0 : plainRelCount > 0),
     },
-    coherence: { count: null, show: !highlightedIds && hasCoherence },
-    clusters: { count: clusterCount || null, show: clusterCount > 0 },
+    // Shown even at zero, unlike every other pill: the section's "+" is the
+    // panel's answer to "how do I make a group", and a pill that appears only
+    // once you have one is no help to anyone who has not.
+    groups: { count: groups.length || null, show: !highlightedIds },
+    coherence: {
+      count: clusterCount || null,
+      show: !highlightedIds && (hasCoherence || clusterCount > 0),
+    },
     log: { count: state.log.length || null, show: state.log.length > 0 },
   };
-  const navItems = NAV_SECTIONS.map(({ key, label }) => ({
-    key,
-    label: key === "relations" && hideNonEntailsRels ? "Arguments" : label,
-    ...sectionMeta[key],
-  })).filter((i) => i.show);
+  const navItems = NAV_SECTIONS.map(({ key, label, name }) => {
+    // In "hide non-entails" mode the relations section holds the arguments and
+    // is titled as such, so its pill and tooltip have to follow.
+    const asArguments = key === "relations" && hideNonEntailsRels;
+    return {
+      key,
+      label: asArguments ? "A" : label,
+      name: asArguments ? "arguments" : name,
+      ...sectionMeta[key],
+    };
+  }).filter((i) => i.show);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -295,10 +353,22 @@ export function TextTab({
         onEditRelRequest,
         onWithdrawRequest,
         onWithdrawRelRequest,
+        onReinstate,
+        onReinstateRel,
         badgeColor,
+        badgeFill,
+        badgeTextColor,
         pCovers,
         search,
         withdrawalDeltas,
+        groups,
+        onToggleGroup,
+        onEditGroupRequest,
+        onUngroup,
+        onRemoveFromGroup,
+        // Cards lay their headers out differently once there is no room to put
+        // the chips and the action buttons on the same line.
+        isWide,
       }}
     >
       <div
@@ -317,25 +387,35 @@ export function TextTab({
             search={search}
             onSearch={setSearch}
             onNavigate={navigateTo}
+            isWide={isWide}
           />
         )}
 
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
           <div
             ref={scrollRef}
+            onScroll={(e) =>
+              setScrolledDown(e.currentTarget.scrollTop > TOP_BUTTON_AT)
+            }
             style={{
               overflowY: "auto",
               height: "100%",
-              padding: "0 4px 24px",
+              // The bottom padding clears the floating "↑ Top" button, which is
+              // painted over this box rather than laid out beside it. Without
+              // it the button covers whichever card is scrolled underneath.
+              padding: `0 4px ${TOP_BUTTON_CLEARANCE}px`,
               background: C.bg,
               color: C.text,
             }}
           >
+            <HistoryRoundBanner historyView={historyView} />
+
             {highlightedIds && (
               <HighlightedSection
                 selectedRel={selectedRel}
                 selected={selected}
-                selectedEl={selectedEl}
+                selectedEls={selectedEls}
+                selectedGroup={selectedGroup}
                 neighbourEls={neighbourEls}
                 hlRels={hlRels}
                 restEls={restEls}
@@ -380,22 +460,27 @@ export function TextTab({
               />
             )}
 
-            {/* {hasCoherence && (
-            <CoherenceSection
-              state={state}
-              sectionRef={refCoherence}
-              isCollapsed={isCollapsed("coherence")}
-              onToggle={() => toggle("coherence")}
-            />
-          )} */}
+            {/* The user's own filing comes before the analysis of it. */}
+            {!highlightedIds && (
+              <GroupSection
+                state={state}
+                groups={groups}
+                sectionRef={refGroups}
+                collapsed={isCollapsed("groups")}
+                onToggle={() => toggle("groups")}
+              />
+            )}
 
-            <ClusterSection
-              state={state}
-              clusters={clusters}
-              clusterSectionRef={clusterSectionRef}
-              collapsed={isCollapsed("clusters")}
-              onToggle={() => toggle("clusters")}
-            />
+            {(hasCoherence || clusterCount > 0) && (
+              <CoherenceSection
+                coherence={coherence}
+                state={state}
+                clusters={clusters}
+                sectionRef={clusterSectionRef}
+                isCollapsed={isCollapsed("coherence")}
+                onToggle={() => toggle("coherence")}
+              />
+            )}
 
             {state.log.length > 0 && (
               <LogSection
@@ -408,34 +493,38 @@ export function TextTab({
             )}
           </div>
 
-          <button
-            onClick={() =>
-              scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
-            }
-            style={{
-              zIndex: 99,
-              position: "absolute",
-              bottom: 10,
-              left: 10,
-              background: C.panel,
-              border: `1px solid ${C.border}`,
-              borderRadius: 6,
-              color: C.dim,
-              cursor: "pointer",
-              fontSize: 16,
-              padding: "3px 8px",
-            }}
-          >
-            ↑ Top
-          </button>
+          {/* Only once there is something to scroll back from: on a short or
+              empty list it would be a control that does nothing. */}
+          {scrolledDown && (
+            <button
+              onClick={() =>
+                scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+              }
+              style={{
+                zIndex: 99,
+                position: "absolute",
+                bottom: 10,
+                left: 10,
+                background: C.panel,
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                color: C.dim,
+                cursor: "pointer",
+                fontSize: 16,
+                padding: "3px 8px",
+              }}
+            >
+              ↑ Top
+            </button>
+          )}
         </div>
 
         {!isWide && (
           <MobileAddButton
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
-            elements={state.elements}
-            round={state.round}
+            elements={linkableElements(state.elements)}
+            hideNonEntailsRels={hideNonEntailsRels}
           />
         )}
 
@@ -467,7 +556,9 @@ export function TextTab({
                   width: "100%",
                 }}
               >
-                {roundScoresLoading ? "Calculating…" : "Calculate Z-scores per round"}
+                {roundScoresLoading
+                  ? "Calculating…"
+                  : "Calculate Z-scores per round"}
               </button>
             )}
           </div>

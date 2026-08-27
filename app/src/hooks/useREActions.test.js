@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
+import { StrictMode } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useREActions } from "./useREActions.js";
+import { textAtRound, isWithdrawnNow } from "../utils/stateUtils.js";
 
 vi.mock("../utils/importMarkdown.js", () => ({
   importStateFromFile: vi.fn(),
@@ -150,6 +152,61 @@ describe("handleAddRelation", () => {
     expect(rels[1].addedRound).toBe(2);
   });
 
+  it("groups an argument type under a generated argumentId", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => {
+      result.current.handleAddRelation({ from: "J1", to: "P1", type: "entails", explanation: "" });
+    });
+    expect(result.current.state.relations.at(-1).argumentId).toMatch(/^arg-/);
+  });
+
+  it("leaves a dialectical type ungrouped", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => {
+      result.current.handleAddRelation({ from: "J1", to: "P1", type: "supports", explanation: "" });
+    });
+    expect(result.current.state.relations.at(-1).argumentId).toBeUndefined();
+  });
+
+  it("keeps a caller-supplied argumentId so joint premises stay together", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => {
+      result.current.handleAddRelation({
+        from: "J1", to: "P1", type: "jointly_entails", argumentId: "arg-fixed", explanation: "",
+      });
+    });
+    expect(result.current.state.relations.at(-1).argumentId).toBe("arg-fixed");
+  });
+
+  it("pins the new relation without selecting it when pinRecent is set", () => {
+    // How the argument panels add the last premise: highlight it, but leave the
+    // user's current selection alone.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSelectNode("J1"));
+    act(() => {
+      result.current.handleAddRelation(
+        { from: "J1", to: "P1", type: "supports", explanation: "" },
+        { select: false, pinRecent: true },
+      );
+    });
+    expect(result.current.recentlyAddedRel).toMatchObject({ from: "J1", to: "P1" });
+    expect(result.current.recentlyAdded).toBeNull();
+    expect(result.current.selected).toBe("J1");
+  });
+
+  it("leaves a withdrawn endpoint withdrawn", () => {
+    // An argument may rest on a premise that was withdrawn later; recording it
+    // must not quietly bring that premise back into the position.
+    const withdrawn = makeEl({ id: "J2", status: "withdrawn", withdrawnRound: 1 });
+    const { result } = renderHook(() =>
+      useREActions(baseState({ elements: [makeEl(), withdrawn] })),
+    );
+    act(() => {
+      result.current.handleAddRelation({ from: "J2", to: "P1", type: "entails", explanation: "" });
+    });
+    expect(result.current.state.elements.find((e) => e.id === "J2")).toEqual(withdrawn);
+  });
+
   it("increments state.round and appends a log entry", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => {
@@ -286,6 +343,68 @@ describe("handleEditSave", () => {
   });
 });
 
+// ─── handleReviseElementText ──────────────────────────────────────────────────
+//
+// Used by Detect Arguments when the user rewords an existing premise so the
+// reconstruction goes through. Must record the same revision bookkeeping as the
+// edit modal, and must not fire when the text is unchanged.
+
+describe("handleReviseElementText", () => {
+  it("updates text and records the revision like handleEditSave does", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J1", "Reworded text"));
+    const el = result.current.state.elements[0];
+    expect(el.text).toBe("Reworded text");
+    expect(el.status).toBe("revised");
+    expect(el.previousText).toBe("Original text");
+    expect(el.revisedRound).toBe(2);
+    expect(result.current.state.round).toBe(2);
+  });
+
+  it("marks an LLM-authored element as user-edited", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ elements: [makeEl({ origin: "gpt-4o" })] })),
+    );
+    act(() => result.current.handleReviseElementText("J1", "Reworded text"));
+    expect(result.current.state.elements[0].origin).toBe("gpt-4o & user");
+  });
+
+  it("leaves a user-authored origin unchanged", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J1", "Reworded text"));
+    expect(result.current.state.elements[0].origin).toBe("user");
+  });
+
+  it("is a no-op when the text is unchanged", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J1", "Original text"));
+    expect(result.current.state.elements[0].status).toBe("active");
+    expect(result.current.state.round).toBe(1);
+    expect(result.current.state.log).toHaveLength(0);
+  });
+
+  it("is a no-op for an unknown element id", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J99", "Reworded text"));
+    expect(result.current.state.elements[0].text).toBe("Original text");
+    expect(result.current.state.round).toBe(1);
+  });
+
+  it("leaves other elements untouched", () => {
+    const { result } = renderHook(() =>
+      useREActions(
+        baseState({
+          elements: [makeEl(), makeEl({ id: "P1", type: "principle" })],
+        }),
+      ),
+    );
+    act(() => result.current.handleReviseElementText("J1", "Reworded text"));
+    const p1 = result.current.state.elements[1];
+    expect(p1.text).toBe("Original text");
+    expect(p1.status).toBe("active");
+  });
+});
+
 // ─── handleRelEditSave ────────────────────────────────────────────────────────
 
 describe("handleRelEditSave", () => {
@@ -330,15 +449,262 @@ describe("handleRelEditSave", () => {
   });
 });
 
+// ─── Revision history ─────────────────────────────────────────────────────────
+
+describe("revision history", () => {
+  it("keeps every wording, not just the last", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReviseElementText("J1", "Second wording"));
+    act(() => result.current.handleReviseElementText("J1", "Third wording"));
+
+    const el = result.current.state.elements[0];
+    expect(el.text).toBe("Third wording");
+    expect(el.history).toEqual([
+      { round: 2, type: "revised", previousText: "Original text" },
+      { round: 3, type: "revised", previousText: "Second wording" },
+    ]);
+    // The first wording used to be unrecoverable after the second edit.
+    expect(textAtRound(el, 1)).toBe("Original text");
+    expect(textAtRound(el, 2)).toBe("Second wording");
+    expect(textAtRound(el, 3)).toBe("Third wording");
+  });
+
+  it("brings a withdrawn element back when reworded on argument accept", () => {
+    // Withdrawn premises are selectable when reconstructing an argument, so a
+    // rewording can land on one; leaving the withdrawal open would contradict
+    // the "revised" status it gets.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawConfirm("J1", "Too broad"));
+    act(() => result.current.handleReviseElementText("J1", "Reworded"));
+
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("revised");
+    expect(el.history.map((h) => [h.round, h.type])).toEqual([
+      [2, "withdrawn"],
+      [3, "reinstated"],
+      [3, "revised"],
+    ]);
+    expect(isWithdrawnNow(el)).toBe(false);
+  });
+
+  it("records a relation's previous explanation", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.setEditingRel(result.current.state.relations[0]));
+    act(() =>
+      result.current.handleRelEditSave({
+        type: "supports",
+        explanation: "Reworded",
+      }),
+    );
+    expect(result.current.state.relations[0].history).toEqual([
+      { round: 2, type: "revised", previousText: "J1 supports P1" },
+    ]);
+  });
+
+  it("records reinstatement when a withdrawn element is revised", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawConfirm("J1", "Too broad"));
+    act(() => result.current.handleEditRequest("J1"));
+    act(() =>
+      result.current.handleEditSave({
+        type: "judgment",
+        confidence: 1.0,
+        origin: "user",
+        text: "Reworded",
+      }),
+    );
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("revised");
+    expect(el.history.map((h) => [h.round, h.type])).toEqual([
+      [2, "withdrawn"],
+      [3, "reinstated"],
+      [3, "revised"],
+    ]);
+  });
+});
+
+// ─── handleApplyRethonEquilibrium ─────────────────────────────────────────────
+
+describe("handleApplyRethonEquilibrium", () => {
+  const state = () =>
+    baseState({
+      elements: [
+        makeEl({ id: "J1" }),
+        makeEl({ id: "J2" }),
+        makeEl({ id: "J3", status: "withdrawn", withdrawnRound: 1 }),
+        makeEl({ id: "J4", status: "rejected", rejectedRound: 1 }),
+      ],
+    });
+  const byId = (result, id) =>
+    result.current.state.elements.find((e) => e.id === id);
+
+  it("withdraws everything outside the commitment set", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    expect(byId(result, "J1").status).toBe("active");
+    expect(byId(result, "J2").status).toBe("withdrawn");
+    expect(byId(result, "J2").reason).toMatch(/rethon/i);
+  });
+
+  it("records the withdrawal as an event", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    expect(byId(result, "J2").history).toEqual([
+      { round: 2, type: "withdrawn", reason: expect.stringMatching(/rethon/i) },
+    ]);
+  });
+
+  it("leaves already-withdrawn and rejected elements untouched", () => {
+    const before = state();
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    expect(byId(result, "J3")).toEqual(before.elements[2]);
+    expect(byId(result, "J4")).toEqual(before.elements[3]);
+  });
+
+  it("bumps the round and logs what was retained", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    expect(result.current.state.round).toBe(2);
+    expect(result.current.state.log.at(-1).changes).toContain("J1");
+  });
+});
+
+// ─── handleDeleteRelationsByArgId ─────────────────────────────────────────────
+
+describe("handleDeleteRelationsByArgId", () => {
+  const argRels = () => [
+    makeRel({ from: "J1", type: "jointly_entails", argumentId: "arg-1" }),
+    makeRel({ from: "J2", type: "jointly_entails", argumentId: "arg-1" }),
+    makeRel({ from: "J3", type: "supports", argumentId: "arg-1" }),
+    makeRel({ from: "J4", type: "jointly_entails", argumentId: "arg-2" }),
+  ];
+
+  it("removes only the argument relations of that argument", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ relations: argRels() })),
+    );
+    act(() => result.current.handleDeleteRelationsByArgId("arg-1"));
+    expect(result.current.state.relations.map((r) => r.from)).toEqual([
+      // The `supports` relation shares the id but is not part of the argument.
+      "J3",
+      "J4",
+    ]);
+  });
+
+  it("clears the selection when the deleted argument was selected", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ relations: argRels() })),
+    );
+    act(() => result.current.handleSelectRel(result.current.state.relations[0]));
+    expect(result.current.selectedRel).not.toBeNull();
+    act(() => result.current.handleDeleteRelationsByArgId("arg-1"));
+    expect(result.current.selectedRel).toBeNull();
+  });
+
+  it("does not bump the round — deletion is not a revision", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ relations: argRels() })),
+    );
+    act(() => result.current.handleDeleteRelationsByArgId("arg-1"));
+    expect(result.current.state.round).toBe(1);
+  });
+});
+
+// ─── handleReinstateElement ───────────────────────────────────────────────────
+
+describe("handleReinstateElement", () => {
+  const withdrawn = () =>
+    makeEl({ id: "J1", status: "withdrawn", withdrawnRound: 2, reason: "Too broad" });
+  const rejected = () =>
+    makeEl({ id: "J1", status: "rejected", rejectedRound: 2 });
+
+  it("returns a withdrawn element to active and records the event", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [withdrawn()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("active");
+    // The legacy round is migrated into the list, so history is kept.
+    expect(el.history).toEqual([
+      { round: 2, type: "withdrawn", reason: "Too broad" },
+      { round: 5, type: "reinstated" },
+    ]);
+  });
+
+  it("returns a rejected element to active, keeping the rejection in history", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [rejected()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("active");
+    expect(el.history).toEqual([
+      { round: 2, type: "rejected" },
+      { round: 5, type: "reinstated" },
+    ]);
+  });
+
+  it("increments the round and logs the decision", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [withdrawn()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    expect(result.current.state.round).toBe(5);
+    expect(result.current.state.log.at(-1).decision).toBe("Reinstated");
+  });
+
+  it("ignores elements that are already in play", () => {
+    const { result } = renderHook(() => useREActions(baseState({ round: 4 })));
+    act(() => result.current.handleReinstateElement("J1"));
+    expect(result.current.state.round).toBe(4);
+    expect(result.current.state.log).toHaveLength(0);
+  });
+
+  it("ignores an unknown id", () => {
+    const { result } = renderHook(() => useREActions(baseState({ round: 4 })));
+    act(() => result.current.handleReinstateElement("J99"));
+    expect(result.current.state.round).toBe(4);
+  });
+
+  it("records every withdraw/reinstate cycle", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [withdrawn()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    act(() => result.current.handleWithdrawConfirm("J1", "changed my mind"));
+    act(() => result.current.handleReinstateElement("J1"));
+    const el = result.current.state.elements[0];
+    expect(el.status).toBe("active");
+    expect(el.history.map((h) => [h.round, h.type])).toEqual([
+      [2, "withdrawn"],
+      [5, "reinstated"],
+      [6, "withdrawn"],
+      [7, "reinstated"],
+    ]);
+  });
+
+  it("does not reopen a closed period when reinstated twice", () => {
+    const { result } = renderHook(() =>
+      useREActions(baseState({ round: 4, elements: [withdrawn()] })),
+    );
+    act(() => result.current.handleReinstateElement("J1"));
+    const after = result.current.state.elements[0].history;
+    act(() => result.current.handleReinstateElement("J1"));
+    expect(result.current.state.elements[0].history).toEqual(after);
+  });
+});
+
 // ─── handleWithdrawConfirm ────────────────────────────────────────────────────
 
 describe("handleWithdrawConfirm", () => {
-  it("sets element status to 'withdrawn' with withdrawnRound and reason", () => {
+  it("sets element status to 'withdrawn' with an event and reason", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleWithdrawConfirm("J1", "No longer relevant"));
     const el = result.current.state.elements[0];
     expect(el.status).toBe("withdrawn");
-    expect(el.withdrawnRound).toBe(2);
+    expect(el.history).toEqual([{ round: 2, type: "withdrawn", reason: "No longer relevant" }]);
     expect(el.reason).toBe("No longer relevant");
   });
 
@@ -389,16 +755,67 @@ describe("handleWithdrawConfirm", () => {
   });
 });
 
+// ─── handleReinstateRelation ──────────────────────────────────────────────────
+
+describe("handleReinstateRelation", () => {
+  it("returns a withdrawn relation to active and records the event", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawRelRequest(result.current.state.relations[0]));
+    act(() => result.current.handleReinstateRelation(result.current.state.relations[0]));
+    const rel = result.current.state.relations[0];
+    expect(rel.status).toBe("active");
+    expect(rel.history).toEqual([
+      { round: 2, type: "withdrawn" },
+      { round: 3, type: "reinstated" },
+    ]);
+  });
+
+  it("ignores a relation that is not withdrawn", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleReinstateRelation(result.current.state.relations[0]));
+    expect(result.current.state.round).toBe(1);
+    expect(result.current.state.log).toHaveLength(0);
+  });
+
+  it("reinstates every relation of an argument together", () => {
+    const argRels = [
+      makeRel({ from: "J1", to: "P1", type: "jointly_entails", argumentId: "arg-1" }),
+      makeRel({ from: "J2", to: "P1", type: "jointly_entails", argumentId: "arg-1" }),
+    ];
+    const { result } = renderHook(() =>
+      useREActions(baseState({ relations: argRels })),
+    );
+    act(() => result.current.handleWithdrawRelRequest(result.current.state.relations[0]));
+    expect(result.current.state.relations.every((r) => r.status === "withdrawn")).toBe(true);
+
+    act(() => result.current.handleReinstateRelation(result.current.state.relations[0]));
+    expect(result.current.state.relations.every((r) => r.status === "active")).toBe(true);
+    for (const r of result.current.state.relations) {
+      expect(r.history).toEqual([
+        { round: 2, type: "withdrawn" },
+        { round: 3, type: "reinstated" },
+      ]);
+    }
+  });
+
+  it("logs the decision", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawRelRequest(result.current.state.relations[0]));
+    act(() => result.current.handleReinstateRelation(result.current.state.relations[0]));
+    expect(result.current.state.log.at(-1).decision).toBe("Reinstated");
+  });
+});
+
 // ─── handleWithdrawRelRequest ─────────────────────────────────────────────────
 
 describe("handleWithdrawRelRequest", () => {
-  it("sets relation status to 'withdrawn' with withdrawnRound", () => {
+  it("sets relation status to 'withdrawn' and records the event", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     const rel = result.current.state.relations[0];
     act(() => result.current.handleWithdrawRelRequest(rel));
     const updated = result.current.state.relations[0];
     expect(updated.status).toBe("withdrawn");
-    expect(updated.withdrawnRound).toBe(2);
+    expect(updated.history).toEqual([{ round: 2, type: "withdrawn" }]);
   });
 
   it("increments state.round and appends a log entry with decision 'Withdrawn'", () => {
@@ -625,6 +1042,189 @@ describe("handleUndo / canUndo", () => {
   });
 });
 
+// ─── handleRedo / canRedo ────────────────────────────────────────────────────
+
+describe("handleRedo / canRedo", () => {
+  const addEl = (result, text) =>
+    act(() =>
+      result.current.handleAddElement({
+        type: "judgment",
+        text,
+        confidence: 1.0,
+        origin: "user",
+      }),
+    );
+
+  it("canRedo is false until something has been undone", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    expect(result.current.canRedo).toBe(false);
+    addEl(result, "a");
+    expect(result.current.canRedo).toBe(false);
+  });
+
+  it("canRedo is true after an undo", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    expect(result.current.canRedo).toBe(true);
+  });
+
+  it("restores the state the undo took away", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(0);
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements).toHaveLength(1);
+    expect(result.current.state.elements[0].text).toBe("a");
+  });
+
+  it("walks back and forth over several edits", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    addEl(result, "b");
+    addEl(result, "c");
+
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
+
+    act(() => result.current.handleRedo());
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements).toHaveLength(3);
+    expect(result.current.canRedo).toBe(false);
+  });
+
+  it("does nothing when there is nothing to redo", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements).toHaveLength(1);
+  });
+
+  it("a new edit abandons the redo branch", () => {
+    // The undone states describe a future that no longer follows from here.
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    addEl(result, "b");
+    act(() => result.current.handleUndo());
+    expect(result.current.canRedo).toBe(true);
+
+    addEl(result, "c");
+    expect(result.current.canRedo).toBe(false);
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements.map((e) => e.text)).toEqual(["a", "c"]);
+  });
+
+  it("redo is still available after an undo that followed a redo", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleRedo());
+    act(() => result.current.handleUndo());
+    expect(result.current.canRedo).toBe(true);
+    expect(result.current.state.elements).toHaveLength(0);
+  });
+
+  it("importing a file clears both directions", () => {
+    // A new process is not a step in this one.
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    expect(result.current.canRedo).toBe(true);
+
+    importStateFromFile.mockResolvedValue(baseState({ elements: [] }));
+    return act(() => result.current.handleImportFile(new Blob())).then(() => {
+      expect(result.current.canRedo).toBe(false);
+      expect(result.current.canUndo).toBe(false);
+    });
+  });
+
+  it("clears a selection the redone state does not contain", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })));
+    addEl(result, "a");
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleSelectNode("J1"));
+    // J1 exists again after the redo, so the selection should survive it.
+    act(() => result.current.handleRedo());
+    expect(result.current.selected).toBe("J1");
+  });
+
+  it("works under StrictMode", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })), {
+      wrapper: StrictMode,
+    });
+    addEl(result, "a");
+    addEl(result, "b");
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleRedo());
+    act(() => result.current.handleRedo());
+    expect(result.current.state.elements).toHaveLength(2);
+  });
+});
+
+// ─── handleUndo under updater re-invocation ──────────────────────────────────
+
+// main.jsx renders the app inside StrictMode, which deliberately runs state
+// updaters twice; concurrent React may also re-run one when it discards an
+// in-progress render. Anything the update does besides computing the next state
+// therefore happens more often than the edit did. The undo stack used to be a
+// ref pushed to from inside the updater, so each edit recorded two entries while
+// the counter recorded one, and an edit could survive being undone.
+//
+// The rest of this file renders without a wrapper, which is exactly the
+// condition under which that bug is invisible — hence a StrictMode pass here.
+describe("handleUndo / canUndo under StrictMode", () => {
+  const addN = (result, n) => {
+    for (let i = 0; i < n; i++) {
+      act(() =>
+        result.current.handleAddElement({
+          type: "judgment",
+          text: `x${i}`,
+          confidence: 1.0,
+          origin: "user",
+        }),
+      );
+    }
+  };
+
+  it("records one undo step per edit, not one per updater call", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })), {
+      wrapper: StrictMode,
+    });
+    addN(result, 3);
+    expect(result.current.state.elements).toHaveLength(3);
+
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleUndo());
+    act(() => result.current.handleUndo());
+
+    expect(result.current.state.elements).toHaveLength(0);
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("still reverts exactly one edit per undo", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })), {
+      wrapper: StrictMode,
+    });
+    addN(result, 2);
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
+  });
+
+  it("still caps the stack at MAX_UNDO (20)", () => {
+    const { result } = renderHook(() => useREActions(baseState({ elements: [] })), {
+      wrapper: StrictMode,
+    });
+    addN(result, 21);
+    for (let i = 0; i < 20; i++) act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
+  });
+});
+
 // ─── handleSelectNode / handleSelectRel ──────────────────────────────────────
 
 describe("handleSelectNode", () => {
@@ -696,11 +1296,27 @@ describe("handleSelectRel", () => {
 // ─── handleEditRequest ────────────────────────────────────────────────────────
 
 describe("handleEditRequest", () => {
-  it("sets selected and editingEl to the matching element", () => {
+  it("sets editingEl to the matching element", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleEditRequest("J1"));
-    expect(result.current.selected).toBe("J1");
     expect(result.current.editingEl).toEqual(result.current.state.elements[0]);
+  });
+
+  it("leaves the selection alone", () => {
+    // Selection follows the user's pointer only — a click on a node or a text
+    // card. Revising is not a click on the element.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleEditRequest("J1"));
+    expect(result.current.selected).toBeNull();
+  });
+
+  it("does not deselect whatever the user had selected", () => {
+    // `handleSelectNode` is the one path selection comes from — it is what
+    // `onSelect` is wired to on both the graph and the text panel.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSelectNode("J1"));
+    act(() => result.current.handleEditRequest("J1"));
+    expect(result.current.selected).toBe("J1");
   });
 
   it("resets editingEl to null when element id is not found", () => {
@@ -736,5 +1352,335 @@ describe("handleImportFile", () => {
     expect(result.current.canUndo).toBe(false);
     expect(result.current.selected).toBeNull();
     expect(result.current.selectedRel).toBeNull();
+  });
+});
+
+// ─── Groups ───────────────────────────────────────────────────────────────────
+
+describe("review actions", () => {
+  const aReview = (overrides = {}) => ({
+    headline: "The centre moved.",
+    arc: "How it moved.",
+    surprises: "What turned.",
+    missed: "What was left.",
+    method: "How it was done.",
+    model: "gpt-4o",
+    origin: "gpt-4o",
+    ...overrides,
+  });
+
+  it("stamps a saved review with an id and the current round", () => {
+    const { result } = renderHook(() => useREActions(baseState({ round: 5 })));
+    act(() => result.current.handleSaveReview(aReview()));
+
+    expect(result.current.state.reviews).toHaveLength(1);
+    expect(result.current.state.reviews[0]).toMatchObject({
+      round: 5,
+      headline: "The centre moved.",
+      origin: "gpt-4o",
+    });
+    expect(result.current.state.reviews[0].id).toMatch(/^rev-/);
+  });
+
+  it("appends rather than replaces", () => {
+    // The series is the feature: a later review is given the earlier ones and
+    // asked what has moved since, so replacing on accept would cut the thread
+    // every time it was used.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSaveReview(aReview({ headline: "First." })));
+    act(() => result.current.handleSaveReview(aReview({ headline: "Second." })));
+
+    expect(result.current.state.reviews.map((r) => r.headline)).toEqual([
+      "First.",
+      "Second.",
+    ]);
+  });
+
+  it("works on a state written before reviews existed", () => {
+    const before = baseState();
+    delete before.reviews;
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleSaveReview(aReview()));
+
+    expect(result.current.state.reviews).toHaveLength(1);
+  });
+
+  it("discards by id, leaving the rest of the series", () => {
+    // Keyed on id, not round: two reviews can share a round, since nothing stops
+    // a second run before the next change.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSaveReview(aReview({ headline: "First." })));
+    act(() => result.current.handleSaveReview(aReview({ headline: "Second." })));
+    const firstId = result.current.state.reviews[0].id;
+    act(() => result.current.handleDiscardReview(firstId));
+
+    expect(result.current.state.reviews.map((r) => r.headline)).toEqual(["Second."]);
+  });
+
+  it("does not advance the round or write to the log", () => {
+    // A review is a reading *of* the process. Logging one as a change would
+    // alter the record it describes, and would then reach the next review's
+    // timeline as though it were a move in the argument. Not bumping the round
+    // is also what makes running a review mid-process safe.
+    const { result } = renderHook(() => useREActions(baseState({ round: 3 })));
+    act(() => result.current.handleSaveReview(aReview()));
+    const id = result.current.state.reviews[0].id;
+    act(() => result.current.handleDiscardReview(id));
+
+    expect(result.current.state.round).toBe(3);
+    expect(result.current.state.log).toEqual([]);
+  });
+
+  it("leaves the elements and relations untouched", () => {
+    const before = baseState();
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleSaveReview(aReview()));
+
+    expect(result.current.state.elements).toEqual(before.elements);
+    expect(result.current.state.relations).toEqual(before.relations);
+  });
+
+  it("is undoable", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleSaveReview(aReview()));
+    expect(result.current.canUndo).toBe(true);
+    act(() => result.current.handleUndo());
+    expect(result.current.state.reviews ?? []).toEqual([]);
+  });
+});
+
+describe("group actions", () => {
+  const twoElements = () =>
+    baseState({
+      elements: [makeEl(), makeEl({ id: "J2" }), makeEl({ id: "J3" })],
+      relations: [],
+    });
+
+  it("groups the elements it is given", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+
+    expect(result.current.state.groups).toEqual([
+      { id: "G1", label: "Group 1", members: ["J1", "J2"], collapsed: true },
+    ]);
+  });
+
+  it("does not advance the round or write to the log", () => {
+    // Grouping is a view device. The log is the record of the RE process —
+    // what was accepted, revised, withdrawn, and why — and tidying the canvas
+    // is none of those.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleToggleGroup("G1"));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1", "J2"],
+      }),
+    );
+
+    expect(result.current.state.round).toBe(1);
+    expect(result.current.state.log).toEqual([]);
+  });
+
+  it("leaves the elements themselves untouched", () => {
+    const before = twoElements();
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleToggleGroup("G1"));
+
+    expect(result.current.state.elements).toEqual(before.elements);
+  });
+
+  it("ignores a selection of fewer than two elements", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1"]));
+    expect(result.current.state.groups ?? []).toEqual([]);
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("expands, renames and dissolves", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    expect(result.current.state.groups[0].collapsed).toBe(true);
+
+    act(() => result.current.handleToggleGroup("G1"));
+    expect(result.current.state.groups[0].collapsed).toBe(false);
+
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1", "J2"],
+      }),
+    );
+    expect(result.current.state.groups[0].label).toBe("Duties");
+    // Editing does not re-collapse what the user just expanded.
+    expect(result.current.state.groups[0].collapsed).toBe(false);
+    expect(result.current.editingGroup).toBeNull();
+
+    act(() => result.current.handleUngroup("G1"));
+    expect(result.current.state.groups).toEqual([]);
+    // Dissolving the group leaves its members exactly where they were.
+    expect(result.current.state.elements).toHaveLength(3);
+  });
+
+  it("changes membership from the dialog, moving elements between groups", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+
+    // An exact list, unlike a canvas selection: J3 joins and J1 leaves.
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J2", "J3"],
+      }),
+    );
+    expect(result.current.state.groups[0].members).toEqual(["J2", "J3"]);
+  });
+
+  it("keeps hold of the group it just saved", () => {
+    // The chip is drawn only for the selection, so dropping it here took the
+    // handles away from under the hand that had opened the dialog.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1", "J2", "J3"],
+      }),
+    );
+    expect(result.current.selected).toBe("G1");
+  });
+
+  it("selects a group created from the dialog", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: null,
+        label: "Duties",
+        members: ["J1", "J2"],
+      }),
+    );
+    expect(result.current.selected).toBe("G1");
+  });
+
+  it("has nothing to hold on to when the save dissolves the group", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleSelectNode(() => "G1"));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1"],
+      }),
+    );
+    expect(result.current.selected).toBeNull();
+  });
+
+  it("creates a group from the dialog when it is given no id", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: null,
+        label: "Duties",
+        members: ["J1", "J3"],
+      }),
+    );
+    expect(result.current.state.groups).toEqual([
+      { id: "G1", label: "Duties", members: ["J1", "J3"], collapsed: true },
+    ]);
+  });
+
+  it("dissolves a group saved with fewer than two members", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Duties",
+        members: ["J1"],
+      }),
+    );
+    expect(result.current.state.groups).toEqual([]);
+  });
+
+  it("takes one element out from the panel's member list", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2", "J3"]));
+    act(() => result.current.handleRemoveFromGroup("J2"));
+    expect(result.current.state.groups[0].members).toEqual(["J1", "J3"]);
+  });
+
+  it("opens the dialog on a group, or on nothing to make one", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleEditGroupRequest());
+    expect(result.current.editingGroup).toBe("new");
+
+    act(() => result.current.setEditingGroup(null));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleEditGroupRequest("G1"));
+    expect(result.current.editingGroup).toMatchObject({ id: "G1" });
+  });
+
+  it("is undoable like any other edit", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    expect(result.current.canUndo).toBe(true);
+
+    act(() => result.current.handleUndo());
+    expect(result.current.state.groups ?? []).toEqual([]);
+  });
+
+  it("keeps hold of a group while it is being opened", () => {
+    // Expanding replaces the group's node with its members, but the group is
+    // still what the user has hold of — dropping it here would take the handle
+    // to close it again off the canvas at the moment of reaching for it.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleSelectNode(() => "G1"));
+
+    act(() => result.current.handleToggleGroup("G1"));
+    expect(result.current.state.groups[0].collapsed).toBe(false);
+    expect(result.current.selected).toBe("G1");
+  });
+
+  it("lets go of a group as it is closed", () => {
+    // Closing one is putting it away. Its handles are drawn for the selection,
+    // and leaving them up over a tidied-away group is the clutter that
+    // collapsing was asked to remove.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleToggleGroup("G1", false));
+    act(() => result.current.handleSelectNode(() => "G1"));
+
+    act(() => result.current.handleToggleGroup("G1"));
+    expect(result.current.state.groups[0].collapsed).toBe(true);
+    expect(result.current.selected).toBeNull();
+  });
+
+  it("leaves another selection alone when a group closes", () => {
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleToggleGroup("G1", false));
+    act(() => result.current.handleSelectNode(() => "J3"));
+
+    act(() => result.current.handleToggleGroup("G1"));
+    expect(result.current.selected).toBe("J3");
+  });
+
+  it("drops a selection pointing at a group that is going away", () => {
+    // Selection dims everything it is not connected to, so it must never be
+    // left on something the canvas has stopped drawing at all.
+    const { result } = renderHook(() => useREActions(twoElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    act(() => result.current.handleSelectNode(() => "G1"));
+
+    act(() => result.current.handleUngroup("G1"));
+    expect(result.current.selected).toBeNull();
   });
 });

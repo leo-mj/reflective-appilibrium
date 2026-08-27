@@ -9,9 +9,9 @@ import { C } from "../../constants/colors.js";
 
 export const SCORE_SERIES = [
   { key: "z", label: "Z-score", color: C.supports, width: 1 },
-  { key: "account", label: "Account", color: C.judgment.high, width: 0.5 },
-  { key: "systematicity", label: "Systematicity", color: C.principle.high, width: 0.5 },
-  { key: "faithfulness", label: "Faithfulness", color: C.theory.high, width: 0.5 },
+  { key: "account", label: "Account", color: C.judgment.accent, width: 0.5 },
+  { key: "systematicity", label: "Systematicity", color: C.principle.accent, width: 0.5 },
+  { key: "faithfulness", label: "Faithfulness", color: C.theory.accent, width: 0.5 },
 ];
 
 /**

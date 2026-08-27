@@ -14,6 +14,7 @@ import {
   nextElementId,
   argumentRelationType,
   argumentPostulateExplanation,
+  newArgumentId,
   withUserEdit,
   llmOrigin,
 } from "../../utils/stateUtils.js";
@@ -26,21 +27,28 @@ import {
   ErrorBanner,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
-import { AddArgumentPanel } from "../user_edits/WorkflowAddPanels.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
-import { ProgressWorkflowBtn } from "./workflowComponents.jsx";
+import { ProgressWorkflowBtn, ToolbarStrip } from "./workflowComponents.jsx";
+import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
+import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 
-const ACCENT = C.judgment.high;
+const ACCENT = C.judgment.accent;
+/** The same accent where it is type rather than a shape — see index.css. */
+const ACCENT_TEXT = C.judgment.text;
+
+// The header strip carries the entails green — what this tab produces — while
+// the added-premise badges keep ACCENT: those are about the judgments being
+// added, not about the arrows the argument becomes. See useHeaderAccent.
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function elementColor(type) {
   return type === "judgment"
-    ? C.judgment.high
+    ? C.judgment.accent
     : type === "principle"
-      ? C.principle.high
-      : C.theory.high;
+      ? C.principle.accent
+      : C.theory.accent;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -92,7 +100,7 @@ function IdBadge({ element, isAdded = false }) {
 }
 
 function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
-  const isEditing = isAdded && onDraftChange != null;
+  const isEditing = onDraftChange != null;
   return (
     <div
       style={{
@@ -128,7 +136,7 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
           {isAdded && (
             <span
               style={{
-                color: ACCENT,
+                color: ACCENT_TEXT,
                 fontSize: 10,
                 fontStyle: "italic",
                 marginLeft: 6,
@@ -150,6 +158,8 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
  * @param {string[]} props.postulates  Meaning-postulate texts this argument relies on.
  * @param {{status:'accepted'|'rejected', argumentId?:string}|undefined} props.decision
  * @param {Object|null} props.editingDrafts  Map premiseId→text, or null if not editing.
+ *   Covers every premise, added and existing alike: an existing premise may need
+ *   rewording before the reconstruction goes through.
  * @param {Function} props.onAccept
  * @param {Function} props.onReject
  * @param {Function} props.onModify
@@ -172,7 +182,6 @@ function ArgumentCard({
 }) {
   const conclusion = argument.at(-1);
   const premises = argument.slice(0, -1);
-  const hasAddedPremises = argument.some((el) => addedIds.has(el.id));
   const isEditing = editingDrafts != null;
   const isAccepted = decision?.status === "accepted";
   const isRejected = decision?.status === "rejected";
@@ -195,11 +204,7 @@ function ArgumentCard({
           element={p}
           isAdded={addedIds.has(p.id)}
           draft={editingDrafts?.[p.id]}
-          onDraftChange={
-            isEditing && addedIds.has(p.id)
-              ? (text) => onModifyChange(p.id, text)
-              : null
-          }
+          onDraftChange={isEditing ? (text) => onModifyChange(p.id, text) : null}
         />
       ))}
       <div
@@ -267,18 +272,20 @@ function ArgumentCard({
             </button>
           </>
         ) : isEditing ? (
+          // Accept-then-modify-slot ordering, matching the other suggestion tabs.
           <>
-            <CancelButton onClick={onModifyCancel} />
             <AcceptButton
               onClick={() => onAccept(editingDrafts)}
               accentColor={ACCENT}
             />
+            <RejectButton onClick={onReject} />
+            <CancelButton onClick={onModifyCancel} />
           </>
         ) : (
           <>
-            {hasAddedPremises && <ModifyButton onClick={onModify} />}
-            <RejectButton onClick={onReject} />
             <AcceptButton onClick={() => onAccept({})} accentColor={ACCENT} />
+            <RejectButton onClick={onReject} />
+            <ModifyButton onClick={onModify} />
           </>
         )}
       </div>
@@ -293,6 +300,8 @@ function ArgumentCard({
  * @param {REState}  props.state
  * @param {boolean}  [props.useDummy]
  * @param {Function} [props.onAddElement]
+ * @param {Function} [props.onReviseElementText]  (elementId, text) — rewords an
+ *   element already in the state, recorded as a revision.
  * @param {Function} [props.onAddRelation]
  * @param {Function} [props.onDeleteRelationsByArgId]
  */
@@ -301,14 +310,16 @@ export function DetectArgumentsTab({
   useDummy = false,
   verifyArguments = true,
   onAddElement,
+  onReviseElementText,
   onAddRelation,
   onDeleteRelationsByArgId,
   autoFetch,
   workflowPhase,
+  workflowNextPhase,
   onAdvanceWorkflow,
   nextPhaseIsEnabled,
-  hideNonEntailsRels,
 }) {
+  const header = useHeaderAccent("detectArguments");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -394,13 +405,25 @@ export function DetectArgumentsTab({
       }
     }
 
+    // A premise that already exists in the state is reworded in place rather
+    // than duplicated: the user is fixing the wording of the element they
+    // already hold, so the edit has to land on it and be recorded as a revision.
+    // Only premises are editable, so the conclusion never reaches this loop.
+    for (const el of premises) {
+      if (addedIds.has(el.id)) continue;
+      const editedText = drafts?.[el.id];
+      if (editedText != null && editedText !== el.text) {
+        onReviseElementText?.(el.id, editedText);
+      }
+    }
+
     // Resolve the frontend ID for each element (original for existing, assigned for added).
     const resolveId = (el) =>
       addedIds.has(el.id) ? newSubmittedIds[el.id] : el.id;
 
     // Add one relation per premise → conclusion, grouped by a shared argumentId.
     // Single-premise args use entails/precludes; multi-premise use jointly_entails/jointly_precludes.
-    const argumentId = `arg-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+    const argumentId = newArgumentId();
     if (premises.length > 0) {
       const conclusionId = resolveId(conclusion);
       const relationType = argumentRelationType(
@@ -453,22 +476,28 @@ export function DetectArgumentsTab({
   };
 
   const disabled = loading || activeCount < 3;
+  const why = suggestionsUnavailable({
+    loading,
+    needs: activeCount < 3 ? "Add at least three active elements first." : undefined,
+  });
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
         {/* Toolbar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 0 14px",
-            gap: 12,
-          }}
+        <ToolbarStrip
+          disclosure={
+            result &&
+            result.translated_arguments.length > 0 && (
+              <AiDisclosureBanner model={result.model} />
+            )
+          }
         >
           <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-            <span style={{ color: ACCENT, fontWeight: "bold" }}>
+            <span
+              {...header.marker}
+              style={{ ...header.badge, color: header.ink, fontWeight: header.weight }}
+            >
               Detect Arguments
             </span>
             <span style={{ color: C.dim }}>
@@ -487,14 +516,16 @@ export function DetectArgumentsTab({
               <button
                 onClick={detect}
                 disabled={disabled}
+                title={why}
                 style={{
                   background: "transparent",
-                  border: `1px solid ${disabled ? C.border : ACCENT}`,
-                  color: disabled ? C.dim : ACCENT,
+                  ...(disabled ? {} : header.badge),
+                  border: `1px solid ${disabled ? C.border : header.accent}`,
+                  color: disabled ? C.dim : header.ink,
                   borderRadius: 6,
                   padding: "5px 12px",
                   fontSize: 12,
-                  fontWeight: "bold",
+                  fontWeight: disabled ? "bold" : header.weight,
                   cursor: disabled ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -518,13 +549,13 @@ export function DetectArgumentsTab({
                 <ProgressWorkflowBtn
                   nextPhaseIsEnabled={nextPhaseIsEnabled}
                   workflowPhase={workflowPhase}
+                  nextPhase={workflowNextPhase}
                   advanceWorkflow={onAdvanceWorkflow}
-                  hideNonEntailsRels={hideNonEntailsRels}
                 />
               </>
             )}
           </div>
-        </div>
+        </ToolbarStrip>
 
         {activeCount < 3 && (
           <div style={{ fontSize: 12, color: C.dim }}>
@@ -533,9 +564,6 @@ export function DetectArgumentsTab({
         )}
 
         {error && <ErrorBanner message={error} />}
-        {result && result.translated_arguments.length > 0 && (
-          <AiDisclosureBanner model={result.model} />
-        )}
 
         {result && (
           <>
@@ -604,12 +632,6 @@ export function DetectArgumentsTab({
           </>
         )}
       </div>
-      <AddArgumentPanel
-        elements={state.elements.filter((e) =>
-          ["active", "revised"].includes(e.status),
-        )}
-        onAddRelation={onAddRelation}
-      />
     </div>
   );
 }

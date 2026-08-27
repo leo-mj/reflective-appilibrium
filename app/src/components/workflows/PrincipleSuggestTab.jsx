@@ -9,13 +9,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
-import { quickScore } from "../../utils/simulateRethonClient.js";
-import { SpinnerIcon } from "../Icons.jsx";
 import { fetchPrincipleSuggestions } from "../../utils/principlesClient.js";
-import { AddElementPanel } from "../user_edits/WorkflowAddPanels.jsx";
-import { Tooltip } from "../Tooltip.jsx";
-import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { llmOrigin } from "../../utils/stateUtils.js";
+import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
+import { useScoreBaseline } from "../../hooks/useScoreBaseline.js";
 import {
   AcceptButton,
   RejectButton,
@@ -26,98 +23,13 @@ import {
   ErrorBanner,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
+import { nextPhaseEnabled } from "../../utils/workflowUtils.js";
 import {
-  nextPhaseEnabled,
-  WORKFLOW_NEXT_PHASE,
-} from "../../utils/workflowUtils.js";
-import { ProgressWorkflowBtn, ScoreDeltaBadge } from "./workflowComponents.jsx";
+  ScoreDeltaBadge,
+  SuggestionToolbar,
+} from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
-
-/**
- * @param {Object}           props
- * @param {number}           props.jAndPCount   Used to disable the button; not shown in label.
- * @param {number|null}      props.suggestionCount  Remaining suggestions, or null if not yet fetched.
- * @param {boolean}          props.loading
- * @param {boolean}          props.hasResult
- * @param {Function}         props.onSuggest
- * @param {string|undefined} props.model
- */
-function Toolbar({
-  jAndPCount,
-  suggestionCount,
-  loading,
-  hasResult,
-  onSuggest,
-  model,
-  workflowPhase,
-  advanceWorkflow,
-  nextPhaseIsEnabled,
-  suggestionsDisabled,
-}) {
-  const suggestDisabled = loading || jAndPCount < 1 || suggestionsDisabled;
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "10px 0 14px",
-        gap: 12,
-      }}
-    >
-      <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-        <span style={{ color: C.principle.high, fontWeight: "bold" }}>
-          Suggest Principles
-        </span>
-        {suggestionCount !== null && (
-          <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
-        )}
-        {model && <span style={{ color: C.dim }}> · {model}</span>}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <Tooltip text={sendsToLlmText()}>
-          <button
-            onClick={onSuggest}
-            disabled={suggestDisabled}
-            style={{
-              background: "transparent",
-              border: `1px solid ${suggestDisabled ? C.border : C.principle.high}`,
-              color: suggestDisabled ? C.dim : C.principle.high,
-              borderRadius: 6,
-              padding: "5px 12px",
-              fontSize: 12,
-              fontWeight: "bold",
-              cursor: suggestDisabled ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            {loading ? <SpinnerIcon /> : <span>↺</span>}
-            {loading ? "Thinking…" : hasResult ? "Re-suggest" : "Suggest"}
-          </button>
-        </Tooltip>
-        {workflowPhase && (
-          <>
-            <div
-              style={{
-                width: 1,
-                height: 18,
-                background: C.border,
-                margin: "0 8px",
-              }}
-            />
-            <ProgressWorkflowBtn
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-              workflowPhase={workflowPhase}
-              advanceWorkflow={advanceWorkflow}
-            />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+import { confidenceLabel } from "../../utils/confidenceLabel.js";
 
 /**
  * A single principle suggestion card. The principle text can be modified inline
@@ -153,7 +65,7 @@ function SuggestionCard({
   return (
     <div
       style={{
-        borderLeft: `3px solid ${C.principle.high}`,
+        borderLeft: `3px solid ${C.principle.accent}`,
         background: C.panel,
         borderRadius: "0 6px 6px 0",
         padding: "10px 14px",
@@ -173,7 +85,7 @@ function SuggestionCard({
           <ModifyTextarea
             value={draft}
             onChange={onModifyChange}
-            accentColor={C.principle.high}
+            accentColor={C.principle.accent}
           />
         ) : (
           <div
@@ -203,7 +115,7 @@ function SuggestionCard({
             baseline={baseline}
             weights={weights}
           />
-          <AcceptButton onClick={onAccept} accentColor={C.principle.high} />
+          <AcceptButton onClick={onAccept} accentColor={C.principle.accent} />
           <RejectButton onClick={onReject} />
           {isEditing ? (
             <CancelButton onClick={onModifyCancel} />
@@ -213,7 +125,7 @@ function SuggestionCard({
           {!suggestionsAreSample && (
             <ChatButton
               isOpen={convOpen}
-              accentColor={C.principle.high}
+              accentColor={C.principle.accent}
               onClick={() => setConvOpen((o) => !o)}
             />
           )}
@@ -228,18 +140,17 @@ function SuggestionCard({
         }}
       >
         <span
+          title={confidenceLabel(suggestion.confidence).title}
           style={{
             fontSize: 10,
             lineHeight: 1,
-            color: C.principle.high,
-            border: `1px solid ${C.principle.high}`,
+            color: C.principle.text,
+            border: `1px solid ${C.principle.accent}`,
             borderRadius: 4,
             padding: "3px 6px",
           }}
         >
-          {typeof suggestion.confidence === "number"
-            ? suggestion.confidence.toFixed(2)
-            : suggestion.confidence}
+          {confidenceLabel(suggestion.confidence).text}
         </span>
         {suggestion.covers.length > 0 && (
           <span style={{ fontSize: 10, color: C.dim }}>
@@ -271,31 +182,25 @@ export function PrincipleSuggestTab({
   onRejectElements,
   autoFetch,
   workflowPhase,
+  workflowNextPhase,
   onAdvanceWorkflow,
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
   weights = null,
 }) {
-  /** @type {[Array<{text: string, confidence: string, covers: string[], explanation: string}>|null, Function]} */
-  const [suggestions, setSuggestions] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [model, setModel] = useState(null);
-  /** @type {[{suggestion: Object, draft: string}|null, Function]} */
-  const [editing, setEditing] = useState(null);
-
-  // Baseline account + systematicity for the current state.
-  const [baseline, setBaseline] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    quickScore(state.elements, state.relations, weights).then((scores) => {
-      if (!cancelled) setBaseline(scores ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [state.elements, state.relations, weights]); // eslint-disable-line react-hooks/exhaustive-deps
+  const {
+    suggestions,
+    setSuggestions,
+    loading,
+    error,
+    model,
+    editing,
+    setEditing,
+    hasResult,
+    run,
+  } = useSuggestionWorkflow(fetchPrincipleSuggestions);
+  const baseline = useScoreBaseline(state, weights);
 
   const judgments = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.type === "judgment",
@@ -303,23 +208,9 @@ export function PrincipleSuggestTab({
   const principles = state.elements.filter(
     (e) => e.status !== "withdrawn" && e.type === "principle",
   );
+  const jAndPCount = judgments.length + principles.length;
 
-  const suggest = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { suggestions: s, model: m } = await fetchPrincipleSuggestions(
-        state,
-        useDummy,
-      );
-      setSuggestions(s);
-      setModel(m);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const suggest = () => run(state, useDummy);
 
   const autoFetchRef = useRef(autoFetch);
   useEffect(() => {
@@ -360,31 +251,39 @@ export function PrincipleSuggestTab({
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
-        <Toolbar
-          jAndPCount={judgments.length + principles.length}
-          suggestionCount={suggestions !== null ? suggestions.length : null}
+        <SuggestionToolbar
+          tab="suggestPrinciples"
+          title="Suggest Principles"
+          actionLabel="Suggest"
+          rerunLabel="Re-suggest"
+          suggestionCount={hasResult ? suggestions.length : null}
           loading={loading}
-          hasResult={suggestions !== null}
-          onSuggest={suggest}
+          hasResult={hasResult}
+          onRun={suggest}
           model={model}
+          disabled={suggestionsDisabled}
+          needs={
+            jAndPCount < 1 ? "Add a judgment or principle first." : undefined
+          }
           workflowPhase={workflowPhase}
+          nextPhase={workflowNextPhase}
           advanceWorkflow={onAdvanceWorkflow}
           nextPhaseIsEnabled={nextPhaseIsEnabled}
-          suggestionsDisabled={suggestionsDisabled}
+          disclosure={
+            hasResult &&
+            suggestions.length > 0 && <AiDisclosureBanner model={model} />
+          }
         />
         {error && <ErrorBanner message={error} />}
-        {suggestions !== null && suggestions.length > 0 && (
-          <AiDisclosureBanner model={model} />
-        )}
 
-        {judgments.length + principles.length <= 1 && (
+        {jAndPCount <= 1 && (
           <div style={{ fontSize: 12, color: C.dim }}>
             Add at least one non-withdrawn judgment or principle to suggest
             principles.
           </div>
         )}
 
-        {suggestions !== null && suggestions.length === 0 && (
+        {hasResult && suggestions.length === 0 && (
           <div style={{ fontSize: 12, color: C.dim }}>
             No suggestions remaining.
           </div>
@@ -409,7 +308,6 @@ export function PrincipleSuggestTab({
           />
         ))}
       </div>
-      <AddElementPanel elementType="principle" onAddElement={onAddElement} />
     </div>
   );
 }

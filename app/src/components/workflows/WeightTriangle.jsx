@@ -123,7 +123,7 @@ const DEFAULT_DOT = toPixel({ account: 0.35, systematicity: 0.55, faithfulness: 
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const ACCENT = C.principle.high;
+const ACCENT = C.principle.accent;
 
 /**
  * @param {{ account: number, systematicity: number, faithfulness: number }} weights

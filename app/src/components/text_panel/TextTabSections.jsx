@@ -27,14 +27,19 @@ function SortToggle({ value, onChange }) {
         <button
           key={opt}
           onClick={() => onChange(opt)}
+          className="tap-target"
           style={{
             ...GHOST_BTN_STYLE,
             fontSize: 10,
             padding: "1px 6px",
             letterSpacing: 0.5,
+            // Weight and ink carry the selection, not opacity. At 10px, fading
+            // the unselected one to 0.6 put it at 3.31:1 on the dark ground and
+            // 2.36:1 on the light one — under AA on both, and the light theme
+            // fails at every opacity below 1.
             fontWeight: value === opt ? "bold" : "normal",
+            color: value === opt ? C.text : C.dim,
             textTransform: "none",
-            opacity: value === opt ? 1 : 0.6,
           }}
         >
           {opt === "element" ? "by element" : "by date"}
@@ -57,7 +62,8 @@ function sortEls(els, sort) {
 export function HighlightedSection({
   selectedRel,
   selected,
-  selectedEl,
+  selectedEls,
+  selectedGroup,
   neighbourEls,
   hlRels,
   restEls,
@@ -81,8 +87,17 @@ export function HighlightedSection({
         )
       ) : (
         <>
-          <SectionHeader title={selected} />
-          {selectedEl && <ElementCard e={selectedEl} />}
+          {/* A group's name, not its id: "G1" is an internal handle, and the
+              members below are the only thing that makes the heading mean
+              anything. For an element the id *is* what it is called. */}
+          <SectionHeader
+            title={
+              selectedGroup
+                ? `${selectedGroup.label} (${selectedGroup.members.length})`
+                : selected
+            }
+          />
+          <ElementCards els={selectedEls} />
           {neighbourEls.length > 0 && <SectionHeader title="Neighbours" />}
           <ElementCards els={neighbourEls} />
           {hlRels.length > 0 && (

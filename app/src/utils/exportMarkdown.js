@@ -13,7 +13,9 @@ import {
   findMergeCandidates,
 } from "./clusterUtils.js";
 import { buildPrincipleCovers } from "./textTabHelpers.js";
-import { sortElementIds } from "./stateUtils.js";
+import { citationMarkdown } from "./citation.js";
+import { sortElementIds, historyOf, reviewsOf } from "./stateUtils.js";
+import { groupsOf } from "./groupUtils.js";
 import { generateGraphSVG, svgToDataUrl } from "./generateSVG.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -30,28 +32,74 @@ function esc(text) {
 
 // ─── Sections ─────────────────────────────────────────────────────────────────
 
+const STATUS_TAG = {
+  withdrawn: " *(withdrawn)*",
+  revised: " *(revised)*",
+  rejected: " *(rejected)*",
+};
+
+/** One human-readable line per recorded event, oldest first. */
+function historyEntries(item) {
+  return historyOf(item).map((ev) => {
+    switch (ev.type) {
+      case "revised":
+        return `Round ${ev.round}: reworded${
+          ev.previousText ? ` from "${esc(ev.previousText)}"` : ""
+        }`;
+      case "withdrawn":
+        return `Round ${ev.round}: withdrawn${
+          ev.reason ? ` — ${esc(ev.reason)}` : ""
+        }`;
+      case "reinstated":
+        return `Round ${ev.round}: reinstated`;
+      case "rejected":
+        return `Round ${ev.round}: rejected`;
+      default:
+        return `Round ${ev.round}: ${esc(ev.type)}`;
+    }
+  });
+}
+
+/**
+ * The works an element is attributed to, in APA 7.
+ *
+ * The label carries the provenance, and does so here rather than only on screen:
+ * an exported document is the artefact someone might go on to cite *from*, so a
+ * caveat that lived in the UI alone would evaporate at exactly the moment it
+ * started to matter. What it can honestly say is narrow — these were named by a
+ * model, and a Crossref match (the DOI) establishes that a work exists, never
+ * that it says what the element claims.
+ */
+function sourcesLines(el) {
+  if (!el.sources?.length) return "";
+  const refs = el.sources
+    // `esc` escapes `*` and `_`, so it is passed *into* the formatter to be
+    // applied per run — escaping the finished string would put a backslash in
+    // front of every emphasis marker the formatter had just added.
+    .map((s) => `\n> ${citationMarkdown(s, esc)}`)
+    .join("");
+  return `\n\n*Sources (AI-generated, unverified):*${refs}`;
+}
+
 function elementsSection(elements, type, label, pCovers) {
   const els = elements.filter((e) => e.type === type);
   if (!els.length) return "";
   const lines = [`### ${label}\n`];
   for (const el of els) {
-    const statusTag =
-      el.status === "withdrawn"
-        ? " *(withdrawn)*"
-        : el.status === "revised"
-          ? " *(revised)*"
-          : "";
+    const statusTag = STATUS_TAG[el.status] ?? "";
     const covers = pCovers[el.id]?.length
       ? `\n*Covers: ${pCovers[el.id].join(", ")}*`
       : "";
     const bodyText =
       el.status === "withdrawn" ? `~~${esc(el.text)}~~` : esc(el.text);
-    const prev = el.previousText
-      ? `\n> Previously: "${esc(el.previousText)}"`
-      : "";
-    const reason = el.reason ? `\n> Withdrawn: ${esc(el.reason)}` : "";
+    // The full trail, so a wording revised more than once is still recoverable
+    // from the prose and not only from the JSON block.
+    const trail = historyEntries(el)
+      .map((line) => `\n> ${line}`)
+      .join("");
     lines.push(
-      `**${el.id}** · ${el.confidence}${statusTag}\n${bodyText}${covers}${prev}${reason}\n`,
+      `**${el.id}** · ${el.confidence}${statusTag}\n${bodyText}${covers}${trail}` +
+        `${sourcesLines(el)}\n`,
     );
   }
   return lines.join("\n");
@@ -60,15 +108,34 @@ function elementsSection(elements, type, label, pCovers) {
 function relationsSection(relations) {
   if (!relations.length) return "";
   const lines = relations.map((r) => {
-    const withdrawn = r.status === "withdrawn" ? " *(withdrawn)*" : "";
+    const statusTag = STATUS_TAG[r.status] ?? "";
     const explanation = r.explanation ? `: ${esc(r.explanation)}` : "";
-    return `- **${r.from}** → *${r.type}* → **${r.to}**${withdrawn}${explanation}`;
+    const trail = historyEntries(r)
+      .map((line) => `\n  - ${line}`)
+      .join("");
+    return `- **${r.from}** → *${r.type}* → **${r.to}**${statusTag}${explanation}${trail}`;
   });
   return "## Relations\n\n" + lines.join("\n");
 }
 
-function graphSection(elements, relations, positions) {
-  const svg = generateGraphSVG(elements, relations, positions);
+/**
+ * The user's groups, as prose.
+ *
+ * The graph image below already shows them, but an export is also read as text
+ * — and a collapsed group's members are, by construction, the elements the
+ * picture does not name.
+ */
+function groupsSection(groups) {
+  if (!groups.length) return "";
+  const lines = groups.map(
+    (g) =>
+      `- **${esc(g.label)}**${g.collapsed ? " *(collapsed)*" : ""}: ${g.members.join(", ")}`,
+  );
+  return "## Groups\n\n" + lines.join("\n");
+}
+
+function graphSection(elements, relations, positions, groups) {
+  const svg = generateGraphSVG(elements, relations, positions, { groups });
   if (!svg) return "";
   return (
     '## Graph\n\n<img src="' + svgToDataUrl(svg) + '" style="max-width:100%"/>'
@@ -140,6 +207,32 @@ function coherenceSection({ tensions, orphans, clusters }) {
   return lines.join("\n");
 }
 
+/** The parts of a review, in the order the tab shows them. */
+const REVIEW_PARTS = [
+  ["arc", "How the position moved"],
+  ["surprises", "Surprising turns"],
+  ["missed", "Missed opportunities"],
+  ["method", "How the process was conducted"],
+];
+
+/**
+ * The accepted process reviews, oldest first — the order they were written in,
+ * so the series reads forward and each one's back-references land after what
+ * they refer to.
+ */
+function reviewsSection(reviews) {
+  if (!reviews.length) return "";
+  const lines = ["## Process Reviews"];
+  reviews.forEach((r) => {
+    lines.push(`\n### Round ${r.round} — ${esc(r.headline)}\n`);
+    if (r.origin) lines.push(`*AI-generated by ${esc(r.origin)}*\n`);
+    REVIEW_PARTS.forEach(([key, label]) => {
+      if (r[key]) lines.push(`**${label}**\n\n${esc(r[key])}\n`);
+    });
+  });
+  return lines.join("\n");
+}
+
 function logSection(log) {
   if (!log.length) return "";
   const lines = ["## Round Log"];
@@ -154,13 +247,14 @@ function logSection(log) {
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
- * Generates a markdown document from `state` and triggers a browser download.
- * `positions` is the force-simulation position map from `useStablePositions`.
+ * Renders `state` as a markdown document. Split out from `downloadMarkdown` so
+ * the document itself can be asserted on without touching the DOM.
  *
  * @param {REState}    state
  * @param {PositionMap} positions
+ * @returns {string}
  */
-export function downloadMarkdown(state, positions) {
+export function buildMarkdown(state, positions) {
   const date = new Date().toISOString().slice(0, 10);
   const visIds = new Set(state.elements.map((e) => e.id));
   const pCovers = buildPrincipleCovers(
@@ -185,14 +279,30 @@ export function downloadMarkdown(state, positions) {
     header,
     elementsBlock,
     relationsSection(state.relations),
-    graphSection(state.elements, state.relations, positions),
+    groupsSection(groupsOf(state)),
+    // Groups are the user's own filing, so the graph is drawn as they left it.
+    // The cluster diagrams below are not: a coherent cluster is computed from
+    // the relations, and cuts across the grouping rather than following it.
+    graphSection(state.elements, state.relations, positions, groupsOf(state)),
     clustersSection(state, positions),
     coherenceSection(state.coherence),
+    reviewsSection(reviewsOf(state)),
     logSection(state.log),
     stateBlock,
   ].filter(Boolean);
 
-  const markdown = parts.join("\n\n---\n\n");
+  return parts.join("\n\n---\n\n");
+}
+
+/**
+ * Generates a markdown document from `state` and triggers a browser download.
+ * `positions` is the force-simulation position map from `useStablePositions`.
+ *
+ * @param {REState}    state
+ * @param {PositionMap} positions
+ */
+export function downloadMarkdown(state, positions) {
+  const markdown = buildMarkdown(state, positions);
   const slug = state.topic.slice(0, 30).replace(/\s+/g, "-").toLowerCase();
   const filename = `re-${slug}-round${state.round}.md`;
 

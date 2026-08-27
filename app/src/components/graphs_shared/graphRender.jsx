@@ -10,9 +10,15 @@
 
 /** @import { REElement, RERelation, PositionMap } from '../../types.js' */
 
-import { C, confOp, TRANSITION } from "../../constants/colors.js";
-import { nodeRadius, computeJunction } from "../../utils/graphHelpers.js";
-import { GraphEdge, GraphNode, PulseRing } from "./GraphElements.jsx";
+import { C, TRANSITION } from "../../constants/colors.js";
+import { elementRadius, computeJunction } from "../../utils/graphHelpers.js";
+import { isWithdrawnAt } from "../../utils/stateUtils.js";
+import {
+  GraphEdge,
+  GraphGroupNode,
+  GraphNode,
+  PulseRing,
+} from "./GraphElements.jsx";
 
 // ─── Tooltip handler factory ──────────────────────────────────────────────────
 
@@ -75,7 +81,11 @@ export function resolveEdge(relation, positions, elementById) {
  */
 export function historyEdgeVisuals(relation, wIds, snappedRound, groupRels = null) {
   const edges = groupRels ?? [relation];
-  const isWithdrawn = edges.some((r) => wIds.has(r.from) || wIds.has(r.to));
+  // Either endpoint being gone takes the edge with it, and the relation can also
+  // have been withdrawn on its own while both endpoints stayed in play.
+  const isWithdrawn = edges.some(
+    (r) => wIds.has(r.from) || wIds.has(r.to) || isWithdrawnAt(r, snappedRound),
+  );
   const isFuture = (relation.addedRound || 1) > snappedRound;
   return {
     isWithdrawn,
@@ -133,11 +143,11 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
   const isNew = newIds.has(element.id);
   return {
     isWithdrawn,
-    opacity: isFuture ? 0 : isWithdrawn ? 0.25 : confOp(element.confidence),
+    opacity: isFuture ? 0 : isWithdrawn ? 0.25 : 1,
     transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
     children:
       isNew && !isWithdrawn ? (
-        <PulseRing type={element.type} radius={nodeRadius(element.type, element.confidence)} />
+        <PulseRing type={element.type} radius={elementRadius(element)} />
       ) : null,
   };
 }
@@ -162,21 +172,31 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
   const isCtrlFirst = element.id === ctrlFirst;
   const isRecentlyAdded = element.id === recentlyAdded;
   const isPreviewWithdrawn = previewWithdrawnIds?.has(element.id) ?? false;
-  const baseOpacity =
-    isWithdrawn || isPreviewWithdrawn ? 0.25 : isRejected ? 0.35 : confOp(element.confidence);
-  const r = nodeRadius(element.type, element.confidence);
+  const isDimmed = dimNode(element.id);
+  // Opacity is now only ever about *state* — dimmed by a selection elsewhere,
+  // withdrawn, rejected. Confidence used to fade the node too, which washed the
+  // id out along with the disc and capped label contrast at ~3.8:1 however the
+  // ink was chosen; it lives in the fill colour now (see constants/colors.js).
+  const r = elementRadius(element);
   return {
     isWithdrawn: isWithdrawn || isPreviewWithdrawn,
     isRejected,
-    opacity: dimNode(element.id) ? 0.12 : baseOpacity,
+    opacity: isDimmed
+      ? 0.12
+      : isWithdrawn || isPreviewWithdrawn
+        ? 0.25
+        : isRejected
+          ? 0.35
+          : 1,
     transition: TRANSITION,
     children: isSelected ? (
       <circle
         r={r + 8}
         fill="none"
-        stroke="#fff"
+        // Theme-aware: a white ring on the light ground measures 1.05:1.
+        stroke={C.text}
         strokeWidth={2}
-        opacity={0.45}
+        opacity={0.6}
       />
     ) : isPreviewWithdrawn ? (
       <circle
@@ -205,16 +225,24 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
  * @param {PositionMap}         positions
  * @param {Map<string,REElement>} elementById
  * @param {Object}              visuals  - Output of `graphEdgeVisuals` for the group.
+ * @param {import('../../constants/palettes.js').Palette} palette - Passed rather
+ *   than hooked: this is a plain function, and its caller already holds one.
  * @returns {React.ReactElement|null}
  */
-export function renderJointArgument(rels, positions, elementById, visuals) {
+export function renderJointArgument(
+  rels,
+  positions,
+  elementById,
+  visuals,
+  palette,
+) {
   const conclusionId = rels[0].to;
   const conclusionEl = elementById.get(conclusionId);
   const conclusionPos = positions[conclusionId];
   if (!conclusionPos || !conclusionEl) return null;
 
   const { isWithdrawn, opacity, strokeWidth = 2, transition } = visuals;
-  const color = isWithdrawn ? C.withdrawn : C[rels[0].type];
+  const color = isWithdrawn ? C.withdrawn : palette.edges[rels[0].type];
 
   const premises = rels
     .map((r) => ({ r, el: elementById.get(r.from), pos: positions[r.from] }))
@@ -222,7 +250,7 @@ export function renderJointArgument(rels, positions, elementById, visuals) {
   if (premises.length === 0) return null;
 
   // Conclusion node radius — needed for junction clamping and arrow geometry.
-  const tr = nodeRadius(conclusionEl.type, conclusionEl.confidence);
+  const tr = elementRadius(conclusionEl);
 
   const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
   const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
@@ -240,7 +268,7 @@ export function renderJointArgument(rels, positions, elementById, visuals) {
   return (
     <g opacity={opacity} style={{ transition }}>
       {premises.map(({ r, el, pos }) => {
-        const sr = nodeRadius(el.type, el.confidence);
+        const sr = elementRadius(el);
         const dx = jx - pos.x, dy = jy - pos.y;
         const dist = Math.hypot(dx, dy) || 1;
         return (
@@ -278,7 +306,11 @@ export function renderEdge(relation, positions, elementById, visuals, parallelOf
   const { sourcePos, targetPos, sourceEl, targetEl } = resolved;
   return (
     <GraphEdge
-      key={`${relation.from}-${relation.to}-${relation.type}-${relation.addedRound ?? 1}`}
+      // The source endpoints, not the drawn ones: two members of one
+      // collapsed group holding the same relation type against the same
+      // outside element are re-pointed to the same pair, and would otherwise
+      // collide on this key.
+      key={`${relation.sourceFrom ?? relation.from}-${relation.sourceTo ?? relation.to}-${relation.type}-${relation.addedRound ?? 1}`}
       relation={relation}
       sourcePos={sourcePos}
       targetPos={targetPos}
@@ -311,15 +343,36 @@ export function renderNode(
   const position = positions[element.id];
   if (!position) return null;
   const { children = null, ...nodeProps } = visuals;
+  // `key` is deliberately *not* in here. React 19 warns when a key arrives
+  // through a spread, because a spread key is indistinguishable from a data
+  // prop at the call site; it is passed explicitly on each element below.
+  const shared = {
+    element,
+    position,
+    cursor: isDragging ? "grabbing" : "pointer",
+    ...makeTooltipHandlers(isDragging, setTooltip, element),
+  };
+  // A collapsed group is a node in every way the canvas cares about — it is
+  // hit-tested, selected, hovered and drawn at a position like any other — but
+  // it has no type ramp and no confidence, so it gets its own shape rather than
+  // a branch inside `NodeShape`.
+  if (element.type === "group") {
+    // Named rather than spread: `isWithdrawn` and `isRejected` are the rest of
+    // what the factory returns, and neither is a state a group can be in.
+    return (
+      <GraphGroupNode
+        key={element.id}
+        {...shared}
+        radius={elementRadius(element)}
+        opacity={nodeProps.opacity}
+        transition={nodeProps.transition}
+      >
+        {children}
+      </GraphGroupNode>
+    );
+  }
   return (
-    <GraphNode
-      key={element.id}
-      element={element}
-      position={position}
-      cursor={isDragging ? "grabbing" : "pointer"}
-      {...makeTooltipHandlers(isDragging, setTooltip, element)}
-      {...nodeProps}
-    >
+    <GraphNode key={element.id} {...shared} {...nodeProps}>
       {children}
     </GraphNode>
   );

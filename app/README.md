@@ -27,7 +27,7 @@ Three environments, controlled by `VITE_APP_ENV`:
 npm run build
 ```
 
-Produces a static site with all tabs present. LLM-dependent features (Assist workflow tabs, coherence matrix, RE simulation) fall back to pre-set sample data and show a "No LLM API connection" banner. Deploy the `dist/` folder to any static host.
+Produces a static site with all tabs present. LLM-dependent features (Assist workflow tabs, RE simulation) fall back to pre-set sample data and show a "No LLM API connection" banner. Deploy the `dist/` folder to any static host.
 
 ### Backend build (deployed backend)
 

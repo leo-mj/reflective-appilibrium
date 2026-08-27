@@ -9,14 +9,30 @@
 
 /** @import { REElement, RERelation, Position } from '../types.js' */
 
+import { groupRadius } from "./groupUtils.js";
+
 // ─── Node sizing ─────────────────────────────────────────────────────────────
 
-/** Base visual radii by element type (at confidence = 1). */
+/** Base visual radii by element type, at the middle of the confidence range. */
 const BASE_RADIUS = { principle: 28, theory: 22, judgment: 18 };
 
 /**
+ * How far confidence moves the radius, as a fraction of the base.
+ *
+ * Confidence 0 → `MIN`, confidence 1 → `MIN + SPAN`. Size is the main way
+ * confidence reads on the graph, so the ends are set far apart on purpose:
+ * 1.85× the radius is 3.4× the area, and area is what the eye compares.
+ *
+ * The floor is set by the label, not by taste. The id is drawn inside the node,
+ * and 0.65 is the smallest that still contains a three-character id at 11px
+ * bold — a judgment there is 23px across against a ~20px label.
+ */
+const RADIUS_MIN = 0.65;
+const RADIUS_SPAN = 0.55;
+
+/**
  * Visual radius of a node scaled by confidence.
- * Confidence 1.0 → full base radius; confidence 0.0 → 50% of base radius.
+ * Confidence 1.0 → 120% of the base radius; confidence 0.0 → 65%.
  *
  * @param {string} type       - Element type ('judgment' | 'principle' | 'theory').
  * @param {number} [confidence=1] - Element confidence in [0, 1].
@@ -25,19 +41,59 @@ const BASE_RADIUS = { principle: 28, theory: 22, judgment: 18 };
 export function nodeRadius(type, confidence = 1) {
   const base = BASE_RADIUS[type] ?? 18;
   const t = Math.max(0, Math.min(1, confidence));
-  return base * (0.5 + 0.5 * t);
+  return base * (RADIUS_MIN + RADIUS_SPAN * t);
 }
 
+/** How far past its outline a node stays clickable. */
+const HIT_PADDING = 8;
+/** Floor on a touch target, whatever the node's own size. */
+const MIN_HIT_RADIUS = 18;
+
 /**
- * Hit-test radius for pointer click detection — slightly larger than the
- * visual radius so small nodes are easier to tap.
+ * Hit-test radius for pointer click detection — larger than the visual radius so
+ * small nodes are easier to tap.
+ *
+ * The floor guards the small end of the size range against a touch target too
+ * small to hit. It does not bind at the current `RADIUS_MIN`; it is here so that
+ * lowering that does not silently make the smallest nodes unpickable.
  *
  * @param {string} type       - Element type.
  * @param {number} [confidence=1] - Element confidence in [0, 1].
  * @returns {number}
  */
 export function hitRadius(type, confidence = 1) {
-  return nodeRadius(type, confidence) + 6;
+  return Math.max(nodeRadius(type, confidence) + HIT_PADDING, MIN_HIT_RADIUS);
+}
+
+/**
+ * Visual radius of whatever the graph is drawing at that spot.
+ *
+ * The same thing as {@link nodeRadius} for an element, and the reason to prefer
+ * it: a collapsed group is drawn as a node too, and its size comes from how
+ * many members it holds rather than from a type and a confidence it does not
+ * have. Anything that has the element in hand should ask this instead of
+ * picking `type` and `confidence` off it — that pair is precisely what a group
+ * node lacks, and the fallback it lands on is a judgment-sized disc under a
+ * shape three times the size.
+ *
+ * @param {REElement} el
+ * @returns {number} Radius in SVG pixels.
+ */
+export function elementRadius(el) {
+  if (el?.type === "group")
+    return groupRadius(el.memberIds?.length ?? 0, el.label);
+  return nodeRadius(el?.type, el?.confidence);
+}
+
+/**
+ * Hit-test radius for whatever the graph is drawing at that spot.
+ * {@link hitRadius} is to {@link nodeRadius} as this is to {@link elementRadius}.
+ *
+ * @param {REElement} el
+ * @returns {number}
+ */
+export function elementHitRadius(el) {
+  return Math.max(elementRadius(el) + HIT_PADDING, MIN_HIT_RADIUS);
 }
 
 // ─── Edge styling ─────────────────────────────────────────────────────────────
@@ -112,6 +168,96 @@ export function getNeighbours(selectedId, visRels) {
     if (r.to === selectedId) ids.add(r.from);
   });
   return ids;
+}
+
+// ─── Viewport fitting ────────────────────────────────────────────────────────
+
+/**
+ * Computes the pan and zoom that centre a set of nodes in the viewport.
+ *
+ * Shared by {@link module:hooks/useAutoFit}, which fits the whole graph once it
+ * is laid out, and by the guided tour, which fits the handful of elements the
+ * section on screen is talking about.
+ *
+ * @param {PositionMap} positions - World-space positions keyed by element ID.
+ * @param {string[]|null} ids     - Subset to fit; null or omitted fits everything.
+ * @param {{ w: number, h: number }} dims - Container pixel dimensions.
+ * @param {Object} [options]
+ * @param {number} [options.padding=96] - Total px subtracted per axis before fitting.
+ *   Never more than half an axis, however large it is asked to be — see below.
+ * @param {number} [options.maxZoom=1]  - Upper zoom bound.
+ * @param {number} [options.minZoom=0.2] - Lower zoom bound, matching `usePan`'s
+ *   own floor: `resetView` takes whatever it is handed without clamping it.
+ * @returns {{ pan: { x: number, y: number }, zoom: number } | null} Null when
+ *   nothing to fit, or the container has no size yet.
+ */
+export function fitView(
+  positions,
+  ids,
+  dims,
+  { padding = 96, maxZoom = 1, minZoom = 0.2 } = {},
+) {
+  if (!positions) return null;
+  const keys = ids ?? Object.keys(positions);
+  const pts = keys.map((id) => positions[id]).filter(Boolean);
+  if (!pts.length || !dims?.w || !dims?.h) return null;
+
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  // `|| 1`: a single node has no extent, so the ratio below would be Infinity
+  // and the zoom would land on maxZoom anyway — this just keeps it finite.
+  const boxW = maxX - minX || 1;
+  const boxH = maxY - minY || 1;
+
+  // Padding is in screen pixels and is chosen for a canvas the size of a
+  // window. The phone's graph strip under the tour's sheet is a couple of
+  // hundred pixels tall, which a 200px margin eats whole: `extent - padding`
+  // came out at zero — nothing visible — or below it, and a negative zoom
+  // flips the graph and blows it up to several times the viewport. So margins
+  // never take more than half an axis, and the zoom is floored as well.
+  const usable = (extent) => Math.max(extent - padding, extent / 2);
+
+  const zoom = Math.max(
+    Math.min(usable(dims.w) / boxW, usable(dims.h) / boxH, maxZoom),
+    minZoom,
+  );
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+
+  return {
+    pan: { x: dims.w / 2 - cx * zoom, y: dims.h / 2 - cy * zoom },
+    zoom,
+  };
+}
+
+/**
+ * How the guided tour frames the handful of elements a section names.
+ *
+ * Both numbers follow the *shorter* axis of the canvas, because both were
+ * chosen for one the size of a desktop window and neither survives the phone's
+ * graph strip — a couple of hundred pixels of it, once the tour's sheet has the
+ * bottom of the screen. A fixed 200px margin is that whole strip, and a 1.5×
+ * cap on a section naming a single node fills it with one circle at a
+ * magnification the reader has no way to read as "this is one node".
+ *
+ * So the cap reaches 1.5 only on a canvas with 600px to give on both axes, and
+ * a phone gets 1× — where a judgment is around a third of the strip's height,
+ * which is what "zoomed to this element" should look like.
+ *
+ * @param {{ w: number, h: number }} dims - Container pixel dimensions.
+ * @returns {{ padding: number, maxZoom: number }} For {@link fitView}.
+ */
+export function focusFraming(dims) {
+  const short = Math.min(dims?.w || 0, dims?.h || 0);
+  return {
+    padding: Math.min(200, short * 0.35),
+    maxZoom: Math.max(1, Math.min(1.5, short / 400)),
+  };
 }
 
 // ─── Joint argument geometry ─────────────────────────────────────────────────
