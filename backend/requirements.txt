@@ -20,7 +20,7 @@ rethon>=1.0.0,<2.0
 # 3.9, so a venv on 3.9 can no longer install this file. CI is on 3.12 and black
 # already targets py311, so the floor follows what the project was already using.
 pytest>=9.0.3,<10.0
-pytest-asyncio>=0.24,<2.0
+pytest-asyncio>=1.4.0,<2.0
 pytest-cov>=7.1.0,<8.0
 httpx>=0.27,<1.0
 pip-audit>=2.7,<3.0
