@@ -1,25 +1,54 @@
 version: 2
 
+# One pull request a month for every dependency this repo has, across all three
+# ecosystems — `multi-ecosystem-groups` is what makes that possible, grouping
+# being per-ecosystem before it existed.
+#
+# The alternative is what August 2026 looked like: fourteen PRs in two minutes,
+# five of them editing five adjacent lines of backend/requirements.txt, so
+# merging any one sent the other four to "conflicting" until Dependabot rebased
+# them. A single PR has no siblings to conflict with, and Dependabot updates
+# that one branch in place rather than opening another beside it.
+#
 # Monthly rather than weekly: this is a research project, and a PR per
 # dependency per week is noise that gets ignored, which is worse than none.
-# Security updates are exempt from the schedule and open as soon as they exist.
+# Security updates are exempt from the schedule and from this grouping — they
+# open on their own, as soon as they exist.
+#
+# The cost, and it is a real one: one member that cannot be installed blocks
+# every other update in the PR. That is what `ignore` below is for, and it is
+# the first thing to reach for when a grouped run goes red at `npm ci`.
+multi-ecosystem-groups:
+  all-dependencies:
+    schedule:
+      interval: monthly
+
+# `patterns` is required on every entry that names a multi-ecosystem group;
+# `["*"]` is the whole ecosystem, which is the point here.
 updates:
   - package-ecosystem: npm
     directory: /app
-    schedule:
-      interval: monthly
-    groups:
-      # One PR for the build/test toolchain instead of a dozen. These do not
-      # ship, so they are reviewed together and merged on a green CI run.
-      dev-tooling:
-        dependency-type: development
+    patterns: ["*"]
+    multi-ecosystem-group: all-dependencies
+    ignore:
+      # eslint 10 cannot be installed here: eslint-plugin-react@7.37.5 — still
+      # the latest release — peers on `^9.7`, so `npm ci` fails with ERESOLVE
+      # before a single test runs, and now that everything shares one PR it
+      # would take the Python and Actions updates down with it. Held at 9 until
+      # the plugin ships eslint 10 support; drop these two entries then, since
+      # every other member of the group updates fine. Minor and patch releases
+      # of eslint 9 are unaffected.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: /backend
-    schedule:
-      interval: monthly
+    patterns: ["*"]
+    multi-ecosystem-group: all-dependencies
 
   - package-ecosystem: github-actions
     directory: /
-    schedule:
-      interval: monthly
+    patterns: ["*"]
+    multi-ecosystem-group: all-dependencies
