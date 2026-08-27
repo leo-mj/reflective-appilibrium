@@ -16,6 +16,13 @@
  * an assist tab), which is why reading the store at mount is enough to keep
  * them in step; two of them on screen at once would want a shared store.
  *
+ * **A dragged height is a floor, not a size.** The bar is sized by its contents
+ * between two bounds — that floor, and {@link HEIGHT_CAP} above it — because the
+ * contents grow while the reader works: an argument taking on premises wraps the
+ * controls row two and three deep. Below the floor the bar cannot fall, past its
+ * contents the top edge moves up, and at the cap it scrolls rather than reaching
+ * under the window. See `sizeStyle`.
+ *
  * The width is the exception, and `axes` is how a bar says so: the strip spans
  * the window and can give width back, while an assist panel is as wide as the
  * column the divider has left it. A height-only bar keeps its hands off the
@@ -43,6 +50,19 @@ const MIN_WIDTH = 360;
 const MAX_HEIGHT_FRACTION = 0.75;
 /** How far one arrow key moves an edge. */
 const KEY_STEP = 16;
+
+/**
+ * How tall a bar may ever be: whichever is the smaller of a share of the window
+ * and the whole of the panel it sits in.
+ *
+ * Two different failures, one cap. `dvh` is the window's — the graph above the
+ * bar has the better claim on the screen, and it is the same fraction the drag
+ * itself clamps to. `100%` is the panel's: an assist tab's bar is as tall as
+ * that tab, and one that outgrows it reaches past the bottom of the window and
+ * gives the whole page a scrollbar. In CSS rather than measured here, so both
+ * answer a window being resized rather than only a re-render.
+ */
+export const HEIGHT_CAP = `min(${Math.round(MAX_HEIGHT_FRACTION * 100)}dvh, 100%)`;
 
 /** The default: `null` on both axes, meaning "whatever the stylesheet says". */
 const UNSET = { height: null, width: null };
@@ -258,16 +278,46 @@ export function useAddBarSize(enabled, { axes: owns = "both" } = {}) {
     ref,
     sizeStyle: {
       position: "relative",
-      ...(size.height
+      ...(enabled
         ? {
-            height: size.height,
-            minHeight: 0,
-            // What `maxWidth` is to a remembered width: a height dragged out on
-            // a tall window, or in the strip that has the whole of one, must
-            // not swallow the shorter window or the assist column it is read
-            // back into. In CSS rather than clamped here, so it answers a
-            // window being resized rather than only a re-render.
-            maxHeight: `${Math.round(MAX_HEIGHT_FRACTION * 100)}dvh`,
+            // The bar is sized by its contents between two bounds, which is the
+            // whole of how it behaves. A dragged height is the floor, not the
+            // size: the controls grow — an argument taking on premises wraps
+            // the row two and three deep — and a bar pinned to a height its own
+            // contents have outgrown clips them, which is how the text field
+            // came to be squeezed out of the bottom of it. Past the content the
+            // bar is anchored at the foot of its panel, so it is the top edge
+            // that moves.
+            //
+            // Which leaves the floor as the whole of what the bar measures with
+            // nothing in it — `ADD_BAR_MIN_HEIGHT`, or what this reader dragged
+            // it to last. A bar that opens taller than that is one carrying a
+            // dragged height; double-clicking the top edge gives it back.
+            //
+            // Its own contents are what the bar is sized by, and the plainest
+            // way to say so is to say nothing: an auto height on a column is
+            // the height of what is in it. `height: max-content` says the same
+            // thing in a way not every engine reads alike — one of them drew
+            // the bar at twice its contents from a standing start — and this
+            // has no such second reading.
+            maxHeight: HEIGHT_CAP,
+            // At the cap the content has nowhere left to grow, so it scrolls
+            // here rather than out of the panel. Sideways it may not: nothing
+            // in this app is read by scrolling that way, and a scroll container
+            // on one axis makes one of the other unless it is told otherwise —
+            // in `hidden`, which every engine has, rather than the `clip` that
+            // says it better and is dropped by the ones that do not know it.
+            overflowY: "auto",
+            overflowX: "hidden",
+            // The floor takes the same two caps, because in CSS a minimum wins
+            // over a maximum: a height dragged out on a tall window and read
+            // back on a short one would otherwise hold the bar past the bottom
+            // of the screen — the cap above it and all — and take the page's
+            // own scrollbar with it. Absent, the floor is the stylesheet's; see
+            // ADD_BAR_MIN_HEIGHT.
+            ...(size.height
+              ? { minHeight: `min(${size.height}px, ${HEIGHT_CAP})` }
+              : null),
           }
         : null),
       ...(ownsWidth && size.width

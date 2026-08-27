@@ -30,6 +30,11 @@ import {
   selectedRow,
 } from "./dropdownTestUtils.js";
 import { AddBar } from "./TextTabAddPanel.jsx";
+import { ADD_BAR_MIN_HEIGHT } from "./addPanelShared.js";
+import { HEIGHT_CAP } from "../../hooks/useAddBarSize.js";
+
+/** How a dragged height reaches the bar: as a floor, under the same cap. */
+const floorOf = (px) => `min(${px}px, ${HEIGHT_CAP})`;
 
 afterEach(cleanup);
 
@@ -753,7 +758,9 @@ describe("AddBar resizing", () => {
     const handle = screen.getByRole("separator", { name: "Resize add bar height" });
     fireEvent.keyDown(handle, { key: "ArrowUp" });
 
-    expect(bar(container).style.height).toBeTruthy();
+    // In px on the bar, where the dragged height is the floor it may not fall
+    // below rather than the size it is held at.
+    expect(bar(container).style.minHeight).toMatch(/^min\(\d+px, /);
     expect(JSON.parse(localStorage.getItem("addBarSize")).height).toBeGreaterThan(0);
   });
 
@@ -772,18 +779,51 @@ describe("AddBar resizing", () => {
     fireEvent.keyDown(handle, { key: "ArrowUp" });
     fireEvent.doubleClick(handle);
 
-    expect(bar(container).style.height).toBe("");
+    expect(bar(container).style.minHeight).toBe(ADD_BAR_MIN_HEIGHT);
+    expect(bar(container).style.width).toBe("");
     expect(JSON.parse(localStorage.getItem("addBarSize"))).toEqual({
       height: null,
       width: null,
     });
   });
 
-  it("opens at the size the last drag left it", () => {
+  // The height the reader dragged to is how much room they want, not all the
+  // bar may have: an argument taking on a third and fourth premise wraps the
+  // controls row two and three deep, and a bar pinned to a height its contents
+  // have outgrown clips them — which is how the text field came to be squeezed
+  // out from under them. Past the dragged height the top edge moves up instead,
+  // and past the cap the bar scrolls rather than reaching under the window.
+  it("opens at the size the last drag left it, as a floor", () => {
     localStorage.setItem("addBarSize", JSON.stringify({ height: 240, width: 500 }));
     const { container } = renderBar();
-    expect(bar(container).style.height).toBe("240px");
+    expect(bar(container).style.minHeight).toBe(floorOf(240));
+    expect(bar(container).style.height).toBe("");
     expect(bar(container).style.width).toBe("500px");
+  });
+
+  // Being a scroll container is what makes a field half a pixel too wide a
+  // horizontal scrollbar across the whole bar — and a percentage of a
+  // fractional content box is exactly how that half pixel arrives.
+  it("stretches the text field rather than sizing it at 100%", () => {
+    const field = renderBar().container.querySelector("textarea");
+    expect(field.style.width).toBe("");
+    expect(field.style.alignSelf).toBe("stretch");
+    // And no horizontal scroll port of its own: a textarea wraps, so `auto`
+    // there can only ever be a rounding artefact.
+    expect(field.style.overflowX).toBe("hidden");
+  });
+
+  it("is capped by the window and by the panel it sits in", () => {
+    const { container } = renderBar();
+    expect(bar(container).style.maxHeight).toBe(HEIGHT_CAP);
+    expect(bar(container).style.overflowY).toBe("auto");
+    expect(bar(container).style.overflowX).toBe("hidden");
+  });
+
+  it("keeps a floor under the text field for the bar to grow by", () => {
+    const { container } = renderBar();
+    expect(parseInt(container.querySelector("textarea").style.minHeight, 10))
+      .toBeGreaterThan(0);
   });
 });
 

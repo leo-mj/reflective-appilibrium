@@ -20,6 +20,43 @@ test.describe("Narrow layout", () => {
     await expectNoHorizontalScroll(page);
     await expect(page.locator('button[aria-label="Menu"]')).toBeVisible();
   });
+
+  // An argument's premises are the widest row in the app and the only one that
+  // grows while you work: each new one is another picker beside the last. Held
+  // in a row that could not wrap, a third premise pushed the panel past the
+  // column it sits in and the whole document scrolled sideways after it.
+  test("an argument's premises wrap instead of widening the page", async ({
+    page,
+  }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    await page.locator('button[aria-label="Menu"]').click();
+    await page.locator('[data-tutorial="tab-detectArguments"]').first().click();
+    await park(page);
+
+    const addPremise = page.locator('button:text-is("+ premise")');
+    await expect(addPremise).toBeVisible();
+    for (let i = 0; i < 4; i++) {
+      if (await addPremise.isDisabled()) break;
+      await addPremise.click();
+    }
+    // By role: "Premise 3" alone also matches its own "Remove premise 3".
+    await expect(
+      page.getByRole("combobox", { name: "Premise 3" }),
+    ).toBeVisible();
+
+    await expectNoHorizontalScroll(page);
+    // Nor down past the bottom of the screen, which is the other way a growing
+    // row goes wrong: the panel is capped and scrolls inside itself.
+    const { scrollHeight, clientHeight } = await page.evaluate(() => ({
+      scrollHeight: document.documentElement.scrollHeight,
+      clientHeight: document.documentElement.clientHeight,
+    }));
+    expect(scrollHeight).toBeLessThanOrEqual(clientHeight + 1);
+    // And the buttons it grew are ones a thumb can hit.
+    const box = await addPremise.boundingBox();
+    expect(box.height).toBeGreaterThanOrEqual(24);
+  });
 });
 
 /**

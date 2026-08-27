@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { C } from "../constants/colors.js";
 import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
-import { useWindowSize } from "../hooks/useWindowSize.js";
+import { useIsWide, useWindowSize } from "../hooks/useWindowSize.js";
 import { useCoarseDims } from "../hooks/useCoarseDims.js";
 import { useSplitRatio } from "../hooks/useSplitRatio.js";
 import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
@@ -164,7 +164,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   }, [handleUndo, handleRedo]);
 
   const dims = useWindowSize();
-  const isWide = dims.w > 768 && dims.h > 500;
+  // Through the hook rather than the comparison, so the add panels — which ask
+  // it themselves, being too deep to be handed a prop — cannot draw themselves
+  // for one layout while this puts them in the other.
+  const isWide = useIsWide();
   // The same tour either way; what differs is where the screen has room for it.
   // Wide reads it down a column beside the graph, narrow along a sheet under
   // it, and the app pads itself by whichever edge it has given away.
@@ -427,6 +430,25 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         // bottom edge — the add bar, the foot of the graph — sits underneath
         // the browser's own chrome. dvh is whatever is actually visible.
         height: "100dvh",
+        // Nothing in the app is read by scrolling sideways — the graph is
+        // panned inside its own canvas, which is a transform rather than a
+        // scroll — so a horizontal scrollbar on the page is always a row that
+        // has failed to wrap, and it takes the whole layout with it: everything
+        // else shifts left while the reader chases it. Wrapping is the fix
+        // wherever one turns up; this is the backstop, and it says out loud
+        // that the axis is not one the app offers.
+        //
+        // `hidden` rather than the `clip` that says it better — `clip` is not a
+        // scroll port, which is exactly what is wanted here — because an engine
+        // that does not know `clip` drops the declaration and leaves the axis
+        // scrolling, which is the one outcome this line exists to prevent. The
+        // cost is that the block axis blockifies to `auto` and this becomes a
+        // scroll container: nothing to scroll while the layout holds, since the
+        // workspace gives up its height to whatever else needs it and the add
+        // bar is capped, and an internal scrollbar rather than a displaced page
+        // if it ever does not. Fixed elements — the pickers' portalled lists,
+        // the tour — are not clipped by either.
+        overflowX: "hidden",
         display: "flex",
         flexDirection: "column",
         padding: 16,

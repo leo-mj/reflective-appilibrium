@@ -11,7 +11,11 @@ import {
   AddElementPanel,
   AddRelationPanel,
 } from "./WorkflowAddPanels.jsx";
-import { ADD_BAR_MIN_HEIGHT } from "./addPanelShared.js";
+import {
+  ADD_BAR_MIN_HEIGHT,
+  TEXT_FIELD_MIN_HEIGHT,
+} from "./addPanelShared.js";
+import { HEIGHT_CAP } from "../../hooks/useAddBarSize.js";
 import {
   choose,
   labelsOf,
@@ -23,6 +27,9 @@ import {
 import { AddBar } from "./TextTabAddPanel.jsx";
 import { C } from "../../constants/colors.js";
 import { PALETTES } from "../../constants/palettes.js";
+
+/** How a dragged height reaches a panel: as a floor, under the same cap. */
+const floorOf = (px) => `min(${px}px, ${HEIGHT_CAP})`;
 
 afterEach(cleanup);
 
@@ -128,6 +135,89 @@ describe("AddRelationPanel", () => {
     expect(onAddRelation).toHaveBeenCalledWith(
       expect.objectContaining({ from: "J1", type: "entails" }),
     );
+  });
+});
+
+// ─── The argument row wraps ───────────────────────────────────────────────────
+// The panel is as wide as the column the central divider has left it, and a run
+// of premises is the widest thing in the app. Held in a `nowrap` row it pushed
+// the panel past that column and the page picked up a horizontal scrollbar —
+// which is never right anywhere outside the graph's own canvas. jsdom lays
+// nothing out, so what these hold is the wiring that lets a row come down a
+// line: that it may wrap, that it may shrink, and that the premises and the
+// conclusion are in one row rather than in groups that wrap independently.
+describe("the argument panel's controls wrap rather than widen the panel", () => {
+  const renderArg = () =>
+    render(<AddArgumentPanel elements={ELEMENTS} onAddRelation={() => {}} />)
+      .container;
+
+  /** The cell one picker sits in: the wrapper the layout is set on, boxed. */
+  const cell = (name) => screen.getByLabelText(name).parentElement.parentElement;
+
+  it("puts the whole argument in one wrapping, shrinkable row", () => {
+    renderArg();
+    const row = cell("Premise 1").parentElement;
+    expect(row.style.flexWrap).toBe("wrap");
+    // Without this the row is held at its contents' width and cannot wrap at
+    // all, whatever `flexWrap` says.
+    expect(row.style.minWidth).toBe("0px");
+  });
+
+  it("keeps the premises and the conclusion in that same row", () => {
+    const container = renderArg();
+    fireEvent.click(button(container, "+ premise"));
+    const row = cell("Premise 1").parentElement;
+    expect(cell("Premise 2").parentElement).toBe(row);
+    expect(screen.getByLabelText("Conclusion").parentElement.parentElement).toBe(
+      row,
+    );
+  });
+
+  it("joins the premises with +, as the strip's own argument tab does", () => {
+    // The same component draws both, which is what keeps a premise added here
+    // sitting where a premise added in the strip sits.
+    const container = renderArg();
+    fireEvent.click(button(container, "+ premise"));
+    expect(cell("Premise 1").lastChild.textContent).toBe("+");
+    expect(cell("Premise 2").lastChild.textContent).toBe("✕");
+  });
+});
+
+// ─── Sized for the layout it is in ────────────────────────────────────────────
+// On a narrow screen this panel *is* the controls: there is no strip under a
+// text panel and no pointer, and an argument's row is half a dozen buttons. It
+// takes the add bar's roomy sizes there, exactly as the phone's own add sheet
+// does. jsdom lays nothing out, so these read the sizes off the style.
+describe("the panels are drawn for the layout they are in", () => {
+  const asWide = [window.innerWidth, window.innerHeight];
+  const setWindow = ([w, h]) => {
+    window.innerWidth = w;
+    window.innerHeight = h;
+  };
+  afterEach(() => setWindow(asWide));
+
+  const renderArg = () =>
+    render(<AddArgumentPanel elements={ELEMENTS} onAddRelation={() => {}} />)
+      .container;
+  const px = (el) => parseInt(el.style.minHeight, 10) || 0;
+
+  it("gives a narrow screen targets a thumb can hit", () => {
+    const wide = px(button(renderArg(), "+ premise"));
+    cleanup();
+    setWindow([390, 780]);
+    const narrow = px(button(renderArg(), "+ premise"));
+
+    // 24px is WCAG 2.5.8's floor and what the pointer layout holds to; the
+    // thumb's wants more than the minimum, not the minimum.
+    expect(wide).toBeGreaterThanOrEqual(24);
+    expect(narrow).toBeGreaterThan(wide);
+  });
+
+  it("grows the pickers and the add button with them", () => {
+    setWindow([390, 780]);
+    const container = renderArg();
+    expect(px(button(container, "Add argument"))).toBeGreaterThanOrEqual(44);
+    expect(px(screen.getByLabelText("Premise 1"))).toBeGreaterThanOrEqual(44);
   });
 });
 
@@ -260,16 +350,57 @@ describe("every add bar is one bar", () => {
     expect(renderStrip().style.minHeight).toBe(ADD_BAR_MIN_HEIGHT);
   });
 
+  // A dragged height says how much room the reader wants, not how much the bar
+  // may have: its controls wrap deeper as an argument takes on premises, and a
+  // bar held at a height its own contents have outgrown clips them — which is
+  // what used to squeeze the statement box out of the bottom of it. So the
+  // dragged height arrives as the floor, and the content sizes the bar.
   it.each(PANELS)("%s — opens at the height the strip was left at", (_n, P) => {
     localStorage.setItem(
       "addBarSize",
       JSON.stringify({ height: 240, width: 500 }),
     );
     const panel = renderPanel(P);
-    expect(panel.style.height).toBe("240px");
+    expect(panel.style.minHeight).toBe(floorOf(240));
+    // And no height of its own beside it: a bar carrying one is a bar that
+    // cannot grow with its contents, which is the whole of what went wrong.
+    expect(panel.style.height).toBe("");
     // The width is not the panel's to take: it is as wide as the column the
     // central divider has left it.
     expect(panel.style.width).toBe("");
+  });
+
+  // And it may not grow the other way either: a panel taller than the tab it
+  // sits in reaches past the bottom of the window and takes the page's own
+  // scrollbar with it. Whichever of the two caps is the smaller holds it.
+  it.each(PANELS)("%s — is capped by the window and by its panel", (_n, P) => {
+    const panel = renderPanel(P);
+    expect(panel.style.maxHeight).toBe(HEIGHT_CAP);
+    // Past the cap the content scrolls inside the bar. Sideways it may not.
+    expect(panel.style.overflowY).toBe("auto");
+    expect(panel.style.overflowX).toBe("hidden");
+  });
+
+  // The bar has to be a scroll container for the case where its controls
+  // outgrow it, which makes a field half a pixel too wide a horizontal
+  // scrollbar across the foot of it. A percentage of a fractional content box
+  // is exactly how you get that half pixel; a stretched flex item is exact.
+  it.each(PANELS)("%s — stretches the text field, never 100%", (_n, Panel) => {
+    const field = renderPanel(Panel).querySelector("textarea");
+    expect(field.style.width).toBe("");
+    expect(field.style.alignSelf).toBe("stretch");
+    // And its own scroll port, which is the last one that could paint one: a
+    // textarea wraps, so `auto` there can only ever be a rounding artefact.
+    expect(field.style.overflowX).toBe("hidden");
+  });
+
+  it.each(PANELS)("%s — keeps a floor under the statement box", (_n, Panel) => {
+    // The bar grows *by* this: a floor on the field is a floor on the content
+    // height the bar is not allowed to fall below.
+    const panel = renderPanel(Panel);
+    expect(panel.querySelector("textarea").style.minHeight).toBe(
+      `${TEXT_FIELD_MIN_HEIGHT}px`,
+    );
   });
 
   it.each(PANELS)("%s — offers the top edge and no other", (_n, Panel) => {
@@ -296,7 +427,7 @@ describe("every add bar is one bar", () => {
     expect(stored.width).toBe(500);
 
     cleanup();
-    expect(renderStrip().style.height).toBe(`${stored.height}px`);
+    expect(renderStrip().style.minHeight).toBe(floorOf(stored.height));
   });
 
   it("double-click drops the height without dropping the strip's width", () => {
@@ -309,7 +440,8 @@ describe("every add bar is one bar", () => {
       screen.getByRole("separator", { name: "Resize add bar height" }),
     );
 
-    expect(panel.style.height).toBe("");
+    // Back to the stylesheet's own floor, which is the one every bar shares.
+    expect(panel.style.minHeight).toBe(ADD_BAR_MIN_HEIGHT);
     expect(JSON.parse(localStorage.getItem("addBarSize"))).toEqual({
       height: null,
       width: 500,

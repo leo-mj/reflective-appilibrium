@@ -46,8 +46,9 @@ import {
   makeRelationDefaults,
   pickerWidth,
   selectStyle,
+  TEXT_FIELD_MIN_HEIGHT,
 } from "./addPanelShared.js";
-import { Field } from "./addPanelPrimitives.jsx";
+import { Field, PremisePickers } from "./addPanelPrimitives.jsx";
 
 // Origin is deliberately not among them: it is who is adding rather than part
 // of the element being written, and so is kept across a clear, an add and a tab
@@ -685,45 +686,21 @@ export function AddBar({
           ) : (
             <>
               {/* Premises, joined by +. One argument can rest on several, and
-                  they are added a row at a time rather than by a count field. */}
-              {premises.map((premise, i) => (
-                <span
-                  key={i}
-                  style={{ display: "flex", alignItems: "center", gap: 4 }}
-                >
-                  <Dropdown
-                    label={`Premise ${i + 1}`}
-                    value={premise}
-                    onChange={(v) => setPremise(i, v)}
-                    options={elementRows}
-                    style={linkSel}
-                    layout={idLayout}
-                  />
-                  {premises.length > 1 && (
-                    <button
-                      onClick={() => removePremise(i)}
-                      aria-label={`Remove premise ${i + 1}`}
-                      title={`Remove premise ${i + 1}`}
-                      style={ghost}
-                    >
-                      ✕
-                    </button>
-                  )}
-                  {premises.length > 1 && i < premises.length - 1 && (
-                    <span style={arrow}>+</span>
-                  )}
-                </span>
-              ))}
-              <button
-                onClick={addPremise}
-                disabled={ids.length <= premises.length + 1}
-                style={{
-                  ...ghost,
-                  opacity: ids.length <= premises.length + 1 ? 0.4 : 1,
-                }}
-              >
-                + premise
-              </button>
+                  they are added a row at a time rather than by a count field.
+                  The assist tabs' panel draws the same run from the same
+                  component — see {@link PremisePickers}. */}
+              <PremisePickers
+                premises={premises}
+                options={elementRows}
+                layout={idLayout}
+                selectStyle={linkSel}
+                ghostStyle={ghost}
+                arrowStyle={arrow}
+                onChange={setPremise}
+                onRemove={removePremise}
+                onAdd={addPremise}
+                canAdd={ids.length > premises.length + 1}
+              />
               <Dropdown
                 label="Argument type"
                 value={negated ? "precludes" : "entails"}
@@ -810,14 +787,26 @@ export function AddBar({
           // a phone is not much once the controls have wrapped onto three
           // lines. The floor is what makes it a field worth typing into.
           //
-          // 0 rather than nothing in the strip: a textarea's own content height
-          // is a floor `flex: 1` cannot shrink past, so a bar dragged short had
-          // the field push its own bottom edge out of the panel instead.
-          minHeight: roomy ? 130 : 0,
+          // The strip's floor used to be 0, so that a bar dragged short could
+          // squeeze the field rather than push its own bottom edge out of the
+          // panel. The bar grows upward now instead — see
+          // {@link module:hooks/useAddBarSize} — so the field can keep a floor
+          // of its own, and an argument that takes on a third premise moves the
+          // top edge up rather than eating the box below it.
+          minHeight: roomy ? 130 : TEXT_FIELD_MIN_HEIGHT,
           marginTop: roomy ? 12 : 8,
           resize: "none",
-          width: "100%",
+          // Stretched rather than `width: 100%` — see `EXPLANATION_STYLE` in
+          // addPanelShared, which is this same field in the assist tabs'
+          // panels. Half a pixel of rounding there is a horizontal scrollbar
+          // across the whole bar.
+          alignSelf: "stretch",
+          minWidth: 0,
           boxSizing: "border-box",
+          // A textarea wraps, so its default `auto` can only ever paint a
+          // horizontal scrollbar for a fraction of a pixel of rounding — see
+          // `EXPLANATION_STYLE`. Vertically it still scrolls.
+          overflowX: "hidden",
           background: C.bg,
           border: `1px solid ${C.border}`,
           borderRadius: 4,

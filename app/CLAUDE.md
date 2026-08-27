@@ -361,6 +361,58 @@ graph on every frame of a drag.
 top edge and right edge plus the corner. The phone sheet passes `enabled: false`:
 there the bar is already most of the screen.
 
+**The bar is sized by its contents between two bounds, and the dragged height is
+the floor rather than the size.** Its controls grow — an argument taking on
+premises wraps its row two and three deep — and a bar pinned to a height its own
+contents have outgrown clips them, which is how the text field came to be
+squeezed out from under them. So the bar carries **no height at all** — an auto
+height on a column is the height of what is in it — floored by the dragged
+height (or the stylesheet's `ADD_BAR_MIN_HEIGHT`) and capped by `HEIGHT_CAP`;
+past the content the top edge moves up, and past the cap the bar scrolls. Which
+also means a bar that *opens* taller than the floor is one carrying a dragged
+height, not a layout fault: double-clicking the top edge gives it back.
+
+`height: max-content` says the same thing and was tried first. Don't: one engine
+drew the bar at twice its contents from a standing start. `overflow-x: clip`
+reads better than the `hidden` beside it too — `clip` is not a scroll port,
+which is the point — and the same engine dropped it as unknown, which leaves the
+axis scrolling and is the one thing the line is there to stop. Both are stated
+the boring way now.
+
+**Being a scroll container is why the fields are stretched rather than 100%
+wide.** The bar has to be one, for the case where its controls outgrow it — and
+that makes a field half a pixel too wide a horizontal scrollbar across the foot
+of the window. A percentage of a fractional content box is exactly how that half
+pixel arrives, and WebKit rounds it the wrong way; a stretched flex item is
+exact. `alignSelf: "stretch"`, never `width: "100%"`, on anything filling one of
+these panels — and `overflow-x: hidden` on the field itself, since a textarea
+wraps and so has no legitimate use for a horizontal scroll port, while its
+default `auto` will paint one for a fraction of a pixel. A viewport of an odd
+width — any scaled display — is where that fraction comes from.
+
+**Both bounds, and the floor takes the cap too.** In CSS a minimum wins over a
+maximum, so a floor left uncapped holds the bar past the bottom of the window —
+which is the other way a growing row goes wrong, and the one that gives the whole
+page a scrollbar. `HEIGHT_CAP` is `min(75dvh, 100%)`: the window's share, and the
+panel it sits in, whichever is smaller. The statement box keeps the floor
+`TEXT_FIELD_MIN_HEIGHT` puts under every one of them — that floor is what the bar
+grows *by*.
+
+Nothing in the app is read by scrolling sideways — the graph is *panned*, which
+is a transform — so a horizontal scrollbar is always a row that has failed to
+wrap; `REState`'s `overflow-x: hidden` says so, but the fix is always the
+wrapping — and the field width above, which is the other way one appears.
+
+**The assist panels draw themselves for the layout they are in.** `usePanelSize`
+asks `useIsWide()` — the app's one definition of the wide layout, which `REState`
+now shares rather than re-deriving — and takes the add bar's `compact` sizes
+there and its `roomy` ones on a narrow screen, where the panel *is* the screen's
+controls and is worked with a thumb. At the wide sizes an argument's row was half
+a dozen targets under the 24px WCAG 2.5.8 asks for, on the layout with no pointer
+to hit them with. It is a hook rather than a prop because these panels are four
+components deep, and every tab between them and `REState` would have to carry a
+prop it has no other use for.
+
 **Every add bar is one bar, at one height.** The strip under the text panel and
 the panel at the foot of an assist tab (`user_edits/WorkflowAddPanels.jsx`, whose
 `Panel` shell is the whole of it) start at the same floor —
@@ -372,6 +424,13 @@ strip spans the window and can give width back, an assist panel is as wide as th
 column the divider has left it, so the panels pass `axes: "height"` and a
 height-only bar leaves the stored width alone — a double-click there resets its
 own axis only.
+
+The two argument forms are one form for the same reason, and draw their premises
+from one component — `PremisePickers` in `user_edits/addPanelPrimitives.jsx`.
+Every premise is a cell of the same width, which is what makes a run of them long
+enough to wrap come down in columns; and the run belongs to the row that holds
+the conclusion, not to a box of its own, since a box could only wrap inside
+itself.
 
 **The tour's column** — `tour/tourWidth.js`, and the one of the three that is a
 *module-level store* rather than a hook's own state, for the reason `useTheme`

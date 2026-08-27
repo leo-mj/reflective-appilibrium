@@ -35,3 +35,22 @@ export function useWindowSize() {
   }, []);
   return size;
 }
+
+/**
+ * Whether the window has room for the wide layout — the app's one definition of
+ * it, so that a component deciding how to draw itself and `REState` deciding
+ * where to put it cannot disagree.
+ *
+ * Both axes, because the wide layout is two panels side by side *above* an add
+ * bar: a short window has no more room for that than a narrow one.
+ *
+ * A hook rather than a prop threaded down: the add panels at the foot of the
+ * assist tabs are four components deep, and every tab between them and `REState`
+ * would have to carry a prop it has no other use for.
+ *
+ * @returns {boolean}
+ */
+export function useIsWide() {
+  const { w, h } = useWindowSize();
+  return w > 768 && h > 500;
+}

@@ -47,6 +47,52 @@ export const PANEL_STYLE = {
   minHeight: ADD_BAR_MIN_HEIGHT,
 };
 
+/**
+ * The floor under every statement and explanation box, wherever a bar is drawn.
+ *
+ * `flex: 1` alone hands the field whatever the controls above it have left
+ * over, which once an argument's premises have wrapped the row twice is
+ * nothing. The bar grows upward rather than squeezing it — see
+ * {@link module:hooks/useAddBarSize} — and this is what it grows *by*: a floor
+ * here is a floor on the whole bar's content height.
+ */
+export const TEXT_FIELD_MIN_HEIGHT = 44;
+
+/**
+ * The explanation box the three assist-tab panels end with. One object rather
+ * than three copies of it: they are the same field, and the floor above has to
+ * be on all of them or the bar it sizes stops growing on the one it is missing
+ * from.
+ */
+export const EXPLANATION_STYLE = {
+  flex: 1,
+  minHeight: TEXT_FIELD_MIN_HEIGHT,
+  marginTop: 8,
+  resize: "none",
+  // Stretched by the column it is in rather than sized at `width: 100%`. The
+  // two agree to within half a pixel, and half a pixel is all it takes: a
+  // percentage of a fractional content box rounds up, the field ends up wider
+  // than the box holding it, and the bar — which has to be a scroll container
+  // for the case where its controls outgrow it — puts a horizontal scrollbar
+  // across the foot of the window for it. A stretched flex item is exact.
+  alignSelf: "stretch",
+  minWidth: 0,
+  boxSizing: "border-box",
+  // And the field's own scroll port, which is the last one here that could
+  // paint a horizontal bar: a textarea wraps, so it has no legitimate use for
+  // one, and its default `auto` will still show one for a fraction of a pixel —
+  // which is what a viewport of an odd width (a scaled display) hands it, and
+  // what WebKit rounds the wrong way. Down the page it still scrolls.
+  overflowX: "hidden",
+  background: C.bg,
+  border: `1px solid ${C.border}`,
+  borderRadius: 4,
+  color: C.text,
+  padding: "6px 10px",
+  fontSize: 14,
+  outline: "none",
+};
+
 // ─── Sizing ───────────────────────────────────────────────────────────────────
 
 /**
@@ -77,7 +123,9 @@ export const SIZES = {
 };
 
 const GHOST_SIZES = {
-  compact: { padding: "3px 7px", fontSize: 11 },
+  // The floor is WCAG 2.5.8's 24px, which the padding alone left it a couple of
+  // pixels under — and these are the smallest controls in the app.
+  compact: { padding: "3px 7px", fontSize: 11, minHeight: 24 },
   prominent: { padding: "3px 8px", fontSize: 12, minHeight: 26 },
   roomy: { padding: "8px 12px", fontSize: 13, minHeight: 40 },
 };
