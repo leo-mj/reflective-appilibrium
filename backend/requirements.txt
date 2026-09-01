@@ -3,11 +3,11 @@
 # on an unrelated PR. Bounds are set at the next major of what is known to work;
 # raise one deliberately, with a test run, rather than by accident.
 
-fastapi>=0.115,<1.0
+fastapi>=0.141.1,<1.0
 uvicorn[standard]>=0.52.4,<1.0
-openai>=3.3.1,<4.0
-anthropic>=1.0.0,<2.0
-pydantic-settings>=2.5,<3.0
+openai>=3.6.0,<4.0
+anthropic>=1.2.0,<2.0
+pydantic-settings>=2.15.0,<3.0
 
 # Formal RE model. Pinned to the 1.x line these schemas were written against.
 theodias>=1.0.0,<2.0
@@ -19,8 +19,8 @@ rethon>=1.0.0,<2.0
 # Note this raises the floor to **Python 3.10** — pytest 9 publishes no wheel for
 # 3.9, so a venv on 3.9 can no longer install this file. CI is on 3.12 and black
 # already targets py311, so the floor follows what the project was already using.
-pytest>=9.0.3,<10.0
+pytest>=9.1.1,<10.0
 pytest-asyncio>=1.4.0,<2.0
 pytest-cov>=7.1.0,<8.0
-httpx>=0.27,<1.0
-pip-audit>=2.7,<3.0
+httpx>=0.28.1,<1.0
+pip-audit>=2.10.1,<3.0
