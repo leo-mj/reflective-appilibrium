@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import Settings, get_settings
 from .dependencies import (
+    rate_limit_scoring,
     rate_limit_simulation,
     require_access_token,
     require_sessions_enabled,
@@ -85,8 +86,16 @@ app.include_router(review.router, dependencies=_gated)
 app.include_router(
     sessions.router, dependencies=_gated + [Depends(require_sessions_enabled)]
 )
+# Two routers over one prefix, each with its own allowance. /quick_score and
+# /score_changes used to ride on the simulation limit, which meant that lowering
+# that limit enough to restrain /simulate would have silently blanked the score
+# badges of anyone editing — the client drops a scoring failure rather than
+# showing it. See dependencies.rate_limit_scoring.
 app.include_router(
     simulate_rethon.router, dependencies=_gated + [Depends(rate_limit_simulation)]
+)
+app.include_router(
+    simulate_rethon.scoring_router, dependencies=_gated + [Depends(rate_limit_scoring)]
 )
 app.include_router(theories.router, dependencies=_gated)
 

@@ -2,13 +2,21 @@
 Simulate rethon router — /api/simulate_rethon
 
 Runs formal reflective equilibrium computations via the theodias / rethon
-Python packages and exposes the results to the frontend.  Five endpoints:
+Python packages and exposes the results to the frontend.  Five endpoints over
+two routers, which share a prefix and differ only in what they cost:
+
+``router`` — runs a process, and is rate limited tightly:
 
 - ``/simulate``         — run a full RE process to fixed point (or resume from a
                           saved evolution).
 - ``/step``             — advance one step at a time (stateless; pass the previous
                           evolution to resume).
 - ``/score_per_round``  — compute the equilibrium Z-score at each workflow round.
+                          R simulations per request, so the most expensive of the
+                          three.
+
+``scoring_router`` — answers analytically, and is called constantly:
+
 - ``/quick_score``      — compute account and systematicity analytically without a
                           full simulation.
 - ``/score_changes``    — batch withdrawal-delta analysis for all active elements.
@@ -49,7 +57,27 @@ from ..services.rethon_scoring import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Two routers over one prefix, split by cost rather than by subject, because the
+# rate limit is attached at `include_router` in main.py and that is the only
+# thing separating them.
+#
+# Doing it with per-route dependencies instead would have been fewer lines and
+# would have broken the rule main.py:72-75 states: a gate applied at the router
+# is a gate a new endpoint inherits, and forgetting to add the dependency is
+# exactly the mistake worth designing out. An endpoint added to the wrong one of
+# these two is mis-limited; an endpoint added to a router with no gate at all is
+# unlimited, which is worse.
+#
+# `router` keeps its name and the expensive endpoints: anything added without
+# thinking about which of the two it belongs in lands under the smaller cap,
+# which is the safe direction to be wrong in.
 router = APIRouter(prefix="/api/simulate_rethon", tags=["simulate_rethon"])
+
+# /quick_score and /score_changes. Not user-initiated — the frontend fires these
+# on every edit — so they take a much larger allowance of their own. See
+# dependencies.rate_limit_scoring for what sharing one bucket cost.
+scoring_router = APIRouter(prefix="/api/simulate_rethon", tags=["simulate_rethon"])
 
 
 @router.post("/simulate", response_model=SimulatedRethonResponse)
@@ -220,7 +248,7 @@ async def score_per_round(
     return ScorePerRoundResponse(round_scores=await asyncio.to_thread(_run))
 
 
-@router.post("/score_changes", response_model=ScoreChangesResponse)
+@scoring_router.post("/score_changes", response_model=ScoreChangesResponse)
 async def score_changes(request: ScoreChangesRequest) -> ScoreChangesResponse:
     """Batch-compute withdrawal Z-score deltas for all active/revised elements.
 
@@ -238,7 +266,7 @@ async def score_changes(request: ScoreChangesRequest) -> ScoreChangesResponse:
     )
 
 
-@router.post("/quick_score", response_model=QuickScoreResponse)
+@scoring_router.post("/quick_score", response_model=QuickScoreResponse)
 async def quick_score(request: QuickScoreRequest) -> QuickScoreResponse:
     """Compute account and systematicity for the current element set analytically.
 

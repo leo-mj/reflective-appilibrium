@@ -125,14 +125,15 @@ def client_identity(
     return "ip:" + (request.client.host if request.client else "unknown")
 
 
-def _enforce_rate_limit(settings: Settings, bucket: str, identity: str) -> None:
+def _enforce_rate_limit(limit: int, bucket: str, identity: str) -> None:
     """Charge one request against ``bucket`` for ``identity``, or raise 429.
 
-    ``bucket`` namespaces the counter so that the LLM endpoints and the rethon
-    simulation get separate allowances of the same size — running a simulation
-    should not use up the budget for asking for suggestions.
+    ``bucket`` namespaces the counter and ``limit`` sizes it, and the two are
+    passed separately so that the three allowances are visibly independent at
+    every call site. They used to share one number, which made "separate
+    allowances" true of the counters and false of the ceilings.
     """
-    limiter = _get_limiter(settings.rate_limit_per_minute)
+    limiter = _get_limiter(limit)
     key = f"{bucket}:{identity}"
     if not limiter.allow(key):
         raise HTTPException(
@@ -149,11 +150,28 @@ def rate_limit_simulation(
     """Cap rethon simulations per caller.
 
     The simulation is the most expensive thing this server does — it runs to a
-    fixed point on a worker thread and is CPU-bound — so it needs a limit for
-    reasons that have nothing to do with API keys. Attached to the router in
-    ``main.py``.
+    fixed point and holds the interpreter while it does — so it needs a limit for
+    reasons that have nothing to do with API keys. Attached to the expensive
+    router in ``main.py``.
     """
-    _enforce_rate_limit(settings, "simulate", identity)
+    _enforce_rate_limit(settings.simulation_rate_limit, "simulate", identity)
+
+
+def rate_limit_scoring(
+    settings: Annotated[Settings, Depends(get_settings)],
+    identity: Annotated[str, Depends(client_identity)],
+) -> None:
+    """Cap score lookups per caller.
+
+    Its own bucket, and a much larger one, because these endpoints are not
+    user-initiated: the frontend fires ``/quick_score`` on every change to an
+    element, a relation or the weights, and ``simulateRethonClient`` turns any
+    failure into ``null`` — a blank badge, with nothing said. Charged against the
+    simulation allowance, as they were, a cap small enough to restrain
+    ``/simulate`` would have silently emptied the score badges of anyone editing
+    at a normal pace. Attached to the scoring router in ``main.py``.
+    """
+    _enforce_rate_limit(settings.scoring_rate_limit, "score", identity)
 
 
 def get_llm_service(
@@ -179,7 +197,7 @@ def get_llm_service(
     if x_base_url not in ALLOWED_BASE_URLS:
         raise HTTPException(status_code=400, detail="Unsupported provider URL")
 
-    _enforce_rate_limit(settings, "llm", identity)
+    _enforce_rate_limit(settings.llm_rate_limit, "llm", identity)
 
     if not x_api_key:
         if not settings.server_keys_allowed:

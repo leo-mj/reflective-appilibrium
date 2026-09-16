@@ -30,9 +30,24 @@ Deployment = Literal["local", "hosted"]
 #
 #                              local            hosted
 # server-side API keys         lent to loopback  never (BYOK only)
-# LLM + simulation rate limit  none              60/min per caller
+# LLM rate limit               none              60/min per caller
+# simulation rate limit        none              5/min per caller
+# scoring rate limit           none              120/min per caller
 # session storage on disk      on                off (browser keeps state)
-_HOSTED_RATE_LIMIT = 60
+#
+# Three limits rather than one, because the three sets of endpoints they cover
+# cost wildly different amounts and are reached in wildly different ways.
+#
+# An LLM call is one outbound request that mostly waits. A simulation runs a BDD
+# to a fixed point and holds the interpreter while it does, so a handful a minute
+# is already generous. Scoring is the odd one: /quick_score and /score_changes
+# are *not* user-initiated at all — the frontend fires quick_score on every edit
+# to an element, a relation or the weights, and drops the result silently on any
+# error. A cap low enough to matter there does not refuse an attack, it blanks
+# the score badges of someone typing.
+_HOSTED_LLM_LIMIT = 60
+_HOSTED_SIMULATION_LIMIT = 5
+_HOSTED_SCORING_LIMIT = 120
 
 
 class Settings(BaseSettings):
@@ -40,10 +55,10 @@ class Settings(BaseSettings):
 
     All fields can be overridden via environment variables or the .env file.
 
-    The three ``Optional`` fields below mean "follow ``deployment``" when unset.
-    Read them through the resolved properties (``server_keys_allowed``,
-    ``rate_limit_per_minute``, ``sessions_enabled``) rather than directly, or the
-    mode is silently ignored.
+    The ``Optional`` fields below mean "follow ``deployment``" when unset. Read
+    them through the resolved properties (``server_keys_allowed``,
+    ``llm_rate_limit``, ``simulation_rate_limit``, ``scoring_rate_limit``,
+    ``sessions_on``) rather than directly, or the mode is silently ignored.
     """
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
@@ -80,11 +95,19 @@ class Settings(BaseSettings):
     # reflects the real caller, and set this to true explicitly.
     allow_loopback_server_keys: Optional[bool] = None
 
-    # Per-caller cap per minute on LLM requests and on rethon simulations, which
-    # get separate allowances of this size. 0 disables it. Applies to
-    # bring-your-own-key callers too: an unmetered relay costs request volume
-    # aimed at the provider through us, not only the key.
+    # Per-caller caps per minute, one bucket each. 0 disables that bucket.
+    #
+    # The LLM cap applies to bring-your-own-key callers too: an unmetered relay
+    # costs request volume aimed at the provider through us, not only the key.
     llm_rate_limit_per_minute: Optional[int] = None
+
+    # /simulate, /step and /score_per_round — the endpoints that run a process to
+    # a fixed point. Small on purpose; see the table above.
+    simulation_rate_limit_per_minute: Optional[int] = None
+
+    # /quick_score and /score_changes, which the frontend fires on every edit.
+    # Set this high or not at all: it is a runaway guard, not a quota.
+    scoring_rate_limit_per_minute: Optional[int] = None
 
     # Whether /api/sessions may read and write session files on disk.
     sessions_enabled: Optional[bool] = None
@@ -156,15 +179,36 @@ class Settings(BaseSettings):
         return not self.is_hosted
 
     @property
-    def rate_limit_per_minute(self) -> int:
-        """Requests per minute per caller; 0 means unlimited.
+    def llm_rate_limit(self) -> int:
+        """LLM requests per minute per caller; 0 means unlimited.
 
         Unlimited locally: the only caller is the person running the server, and
-        a cap there is friction protecting no one.
+        a cap there is friction protecting no one. The same is true of the two
+        below.
         """
         if self.llm_rate_limit_per_minute is not None:
             return self.llm_rate_limit_per_minute
-        return _HOSTED_RATE_LIMIT if self.is_hosted else 0
+        return _HOSTED_LLM_LIMIT if self.is_hosted else 0
+
+    @property
+    def simulation_rate_limit(self) -> int:
+        """Rethon simulations per minute per caller; 0 means unlimited."""
+        if self.simulation_rate_limit_per_minute is not None:
+            return self.simulation_rate_limit_per_minute
+        return _HOSTED_SIMULATION_LIMIT if self.is_hosted else 0
+
+    @property
+    def scoring_rate_limit(self) -> int:
+        """Score lookups per minute per caller; 0 means unlimited.
+
+        Deliberately far above the other two. These endpoints decorate the UI
+        rather than answering a request anyone made, and the client turns a
+        failure into a blank badge rather than an error — so a cap that bites is
+        invisible to the person it is biting.
+        """
+        if self.scoring_rate_limit_per_minute is not None:
+            return self.scoring_rate_limit_per_minute
+        return _HOSTED_SCORING_LIMIT if self.is_hosted else 0
 
     @property
     def sessions_on(self) -> bool:

@@ -30,15 +30,30 @@ def test_local_is_the_default():
 def test_local_lends_keys_runs_unlimited_and_stores_sessions():
     s = make_settings()
     assert s.server_keys_allowed is True
-    assert s.rate_limit_per_minute == 0
+    assert s.llm_rate_limit == 0
+    assert s.simulation_rate_limit == 0
+    assert s.scoring_rate_limit == 0
     assert s.sessions_on is True
 
 
 def test_hosted_flips_all_three():
     s = make_settings(deployment="hosted")
     assert s.server_keys_allowed is False
-    assert s.rate_limit_per_minute == 60
+    assert s.llm_rate_limit == 60
     assert s.sessions_on is False
+
+
+def test_hosted_caps_the_three_features_separately():
+    """The sizes differ by an order of magnitude, and are meant to.
+
+    A simulation holds the interpreter to a fixed point; a score lookup is
+    analytic and fired by the frontend on every edit. One number for both is what
+    made lowering the simulation cap a way to blank the score badges.
+    """
+    s = make_settings(deployment="hosted")
+    assert s.llm_rate_limit == 60
+    assert s.simulation_rate_limit == 5
+    assert s.scoring_rate_limit == 120
 
 
 def test_an_unknown_deployment_value_is_rejected():
@@ -53,8 +68,12 @@ def test_an_unknown_deployment_value_is_rejected():
     "field, value, prop, expected",
     [
         ("allow_loopback_server_keys", True, "server_keys_allowed", True),
-        ("llm_rate_limit_per_minute", 5, "rate_limit_per_minute", 5),
-        ("llm_rate_limit_per_minute", 0, "rate_limit_per_minute", 0),
+        ("llm_rate_limit_per_minute", 5, "llm_rate_limit", 5),
+        ("llm_rate_limit_per_minute", 0, "llm_rate_limit", 0),
+        ("simulation_rate_limit_per_minute", 50, "simulation_rate_limit", 50),
+        ("simulation_rate_limit_per_minute", 0, "simulation_rate_limit", 0),
+        ("scoring_rate_limit_per_minute", 10, "scoring_rate_limit", 10),
+        ("scoring_rate_limit_per_minute", 0, "scoring_rate_limit", 0),
         ("sessions_enabled", True, "sessions_on", True),
     ],
 )
@@ -67,7 +86,9 @@ def test_hosted_defaults_can_be_overridden(field, value, prop, expected):
     "field, value, prop, expected",
     [
         ("allow_loopback_server_keys", False, "server_keys_allowed", False),
-        ("llm_rate_limit_per_minute", 10, "rate_limit_per_minute", 10),
+        ("llm_rate_limit_per_minute", 10, "llm_rate_limit", 10),
+        ("simulation_rate_limit_per_minute", 2, "simulation_rate_limit", 2),
+        ("scoring_rate_limit_per_minute", 30, "scoring_rate_limit", 30),
         ("sessions_enabled", False, "sessions_on", False),
     ],
 )
@@ -244,6 +265,13 @@ def test_no_tokens_configured_means_an_empty_set():
 # ── Separate allowances per feature ───────────────────────────────────────────
 
 
+# Every request below sends `json={}`, which fails request validation. That is
+# the point: a 422 means the call reached validation, so the limiter let it
+# through, and a 429 means it did not — and no simulation ever actually runs.
+_SIMULATE = "/api/simulate_rethon/simulate"
+_SCORE = "/api/simulate_rethon/quick_score"
+
+
 def test_simulation_and_llm_do_not_share_an_allowance(mock_llm_complete):
     """Running a simulation should not use up the budget for asking for help."""
     settings = make_settings(deployment="hosted", llm_rate_limit_per_minute=2)
@@ -255,23 +283,44 @@ def test_simulation_and_llm_do_not_share_an_allowance(mock_llm_complete):
             assert client.post("/api/llm/test", headers=headers).status_code == 200
         assert client.post("/api/llm/test", headers=headers).status_code == 429
 
-        # The simulation allowance is untouched: a malformed body gets as far as
-        # request validation (422), not the rate limiter (429).
-        assert (
-            client.post("/api/simulate_rethon/quick_score", json={}).status_code == 422
-        )
+        # The simulation allowance is untouched.
+        assert client.post(_SIMULATE, json={}).status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_scoring_and_simulation_do_not_share_an_allowance():
+    """The split this ticket exists for.
+
+    The frontend fires /quick_score on every edit to an element, a relation or
+    the weights, and turns any failure into a null — a blank badge, silently. So
+    a simulation cap low enough to be worth having must not reach these two, or
+    tightening the server makes the app look broken to someone merely typing.
+    """
+    settings = make_settings(
+        deployment="hosted",
+        simulation_rate_limit_per_minute=2,
+        scoring_rate_limit_per_minute=50,
+    )
+    try:
+        client = _client_with(settings)
+        # Exhaust the simulation allowance.
+        for _ in range(2):
+            assert client.post(_SIMULATE, json={}).status_code == 422
+        assert client.post(_SIMULATE, json={}).status_code == 429
+
+        # Scoring keeps answering.
+        codes = {client.post(_SCORE, json={}).status_code for _ in range(20)}
+        assert codes == {422}
     finally:
         app.dependency_overrides.clear()
 
 
 def test_simulations_are_rate_limited():
-    settings = make_settings(deployment="hosted", llm_rate_limit_per_minute=3)
+    settings = make_settings(deployment="hosted", simulation_rate_limit_per_minute=3)
     try:
         client = _client_with(settings)
-        codes = [
-            client.post("/api/simulate_rethon/quick_score", json={}).status_code
-            for _ in range(5)
-        ]
+        codes = [client.post(_SIMULATE, json={}).status_code for _ in range(5)]
     finally:
         app.dependency_overrides.clear()
     # The first three get through to validation; the rest are refused earlier.
@@ -279,13 +328,31 @@ def test_simulations_are_rate_limited():
     assert codes[3:] == [429, 429]
 
 
+def test_scoring_is_rate_limited_too_just_far_higher():
+    """A runaway guard, not a quota — but not absent."""
+    settings = make_settings(deployment="hosted", scoring_rate_limit_per_minute=3)
+    try:
+        client = _client_with(settings)
+        codes = [client.post(_SCORE, json={}).status_code for _ in range(5)]
+    finally:
+        app.dependency_overrides.clear()
+    assert codes[:3] == [422, 422, 422]
+    assert codes[3:] == [429, 429]
+
+
 def test_simulations_are_unlimited_locally():
     try:
         client = _client_with(make_settings())
-        codes = {
-            client.post("/api/simulate_rethon/quick_score", json={}).status_code
-            for _ in range(80)
-        }
+        codes = {client.post(_SIMULATE, json={}).status_code for _ in range(80)}
+    finally:
+        app.dependency_overrides.clear()
+    assert codes == {422}
+
+
+def test_scoring_is_unlimited_locally():
+    try:
+        client = _client_with(make_settings())
+        codes = {client.post(_SCORE, json={}).status_code for _ in range(200)}
     finally:
         app.dependency_overrides.clear()
     assert codes == {422}
