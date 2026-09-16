@@ -12,7 +12,7 @@ from ..routers.rethon_schemas import (
     ScoreChangesResponse,
     QuickScoreResponse,
 )
-from .rethon_simulation import build_numerical_arguments
+from .rethon_simulation import build_numerical_arguments, enforce_element_cap
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,7 @@ def compute_score_changes(
     relations: List[RERelation],
     local: bool = True,
     weights: Optional[ModelWeights] = None,
+    max_elements: int = 0,
 ) -> ScoreChangesResponse:
     """Batch-compute withdrawal Z-score deltas for all active/revised elements.
 
@@ -71,8 +72,17 @@ def compute_score_changes(
     (C) and principle/theory elements form the theory position (T).  Z is
     computed directly from ``re_obj.achievement(C, T, C₀)`` — no full RE
     simulation is run.
+
+    "Analytical" is not "cheap": the BDD below is built over the whole sentence
+    pool and then queried once per element, so this is the most size-sensitive
+    thing in the module. Hence the cap, and hence it being checked here rather
+    than only in ``validate_and_build``, which this function never calls.
     """
     n = len(elements)
+    # Before the try below, deliberately: that block turns any exception into an
+    # empty response, so a cap raised inside it would be swallowed and the
+    # oversized BDD would simply be built again on the next keystroke.
+    enforce_element_cap(n, max_elements)
     target_elements = [
         el
         for el in elements
@@ -166,6 +176,7 @@ def compute_quick_score(
     elements: List[REElement],
     relations: List[RERelation],
     weights: Optional[ModelWeights] = None,
+    max_elements: int = 0,
 ) -> QuickScoreResponse:
     """Compute account and systematicity for the current element set analytically.
 
@@ -175,7 +186,12 @@ def compute_quick_score(
 
     Returns ``account=None, systematicity=None`` when there are fewer than 3
     elements, no argument relations, or no active principle/theory elements.
+    Too *many* elements is the one size problem it does not answer with a null:
+    that is a 422, because a blank badge would say "nothing to score here" when
+    what happened is that this deployment declined to.
     """
+    # Outside the try for the reason given in compute_score_changes.
+    enforce_element_cap(len(elements), max_elements)
     try:
         n = len(elements)
         if n < 3:

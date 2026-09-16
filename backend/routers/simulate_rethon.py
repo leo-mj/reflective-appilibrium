@@ -22,8 +22,8 @@ two routers, which share a prefix and differ only in what they cost:
 - ``/score_changes``    — batch withdrawal-delta analysis for all active elements.
 """
 
-from fastapi import APIRouter, HTTPException
-from typing import List, Dict
+from fastapi import APIRouter, Depends, HTTPException
+from typing import Annotated, List, Dict
 import asyncio
 import logging
 
@@ -41,8 +41,10 @@ from .rethon_schemas import (
     QuickScoreRequest,
     QuickScoreResponse,
 )
+from ..config import Settings, get_settings
 from ..services.rethon_simulation import (
     REProcess,
+    enforce_element_cap,
     validate_and_build,
     get_rethon_final_state,
     build_re,
@@ -83,6 +85,7 @@ scoring_router = APIRouter(prefix="/api/simulate_rethon", tags=["simulate_rethon
 @router.post("/simulate", response_model=SimulatedRethonResponse)
 async def simulate_rethon(
     request: SimulateRethonRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
     sentence_pool_minimum: int = 3,
 ) -> SimulatedRethonResponse:
     """Run the RE process to a fixed point and return the translated evolution with Z-scores.
@@ -92,10 +95,14 @@ async def simulate_rethon(
     from where it left off).  Otherwise the simulation starts fresh from the
     element statuses in the request.
 
-    Raises 422 if the sentence pool is too small or no argument relations are present.
+    Raises 422 if the sentence pool is too small, too large for this deployment,
+    or no argument relations are present.
     """
     built_arguments, lookup_w_negated, n = validate_and_build(
-        request.elements, request.relations, sentence_pool_minimum
+        request.elements,
+        request.relations,
+        sentence_pool_minimum,
+        settings.simulation_max_elements,
     )
 
     def _run() -> REProcess:
@@ -141,6 +148,7 @@ async def simulate_rethon(
 @router.post("/step", response_model=SimulatedRethonResponse)
 async def simulate_rethon_step(
     request: SimulateRethonStepRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
     sentence_pool_minimum: int = 3,
 ) -> SimulatedRethonResponse:
     """Advance the RE process by exactly one step and return the updated evolution.
@@ -152,7 +160,10 @@ async def simulate_rethon_step(
     stepping session.  Returns 400 if the process has already reached a fixed point.
     """
     built_arguments, lookup_w_negated, n = validate_and_build(
-        request.elements, request.relations, sentence_pool_minimum
+        request.elements,
+        request.relations,
+        sentence_pool_minimum,
+        settings.simulation_max_elements,
     )
 
     def _run() -> REProcess:
@@ -210,6 +221,7 @@ async def simulate_rethon_step(
 @router.post("/score_per_round", response_model=ScorePerRoundResponse)
 async def score_per_round(
     request: ScorePerRoundRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ScorePerRoundResponse:
     """Compute the equilibrium Z-score for each workflow round from 1 to *request.round*.
 
@@ -217,6 +229,11 @@ async def score_per_round(
     running the rethon simulation.  Rounds where the simulation fails (e.g. not
     enough elements or no arguments yet) are returned with ``scores=None``.
     """
+    # Checked once against the whole list rather than per round: every round's
+    # subset is a filter of it, so nothing downstream can exceed what this
+    # admits. The round count is bounded by the schema — this endpoint runs one
+    # simulation per round, so it is the one place where two numbers multiply.
+    enforce_element_cap(len(request.elements), settings.simulation_max_elements)
 
     def _run() -> List[RoundScores]:
         results: List[RoundScores] = []
@@ -249,7 +266,10 @@ async def score_per_round(
 
 
 @scoring_router.post("/score_changes", response_model=ScoreChangesResponse)
-async def score_changes(request: ScoreChangesRequest) -> ScoreChangesResponse:
+async def score_changes(
+    request: ScoreChangesRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ScoreChangesResponse:
     """Batch-compute withdrawal Z-score deltas for all active/revised elements.
 
     Uses an analytical approach: judgment elements form the commitment position
@@ -263,11 +283,15 @@ async def score_changes(request: ScoreChangesRequest) -> ScoreChangesResponse:
         request.relations,
         request.local,
         request.weights,
+        settings.simulation_max_elements,
     )
 
 
 @scoring_router.post("/quick_score", response_model=QuickScoreResponse)
-async def quick_score(request: QuickScoreRequest) -> QuickScoreResponse:
+async def quick_score(
+    request: QuickScoreRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> QuickScoreResponse:
     """Compute account and systematicity for the current element set analytically.
 
     Derives C (all active/revised/rejected elements) and T (active/revised
@@ -282,4 +306,5 @@ async def quick_score(request: QuickScoreRequest) -> QuickScoreResponse:
         request.elements,
         request.relations,
         request.weights,
+        settings.simulation_max_elements,
     )

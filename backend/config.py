@@ -49,6 +49,29 @@ _HOSTED_LLM_LIMIT = 60
 _HOSTED_SIMULATION_LIMIT = 5
 _HOSTED_SCORING_LIMIT = 120
 
+# The other half of restraining the simulation, and the half a rate limit cannot
+# reach: the cost of one request rather than how many are allowed.
+#
+# Every one of these computations enumerates the consistent complete positions of
+# a dialectical structure over the sentence pool, and that count grows like the
+# Fibonacci numbers in the element count — roughly x1.6 per element. Measured on
+# a development machine, for a chain of two-premise arguments:
+#
+#     n=20   1.0s      n=24   8.0s      n=26  21.4s
+#     n=22   2.8s      n=25  13.1s      n=28  >30s
+#
+# A rate limit of 5/min is no protection against any of those; 200, which is what
+# the schema permits, is not a long wait but an unbounded one.
+#
+# 20 rather than 25 because of what a slow request currently costs *other*
+# callers. `dd` ships no compiled _cudd extension here, so the BDD is pure Python
+# and holds the GIL: one 13-second computation freezes the event loop, and with
+# it /api/health and every other visitor's in-flight LLM call. Until Epic E moves
+# these into a worker process with a wall-clock timeout, the cap is the only
+# thing standing between one large request and a server-wide stall — so it is set
+# where a request stays about a second. Raise it once the pool lands.
+_HOSTED_MAX_ELEMENTS = 20
+
 
 class Settings(BaseSettings):
     """Pydantic-settings model for the backend configuration.
@@ -108,6 +131,11 @@ class Settings(BaseSettings):
     # /quick_score and /score_changes, which the frontend fires on every edit.
     # Set this high or not at all: it is a runaway guard, not a quota.
     scoring_rate_limit_per_minute: Optional[int] = None
+
+    # Largest sentence pool any rethon computation will accept. 0 disables the
+    # cap, which is right on a machine whose only user can watch it work and
+    # wrong anywhere a stranger can send a payload.
+    max_simulation_elements: Optional[int] = None
 
     # Whether /api/sessions may read and write session files on disk.
     sessions_enabled: Optional[bool] = None
@@ -209,6 +237,18 @@ class Settings(BaseSettings):
         if self.scoring_rate_limit_per_minute is not None:
             return self.scoring_rate_limit_per_minute
         return _HOSTED_SCORING_LIMIT if self.is_hosted else 0
+
+    @property
+    def simulation_max_elements(self) -> int:
+        """Largest sentence pool a rethon computation will accept; 0 = unlimited.
+
+        Unlimited locally for the same reason the caps above are: the only caller
+        is the person running the server, who can see the request take minutes
+        and decide for themselves whether to wait. Nobody else can.
+        """
+        if self.max_simulation_elements is not None:
+            return self.max_simulation_elements
+        return _HOSTED_MAX_ELEMENTS if self.is_hosted else 0
 
     @property
     def sessions_on(self) -> bool:

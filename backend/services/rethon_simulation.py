@@ -297,17 +297,49 @@ def translate_re_state(
     return result
 
 
+def enforce_element_cap(n: int, max_elements: int) -> None:
+    """Refuse a sentence pool too large to compute over, or return quietly.
+
+    ``max_elements`` of 0 means unlimited, which is how a local install opts out.
+
+    Every rethon computation here builds a BDD whose size grows exponentially in
+    the sentence pool, so this is a wall-clock guard, not a fairness one: past
+    some width a single request stops being slow and starts being one that never
+    returns, taking the worker with it. 422 rather than 413, because the payload
+    is well-formed and the right size for a different deployment — it is this
+    server that cannot answer it.
+
+    Called by every entry point that builds a structure, including the two in
+    ``rethon_scoring`` that build their own rather than going through
+    ``validate_and_build``.
+    """
+    if max_elements and n > max_elements:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"This instance computes over at most {max_elements} elements; "
+                f"the request has {n}. Run the backend locally to lift the cap."
+            ),
+        )
+
+
 def validate_and_build(
     elements: List[REElement],
     relations: List[RERelation],
     sentence_pool_minimum: int = 3,
+    max_elements: int = 0,
 ) -> tuple[DetectArgumentsResponse, Dict[int, REElement], int]:
     """Validate the request payload and build the numerical argument structures.
 
     Raises HTTPException on invalid input.  Returns the built arguments, the
     negated lookup, and the sentence pool size.
+
+    ``max_elements`` is passed in rather than read from settings so this stays a
+    pure function of its arguments — which is what lets it be called from a
+    worker process without carrying configuration across the pipe.
     """
     n = len(elements)
+    enforce_element_cap(n, max_elements)
     if n < sentence_pool_minimum:
         raise HTTPException(
             status_code=422,
