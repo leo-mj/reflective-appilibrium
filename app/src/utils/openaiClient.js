@@ -4,18 +4,18 @@
  * @module utils/openaiClient
  */
 
+import { readLLMSettings } from "./llmKey.js";
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 /**
- * Returns BYOK request headers from sessionStorage, or an empty object if
- * no LLM settings have been saved.
+ * Returns BYOK request headers from the saved settings, or an empty object if
+ * none have been saved.
  *
  * @returns {Record<string, string>}
  */
 export function getLLMHeaders() {
-  const raw = sessionStorage.getItem("llmSettings");
-  if (!raw) return {};
-  const { apiKey, baseUrl, model } = JSON.parse(raw);
+  const { apiKey, baseUrl, model } = readLLMSettings() ?? {};
   const headers = {};
   if (apiKey) headers["x-api-key"] = apiKey;
   if (baseUrl) headers["x-base-url"] = baseUrl;
@@ -31,16 +31,10 @@ export function getLLMHeaders() {
  * @returns {string|null}
  */
 export function getConfiguredModel() {
-  try {
-    const raw = sessionStorage.getItem("llmSettings");
-    if (raw) {
-      const { model } = JSON.parse(raw);
-      if (model) return model;
-    }
-  } catch {
-    // Malformed sessionStorage value — fall through to the build-time default.
-  }
-  return import.meta.env.VITE_DEFAULT_MODEL || null;
+  // readLLMSettings swallows an unreadable or malformed value, so a broken
+  // sessionStorage entry falls through to the build-time default rather than
+  // failing the render of whatever asked which model it is about to send to.
+  return readLLMSettings()?.model || import.meta.env.VITE_DEFAULT_MODEL || null;
 }
 
 /**

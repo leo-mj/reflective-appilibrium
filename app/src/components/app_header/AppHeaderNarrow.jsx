@@ -8,6 +8,10 @@ import { C } from "../../constants/colors.js";
 import { useTheme } from "../../hooks/useTheme.js";
 import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
+import {
+  useLLMSettings,
+  useLLMSettingsRequested,
+} from "../../utils/llmKey.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import {
@@ -88,15 +92,16 @@ export function AppHeaderNarrow({
     toggleAccessible,
   } = useTheme();
 
-  const llmSaved = (() => {
-    if (!BYOK_ENABLED) return null;
-    try {
-      const s = JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}");
-      return s?.apiKey ? s : null;
-    } catch {
-      return null;
-    }
-  })();
+  // Both of these are the wide header's, line for line — see the comments there.
+  const settings = useLLMSettings();
+  const llmSaved = BYOK_ENABLED && settings?.apiKey ? settings : null;
+
+  const llmRequests = useLLMSettingsRequested();
+  const [seenLlmRequest, setSeenLlmRequest] = useState(llmRequests);
+  if (seenLlmRequest !== llmRequests) {
+    setSeenLlmRequest(llmRequests);
+    setLlmOpen(true);
+  }
 
   const menuBtn = (active = false) => ({
     ...btn(active),

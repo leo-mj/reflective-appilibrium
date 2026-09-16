@@ -11,6 +11,11 @@ import { LLM_PROVIDERS } from "../../constants/llmProviders.js";
 import { BYOK_ENABLED } from "../../config.js";
 import { btn } from "./appHeaderStyles.js";
 import { getSessionUsage, clearSessionUsage } from "../../utils/openaiClient.js";
+import {
+  readLLMSettings,
+  useHasLLMKey,
+  notifyLLMKeyChanged,
+} from "../../utils/llmKey.js";
 
 /** Why the inert controls are inert, for hover and assistive technology. */
 const DEMO_REASON = "Unavailable in the demo — this build has no backend.";
@@ -18,21 +23,17 @@ const DEMO_REASON = "Unavailable in the demo — this build has no backend.";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 function getInitialProvider() {
-  const raw = sessionStorage.getItem("llmSettings");
-  if (raw) {
-    const { baseUrl } = JSON.parse(raw);
-    return LLM_PROVIDERS.find((p) => p.baseUrl === baseUrl) ?? LLM_PROVIDERS[0];
+  const saved = readLLMSettings();
+  if (saved) {
+    return LLM_PROVIDERS.find((p) => p.baseUrl === saved.baseUrl) ?? LLM_PROVIDERS[0];
   }
   const defaultId = import.meta.env.VITE_DEFAULT_PROVIDER;
   return LLM_PROVIDERS.find((p) => p.id === defaultId) ?? LLM_PROVIDERS[0];
 }
 
 function getInitialModel(provider) {
-  const raw = sessionStorage.getItem("llmSettings");
-  if (raw) {
-    const { model } = JSON.parse(raw);
-    if (model) return model;
-  }
+  const saved = readLLMSettings();
+  if (saved?.model) return saved.model;
   const defaultModel = import.meta.env.VITE_DEFAULT_MODEL;
   if (defaultModel) return defaultModel;
   return provider.models[0];
@@ -65,15 +66,9 @@ export function LLMSettingsModal({ open, onClose }) {
       .catch(() => {});
   }, [open, demo]);
 
-  const hasSessionKey = Boolean(
-    (() => {
-      try {
-        return JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}")?.apiKey;
-      } catch {
-        return false;
-      }
-    })()
-  );
+  // Subscribed rather than read once: Clear writes and closes, and the "· Key
+  // saved" line beside the field has to have moved by the time it reopens.
+  const hasSessionKey = useHasLLMKey();
   const hasSavedKey = hasSessionKey || serverKeyUrls.has(provider.baseUrl);
 
   const effectiveApiKey = apiKey || provider.defaultApiKey || "";
@@ -129,11 +124,13 @@ export function LLMSettingsModal({ open, onClose }) {
       "llmSettings",
       JSON.stringify({ apiKey: effectiveApiKey, baseUrl: provider.baseUrl, model })
     );
+    notifyLLMKeyChanged();
     onClose();
   }
 
   function handleClear() {
     sessionStorage.removeItem("llmSettings");
+    notifyLLMKeyChanged();
     clearSessionUsage();
     setApiKey("");
     setTestStatus(null);

@@ -29,6 +29,10 @@ import { MenuToggle } from "./MenuToggle.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
+import {
+  useLLMSettings,
+  useLLMSettingsRequested,
+} from "../../utils/llmKey.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
 
@@ -103,15 +107,22 @@ export function AppHeaderWide({
     setMenuOpen(!!tourMenuOpen);
   }
 
-  const llmSaved = (() => {
-    if (!BYOK_ENABLED) return null;
-    try {
-      const s = JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}");
-      return s?.apiKey ? s : null;
-    } catch {
-      return null;
-    }
-  })();
+  // The BYOK_ENABLED test stays here rather than in the store: whether to name
+  // the model in the menu is a display question, and llmKey.js does not know
+  // which build it is in.
+  const settings = useLLMSettings();
+  const llmSaved = BYOK_ENABLED && settings?.apiKey ? settings : null;
+
+  // A tab that needs a key asks for this modal rather than having `llmOpen`
+  // lifted out through ten components. Adjusted during render, as the tour's
+  // menu above is and for the same reason — an effect would open it a paint
+  // later than the press that asked for it.
+  const llmRequests = useLLMSettingsRequested();
+  const [seenLlmRequest, setSeenLlmRequest] = useState(llmRequests);
+  if (seenLlmRequest !== llmRequests) {
+    setSeenLlmRequest(llmRequests);
+    setLlmOpen(true);
+  }
 
   const menuItem = {
     ...btn(false),
