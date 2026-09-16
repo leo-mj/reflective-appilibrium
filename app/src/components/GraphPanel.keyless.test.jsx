@@ -91,6 +91,21 @@ async function renderPanel(props = {}) {
   await screen.findByText(/Elicit Judgments/i);
 }
 
+/**
+ * The URLs of requests that would spend an API key.
+ *
+ * Not "every request": the assist panel also asks `/simulate_rethon/quick_score`
+ * for the score badges on its suggestion cards, which is analytic, needs no key,
+ * and has its own rate bucket on the server precisely because it is fired this
+ * freely. Asserting on the whole call list would fail on that and say nothing
+ * about the thing under test.
+ */
+function llmCalls() {
+  return fetchMock.mock.calls
+    .map(([url]) => String(url))
+    .filter((url) => !url.includes("/simulate_rethon/"));
+}
+
 function saveKey() {
   sessionStorage.setItem(
     "llmSettings",
@@ -117,9 +132,9 @@ describe("an assist tab with no API key saved", () => {
   // The whole point. A keyless visitor pressing a suggest button, or arriving on
   // a tab that auto-fetches, must be served the fixture rather than a request
   // that can only 400.
-  it("fires no request when the workflow auto-fetches", async () => {
+  it("fires no LLM request when the workflow auto-fetches", async () => {
     await renderPanel({ workflowPhase: "elicitJudgments" });
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(llmCalls()).toEqual([]);
   });
 });
 
@@ -133,7 +148,7 @@ describe("once a key is saved", () => {
   it("goes to the network on an auto-fetch", async () => {
     saveKey();
     await renderPanel({ workflowPhase: "elicitJudgments" });
-    expect(fetchMock).toHaveBeenCalled();
+    expect(llmCalls()).not.toEqual([]);
   });
 
   // No reload: the panel is already mounted when the key arrives, which is what

@@ -336,7 +336,6 @@ export function GraphPanel({
               useDummy={suggestionsAreSample}
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
-              keyMissing={keyMissing}
             />
           </Suspense>
         )}
@@ -354,7 +353,6 @@ export function GraphPanel({
               useDummy={suggestionsAreSample}
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
-              keyMissing={keyMissing}
               weights={weights}
             />
           </Suspense>
@@ -373,7 +371,6 @@ export function GraphPanel({
               useDummy={suggestionsAreSample}
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
-              keyMissing={keyMissing}
               weights={weights}
             />
           </Suspense>
@@ -391,7 +388,6 @@ export function GraphPanel({
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
-              keyMissing={keyMissing}
             />
           </Suspense>
         )}
@@ -414,7 +410,6 @@ export function GraphPanel({
               useDummy={suggestionsAreSample}
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
-              keyMissing={keyMissing}
             />
           </Suspense>
         )}
@@ -434,7 +429,6 @@ export function GraphPanel({
               state={state}
               useDummy={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
-              keyMissing={keyMissing}
               verifyArguments={verifyArguments}
               onAddElement={onAddElement}
               onReviseElementText={onReviseElementText}

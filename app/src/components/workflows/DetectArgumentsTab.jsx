@@ -302,8 +302,6 @@ function ArgumentCard({
  * @param {boolean}  [props.useDummy]
  * @param {boolean}  [props.suggestionsDisabled]  No backend and nothing sample to
  *   fall back on — the run button is inert and the auto-fetch must not fire.
- * @param {boolean}  [props.keyMissing]  LLM features are built in but the visitor
- *   has supplied no API key, so what is shown below is the sample fixture.
  * @param {Function} [props.onAddElement]
  * @param {Function} [props.onReviseElementText]  (elementId, text) — rewords an
  *   element already in the state, recorded as a revision.
@@ -314,7 +312,6 @@ export function DetectArgumentsTab({
   state,
   useDummy = false,
   suggestionsDisabled = false,
-  keyMissing = false,
   verifyArguments = true,
   onAddElement,
   onReviseElementText,
@@ -574,7 +571,7 @@ export function DetectArgumentsTab({
           </div>
         )}
 
-        {keyMissing && <NeedsKeyNotice />}
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {result && (

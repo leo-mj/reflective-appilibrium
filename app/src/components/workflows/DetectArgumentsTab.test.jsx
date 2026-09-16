@@ -6,7 +6,7 @@
 // cannot serve a suggestion therefore asked anyway, on arrival rather than on a
 // press anyone could decline. These pin the guard and the keyless notice.
 import { vi, describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { render, cleanup, act } from "@testing-library/react";
 
 vi.mock("../../utils/argumentsClient.js", () => ({
   detectArguments: vi.fn().mockResolvedValue({
@@ -66,15 +66,6 @@ describe("the auto-fetch guard", () => {
   });
 });
 
-describe("the keyless notice", () => {
-  it("is absent when a key is configured", async () => {
-    await renderTab();
-    expect(screen.queryByText(/These are sample suggestions/)).toBeNull();
-  });
-
-  it("appears when the visitor has supplied no key", async () => {
-    await renderTab({ keyMissing: true });
-    expect(screen.getByText(/These are sample suggestions/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Add a key/ })).toBeTruthy();
-  });
-});
+// The keyless notice gates itself on the key store and LLM_ENABLED, neither of
+// which this tab knows about — so it is tested where those can be controlled,
+// in GraphPanel.keyless.test.jsx, rather than mocked twice.

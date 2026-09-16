@@ -25,6 +25,8 @@
 
 import { useSyncExternalStore } from "react";
 
+import { LLM_ENABLED } from "../config.js";
+
 const KEY = "llmSettings";
 
 const listeners = new Set();
@@ -88,6 +90,22 @@ export function notifyLLMKeyChanged() {
 /** The saved settings, re-rendering the caller when they change. */
 export function useLLMSettings() {
   return useSyncExternalStore(subscribe, readLLMSettings, readLLMSettings);
+}
+
+/**
+ * Whether this build has the LLM features and the visitor has not supplied a
+ * key — the public site's ordinary first state, and the condition every assist
+ * tab falls back to samples on.
+ *
+ * Here rather than derived at each call site so that the panel deciding what to
+ * fetch and the notice explaining why cannot disagree about what "keyless"
+ * means. It is the only thing in this module that knows which build it is in.
+ */
+export function useKeyMissing() {
+  // Read unconditionally: `LLM_ENABLED && !useHasLLMKey()` is a conditional hook
+  // call, constant though the left side is.
+  const hasKey = useHasLLMKey();
+  return LLM_ENABLED && !hasKey;
 }
 
 /** Whether a usable key is saved, re-rendering the caller when that flips. */

@@ -234,7 +234,6 @@ export function TheorySuggestTab({
   nextPhaseIsEnabled,
   useDummy = false,
   suggestionsDisabled = false,
-  keyMissing = false,
 }) {
   const {
     suggestions,
@@ -346,7 +345,7 @@ export function TheorySuggestTab({
             )
           }
         />
-        {keyMissing && <NeedsKeyNotice />}
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {principles.length < 1 && (

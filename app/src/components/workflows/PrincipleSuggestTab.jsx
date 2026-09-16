@@ -188,7 +188,6 @@ export function PrincipleSuggestTab({
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
-  keyMissing = false,
   weights = null,
 }) {
   const {
@@ -276,7 +275,7 @@ export function PrincipleSuggestTab({
             suggestions.length > 0 && <AiDisclosureBanner model={model} />
           }
         />
-        {keyMissing && <NeedsKeyNotice />}
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {jAndPCount <= 1 && (

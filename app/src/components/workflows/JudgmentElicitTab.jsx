@@ -227,7 +227,6 @@ export function JudgmentElicitTab({
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
-  keyMissing = false,
   weights = null,
 }) {
   const {
@@ -309,7 +308,7 @@ export function JudgmentElicitTab({
             suggestions.length > 0 && <AiDisclosureBanner model={model} />
           }
         />
-        {keyMissing && <NeedsKeyNotice />}
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {hasResult && suggestions.length === 0 && (

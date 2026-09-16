@@ -161,7 +161,6 @@ export function RelationSuggestTab({
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
-  keyMissing = false,
 }) {
   const {
     suggestions,
@@ -253,7 +252,7 @@ export function RelationSuggestTab({
           }
         />
 
-        {keyMissing && <NeedsKeyNotice />}
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {activeElements.length < 2 && (

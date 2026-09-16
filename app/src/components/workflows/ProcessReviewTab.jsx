@@ -320,7 +320,6 @@ export function ProcessReviewTab({
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
-  keyMissing = false,
 }) {
   const {
     suggestions,
@@ -419,7 +418,7 @@ export function ProcessReviewTab({
             )
           }
         />
-        {keyMissing && <NeedsKeyNotice />}
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {state.log.length < 2 && (

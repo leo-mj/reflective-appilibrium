@@ -8,7 +8,7 @@
 import { C } from "../constants/colors.js";
 import { CheckIcon, XIcon, EditIcon, ChatIcon } from "./Icons.jsx";
 import { Tooltip } from "./Tooltip.jsx";
-import { requestLLMSettings } from "../utils/llmKey.js";
+import { requestLLMSettings, useKeyMissing } from "../utils/llmKey.js";
 
 const CIRCLE_BTN = {
   width: 26,
@@ -209,11 +209,17 @@ export function ErrorBanner({ message }) {
  * than the danger red, and the wording says what is on screen before it says
  * what is missing.
  *
- * The button goes through `requestLLMSettings()` rather than a prop, so a tab
- * six levels down can open a modal the header owns without `llmOpen` being
- * lifted through everything in between.
+ * Decides for itself whether to appear, and takes no props at all. What it
+ * renders on is a build constant and the key store, neither of which the tab
+ * hosting it knows anything about — threading a `keyMissing` prop down to six
+ * tabs only moved the same two reads further from the thing that needed them.
+ * Its button goes through `requestLLMSettings()` for the same reason: a tab six
+ * levels down can open a modal the header owns without `llmOpen` being lifted
+ * through everything in between.
  */
 export function NeedsKeyNotice() {
+  const keyMissing = useKeyMissing();
+  if (!keyMissing) return null;
   return (
     <div
       style={{
