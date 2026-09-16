@@ -20,6 +20,7 @@ import {
   ChatButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { nextPhaseEnabled } from "../../utils/workflowUtils.js";
@@ -160,6 +161,7 @@ export function RelationSuggestTab({
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
+  keyMissing = false,
 }) {
   const {
     suggestions,
@@ -251,6 +253,7 @@ export function RelationSuggestTab({
           }
         />
 
+        {keyMissing && <NeedsKeyNotice />}
         {error && <ErrorBanner message={error} />}
 
         {activeElements.length < 2 && (

@@ -33,6 +33,7 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { SuggestionToolbar } from "./workflowComponents.jsx";
@@ -319,6 +320,7 @@ export function ProcessReviewTab({
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
+  keyMissing = false,
 }) {
   const {
     suggestions,
@@ -417,6 +419,7 @@ export function ProcessReviewTab({
             )
           }
         />
+        {keyMissing && <NeedsKeyNotice />}
         {error && <ErrorBanner message={error} />}
 
         {state.log.length < 2 && (

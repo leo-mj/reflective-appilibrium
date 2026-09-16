@@ -21,6 +21,7 @@ import {
   ChatButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { nextPhaseEnabled } from "../../utils/workflowUtils.js";
@@ -187,6 +188,7 @@ export function PrincipleSuggestTab({
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
+  keyMissing = false,
   weights = null,
 }) {
   const {
@@ -274,6 +276,7 @@ export function PrincipleSuggestTab({
             suggestions.length > 0 && <AiDisclosureBanner model={model} />
           }
         />
+        {keyMissing && <NeedsKeyNotice />}
         {error && <ErrorBanner message={error} />}
 
         {jAndPCount <= 1 && (

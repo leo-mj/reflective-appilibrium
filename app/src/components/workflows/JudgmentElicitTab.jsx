@@ -22,6 +22,7 @@ import {
   ChatButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import {
@@ -226,6 +227,7 @@ export function JudgmentElicitTab({
   useDummy = false,
   suggestionsAreSample = false,
   suggestionsDisabled = false,
+  keyMissing = false,
   weights = null,
 }) {
   const {
@@ -307,6 +309,7 @@ export function JudgmentElicitTab({
             suggestions.length > 0 && <AiDisclosureBanner model={model} />
           }
         />
+        {keyMissing && <NeedsKeyNotice />}
         {error && <ErrorBanner message={error} />}
 
         {hasResult && suggestions.length === 0 && (

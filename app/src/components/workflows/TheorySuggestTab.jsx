@@ -36,6 +36,7 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { SuggestionToolbar } from "./workflowComponents.jsx";
@@ -233,6 +234,7 @@ export function TheorySuggestTab({
   nextPhaseIsEnabled,
   useDummy = false,
   suggestionsDisabled = false,
+  keyMissing = false,
 }) {
   const {
     suggestions,
@@ -344,6 +346,7 @@ export function TheorySuggestTab({
             )
           }
         />
+        {keyMissing && <NeedsKeyNotice />}
         {error && <ErrorBanner message={error} />}
 
         {principles.length < 1 && (
