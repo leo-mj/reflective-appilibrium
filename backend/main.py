@@ -10,8 +10,10 @@ Interactive docs at http://localhost:8000/docs
 import logging
 from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from .config import Settings, get_settings
 from .dependencies import (
@@ -34,6 +36,7 @@ from .routers import (
     theories,
     arguments,
 )
+from .security_headers import SecurityHeadersMiddleware
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +61,10 @@ app = FastAPI(
     title="Reflective Appilibrium API",
     version="0.1.0",
     description="Backend for the V2 local RE tool.",
+    # Served by the routes under "Docs" below instead, which can see the mode.
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 # ── CORS ───────────────────────────────────────────────────────────────────────
@@ -72,6 +79,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Added last so it is outermost, and a CORS preflight answer carries the headers too.
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 
@@ -112,6 +121,37 @@ app.include_router(
     simulate_rethon.scoring_router, dependencies=_gated + [Depends(rate_limit_scoring)]
 )
 app.include_router(theories.router, dependencies=_gated)
+
+
+# ── Docs ───────────────────────────────────────────────────────────────────────
+
+# Local only. The docs routes are not routers, so `_gated` never covered them, and
+# on a public instance they publish the whole schema beside a "Try it out" button
+# that spends whatever key the visitor types into it. Checked per request through
+# the settings dependency, like health below, so the mode is testable.
+
+
+def _require_local(settings: Annotated[Settings, Depends(get_settings)]) -> None:
+    if settings.is_hosted:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
+_docs_only = [Depends(_require_local)]
+
+
+@app.get("/openapi.json", include_in_schema=False, dependencies=_docs_only)
+async def openapi_schema() -> JSONResponse:
+    return JSONResponse(app.openapi())
+
+
+@app.get("/docs", include_in_schema=False, dependencies=_docs_only)
+async def swagger_docs() -> HTMLResponse:
+    return get_swagger_ui_html(openapi_url="/openapi.json", title=app.title)
+
+
+@app.get("/redoc", include_in_schema=False, dependencies=_docs_only)
+async def redoc_docs() -> HTMLResponse:
+    return get_redoc_html(openapi_url="/openapi.json", title=app.title)
 
 
 # ── Health ─────────────────────────────────────────────────────────────────────

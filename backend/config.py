@@ -19,6 +19,8 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path  # used in default value for sessions_dir
 from typing import Literal, Optional
+from urllib.parse import urlsplit
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -197,6 +199,35 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Wildcard '*' is not permitted in CORS_ORIGINS; list specific origins explicitly."
             )
+        return v
+
+    @field_validator("cors_origins")
+    @classmethod
+    def origins_not_urls(cls, v: str) -> str:
+        """Each entry must be exactly ``scheme://host[:port]``.
+
+        Starlette compares the browser's ``Origin`` header, which never carries a
+        path, against these strings verbatim. So the natural thing to paste for a
+        GitHub Pages site — ``https://user.github.io/repo`` — or even a trailing
+        slash never matches, and every request fails CORS with nothing in the
+        server log to say why.
+        """
+        for origin in (o.strip() for o in v.split(",")):
+            if not origin or origin == "*":
+                continue
+            parts = urlsplit(origin)
+            if (
+                parts.scheme not in ("http", "https")
+                or not parts.netloc
+                or parts.path
+                or parts.query
+                or parts.fragment
+            ):
+                raise ValueError(
+                    f"CORS_ORIGINS entry {origin!r} is not an origin: give "
+                    "scheme://host[:port] with no path or trailing slash, e.g. "
+                    "https://user.github.io rather than https://user.github.io/repo."
+                )
         return v
 
     # ── Resolved values ───────────────────────────────────────────────────────

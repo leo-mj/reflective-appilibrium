@@ -58,7 +58,90 @@ def test_cors_origins_allows_an_explicit_list():
 
 
 def test_cors_origins_list_strips_whitespace():
-    assert make_settings(cors_origins=" a , b ").cors_origins_list == ["a", "b"]
+    settings = make_settings(cors_origins=" https://a.io , https://b.io ")
+    assert settings.cors_origins_list == ["https://a.io", "https://b.io"]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://leo-mj.github.io/reflective-appilibrium",
+        "https://example.com/",
+        "http://localhost:5173,https://example.com/app",
+        "https://example.com?x=1",
+        "example.com",
+        "ftp://example.com",
+    ],
+    ids=[
+        "pages-path",
+        "trailing-slash",
+        "second-entry",
+        "query",
+        "no-scheme",
+        "scheme",
+    ],
+)
+def test_cors_origins_rejects_anything_that_is_not_a_bare_origin(value):
+    """The browser's Origin header has no path, and Starlette matches verbatim —
+    so a Pages URL with its repo path would never match, and fail every request."""
+    with pytest.raises(ValidationError, match="not an origin"):
+        make_settings(cors_origins=value)
+
+
+def test_cors_origins_accepts_a_port():
+    assert make_settings(cors_origins="http://127.0.0.1:5173").cors_origins_list == [
+        "http://127.0.0.1:5173"
+    ]
+
+
+# ── Docs and response headers ─────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_docs_are_served_locally_and_absent_when_hosted(path):
+    """A public schema with a Try-it-out button spends a visitor's key for anyone."""
+    try:
+        app.dependency_overrides[get_settings] = lambda: make_settings()
+        assert TestClient(app).get(path).status_code == 200
+        app.dependency_overrides[get_settings] = lambda: make_settings(
+            deployment="hosted"
+        )
+        assert TestClient(app).get(path).status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_every_response_carries_the_security_headers():
+    try:
+        app.dependency_overrides[get_settings] = lambda: make_settings()
+        res = TestClient(app).get("/api/health")
+    finally:
+        app.dependency_overrides.clear()
+    assert res.headers["x-content-type-options"] == "nosniff"
+    assert res.headers["referrer-policy"] == "no-referrer"
+    assert res.headers["content-security-policy"] == "frame-ancestors 'none'"
+
+
+def test_only_api_responses_are_marked_no_store():
+    """API replies carry a user's reasoning; the docs page is no one's."""
+    try:
+        app.dependency_overrides[get_settings] = lambda: make_settings()
+        client = TestClient(app)
+        api, docs = client.get("/api/health"), client.get("/docs")
+    finally:
+        app.dependency_overrides.clear()
+    assert api.headers["cache-control"] == "no-store"
+    assert "no-store" not in docs.headers.get("cache-control", "")
+
+
+def test_an_error_response_carries_the_headers_too():
+    try:
+        app.dependency_overrides[get_settings] = lambda: make_settings()
+        res = TestClient(app).post("/api/simulate_rethon/simulate", json={})
+    finally:
+        app.dependency_overrides.clear()
+    assert res.status_code == 422
+    assert res.headers["cache-control"] == "no-store"
 
 
 # ── Server-side keys are loopback-only ────────────────────────────────────────

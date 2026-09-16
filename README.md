@@ -114,7 +114,7 @@ Or run directly:
 uvicorn backend.main:app --reload
 ```
 
-The API is then available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+The API is then available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs` — local only; a `hosted` instance answers 404 there.
 
 ### 5. Start the frontend
 
