@@ -17,6 +17,7 @@ from .config import Settings, get_settings
 from .dependencies import (
     rate_limit_scoring,
     rate_limit_simulation,
+    rate_limit_stepping,
     require_access_token,
     require_sessions_enabled,
 )
@@ -86,13 +87,22 @@ app.include_router(review.router, dependencies=_gated)
 app.include_router(
     sessions.router, dependencies=_gated + [Depends(require_sessions_enabled)]
 )
-# Two routers over one prefix, each with its own allowance. /quick_score and
-# /score_changes used to ride on the simulation limit, which meant that lowering
-# that limit enough to restrain /simulate would have silently blanked the score
-# badges of anyone editing — the client drops a scoring failure rather than
-# showing it. See dependencies.rate_limit_scoring.
+# Three routers over one prefix, each with its own allowance, because "how
+# expensive is one call" and "how often is it called" are independent here and a
+# single bucket can only express one of them.
+#
+# Both splits were made after the shared bucket broke something. /quick_score and
+# /score_changes are fired by the frontend on every edit and once per suggestion
+# card, so a limit low enough to restrain /simulate blanked the score badges of
+# anyone editing — silently, since the client renders a failed score as an empty
+# badge. /step costs what /simulate costs but is pressed once per step, so the
+# same limit stopped the stepper at its sixth press.
 app.include_router(
     simulate_rethon.router, dependencies=_gated + [Depends(rate_limit_simulation)]
+)
+app.include_router(
+    simulate_rethon.stepping_router,
+    dependencies=_gated + [Depends(rate_limit_stepping)],
 )
 app.include_router(
     simulate_rethon.scoring_router, dependencies=_gated + [Depends(rate_limit_scoring)]
@@ -114,6 +124,13 @@ async def health(
     controls rather than offer them and fail: the browser cannot otherwise know
     whether this instance persists anything.
 
+    ``max_simulation_elements`` is here for the same reason, and 0 means no cap.
+    The score-delta badges ask what the state *plus one suggested element* would
+    score, so at exactly the cap every badge asks for one element too many and
+    gets a 422 while the baseline beside it succeeds. Telling the browser the
+    number lets it stop asking instead of firing a request per card that can only
+    be refused.
+
     Reads settings through the dependency rather than the module-level value so
     that it reflects overrides, which is also what makes it testable.
     """
@@ -122,4 +139,5 @@ async def health(
         "model": settings.default_model,
         "deployment": settings.deployment,
         "sessions": settings.sessions_on,
+        "max_simulation_elements": settings.simulation_max_elements,
     }

@@ -157,6 +157,20 @@ def rate_limit_simulation(
     _enforce_rate_limit(settings.simulation_rate_limit, "simulate", identity)
 
 
+def rate_limit_stepping(
+    settings: Annotated[Settings, Depends(get_settings)],
+    identity: Annotated[str, Depends(client_identity)],
+) -> None:
+    """Cap ``/step`` per caller, on its own allowance.
+
+    One press of the stepper is one request, and a reader walks an evolution
+    forward as many steps as it takes — so this endpoint is expensive per call
+    *and* called repeatedly, which no single bucket can express alongside
+    ``/simulate``. Attached to the stepping router in ``main.py``.
+    """
+    _enforce_rate_limit(settings.stepping_rate_limit, "step", identity)
+
+
 def rate_limit_scoring(
     settings: Annotated[Settings, Depends(get_settings)],
     identity: Annotated[str, Depends(client_identity)],

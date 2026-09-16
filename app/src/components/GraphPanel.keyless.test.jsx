@@ -95,15 +95,17 @@ async function renderPanel(props = {}) {
  * The URLs of requests that would spend an API key.
  *
  * Not "every request": the assist panel also asks `/simulate_rethon/quick_score`
- * for the score badges on its suggestion cards, which is analytic, needs no key,
- * and has its own rate bucket on the server precisely because it is fired this
- * freely. Asserting on the whole call list would fail on that and say nothing
- * about the thing under test.
+ * for the score badges on its suggestion cards, and `/api/health` for the
+ * element cap those badges check before asking. Both are keyless and neither
+ * says anything about the thing under test, so asserting on the whole call list
+ * would only fail on them.
  */
+const KEYLESS_PATHS = ["/simulate_rethon/", "/api/health"];
+
 function llmCalls() {
   return fetchMock.mock.calls
     .map(([url]) => String(url))
-    .filter((url) => !url.includes("/simulate_rethon/"));
+    .filter((url) => !KEYLESS_PATHS.some((p) => url.includes(p)));
 }
 
 function saveKey() {

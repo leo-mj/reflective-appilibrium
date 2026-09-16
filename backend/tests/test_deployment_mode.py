@@ -32,6 +32,7 @@ def test_local_lends_keys_runs_unlimited_and_stores_sessions():
     assert s.server_keys_allowed is True
     assert s.llm_rate_limit == 0
     assert s.simulation_rate_limit == 0
+    assert s.stepping_rate_limit == 0
     assert s.scoring_rate_limit == 0
     assert s.sessions_on is True
 
@@ -43,17 +44,39 @@ def test_hosted_flips_all_three():
     assert s.sessions_on is False
 
 
-def test_hosted_caps_the_three_features_separately():
-    """The sizes differ by an order of magnitude, and are meant to.
+def test_hosted_caps_the_four_features_separately():
+    """The sizes differ by orders of magnitude, and are meant to.
 
-    A simulation holds the interpreter to a fixed point; a score lookup is
-    analytic and fired by the frontend on every edit. One number for both is what
-    made lowering the simulation cap a way to blank the score badges.
+    A simulation holds the interpreter to a fixed point; /step costs the same but
+    is pressed once per step; a score lookup is analytic and fired once per
+    suggestion card. One number across them is what made lowering the simulation
+    cap a way to blank the score badges — and then a way to stop the stepper.
     """
     s = make_settings(deployment="hosted")
     assert s.llm_rate_limit == 60
     assert s.simulation_rate_limit == 5
-    assert s.scoring_rate_limit == 120
+    assert s.stepping_rate_limit == 30
+    assert s.scoring_rate_limit == 300
+
+
+def test_stepping_is_not_charged_against_the_simulation_allowance():
+    """Stepping is repeated by design: one press, one request, as many presses as
+    the evolution has steps. Charged against /simulate's five a minute, the
+    stepper refused its sixth press."""
+    settings = make_settings(deployment="hosted", simulation_rate_limit_per_minute=2)
+    try:
+        client = _client_with(settings)
+        for _ in range(2):
+            assert client.post(_SIMULATE, json={}).status_code == 422
+        assert client.post(_SIMULATE, json={}).status_code == 429
+
+        codes = {
+            client.post("/api/simulate_rethon/step", json={}).status_code
+            for _ in range(10)
+        }
+        assert codes == {422}
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_an_unknown_deployment_value_is_rejected():
@@ -72,6 +95,8 @@ def test_an_unknown_deployment_value_is_rejected():
         ("llm_rate_limit_per_minute", 0, "llm_rate_limit", 0),
         ("simulation_rate_limit_per_minute", 50, "simulation_rate_limit", 50),
         ("simulation_rate_limit_per_minute", 0, "simulation_rate_limit", 0),
+        ("stepping_rate_limit_per_minute", 7, "stepping_rate_limit", 7),
+        ("stepping_rate_limit_per_minute", 0, "stepping_rate_limit", 0),
         ("scoring_rate_limit_per_minute", 10, "scoring_rate_limit", 10),
         ("scoring_rate_limit_per_minute", 0, "scoring_rate_limit", 0),
         ("sessions_enabled", True, "sessions_on", True),

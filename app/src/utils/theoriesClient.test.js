@@ -85,7 +85,12 @@ describe("fetchTheorySuggestions", () => {
     openaiStub();
     const { fetchTheorySuggestions } = await import("./theoriesClient.js");
 
-    await expect(fetchTheorySuggestions(aState(), false)).rejects.toThrow(/502/);
+    // The message is prose now — the status lives on the error as a property
+    // rather than in the sentence a reader sees.
+    await expect(fetchTheorySuggestions(aState(), false)).rejects.toThrow(/bad/);
+    await expect(fetchTheorySuggestions(aState(), false)).rejects.toMatchObject({
+      status: 502,
+    });
   });
 });
 

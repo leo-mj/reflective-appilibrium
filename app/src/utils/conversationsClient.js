@@ -5,22 +5,25 @@
  */
 
 import { getLLMHeaders } from "./openaiClient.js";
+import { fetchOk } from "./backendError.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 async function post(url, body) {
   // Both conversation endpoints depend on get_llm_service, which rejects a
   // missing x-base-url before it looks at any key — so without these headers
-  // the panel 400s in every deployment mode, server-side key or not.
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getLLMHeaders() },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Backend error ${res.status}: ${text}`);
-  }
+  // the panel 400s in every deployment mode, server-side key or not. That 400
+  // is exactly the one backendError turns into "No API key configured", which
+  // is what it means to whoever pressed the button.
+  const res = await fetchOk(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getLLMHeaders() },
+      body: JSON.stringify(body),
+    },
+    "/api/conversations",
+  );
   return res.json();
 }
 

@@ -7,6 +7,7 @@
 
 import { LLM_ENABLED } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
+import { fetchOk } from "./backendError.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -23,15 +24,21 @@ export function makeLLMClient({ endpoint, dummyData, buildBody, transformRespons
     if (!LLM_ENABLED || useDummy) {
       return typeof dummyData === "function" ? dummyData(state) : dummyData;
     }
-    const res = await fetch(`${BACKEND_URL}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...getLLMHeaders() },
-      body: JSON.stringify({ ...buildBody(state), ...extraBody }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`[${endpoint}] Backend error ${res.status}: ${body}`);
-    }
+    // All six assist endpoints come through here, so this is the one place that
+    // has to turn a failure into something readable — and the one place that has
+    // `Retry-After` in scope, which matters now that /simulate allows five a
+    // minute. The endpoint goes on the error as a property rather than into the
+    // text: a reader does not need the path, and whoever is debugging can see it
+    // in the console.
+    const res = await fetchOk(
+      `${BACKEND_URL}${endpoint}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getLLMHeaders() },
+        body: JSON.stringify({ ...buildBody(state), ...extraBody }),
+      },
+      endpoint,
+    );
     const data = await res.json();
     accumulateUsage(data);
     return transformResponse(data);

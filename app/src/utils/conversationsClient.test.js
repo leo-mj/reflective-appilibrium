@@ -62,12 +62,30 @@ describe("conversationsClient", () => {
     expect(headers["x-base-url"]).toBeUndefined();
   });
 
-  it("surfaces a backend error rather than resolving", async () => {
+  // The backend's answer to a keyless request is `400 Missing x-base-url
+  // header`, which names a header the reader has never heard of. What it means
+  // to them is that they have not set a key, so that is what the banner says —
+  // and the status stays on the error for anything that wants to branch.
+  it("turns the missing-header 400 into a key prompt", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
       status: 400,
       text: async () => '{"detail":"Missing x-base-url header"}',
     });
-    await expect(startConversation({ topic: "t" }, {}, "why?")).rejects.toThrow(/400/);
+    await expect(startConversation({ topic: "t" }, {}, "why?")).rejects.toThrow(
+      /No API key configured/,
+    );
+  });
+
+  it("keeps the status and the server's own wording on the error", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => '{"detail":"Missing x-base-url header"}',
+    });
+    await expect(startConversation({ topic: "t" }, {}, "why?")).rejects.toMatchObject({
+      status: 400,
+      detail: "Missing x-base-url header",
+    });
   });
 });

@@ -16,6 +16,7 @@ import {
   useHasLLMKey,
   notifyLLMKeyChanged,
 } from "../../utils/llmKey.js";
+import { unwrapDetail } from "../../utils/backendError.js";
 
 /** Why the inert controls are inert, for hover and assistive technology. */
 const DEMO_REASON = "Unavailable in the demo — this build has no backend.";
@@ -102,15 +103,15 @@ export function LLMSettingsModal({ open, onClose }) {
         const data = await res.json();
         setTestStatus({ ok: true, message: `Connected — model: ${data.model}` });
       } else {
+        // This is a connection test, so it is the one place that *should* show
+        // the server's own words — "Unsupported provider URL" is the answer the
+        // reader is looking for. backendError's friendlier rewording would be
+        // wrong here; only the envelope-unwrapping is wanted.
         const raw = await res.text();
-        let message = raw || `Error ${res.status}`;
-        try {
-          const detail = JSON.parse(raw)?.detail;
-          if (detail) message = typeof detail === "string" ? detail : JSON.stringify(detail);
-        } catch {
-          /* not JSON — show the raw text */
-        }
-        setTestStatus({ ok: false, message });
+        setTestStatus({
+          ok: false,
+          message: unwrapDetail(raw) || `Error ${res.status}`,
+        });
       }
     } catch (err) {
       setTestStatus({ ok: false, message: err.message });

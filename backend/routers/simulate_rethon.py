@@ -5,15 +5,17 @@ Runs formal reflective equilibrium computations via the theodias / rethon
 Python packages and exposes the results to the frontend.  Five endpoints over
 two routers, which share a prefix and differ only in what they cost:
 
-``router`` — runs a process, and is rate limited tightly:
+``router`` — runs a whole process in one request, and is rate limited tightly:
 
 - ``/simulate``         — run a full RE process to fixed point (or resume from a
                           saved evolution).
+- ``/score_per_round``  — compute the equilibrium Z-score at each workflow round.
+                          R simulations per request, so the most expensive of all.
+
+``stepping_router`` — as costly per call, but called once per press:
+
 - ``/step``             — advance one step at a time (stateless; pass the previous
                           evolution to resume).
-- ``/score_per_round``  — compute the equilibrium Z-score at each workflow round.
-                          R simulations per request, so the most expensive of the
-                          three.
 
 ``scoring_router`` — answers analytically, and is called constantly:
 
@@ -76,9 +78,14 @@ logger = logging.getLogger(__name__)
 # which is the safe direction to be wrong in.
 router = APIRouter(prefix="/api/simulate_rethon", tags=["simulate_rethon"])
 
+# /step alone. Costs what a simulation costs and is pressed once per step, which
+# is a combination neither of the other two buckets can hold.
+stepping_router = APIRouter(prefix="/api/simulate_rethon", tags=["simulate_rethon"])
+
 # /quick_score and /score_changes. Not user-initiated — the frontend fires these
-# on every edit — so they take a much larger allowance of their own. See
-# dependencies.rate_limit_scoring for what sharing one bucket cost.
+# on every edit and once per suggestion card — so they take a much larger
+# allowance of their own. See dependencies.rate_limit_scoring for what sharing
+# one bucket cost.
 scoring_router = APIRouter(prefix="/api/simulate_rethon", tags=["simulate_rethon"])
 
 
@@ -145,7 +152,7 @@ async def simulate_rethon(
     )
 
 
-@router.post("/step", response_model=SimulatedRethonResponse)
+@stepping_router.post("/step", response_model=SimulatedRethonResponse)
 async def simulate_rethon_step(
     request: SimulateRethonStepRequest,
     settings: Annotated[Settings, Depends(get_settings)],

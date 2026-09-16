@@ -32,22 +32,34 @@ Deployment = Literal["local", "hosted"]
 # server-side API keys         lent to loopback  never (BYOK only)
 # LLM rate limit               none              60/min per caller
 # simulation rate limit        none              5/min per caller
-# scoring rate limit           none              120/min per caller
+# stepping rate limit          none              30/min per caller
+# scoring rate limit           none              300/min per caller
 # session storage on disk      on                off (browser keeps state)
 #
-# Three limits rather than one, because the three sets of endpoints they cover
-# cost wildly different amounts and are reached in wildly different ways.
+# Four limits rather than one, because the endpoints they cover cost wildly
+# different amounts and are reached in wildly different ways.
 #
-# An LLM call is one outbound request that mostly waits. A simulation runs a BDD
-# to a fixed point and holds the interpreter while it does, so a handful a minute
-# is already generous. Scoring is the odd one: /quick_score and /score_changes
-# are *not* user-initiated at all — the frontend fires quick_score on every edit
-# to an element, a relation or the weights, and drops the result silently on any
-# error. A cap low enough to matter there does not refuse an attack, it blanks
-# the score badges of someone typing.
+# An LLM call is one outbound request that mostly waits. A full simulation runs a
+# BDD to a fixed point and holds the interpreter while it does, so a handful a
+# minute is already generous.
+#
+# Stepping is the awkward middle. /step costs about what /simulate costs — it
+# rebuilds the structure on every call — but it is the one endpoint whose entire
+# purpose is to be pressed repeatedly: a reader walking an RE process forward
+# does it one step at a time, and an evolution runs to as many steps as it takes.
+# Charged against the simulation allowance it was unusable by its sixth press.
+#
+# Scoring is the other extreme: /quick_score and /score_changes are not
+# user-initiated at all. The frontend fires quick_score from useScoreBaseline on
+# every edit AND once per suggestion card from ScoreDeltaBadge — so a tab showing
+# nine suggestions makes ten calls, and accepting one re-fires all ten because
+# state.elements is in the dependency array. There is no debounce anywhere on
+# that path. 300 is a runaway guard; anything near the real fan-out would blank
+# the badges of someone simply working through a list.
 _HOSTED_LLM_LIMIT = 60
 _HOSTED_SIMULATION_LIMIT = 5
-_HOSTED_SCORING_LIMIT = 120
+_HOSTED_STEPPING_LIMIT = 30
+_HOSTED_SCORING_LIMIT = 300
 
 # The other half of restraining the simulation, and the half a rate limit cannot
 # reach: the cost of one request rather than how many are allowed.
@@ -124,9 +136,13 @@ class Settings(BaseSettings):
     # costs request volume aimed at the provider through us, not only the key.
     llm_rate_limit_per_minute: Optional[int] = None
 
-    # /simulate, /step and /score_per_round — the endpoints that run a process to
-    # a fixed point. Small on purpose; see the table above.
+    # /simulate and /score_per_round — the endpoints that run a process to a
+    # fixed point in one request. Small on purpose; see the table above.
     simulation_rate_limit_per_minute: Optional[int] = None
+
+    # /step alone. Same cost per call as a simulation, but pressed once per step
+    # by a reader walking the process forward, so it needs room to be used.
+    stepping_rate_limit_per_minute: Optional[int] = None
 
     # /quick_score and /score_changes, which the frontend fires on every edit.
     # Set this high or not at all: it is a runaway guard, not a quota.
@@ -224,6 +240,19 @@ class Settings(BaseSettings):
         if self.simulation_rate_limit_per_minute is not None:
             return self.simulation_rate_limit_per_minute
         return _HOSTED_SIMULATION_LIMIT if self.is_hosted else 0
+
+    @property
+    def stepping_rate_limit(self) -> int:
+        """``/step`` calls per minute per caller; 0 means unlimited.
+
+        Its own allowance because stepping is inherently repeated: one press is
+        one request, and an evolution takes as many steps as it takes. Sharing
+        the simulation bucket made the stepper refuse its sixth press, which is
+        the same mistake splitting the scoring bucket out of it corrected.
+        """
+        if self.stepping_rate_limit_per_minute is not None:
+            return self.stepping_rate_limit_per_minute
+        return _HOSTED_STEPPING_LIMIT if self.is_hosted else 0
 
     @property
     def scoring_rate_limit(self) -> int:
