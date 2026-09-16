@@ -4,12 +4,17 @@
  * @module utils/conversationsClient
  */
 
+import { getLLMHeaders } from "./openaiClient.js";
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 async function post(url, body) {
+  // Both conversation endpoints depend on get_llm_service, which rejects a
+  // missing x-base-url before it looks at any key — so without these headers
+  // the panel 400s in every deployment mode, server-side key or not.
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify(body),
   });
   if (!res.ok) {

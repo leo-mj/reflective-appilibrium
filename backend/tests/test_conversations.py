@@ -143,3 +143,51 @@ def test_an_oversized_message_is_rejected(client):
         f"/api/conversations/{session_id}/messages", json={"message": "x" * 10_001}
     )
     assert res.status_code == 422
+
+
+# ── The provider headers these endpoints require ──────────────────────────────
+#
+# Every test above overrides `get_llm_service` outright, which is the right shape
+# for testing the session caps — but it also skips the header validation that
+# dependency performs, and the frontend client shipped without sending any
+# headers at all for long enough that the Discuss panel 400'd in every
+# deployment. These two exercise the real dependency (with only the provider SDK
+# patched out) so the contract the browser has to satisfy is pinned here.
+
+
+def _headers() -> dict:
+    return {"x-api-key": "user-key", "x-base-url": "https://api.openai.com/v1"}
+
+
+def _payload() -> dict:
+    return {"state": a_state(), "suggestion": {"text": "s"}, "message": "hello"}
+
+
+def test_starting_a_conversation_requires_a_base_url(mock_llm_complete):
+    conversations._sessions.clear()
+    res = TestClient(app).post("/api/conversations", json=_payload())
+    assert res.status_code == 400
+    assert "x-base-url" in res.json()["detail"]
+
+
+def test_starting_a_conversation_succeeds_with_provider_headers(mock_llm_complete):
+    conversations._sessions.clear()
+    res = TestClient(app).post(
+        "/api/conversations", json=_payload(), headers=_headers()
+    )
+    assert res.status_code == 200
+    assert res.json()["session_id"]
+
+
+def test_a_follow_up_message_requires_the_headers_too(mock_llm_complete):
+    conversations._sessions.clear()
+    http = TestClient(app)
+    started = http.post("/api/conversations", json=_payload(), headers=_headers())
+    session_id = started.json()["session_id"]
+
+    # The session exists, so a 400 here can only come from the missing header.
+    res = http.post(
+        f"/api/conversations/{session_id}/messages", json={"message": "more"}
+    )
+    assert res.status_code == 400
+    assert "x-base-url" in res.json()["detail"]
