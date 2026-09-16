@@ -151,6 +151,14 @@ allowance, whereas a single shared token puts a whole seminar room into one.
 The rate limiter, the session store and the discussion sessions all live in one
 process, so run **one** uvicorn worker unless you replace them with a shared store.
 
+**Behind a reverse proxy, tell uvicorn to trust it.** Without tokens the rate
+limiter identifies callers by address, and an untrusted proxy's address is the
+same for every visitor — so all of them share one allowance, and the caps become
+either useless or a site-wide outage. Start uvicorn with
+`--forwarded-allow-ips=<proxy address>` (uvicorn trusts only `127.0.0.1` by
+default). The backend logs a warning at startup when this applies, and a second,
+once per process, when a request shows a proxy uvicorn is ignoring.
+
 ### Where a session lives
 
 The working state is written to the browser's `localStorage` as you go, and the

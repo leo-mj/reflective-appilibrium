@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import Settings, get_settings
 from .dependencies import (
+    proxy_startup_warning,
     rate_limit_scoring,
     rate_limit_simulation,
     rate_limit_stepping,
@@ -62,6 +63,9 @@ app = FastAPI(
 # ── CORS ───────────────────────────────────────────────────────────────────────
 
 settings = get_settings()
+if _proxy_warning := proxy_startup_warning(settings):
+    logging.getLogger("backend.main").warning(_proxy_warning)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,

@@ -9,6 +9,7 @@ that an explicit setting still wins over the mode.
 import pytest
 from fastapi.testclient import TestClient
 
+from backend import dependencies
 from backend.config import get_settings
 from backend.dependencies import client_identity
 from backend.main import app
@@ -233,7 +234,7 @@ def test_health_needs_no_token_even_when_one_is_configured():
 # ── Rate-limit identity ───────────────────────────────────────────────────────
 
 
-def _identity(settings, host, token=None):
+def _identity(settings, host, token=None, headers=None):
     class _Client:
         pass
 
@@ -241,6 +242,8 @@ def _identity(settings, host, token=None):
 
     class _Request:
         client = _Client()
+
+    _Request.headers = headers or {}
 
     return client_identity(_Request(), settings, x_app_token=token)
 
@@ -285,6 +288,79 @@ def test_tokens_are_parsed_as_a_trimmed_list():
 
 def test_no_tokens_configured_means_an_empty_set():
     assert make_settings().access_tokens == set()
+
+
+# ── An untrusted proxy in front ───────────────────────────────────────────────
+
+
+@pytest.fixture
+def fresh_proxy_warning(monkeypatch):
+    monkeypatch.setattr(dependencies, "_proxy_warning_logged", False)
+
+
+@pytest.mark.parametrize(
+    "forwarded_for, peer, evident",
+    [
+        (None, "10.0.0.4", False),
+        # uvicorn trusted the proxy: the peer was taken from the header.
+        ("203.0.113.7", "203.0.113.7", False),
+        ("203.0.113.7, 10.0.0.2", "203.0.113.7", False),
+        # uvicorn ignored the header: the peer is the proxy itself.
+        ("203.0.113.7", "10.0.0.2", True),
+    ],
+)
+def test_an_untrusted_proxy_is_told_apart_from_a_trusted_one(
+    forwarded_for, peer, evident
+):
+    """uvicorn rewrites the peer but leaves x-forwarded-for in place, so the
+    header's presence alone would flag every correctly configured proxy too."""
+    assert dependencies.untrusted_proxy_evident(forwarded_for, peer) is evident
+
+
+def test_an_untrusted_proxy_is_logged_exactly_once(fresh_proxy_warning, caplog):
+    s = make_settings(deployment="hosted")
+    headers = {"x-forwarded-for": "203.0.113.7"}
+    with caplog.at_level("WARNING", logger="backend.dependencies"):
+        for _ in range(5):
+            assert _identity(s, "10.0.0.2", headers=headers) == "ip:10.0.0.2"
+    warnings = [r for r in caplog.records if "forwarded-allow-ips" in r.message]
+    assert len(warnings) == 1
+
+
+def test_a_local_instance_does_not_warn_about_proxies(fresh_proxy_warning, caplog):
+    with caplog.at_level("WARNING", logger="backend.dependencies"):
+        _identity(make_settings(), "10.0.0.2", headers={"x-forwarded-for": "1.2.3.4"})
+    assert not caplog.records
+
+
+def test_a_matched_token_makes_the_proxy_irrelevant(fresh_proxy_warning, caplog):
+    s = make_settings(deployment="hosted", app_access_tokens="alice")
+    with caplog.at_level("WARNING", logger="backend.dependencies"):
+        _identity(s, "10.0.0.2", "alice", headers={"x-forwarded-for": "1.2.3.4"})
+    assert not caplog.records
+
+
+@pytest.mark.parametrize(
+    "overrides, warns",
+    [
+        ({"deployment": "hosted"}, True),
+        ({}, False),
+        ({"deployment": "hosted", "app_access_tokens": "alice"}, False),
+        (
+            {
+                "deployment": "hosted",
+                "llm_rate_limit_per_minute": 0,
+                "simulation_rate_limit_per_minute": 0,
+                "stepping_rate_limit_per_minute": 0,
+                "scoring_rate_limit_per_minute": 0,
+            },
+            False,
+        ),
+    ],
+)
+def test_startup_warns_only_where_callers_are_keyed_on_address(overrides, warns):
+    warning = dependencies.proxy_startup_warning(make_settings(**overrides))
+    assert (warning is not None) is warns
 
 
 # ── Separate allowances per feature ───────────────────────────────────────────

@@ -5,6 +5,7 @@ Each `get_*` function can be overridden in tests via `app.dependency_overrides`.
 """
 
 import hashlib
+import logging
 import secrets
 from functools import lru_cache
 from pathlib import Path
@@ -25,6 +26,8 @@ ALLOWED_BASE_URLS = {
     "https://api.anthropic.com/v1",
     "http://localhost:11434/v1",
 }
+
+logger = logging.getLogger(__name__)
 
 
 def require_sessions_enabled(
@@ -122,7 +125,66 @@ def client_identity(
     token = _matching_token(x_app_token, settings.access_tokens)
     if token:
         return "t:" + hashlib.sha256(token.encode()).hexdigest()[:16]
-    return "ip:" + (request.client.host if request.client else "unknown")
+    host = request.client.host if request.client else "unknown"
+    if settings.is_hosted:
+        _warn_if_proxy_untrusted(request.headers.get("x-forwarded-for"), host)
+    return "ip:" + host
+
+
+_proxy_warning_logged = False
+
+
+def untrusted_proxy_evident(forwarded_for: Optional[str], peer: str) -> bool:
+    """Whether a request shows a proxy in front that uvicorn does not trust.
+
+    When uvicorn trusts the proxy it replaces the peer with an address taken
+    from ``x-forwarded-for`` — but leaves the header in place, so the header's
+    presence alone proves nothing. A peer that is *not* among the forwarded
+    addresses does: something forwarded this request and uvicorn ignored it.
+    The rate limiter is then charging every visitor to the proxy's address.
+    """
+    if not forwarded_for:
+        return False
+    return peer not in {h.strip() for h in forwarded_for.split(",")}
+
+
+def _warn_if_proxy_untrusted(forwarded_for: Optional[str], peer: str) -> None:
+    """Log the misconfiguration once per process rather than once per request."""
+    global _proxy_warning_logged
+    if _proxy_warning_logged or not untrusted_proxy_evident(forwarded_for, peer):
+        return
+    _proxy_warning_logged = True
+    logger.warning(
+        "Request from %s carries x-forwarded-for, but uvicorn is not trusting it: "
+        "every visitor behind this proxy shares one rate-limit allowance. Run "
+        "uvicorn with --forwarded-allow-ips=<proxy address>. (A client sending the "
+        "header directly, with no proxy in front, also triggers this once.)",
+        peer,
+    )
+
+
+def proxy_startup_warning(settings: Settings) -> Optional[str]:
+    """The warning ``main.py`` logs at startup, or None when it does not apply.
+
+    Hosted, with any rate limit on and no access tokens, every caller is charged
+    to its peer address — which behind an untrusted proxy is the proxy, for all
+    of them. Nothing at startup can tell whether a proxy is there, so this says
+    what to check. Tokens make it moot: a matched token is the identity.
+    """
+    limits = (
+        settings.llm_rate_limit,
+        settings.simulation_rate_limit,
+        settings.stepping_rate_limit,
+        settings.scoring_rate_limit,
+    )
+    if not settings.is_hosted or not any(limits) or settings.access_tokens:
+        return None
+    return (
+        "Hosted with rate limits on and no APP_ACCESS_TOKENS: callers are "
+        "identified by peer address. Behind a reverse proxy, start uvicorn with "
+        "--forwarded-allow-ips=<proxy address>, or every visitor shares one "
+        "allowance."
+    )
 
 
 def _enforce_rate_limit(limit: int, bucket: str, identity: str) -> None:
