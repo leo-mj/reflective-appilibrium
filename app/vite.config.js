@@ -1,16 +1,23 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// GitHub Pages serves a project site from /<repo>/, so the production build's
-// asset URLs must be prefixed with the repo name — a mismatch 404s every asset
-// and renders a blank page. Actions sets GITHUB_REPOSITORY to "owner/repo", so
+// GitHub Pages serves a project site from /<repo>/, so a build bound for it must
+// prefix every asset URL with the repo name — a mismatch 404s every asset and
+// renders a blank page. Actions sets GITHUB_REPOSITORY to "owner/repo", so
 // deriving it there keeps this correct across repo renames; the literal is only
-// the fallback for a production build run outside CI.
+// the fallback for such a build run outside CI.
 const repoName = process.env.GITHUB_REPOSITORY?.split("/")[1];
+
+// Listed by destination rather than tested as `mode === "production"`, which was
+// wrong in a way nothing caught: `build:backend` runs `--mode backend`, so the
+// BYOK build — the one that is actually deployed to Pages — took the "/" branch
+// and shipped asset URLs that 404 there. The dev server and `build:local` are
+// served from a root and keep "/".
+const PAGES_MODES = ["production", "backend"];
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: mode === "production" ? `/${repoName ?? "reflective-appilibrium"}/` : "/",
+  base: PAGES_MODES.includes(mode) ? `/${repoName ?? "reflective-appilibrium"}/` : "/",
   plugins: [react()],
   test: {
     environment: "node",
