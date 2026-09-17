@@ -6,7 +6,7 @@
 
 /** @import { REState } from '../../types.js' */
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { SpinnerIcon } from "../Icons.jsx";
 import {
@@ -76,67 +76,125 @@ export function SimulateRethonTab({
   const [error, setError] = useState(null);
   const [evolutionOpen, setEvolutionOpen] = useState(false);
   const [decision, setDecision] = useState(null); // "accepted" | "rejected" | null
-  const [neighbourhoodDepth, setNeighbourhoodDepth] = useState(1);
+  const [neighbourhoodDepth, setNeighbourhoodDepth] = useState(3);
 
-  useEffect(() => () => onSetEquilibriumPreview?.(null), [onSetEquilibriumPreview]);
+  useEffect(
+    () => () => onSetEquilibriumPreview?.(null),
+    [onSetEquilibriumPreview],
+  );
 
   const activeCount = state.elements.filter((e) =>
     ["active", "revised"].includes(e.status),
   ).length;
 
   const atLeastOneArgument =
-    state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type)).length > 0;
+    state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type)).length >
+    0;
 
   const equilibrium = useMemo(
     () => (result ? deriveEquilibrium(result) : null),
     [result],
   );
 
-  const simulate = async () => {
-    const startingEvolution = confirmedEvolution;
-    setLoadingMode("simulate");
+  // The request in flight, so Stop can abort it. Aborting is also what stops the
+  // computation on the server, which notices the dropped connection and kills
+  // the worker — without that a stopped simulation would go on holding the only
+  // worker for whoever runs one next.
+  const controllerRef = useRef(null);
+  const [stopped, setStopped] = useState(false);
+
+  // Leaving the tab abandons the result, so it abandons the computation too.
+  useEffect(() => () => controllerRef.current?.abort(), []);
+
+  /**
+   * Runs one request, and applies its result only if it succeeded.
+   *
+   * The previous result stays on screen until then, so Stop returns the tab to
+   * exactly where it was — including any steps already accepted, which a run
+   * from them would otherwise have discarded before it began. Everything is
+   * checked against the controller still being this run's: a stopped request
+   * settles after the next one may already have started, and must not clear
+   * that one's spinner or overwrite its result.
+   */
+  const run = async (mode, request, apply) => {
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const current = () => controllerRef.current === controller;
+    setLoadingMode(mode);
     setError(null);
-    setEvolutionOpen(false);
-    setDecision(null);
-    setConfirmedEvolution(null);
-    setConfirmedResult(null);
-    setStepPending(false);
-    onSetEquilibriumPreview?.(null);
+    setStopped(false);
     try {
-      const data = await simulateRethon(state, true, startingEvolution, weights, neighbourhoodDepth);
-      setResult(data);
-      setResultMode("simulate");
-      const eq = deriveEquilibrium(data);
-      onSetEquilibriumPreview?.(new Set(eq.withdrawn.map((e) => e.id)));
+      const data = await request(controller.signal);
+      if (current()) apply(data);
     } catch (e) {
-      setError(e.message);
+      if (!current()) return;
+      if (controller.signal.aborted) setStopped(true);
+      else setError(e.message);
     } finally {
-      setLoadingMode(null);
+      if (current()) {
+        controllerRef.current = null;
+        setLoadingMode(null);
+      }
     }
   };
 
-  const step = async () => {
-    setLoadingMode("step");
-    setError(null);
-    if (confirmedEvolution === null) {
-      setEvolutionOpen(false);
-      setDecision(null);
-      setConfirmedResult(null);
-      onSetEquilibriumPreview?.(null);
-    }
-    try {
-      const data = await simulateRethonStep(state, true, confirmedEvolution, weights, neighbourhoodDepth);
-      setResult(data);
-      setResultMode("step");
-      setStepPending(true);
-      const eq = deriveEquilibrium(data);
-      onSetEquilibriumPreview?.(new Set(eq.withdrawn.map((e) => e.id)));
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoadingMode(null);
-    }
+  const stop = () => {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    setLoadingMode(null);
+    setStopped(true);
   };
+
+  const simulate = () =>
+    run(
+      "simulate",
+      (signal) =>
+        simulateRethon(
+          state,
+          true,
+          confirmedEvolution,
+          weights,
+          neighbourhoodDepth,
+          { signal },
+        ),
+      (data) => {
+        setEvolutionOpen(false);
+        setDecision(null);
+        setConfirmedEvolution(null);
+        setConfirmedResult(null);
+        setStepPending(false);
+        setResult(data);
+        setResultMode("simulate");
+        const eq = deriveEquilibrium(data);
+        onSetEquilibriumPreview?.(new Set(eq.withdrawn.map((e) => e.id)));
+      },
+    );
+
+  const step = () =>
+    run(
+      "step",
+      (signal) =>
+        simulateRethonStep(
+          state,
+          true,
+          confirmedEvolution,
+          weights,
+          neighbourhoodDepth,
+          { signal },
+        ),
+      (data) => {
+        if (confirmedEvolution === null) {
+          setEvolutionOpen(false);
+          setDecision(null);
+          setConfirmedResult(null);
+        }
+        setResult(data);
+        setResultMode("step");
+        setStepPending(true);
+        const eq = deriveEquilibrium(data);
+        onSetEquilibriumPreview?.(new Set(eq.withdrawn.map((e) => e.id)));
+      },
+    );
 
   const handleAccept = () => {
     const evolution = result.translated_re_state.evolution;
@@ -177,7 +235,8 @@ export function SimulateRethonTab({
   };
 
   const stepFinished = confirmedResult?.translated_re_state.finished ?? false;
-  const baseDisabled = loadingMode !== null || activeCount < 3 || !atLeastOneArgument;
+  const baseDisabled =
+    loadingMode !== null || activeCount < 3 || !atLeastOneArgument;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -193,7 +252,9 @@ export function SimulateRethonTab({
           }}
         >
           <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-            <span style={{ color: ACCENT_TEXT, fontWeight: "bold" }}>Simulate RE</span>
+            <span style={{ color: ACCENT_TEXT, fontWeight: "bold" }}>
+              Simulate RE
+            </span>
             <span style={{ color: C.dim }}>
               {" · "}
               {activeCount} active element{activeCount !== 1 ? "s" : ""}
@@ -206,26 +267,54 @@ export function SimulateRethonTab({
               </span>
             )}
             {equilibrium && (
-              <span style={{ color: equilibrium.finished ? C.supports : C.conflicts }}>
+              <span
+                style={{
+                  color: equilibrium.finished ? C.supports : C.conflicts,
+                }}
+              >
                 {" · "}
-                {equilibrium.finished ? "Equilibrium reached" : "Equilibrium not reached yet"}
+                {equilibrium.finished
+                  ? "Equilibrium reached"
+                  : "Equilibrium not reached yet"}
               </span>
             )}
             {result?.model && (
-              <span style={{ color: C.dim }}>{" · "}{result.model}</span>
+              <span style={{ color: C.dim }}>
+                {" · "}
+                {result.model}
+              </span>
             )}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <label style={{ fontSize: 11, color: C.dim, display: "flex", alignItems: "center", gap: 4 }}>
+            <label
+              style={{
+                fontSize: 11,
+                color: C.dim,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
               Depth
               <select
                 value={neighbourhoodDepth}
                 onChange={(e) => setNeighbourhoodDepth(Number(e.target.value))}
                 disabled={loadingMode !== null}
-                style={{ fontSize: 11, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 4, color: C.text, padding: "2px 4px" }}
+                style={{
+                  fontSize: 11,
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 4,
+                  color: C.text,
+                  padding: "2px 4px",
+                }}
               >
-                {[1, 2, 3, 4].map((d) => <option key={d} value={d}>{d}</option>)}
+                {[1, 2, 3, 4].map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
               </select>
             </label>
             {/* Simulate button */}
@@ -251,7 +340,15 @@ export function SimulateRethonTab({
               {loadingMode === "simulate" ? "Equilibrating..." : "Equilibrate"}
             </button>
 
-            <div style={{ width: 1, height: 24, background: C.border, margin: "0 4px", alignSelf: "center" }} />
+            <div
+              style={{
+                width: 1,
+                height: 24,
+                background: C.border,
+                margin: "0 4px",
+                alignSelf: "center",
+              }}
+            />
 
             {/* Step button */}
             {(() => {
@@ -293,23 +390,56 @@ export function SimulateRethonTab({
                 </button>
               );
             })()}
+
+            {loadingMode !== null && (
+              <button
+                onClick={stop}
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  color: C.text,
+                  borderRadius: 6,
+                  padding: "5px 12px",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  flexShrink: 0,
+                }}
+              >
+                <span aria-hidden="true">■</span>
+                Stop
+              </button>
+            )}
           </div>
         </div>
 
         {(activeCount < 3 || !atLeastOneArgument) && (
           <div style={{ fontSize: 12, color: C.dim }}>
-            Add at least three active elements and one argument to run the simulation.
+            Add at least three active elements and one argument to run the
+            simulation.
           </div>
         )}
 
         {error && <ErrorBanner message={error} />}
 
+        {stopped && (
+          <div role="status" style={{ fontSize: 12, color: C.dim }}>
+            Stopped. Nothing was changed.
+          </div>
+        )}
+
         {/* Accept / Reject */}
         {equilibrium &&
           (decision === "accepted" ? (
-            <div style={{ fontSize: 12, color: C.supports, marginTop: 12 }}>✓ Applied to state</div>
+            <div style={{ fontSize: 12, color: C.supports, marginTop: 12 }}>
+              ✓ Applied to state
+            </div>
           ) : decision === "rejected" ? (
-            <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>Result discarded</div>
+            <div style={{ fontSize: 12, color: C.dim, marginTop: 12 }}>
+              Result discarded
+            </div>
           ) : stepPending || resultMode === "simulate" ? (
             <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
               <button
@@ -356,18 +486,42 @@ export function SimulateRethonTab({
                 </div>
               ) : null;
             })()}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
               <div>
-                <div style={{ fontSize: 11, color: C.supports, fontWeight: "bold", marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: C.supports,
+                    fontWeight: "bold",
+                    marginBottom: 6,
+                  }}
+                >
                   Retained · {equilibrium.retained.length}
                 </div>
-                {equilibrium.retained.map((e) => <ElementRow key={e.id} element={e} />)}
+                {equilibrium.retained.map((e) => (
+                  <ElementRow key={e.id} element={e} />
+                ))}
               </div>
               <div>
-                <div style={{ fontSize: 11, color: C.dim, fontWeight: "bold", marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: C.dim,
+                    fontWeight: "bold",
+                    marginBottom: 6,
+                  }}
+                >
                   Withdrawn · {equilibrium.withdrawn.length}
                 </div>
-                {equilibrium.withdrawn.map((e) => <ElementRow key={e.id} element={e} faded />)}
+                {equilibrium.withdrawn.map((e) => (
+                  <ElementRow key={e.id} element={e} faded />
+                ))}
               </div>
             </div>
           </>
@@ -375,17 +529,27 @@ export function SimulateRethonTab({
 
         {result && (
           <>
-            <SectionHead title="Arguments" count={result.translated_arguments.length} />
+            <SectionHead
+              title="Arguments"
+              count={result.translated_arguments.length}
+            />
             {result.translated_arguments.length === 0 ? (
-              <div style={{ fontSize: 12, color: C.dim }}>No arguments detected.</div>
+              <div style={{ fontSize: 12, color: C.dim }}>
+                No arguments detected.
+              </div>
             ) : (
               result.translated_arguments.map((arg, i) => (
                 <ArgumentCard key={i} argument={arg} />
               ))
             )}
 
-            <SectionHead title="Evolution" count={result.translated_re_state.evolution.length} />
-            <SimulateScoresChart scores={result.translated_re_state.scores ?? []} />
+            <SectionHead
+              title="Evolution"
+              count={result.translated_re_state.evolution.length}
+            />
+            <SimulateScoresChart
+              scores={result.translated_re_state.scores ?? []}
+            />
             <button
               onClick={() => setEvolutionOpen((o) => !o)}
               style={{

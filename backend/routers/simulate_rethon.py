@@ -24,8 +24,9 @@ two routers, which share a prefix and differ only in what they cost:
 - ``/score_changes``    — batch withdrawal-delta analysis for all active elements.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Annotated
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from typing import Annotated, Awaitable, Callable, TypeVar, Union
+import asyncio
 import logging
 
 from .rethon_schemas import (
@@ -40,7 +41,7 @@ from .rethon_schemas import (
     QuickScoreResponse,
 )
 from ..config import Settings, get_settings
-from ..process_pool import run_in_pool
+from ..process_pool import ComputationStopped, run_in_pool
 from ..services.rethon_simulation import (
     SimulationFinished,
     enforce_element_cap,
@@ -82,13 +83,64 @@ stepping_router = APIRouter(prefix="/api/simulate_rethon", tags=["simulate_retho
 # one bucket cost.
 scoring_router = APIRouter(prefix="/api/simulate_rethon", tags=["simulate_rethon"])
 
+T = TypeVar("T")
+
+# How often a running computation checks whether its caller is still there.
+_DISCONNECT_POLL_SECONDS = 0.25
+
+
+async def _watch_for_disconnect(
+    http_request: Request, stop: asyncio.Event, finished: asyncio.Event
+) -> None:
+    """Set ``stop`` if the caller leaves before ``finished`` is set."""
+    while not finished.is_set():
+        if await http_request.is_disconnected():
+            logger.info("The caller left; stopping its computation.")
+            stop.set()
+            return
+        await asyncio.sleep(_DISCONNECT_POLL_SECONDS)
+
+
+async def _until_disconnected(
+    http_request: Request, start: Callable[[asyncio.Event], Awaitable[T]]
+) -> Union[T, Response]:
+    """Run ``start(stop)``, setting ``stop`` if the caller goes away first, in
+    which case the result is a bare 499 ``Response`` for the handler to return.
+
+    The Stop button aborts its fetch, and closing the tab drops the connection,
+    but neither reaches the handler by itself: uvicorn goes on running a handler
+    whose client has left, so without this the computation would run to its end
+    for nobody — and, with one worker, hold up whoever is next in line.
+    ``run_in_pool`` kills the worker when ``stop`` is set.
+
+    Nothing here is cancelled or raised past this function. A debugger breaking
+    on uncaught exceptions stops wherever one leaves this code for FastAPI's or
+    asyncio's — a cancelled task, a raised HTTPException — and a Stop press is an
+    expected outcome, not a fault. So the computation is awaited directly rather
+    than in a task, the watcher is only ever told to finish, and the 499 (which
+    nobody receives; it is what the access log records) is returned.
+
+    Only for the three endpoints a person starts and waits on. The scoring
+    endpoints finish in milliseconds, and killing a worker for one would cost
+    the next caller a second of worker start-up.
+    """
+    stop, finished = asyncio.Event(), asyncio.Event()
+    asyncio.ensure_future(_watch_for_disconnect(http_request, stop, finished))
+    try:
+        return await start(stop)
+    except ComputationStopped:
+        return Response(status_code=499)
+    finally:
+        finished.set()
+
 
 @router.post("/simulate", response_model=SimulatedRethonResponse)
 async def simulate_rethon(
     request: SimulateRethonRequest,
+    http_request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     sentence_pool_minimum: int = 3,
-) -> SimulatedRethonResponse:
+) -> Union[SimulatedRethonResponse, Response]:
     """Run the RE process to a fixed point and return the translated evolution with Z-scores.
 
     If ``request.evolution`` is supplied the process is resumed from that
@@ -108,18 +160,22 @@ async def simulate_rethon(
         settings.simulation_max_elements,
     )
     try:
-        return await run_in_pool(
-            "simulation",
-            simulate_to_fixed_point,
-            built_arguments,
-            lookup_w_negated,
-            n,
-            request.elements,
-            request.evolution,
-            request.local,
-            request.weights,
-            request.neighbourhood_depth,
-            timeout=settings.simulation_timeout,
+        return await _until_disconnected(
+            http_request,
+            lambda stop: run_in_pool(
+                "simulation",
+                simulate_to_fixed_point,
+                built_arguments,
+                lookup_w_negated,
+                n,
+                request.elements,
+                request.evolution,
+                request.local,
+                request.weights,
+                request.neighbourhood_depth,
+                timeout=settings.simulation_timeout,
+                stop=stop,
+            ),
         )
     except HTTPException:
         raise  # a timeout or a lost worker, already logged by the pool
@@ -131,9 +187,10 @@ async def simulate_rethon(
 @stepping_router.post("/step", response_model=SimulatedRethonResponse)
 async def simulate_rethon_step(
     request: SimulateRethonStepRequest,
+    http_request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     sentence_pool_minimum: int = 3,
-) -> SimulatedRethonResponse:
+) -> Union[SimulatedRethonResponse, Response]:
     """Advance the RE process by exactly one step and return the updated evolution.
 
     On the first call omit ``request.evolution`` (or pass an empty list) — the
@@ -150,18 +207,22 @@ async def simulate_rethon_step(
         settings.simulation_max_elements,
     )
     try:
-        return await run_in_pool(
-            "simulation",
-            simulate_one_step,
-            built_arguments,
-            lookup_w_negated,
-            n,
-            request.elements,
-            request.evolution,
-            request.local,
-            request.weights,
-            request.neighbourhood_depth,
-            timeout=settings.simulation_timeout,
+        return await _until_disconnected(
+            http_request,
+            lambda stop: run_in_pool(
+                "simulation",
+                simulate_one_step,
+                built_arguments,
+                lookup_w_negated,
+                n,
+                request.elements,
+                request.evolution,
+                request.local,
+                request.weights,
+                request.neighbourhood_depth,
+                timeout=settings.simulation_timeout,
+                stop=stop,
+            ),
         )
     except SimulationFinished as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -175,8 +236,9 @@ async def simulate_rethon_step(
 @router.post("/score_per_round", response_model=ScorePerRoundResponse)
 async def score_per_round(
     request: ScorePerRoundRequest,
+    http_request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
-) -> ScorePerRoundResponse:
+) -> Union[ScorePerRoundResponse, Response]:
     """Compute the equilibrium Z-score for each workflow round from 1 to *request.round*.
 
     Elements and relations are filtered to those present at each round before
@@ -192,16 +254,22 @@ async def score_per_round(
     # cannot be pickled back out of one.
     enforce_element_cap(len(request.elements), settings.simulation_max_elements)
 
-    round_scores = await run_in_pool(
-        "simulation",
-        compute_score_per_round,
-        request.elements,
-        request.relations,
-        request.round,
-        request.local,
-        request.weights,
-        timeout=settings.simulation_timeout,
+    round_scores = await _until_disconnected(
+        http_request,
+        lambda stop: run_in_pool(
+            "simulation",
+            compute_score_per_round,
+            request.elements,
+            request.relations,
+            request.round,
+            request.local,
+            request.weights,
+            timeout=settings.simulation_timeout,
+            stop=stop,
+        ),
     )
+    if isinstance(round_scores, Response):
+        return round_scores  # the caller left
     return ScorePerRoundResponse(round_scores=round_scores)
 
 

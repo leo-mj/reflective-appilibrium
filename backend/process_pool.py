@@ -55,10 +55,13 @@ that costs nobody but the computation being stopped:
   computations as there are workers, so a pool never holds a queued task that a
   kill would take down with it. (With more than one worker, whatever else is
   running at that moment is still lost, and its caller gets a 503.)
-- **Cancelled while running means killed.** Whatever cancels the awaiting
-  coroutine — the timeout below, or a caller that goes away — kills the worker,
-  so the computation stops rather than burning a core for a caller who has
-  given up. Cancelled while still queued, it simply leaves the queue.
+- **Stopped while running means killed.** A ``stop`` event set by a caller who
+  has gone away, the timeout below, or the call being cancelled all kill the
+  worker, so the computation stops rather than burning a core for nobody.
+  Stopped while still queued, it simply leaves the queue. Stopping is signalled
+  rather than done by cancelling, because a cancellation surfaces as an
+  exception in this module's frames, and a debugger breaking on uncaught
+  exceptions stops there on every Stop press.
 - **The timeout counts computing, not queueing.** Otherwise the third request
   in line would time out having done nothing.
 
@@ -74,7 +77,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from threading import Lock
-from typing import Any, Callable, Dict, Literal, TypeVar
+from typing import Any, Callable, Dict, Literal, Optional, TypeVar
 
 from fastapi import HTTPException
 
@@ -165,11 +168,38 @@ def _discard(name: PoolName, pool: ProcessPoolExecutor, kill: bool) -> None:
         pool.shutdown(wait=False, cancel_futures=True)
 
 
+class ComputationStopped(Exception):
+    """The computation was stopped through ``run_in_pool``'s ``stop`` event."""
+
+
+async def _first(awaitable: Any, stop: Optional[asyncio.Event], timeout: float) -> bool:
+    """Wait for ``awaitable``, ``stop`` or ``timeout``; True if the first came first.
+
+    Built on ``asyncio.wait``, which returns rather than raises: nothing is
+    cancelled in this module's frames on the way out, so a Stop press does not
+    surface as an exception to a debugger breaking on uncaught ones. What is
+    cancelled here — the leftover ``stop.wait()`` — is cancelled inside asyncio.
+    """
+    waiters = {awaitable}
+    stopped = asyncio.ensure_future(stop.wait()) if stop is not None else None
+    if stopped is not None:
+        waiters.add(stopped)
+    try:
+        done, _ = await asyncio.wait(
+            waiters, timeout=timeout or None, return_when=asyncio.FIRST_COMPLETED
+        )
+    finally:
+        if stopped is not None and not stopped.done():
+            stopped.cancel()
+    return awaitable in done
+
+
 async def run_in_pool(
     name: PoolName,
     fn: Callable[..., T],
     *args: Any,
     timeout: float = 0,
+    stop: Optional[asyncio.Event] = None,
     **kwargs: Any,
 ) -> T:
     """Run ``fn(*args, **kwargs)`` in a worker of pool ``name`` and await it.
@@ -178,23 +208,54 @@ async def run_in_pool(
     must pickle. See the module docstring for what must never be raised inside,
     and for which pool a computation belongs in.
 
-    ``timeout`` is seconds of computing, 0 for none; ``fn`` therefore cannot take
-    a keyword argument of that name. Past it the worker is killed and the caller
-    gets a 504. A worker that dies gets it a 503. Cancelling the call while the
-    computation runs kills the worker too.
+    ``timeout`` is seconds of computing, 0 for none. Past it the worker is killed
+    and the caller gets a 504; a worker that dies gets it a 503. Setting ``stop``
+    kills the worker too, if the computation has started, and raises
+    ``ComputationStopped``. ``fn`` therefore cannot take keyword arguments named
+    ``timeout`` or ``stop``.
+
+    Cancelling the call still kills the worker, for the case nothing else covers
+    — the server shutting down mid-request — but the router stops a computation
+    through ``stop``, since a cancellation surfaces here as an exception.
     """
-    async with _gate(name):
+    gate = _gate(name)
+    entry = asyncio.ensure_future(gate.acquire())
+
+    def leave_queue() -> None:
+        entry.cancel()
+        # Admitted in the same instant it was stopped: give the place back.
+        if entry.done() and not entry.cancelled():
+            gate.release()
+
+    try:
+        admitted = await _first(entry, stop, 0)
+    except asyncio.CancelledError:
+        leave_queue()
+        raise
+    if not admitted:
+        leave_queue()
+        raise ComputationStopped()
+    try:
         pool = get_pool(name)
         future = asyncio.get_running_loop().run_in_executor(
             pool, partial(fn, *args, **kwargs)
         )
         try:
-            return await asyncio.wait_for(future, timeout or None)
-        except asyncio.TimeoutError:
+            finished = await _first(future, stop, timeout)
+        except asyncio.CancelledError:
+            logger.info("A %s computation was cancelled and stopped.", name)
+            future.cancel()
+            _discard(name, pool, kill=True)
+            raise
+        if not finished:
+            future.cancel()  # so the broken pool's error is never left unretrieved
+            _discard(name, pool, kill=True)
+            if stop is not None and stop.is_set():
+                logger.info("A %s computation was stopped.", name)
+                raise ComputationStopped()
             logger.warning(
                 "A %s computation ran past %ss and was stopped.", name, timeout
             )
-            _discard(name, pool, kill=True)
             raise HTTPException(
                 status_code=504,
                 detail=(
@@ -203,10 +264,8 @@ async def run_in_pool(
                     f"the backend locally."
                 ),
             )
-        except asyncio.CancelledError:
-            logger.info("A %s computation was cancelled and stopped.", name)
-            _discard(name, pool, kill=True)
-            raise
+        try:
+            return future.result()
         except BrokenProcessPool:
             logger.error("A %s worker died; starting a new pool.", name)
             _discard(name, pool, kill=False)
@@ -217,6 +276,8 @@ async def run_in_pool(
                     "possibly out of memory. Please try again."
                 ),
             )
+    finally:
+        gate.release()
 
 
 def shutdown_pools() -> None:

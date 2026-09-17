@@ -30,7 +30,6 @@ async function describeScoringFailure(res, endpoint) {
 }
 
 /**
-/**
  * Advances the step-by-step RE simulation by one step.
  *
  * Pass ``evolution = null`` on the first call to start from the initial
@@ -41,12 +40,17 @@ async function describeScoringFailure(res, endpoint) {
  * @param {REState} state
  * @param {boolean} local
  * @param {Array[]|null} evolution  - translated_re_state.evolution from the previous response
+ * @param {Object|null} [weights=null]
+ * @param {number} [neighbourhoodDepth=1]
+ * @param {{signal?: AbortSignal}} [options]  Aborting stops the computation on
+ *   the server too: it watches for the dropped connection and kills the worker.
  * @returns {Promise<{translated_arguments: Array, translated_re_state: Object}>}
  */
-export async function simulateRethonStep(state, local, evolution = null, weights = null, neighbourhoodDepth = 1) {
+export async function simulateRethonStep(state, local, evolution = null, weights = null, neighbourhoodDepth = 1, { signal } = {}) {
   const url = `${BACKEND_URL}/api/simulate_rethon/step`;
   const res = await fetch(url, {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       elements: state.elements,
@@ -196,10 +200,15 @@ export async function scoreChanges(state, local = true, weights = null) {
   }
 }
 
-export async function simulateRethon(state, local, evolution = null, weights = null, neighbourhoodDepth = 1) {
+/**
+ * Runs the RE process to a fixed point, resuming from `evolution` if given.
+ * Takes the same `{ signal }` option as `simulateRethonStep`, to the same effect.
+ */
+export async function simulateRethon(state, local, evolution = null, weights = null, neighbourhoodDepth = 1, { signal } = {}) {
   const url = `${BACKEND_URL}/api/simulate_rethon/simulate`;
   const res = await fetch(url, {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       elements: state.elements,

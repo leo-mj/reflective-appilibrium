@@ -316,7 +316,7 @@ def test_each_endpoint_uses_the_pool_for_its_kind(monkeypatch):
     used = []
     timeouts = set()
 
-    async def record(name, fn, *args, timeout=0, **kwargs):
+    async def record(name, fn, *args, timeout=0, stop=None, **kwargs):
         used.append((fn.__name__, name))
         timeouts.add(timeout)
         return fn(*args, **kwargs)
@@ -418,6 +418,51 @@ def test_cancelling_a_running_computation_kills_its_worker():
         return workers
 
     _assert_stopped(asyncio.run(scenario()))
+
+
+def test_setting_stop_kills_a_running_computation():
+    async def scenario():
+        await process_pool.run_in_pool("simulation", _hold_the_gil, 0)  # warm
+        workers = _worker_processes("simulation")
+        stop = asyncio.Event()
+        asyncio.get_running_loop().call_later(0.3, stop.set)
+        started = time.monotonic()
+        with pytest.raises(process_pool.ComputationStopped):
+            await process_pool.run_in_pool(
+                "simulation", _hold_the_gil, 30 * _ONE_SECOND_OF_WORK, stop=stop
+            )
+        return workers, time.monotonic() - started
+
+    workers, took = asyncio.run(scenario())
+    assert took < 3
+    _assert_stopped(workers)
+
+
+def test_stopping_a_queued_computation_leaves_the_running_one_alone():
+    """And gives its place in line back: a leaked place would leave the pool's
+    one worker idle and every later request waiting for it for ever."""
+
+    async def scenario():
+        await process_pool.run_in_pool("simulation", _hold_the_gil, 0)  # warm
+        workers = _worker_processes("simulation")
+        ahead = asyncio.ensure_future(
+            process_pool.run_in_pool("simulation", _hold_the_gil, _ONE_SECOND_OF_WORK)
+        )
+        await asyncio.sleep(0.1)
+        stop = asyncio.Event()
+        asyncio.get_running_loop().call_later(0.2, stop.set)
+        with pytest.raises(process_pool.ComputationStopped):
+            await process_pool.run_in_pool("simulation", _hold_the_gil, 10, stop=stop)
+        assert all(p.is_alive() for p in workers)
+        ahead_result = await ahead
+        after = await asyncio.wait_for(
+            process_pool.run_in_pool("simulation", _hold_the_gil, 10), timeout=10
+        )
+        return ahead_result, after
+
+    ahead_result, after = asyncio.run(scenario())
+    assert ahead_result == sum(range(_ONE_SECOND_OF_WORK))
+    assert after == 45
 
 
 def test_stopping_one_computation_spares_the_ones_queued_behind_it():
