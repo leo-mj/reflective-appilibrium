@@ -80,6 +80,28 @@ def test_stepping_is_not_charged_against_the_simulation_allowance():
         app.dependency_overrides.clear()
 
 
+def test_the_llm_timeout_follows_the_mode():
+    """Short where a held connection is a stranger waiting; the SDK's own where
+    the caller may be a quantized model on a consumer GPU, slow but not stuck."""
+    assert make_settings(deployment="hosted").llm_timeout == 90
+    assert make_settings().llm_timeout == 600
+    assert make_settings(deployment="hosted", llm_timeout_seconds=30).llm_timeout == 30
+
+
+def test_the_llm_service_is_built_with_the_timeout_and_retries(mock_llm_complete):
+    """Checked through the real dependency, not an override of it."""
+    settings = make_settings(deployment="hosted", llm_max_retries=0)
+    headers = {"x-api-key": "k", "x-base-url": "https://api.openai.com/v1"}
+    try:
+        client = _client_with(settings)
+        assert client.post("/api/llm/test", headers=headers).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+    kwargs = mock_llm_complete.call_args.kwargs
+    assert kwargs["max_retries"] == 0
+    assert kwargs["timeout"].read == 90
+
+
 def test_an_unknown_deployment_value_is_rejected():
     with pytest.raises(Exception):
         make_settings(deployment="staging")

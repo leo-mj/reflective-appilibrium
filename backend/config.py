@@ -36,6 +36,7 @@ Deployment = Literal["local", "hosted"]
 # simulation rate limit        none              5/min per caller
 # stepping rate limit          none              30/min per caller
 # scoring rate limit           none              300/min per caller
+# LLM call timeout             600s (SDK)        90s
 # session storage on disk      on                off (browser keeps state)
 #
 # Four limits rather than one, because the endpoints they cover cost wildly
@@ -62,6 +63,12 @@ _HOSTED_LLM_LIMIT = 60
 _HOSTED_SIMULATION_LIMIT = 5
 _HOSTED_STEPPING_LIMIT = 30
 _HOSTED_SCORING_LIMIT = 300
+
+# Short hosted, where every held connection is a visitor waiting on the single
+# worker. Locally the SDKs' own default: the targets include quantized models on a
+# consumer GPU, and a long relation-detection reply there is slow, not stuck.
+_HOSTED_LLM_TIMEOUT = 90.0
+_SDK_DEFAULT_LLM_TIMEOUT = 600.0
 
 # The other half of restraining the simulation, and the half a rate limit cannot
 # reach: the cost of one request rather than how many are allowed.
@@ -190,6 +197,15 @@ class Settings(BaseSettings):
     # response stops at the cap.
     llm_max_tokens: int = 4096
 
+    # Seconds one provider call may take; each retry gets its own. Follows
+    # DEPLOYMENT when unset — see the table above. Connecting is capped at 10s
+    # regardless, in services.llm.
+    llm_timeout_seconds: Optional[float] = None
+
+    # Retries on connection errors, 429 and 5xx. The SDKs default to 2, which
+    # triples a timeout before anyone sees an error.
+    llm_max_retries: int = 1
+
     # ── Validation ────────────────────────────────────────────────────────────
 
     @field_validator("cors_origins")
@@ -264,6 +280,13 @@ class Settings(BaseSettings):
         if self.llm_rate_limit_per_minute is not None:
             return self.llm_rate_limit_per_minute
         return _HOSTED_LLM_LIMIT if self.is_hosted else 0
+
+    @property
+    def llm_timeout(self) -> float:
+        """Seconds one provider call may take before it is abandoned."""
+        if self.llm_timeout_seconds is not None:
+            return self.llm_timeout_seconds
+        return _HOSTED_LLM_TIMEOUT if self.is_hosted else _SDK_DEFAULT_LLM_TIMEOUT
 
     @property
     def simulation_rate_limit(self) -> int:

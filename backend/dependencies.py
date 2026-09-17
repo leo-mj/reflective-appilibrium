@@ -300,5 +300,7 @@ def get_llm_service(
         base_url=x_base_url,
         model=x_model or settings.default_model,
         max_tokens=settings.llm_max_tokens,
+        timeout_seconds=settings.llm_timeout,
+        max_retries=settings.llm_max_retries,
     )
     return LLMService(config)

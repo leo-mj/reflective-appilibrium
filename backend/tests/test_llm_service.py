@@ -89,6 +89,28 @@ def test_local_url_creates_openai_client():
     assert svc._anthropic is None
 
 
+# --- timeout and retries ---
+
+
+@pytest.mark.parametrize(
+    "base_url", ["https://api.openai.com/v1", "https://api.anthropic.com/v1"]
+)
+def test_both_clients_get_the_configured_timeout_and_retries(base_url):
+    """Left to the SDKs, a slow provider holds a request for 600s, three times."""
+    svc = LLMService(LLMConfig("k", base_url, "m", timeout_seconds=90, max_retries=1))
+    client = svc._anthropic or svc._openai
+    assert client.max_retries == 1
+    assert client.timeout.read == 90
+    assert client.timeout.connect == 10
+
+
+def test_connecting_never_gets_longer_than_the_whole_budget():
+    svc = LLMService(
+        LLMConfig("k", "https://api.openai.com/v1", "m", timeout_seconds=3)
+    )
+    assert svc._openai.timeout.connect == 3
+
+
 # --- temperature-restriction handling (reasoning models) ---
 
 
