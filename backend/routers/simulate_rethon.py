@@ -180,7 +180,7 @@ async def simulate_rethon(
     except HTTPException:
         raise  # a timeout or a lost worker, already logged by the pool
     except Exception as e:
-        logger.error("Simulation failed: %s", e, exc_info=True)
+        logger.error("Simulation failed: %s", type(e).__name__, exc_info=True)
         raise
 
 
@@ -229,7 +229,7 @@ async def simulate_rethon_step(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Step simulation failed: %s", e, exc_info=True)
+        logger.error("Step simulation failed: %s", type(e).__name__, exc_info=True)
         raise
 
 

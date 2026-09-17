@@ -13,6 +13,7 @@ import {
   useLLMSettingsRequested,
 } from "../../utils/llmKey.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
+import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import {
   ASSIST_TABS,
@@ -84,6 +85,7 @@ export function AppHeaderNarrow({
 }) {
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
   const {
     isDark,
@@ -166,6 +168,7 @@ export function AppHeaderNarrow({
       </div>
       <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
+      <PrivacyModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       {menuOpen && (
         <div
           style={{
@@ -337,6 +340,16 @@ export function AppHeaderNarrow({
             >
               <span style={menuIconStyle}>⚙</span>
               {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
+            </button>
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setPrivacyOpen(true);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>ⓘ</span>
+              {MENU_LABELS.privacy}
             </button>
             {BACKEND_ENABLED && (
               <>

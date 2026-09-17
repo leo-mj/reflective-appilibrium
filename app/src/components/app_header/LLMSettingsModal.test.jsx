@@ -69,6 +69,11 @@ describe("in the demo build", () => {
     }
   });
 
+  it("makes no claim about where a key goes, since none can be entered", () => {
+    open();
+    expect(document.body.textContent).not.toContain("Kept in this tab only");
+  });
+
   it("asks the backend for nothing on open", () => {
     open();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -101,6 +106,13 @@ describe("when BYOK is available", () => {
   it("allows a connection test", () => {
     open();
     expect(button("Test connection").disabled).toBe(false);
+  });
+
+  it("says, beside the key, how long it is kept and where it goes", () => {
+    open();
+    const t = document.body.textContent;
+    expect(t).toContain("Kept in this tab only and forgotten when it closes");
+    expect(t).toContain("does not store or log it");
   });
 
   it("looks up which providers the server already has keys for", () => {

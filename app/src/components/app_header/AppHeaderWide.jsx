@@ -34,6 +34,7 @@ import {
   useLLMSettingsRequested,
 } from "../../utils/llmKey.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
+import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
 
 /**
@@ -87,6 +88,7 @@ export function AppHeaderWide({
   const [menuOpen, setMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
   const {
     isDark,
@@ -388,6 +390,18 @@ export function AppHeaderWide({
                           : MENU_LABELS.llm}
                       </button>
                     </Tooltip>
+                    <Tooltip text={MENU_TOOLTIPS.privacy}>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setPrivacyOpen(true);
+                        }}
+                        style={menuItem}
+                      >
+                        <span style={menuIconStyle}>ⓘ</span>
+                        {MENU_LABELS.privacy}
+                      </button>
+                    </Tooltip>
 
                     {BACKEND_ENABLED && (
                       <>
@@ -558,6 +572,7 @@ export function AppHeaderWide({
 
       <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
+      <PrivacyModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
 
       {/* Row 2: tab bar */}
       {!hideTabBar && (

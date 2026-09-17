@@ -2,6 +2,8 @@
  * @fileoverview BYOK settings modal — lets the user supply their own API key,
  * provider, and model. Values are stored in sessionStorage only (cleared on
  * tab close) and sent as request headers; the backend never persists them.
+ * The modal says so to the reader beside the key field, and PrivacyModal says
+ * the rest of what leaves the browser.
  * @module components/app_header/LLMSettingsModal
  */
 
@@ -302,6 +304,23 @@ export function LLMSettingsModal({ open, onClose }) {
               }}
               autoComplete="off"
             />
+            {/* Where the key goes, said where it is typed. Not in the demo,
+                where no key can be entered at all. */}
+            {!demo && (
+              <div
+                style={{
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                  color: C.dim,
+                  marginTop: 6,
+                }}
+              >
+                Kept in this tab only and forgotten when it closes. Sent to
+                this app&apos;s server with each AI request and passed on to{" "}
+                {provider.label}; the server does not store or log it. See
+                Privacy in the menu for what else is sent.
+              </div>
+            )}
           </div>
         )}
 
