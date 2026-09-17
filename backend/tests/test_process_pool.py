@@ -1,4 +1,4 @@
-"""The simulation worker pool.
+"""The rethon worker pools.
 
 What it has to guarantee, beyond the endpoint tests that already run through it:
 that moving a computation into another process changes none of its results; that
@@ -7,7 +7,7 @@ that a worker's log lines still arrive; and that the app's shutdown stops it.
 """
 
 import asyncio
-import logging
+import random
 import time
 
 import pytest
@@ -16,11 +16,20 @@ from fastapi.testclient import TestClient
 from backend import process_pool
 from backend.config import get_settings
 from backend.main import app
-from backend.routers.rethon_schemas import ScoreChangesRequest, ScorePerRoundRequest
+from backend.routers.rethon_schemas import (
+    ScoreChangesRequest,
+    ScorePerRoundRequest,
+    SimulateRethonRequest,
+)
 from backend.services.rethon_scoring import (
     compute_quick_score,
     compute_score_changes,
     compute_score_per_round,
+)
+from backend.services.rethon_simulation import (
+    simulate_one_step,
+    simulate_to_fixed_point,
+    validate_and_build,
 )
 from backend.tests.conftest import make_settings
 
@@ -120,6 +129,35 @@ def test_score_per_round_is_identical_in_a_worker():
     )
 
     assert direct[0].scores is None and direct[1].scores is not None
+    assert pooled == direct
+
+
+def _seeded(fn, *args):
+    """Run ``fn`` with Python's random generator seeded.
+
+    rethon breaks ties between equally good positions with ``random.choice``, so
+    the path a full simulation takes varies from run to run even where its scores
+    do not — six different evolutions in forty runs, for a position this small.
+    Seeded, a run is the same in this process and in a fresh worker (checked).
+    """
+    random.seed(0)
+    return fn(*args)
+
+
+def _simulation_args(evolution=None) -> tuple:
+    req = SimulateRethonRequest.model_validate({"round": "1", **_payload()})
+    built, lookup, n = validate_and_build(req.elements, req.relations, 3)
+    return (built, lookup, n, req.elements, evolution, req.local, req.weights, 1)
+
+
+@pytest.mark.parametrize("fn", [simulate_to_fixed_point, simulate_one_step])
+def test_a_simulation_is_identical_in_a_worker(fn):
+    args = _simulation_args()
+
+    direct = _seeded(fn, *args)
+    pooled = asyncio.run(process_pool.run_in_pool("simulation", _seeded, fn, *args))
+
+    assert len(direct.translated_re_state.evolution) > 1
     assert pooled == direct
 
 
@@ -248,6 +286,29 @@ def test_the_app_shutting_down_stops_the_workers():
     assert process_pool._pools == {}
 
 
+def test_a_step_past_the_fixed_point_is_still_a_400():
+    """Refused inside the worker, as the only place that knows the process has
+    finished. An HTTPException raised there would fail to unpickle and reach the
+    caller as a 500; SimulationFinished is what crosses instead."""
+    app.dependency_overrides[get_settings] = lambda: make_settings()
+    try:
+        client = TestClient(app)
+        payload = {"round": "1", **_payload()}
+        finished = client.post("/api/simulate_rethon/simulate", json=payload)
+        assert finished.status_code == 200
+        state = finished.json()["translated_re_state"]
+        assert state["finished"]
+
+        res = client.post(
+            "/api/simulate_rethon/step",
+            json={**payload, "evolution": state["evolution"]},
+        )
+    finally:
+        app.dependency_overrides.clear()
+    assert res.status_code == 400
+    assert res.json()["detail"] == "The RE process has already reached a fixed point."
+
+
 def test_each_endpoint_uses_the_pool_for_its_kind(monkeypatch):
     """A score lookup sent to the simulation pool would queue behind simulations
     again — the thing the split exists to prevent — and pass every other test."""
@@ -266,12 +327,16 @@ def test_each_endpoint_uses_the_pool_for_its_kind(monkeypatch):
         client.post(
             "/api/simulate_rethon/score_per_round", json=_deterministic_rounds()
         )
+        client.post("/api/simulate_rethon/simulate", json={"round": "1", **_payload()})
+        client.post("/api/simulate_rethon/step", json={"round": "1", **_payload()})
     finally:
         app.dependency_overrides.clear()
     assert used == [
         ("compute_quick_score", "scoring"),
         ("compute_score_changes", "scoring"),
         ("compute_score_per_round", "simulation"),
+        ("simulate_to_fixed_point", "simulation"),
+        ("simulate_one_step", "simulation"),
     ]
 
 

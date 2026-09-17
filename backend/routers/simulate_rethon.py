@@ -25,11 +25,8 @@ two routers, which share a prefix and differ only in what they cost:
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Annotated, Dict
-import asyncio
+from typing import Annotated
 import logging
-
-from theodias import StandardPosition
 
 from .rethon_schemas import (
     SimulateRethonRequest,
@@ -45,14 +42,11 @@ from .rethon_schemas import (
 from ..config import Settings, get_settings
 from ..process_pool import run_in_pool
 from ..services.rethon_simulation import (
-    REProcess,
+    SimulationFinished,
     enforce_element_cap,
+    simulate_one_step,
+    simulate_to_fixed_point,
     validate_and_build,
-    get_rethon_final_state,
-    build_re,
-    reconstruct_re_state,
-    compute_evolution_scores,
-    translate_re_state,
 )
 from ..services.rethon_scoring import (
     compute_score_changes,
@@ -105,51 +99,30 @@ async def simulate_rethon(
     Raises 422 if the sentence pool is too small, too large for this deployment,
     or no argument relations are present.
     """
+    # In this process: its refusals are HTTPExceptions, which cannot be pickled
+    # back out of a worker.
     built_arguments, lookup_w_negated, n = validate_and_build(
         request.elements,
         request.relations,
         sentence_pool_minimum,
         settings.simulation_max_elements,
     )
-
-    def _run() -> REProcess:
-        if request.evolution:
-            id_to_index: Dict[str, int] = {
-                el.id: i + 1 for i, el in enumerate(request.elements)
-            }
-            reconstructed = reconstruct_re_state(request.evolution, id_to_index, n)
-            init_coms = reconstructed.initial_commitments()
-            re = build_re(
-                built_arguments.num_arguments,
-                n,
-                init_coms,
-                request.local,
-                request.weights,
-                request.neighbourhood_depth,
-            )
-            re.set_state(reconstructed)
-            re.re_process()
-        else:
-            re = get_rethon_final_state(
-                numerical_arguments=built_arguments.num_arguments,
-                n_unnegated_sentence_pool=n,
-                lookup=built_arguments.lookup,
-                local=request.local,
-                weights=request.weights,
-                neighbourhood_depth=request.neighbourhood_depth,
-            )
-        return re
-
     try:
-        re = await asyncio.to_thread(_run)
+        return await run_in_pool(
+            "simulation",
+            simulate_to_fixed_point,
+            built_arguments,
+            lookup_w_negated,
+            n,
+            request.elements,
+            request.evolution,
+            request.local,
+            request.weights,
+            request.neighbourhood_depth,
+        )
     except Exception as e:
         logger.error("Simulation failed: %s", e, exc_info=True)
         raise
-    scores = compute_evolution_scores(re)
-    return SimulatedRethonResponse(
-        translated_arguments=built_arguments.translated_arguments,
-        translated_re_state=translate_re_state(re.state(), lookup_w_negated, scores),
-    )
 
 
 @stepping_router.post("/step", response_model=SimulatedRethonResponse)
@@ -166,63 +139,31 @@ async def simulate_rethon_step(
     All fields except ``evolution`` must be identical across calls for a given
     stepping session.  Returns 400 if the process has already reached a fixed point.
     """
+    # In this process, for the reason given in simulate_rethon.
     built_arguments, lookup_w_negated, n = validate_and_build(
         request.elements,
         request.relations,
         sentence_pool_minimum,
         settings.simulation_max_elements,
     )
-
-    def _run() -> REProcess:
-        id_to_index: Dict[str, int] = {
-            el.id: i + 1 for i, el in enumerate(request.elements)
-        }
-        if request.evolution:
-            reconstructed = reconstruct_re_state(request.evolution, id_to_index, n)
-            init_coms = reconstructed.initial_commitments()
-        else:
-            init_coms = StandardPosition.from_set(
-                position={
-                    (
-                        id_to_index[el.id]
-                        if el.status in ("active", "revised")
-                        else -id_to_index[el.id]
-                    )
-                    for el in request.elements
-                    if el.status in ("active", "revised", "rejected")
-                },
-                n_unnegated_sentence_pool=n,
-            )
-        re = build_re(
-            numerical_arguments=built_arguments.num_arguments,
-            n_unnegated_sentence_pool=n,
-            init_coms=init_coms,
-            local=request.local,
-            weights=request.weights,
-            neighbourhood_depth=request.neighbourhood_depth,
-        )
-        if request.evolution:
-            re.set_state(reconstructed)
-        if re.state().finished:
-            raise HTTPException(
-                status_code=400,
-                detail="The RE process has already reached a fixed point.",
-            )
-        re.next_step()
-        return re
-
     try:
-        re = await asyncio.to_thread(_run)
-    except HTTPException:
-        raise
+        return await run_in_pool(
+            "simulation",
+            simulate_one_step,
+            built_arguments,
+            lookup_w_negated,
+            n,
+            request.elements,
+            request.evolution,
+            request.local,
+            request.weights,
+            request.neighbourhood_depth,
+        )
+    except SimulationFinished as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error("Step simulation failed: %s", e, exc_info=True)
         raise
-    scores = compute_evolution_scores(re)
-    return SimulatedRethonResponse(
-        translated_arguments=built_arguments.translated_arguments,
-        translated_re_state=translate_re_state(re.state(), lookup_w_negated, scores),
-    )
 
 
 @router.post("/score_per_round", response_model=ScorePerRoundResponse)

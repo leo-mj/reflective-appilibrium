@@ -11,8 +11,8 @@ Wall-clock timeouts and recovery from a dead worker are built on this.
 
 Two pools, one worker each by default, split by what waits on what:
 
-- ``simulation`` — full RE processes: ``/score_per_round`` now, ``/simulate`` and
-  ``/step`` next. Seconds each, started by a person pressing a button.
+- ``simulation`` — full RE processes: ``/simulate``, ``/step`` and
+  ``/score_per_round``. Seconds each, started by a person pressing a button.
 - ``scoring`` — ``/quick_score`` and ``/score_changes``. Analytic and fast, but
   fired by the frontend on every edit and once per suggestion card.
 
