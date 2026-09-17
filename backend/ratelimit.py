@@ -4,10 +4,9 @@ A small fixed-window rate limiter, used to cap LLM-backed requests per client.
 Deliberately in-process and dependency-free. The alternative was slowapi, but
 its default storage is in-process too, so it would buy no extra correctness here
 while adding two packages to a backend that currently has six runtime
-dependencies. The trade-off is the same one ``conversations._sessions`` already
-makes: counters live in one worker's memory, so with more than one uvicorn
-worker each enforces the limit separately and the effective ceiling multiplies.
-Run a single worker, or move both to a shared store together.
+dependencies. The trade-off: counters live in one worker's memory, so with more
+than one uvicorn worker each enforces the limit separately and the effective
+ceiling multiplies. Run a single worker, or move the counters to a shared store.
 
 Fixed window rather than a token bucket because the failure it guards against is
 sustained volume, not burstiness: a client can send up to 2x the limit across a

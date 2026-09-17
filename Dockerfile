@@ -65,8 +65,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"PORT\"]}/api/health', timeout=4)"
 
 # --workers 1 is required, not a tuning choice: the rate limiter (ratelimit.py)
-# and the discussion sessions (routers/conversations.py) live in process memory,
-# so a second worker would double every allowance and lose conversations.
+# lives in process memory, so a second worker would double every allowance.
 #
 # --forwarded-allow-ips=* trusts x-forwarded-for from any peer. That is only safe
 # because the platform's proxy is the sole way into the container; publish the

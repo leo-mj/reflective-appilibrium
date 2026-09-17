@@ -26,9 +26,6 @@ import { BACKEND_ENABLED } from "../../config.js";
 import { useBackendCapabilities } from "../../hooks/useBackendCapabilities.js";
 import { btn } from "./appHeaderStyles.js";
 
-/** Minutes a Discuss conversation lives in server memory: SESSION_TTL in routers/conversations.py. */
-const CONVERSATION_MINUTES = 30;
-
 const BROWSER =
   "Your work is autosaved in this browser, so a closed tab can be resumed. On a shared computer, discard it from the start screen when you are done.";
 
@@ -57,7 +54,7 @@ function privacySections({ backend, capabilities }) {
       (capabilities.sessions
         ? "Sessions you store with Save are written to its disk. Nothing else is."
         : "Nothing on disk.") +
-      ` A discussion is held in its memory for up to ${CONVERSATION_MINUTES} minutes so it can continue. ` +
+      " A discussion is not kept either: this page sends it whole with each question. " +
       "Where rate limits are on, the address or access token you connect from is counted for a minute. " +
       "Its logs record counts, ids and model names, never what you wrote. " +
       "The service hosting it may keep its own connection logs.";

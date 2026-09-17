@@ -1,6 +1,7 @@
 /**
- * @fileoverview Client for the /api/conversations endpoints.
- * Handles starting a new per-suggestion conversation and sending follow-up messages.
+ * @fileoverview Client for the /api/conversations endpoint.
+ * The server keeps nothing between turns, so every question is sent with the RE
+ * state, the suggestion and the whole conversation so far.
  * @module utils/conversationsClient
  */
 
@@ -9,51 +10,39 @@ import { fetchOk } from "./backendError.js";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
-async function post(url, body) {
-  // Both conversation endpoints depend on get_llm_service, which rejects a
-  // missing x-base-url before it looks at any key — so without these headers
-  // the panel 400s in every deployment mode, server-side key or not. That 400
-  // is exactly the one backendError turns into "No API key configured", which
-  // is what it means to whoever pressed the button.
+/**
+ * Exchanges (a question and its reply) one conversation may hold — MAX_EXCHANGES
+ * in backend/routers/conversations.py, which rejects a longer one.
+ */
+export const MAX_EXCHANGES = 20;
+
+/**
+ * Ask a question in a conversation about a suggestion.
+ *
+ * @param {import('../types.js').REState} state
+ * @param {Object} suggestion  The suggestion object (any shape — serialised as-is).
+ * @param {Array<{ role: "user" | "assistant", content: string }>} messages
+ *   The conversation so far, ending with the new question.
+ * @returns {Promise<{ reply: string, model: string }>}
+ */
+export async function askInConversation(state, suggestion, messages) {
+  // The endpoint depends on get_llm_service, which rejects a missing x-base-url
+  // before it looks at any key — so without these headers the panel 400s in
+  // every deployment mode, server-side key or not. That 400 is exactly the one
+  // backendError turns into "No API key configured", which is what it means to
+  // whoever pressed the button.
   const res = await fetchOk(
-    url,
+    `${BACKEND_URL}/api/conversations`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getLLMHeaders() },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        state,
+        suggestion,
+        messages: messages.map(({ role, content }) => ({ role, content })),
+      }),
     },
     "/api/conversations",
   );
   return res.json();
-}
-
-/**
- * Start a new conversation about a suggestion.
- * The RE state is injected server-side into the system prompt and not repeated
- * in subsequent requests.
- *
- * @param {import('../types.js').REState} state
- * @param {Object} suggestion  The suggestion object (any shape — serialised as-is).
- * @param {string} message     The user's first message.
- * @returns {Promise<{ session_id: string, reply: string, model: string }>}
- */
-export async function startConversation(state, suggestion, message) {
-  return post(`${BACKEND_URL}/api/conversations`, {
-    state,
-    suggestion,
-    message,
-  });
-}
-
-/**
- * Send a follow-up message in an existing conversation.
- *
- * @param {string} sessionId
- * @param {string} message
- * @returns {Promise<{ session_id: string, reply: string, model: string }>}
- */
-export async function sendConversationMessage(sessionId, message) {
-  return post(`${BACKEND_URL}/api/conversations/${sessionId}/messages`, {
-    message,
-  });
 }

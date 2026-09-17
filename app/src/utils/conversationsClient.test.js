@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { startConversation, sendConversationMessage } from "./conversationsClient.js";
+import { askInConversation } from "./conversationsClient.js";
+
+const question = [{ role: "user", content: "why?" }];
 
 /**
- * The backend's conversation endpoints both depend on `get_llm_service`, which
+ * The backend's conversation endpoint depends on `get_llm_service`, which
  * raises 400 on a missing `x-base-url` *before* it considers any API key. So a
  * request without the BYOK headers cannot succeed in any deployment mode — and
  * the panel swallowed that into a generic error banner, which is why it went
@@ -16,7 +18,7 @@ describe("conversationsClient", () => {
     sessionStorage.clear();
     fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ session_id: "s1", reply: "hi", model: "gpt-4o" }),
+      json: async () => ({ reply: "hi", model: "gpt-4o" }),
     });
     vi.stubGlobal("fetch", fetchMock);
   });
@@ -34,9 +36,9 @@ describe("conversationsClient", () => {
     );
   }
 
-  it("sends the BYOK headers when starting a conversation", async () => {
+  it("sends the BYOK headers", async () => {
     savedSettings();
-    await startConversation({ topic: "t" }, { text: "s" }, "why?");
+    await askInConversation({ topic: "t" }, { text: "s" }, question);
 
     const { headers } = fetchMock.mock.calls[0][1];
     expect(headers["x-base-url"]).toBe("https://api.openai.com/v1");
@@ -45,21 +47,34 @@ describe("conversationsClient", () => {
     expect(headers["Content-Type"]).toBe("application/json");
   });
 
-  it("sends the BYOK headers on a follow-up message", async () => {
-    savedSettings();
-    await sendConversationMessage("s1", "and then?");
-
-    const { headers } = fetchMock.mock.calls[0][1];
-    expect(headers["x-base-url"]).toBe("https://api.openai.com/v1");
-    expect(headers["x-api-key"]).toBe("sk-test");
-  });
-
   it("still sends Content-Type when no key is saved", async () => {
-    await startConversation({ topic: "t" }, { text: "s" }, "why?");
+    await askInConversation({ topic: "t" }, { text: "s" }, question);
 
     const { headers } = fetchMock.mock.calls[0][1];
     expect(headers["Content-Type"]).toBe("application/json");
     expect(headers["x-base-url"]).toBeUndefined();
+  });
+
+  // The server keeps nothing, so the state, the suggestion and every earlier
+  // turn have to travel with each question.
+  it("sends the state, the suggestion and the whole conversation", async () => {
+    const messages = [
+      { role: "user", content: "why?" },
+      { role: "assistant", content: "because", model: "gpt-4o" },
+      { role: "user", content: "and then?" },
+    ];
+    await askInConversation({ topic: "t" }, { text: "s" }, messages);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/conversations$/);
+    expect(body.state).toEqual({ topic: "t" });
+    expect(body.suggestion).toEqual({ text: "s" });
+    // Only role and content: the model name is the panel's, not the schema's.
+    expect(body.messages).toEqual([
+      { role: "user", content: "why?" },
+      { role: "assistant", content: "because" },
+      { role: "user", content: "and then?" },
+    ]);
   });
 
   // The backend's answer to a keyless request is `400 Missing x-base-url
@@ -72,7 +87,7 @@ describe("conversationsClient", () => {
       status: 400,
       text: async () => '{"detail":"Missing x-base-url header"}',
     });
-    await expect(startConversation({ topic: "t" }, {}, "why?")).rejects.toThrow(
+    await expect(askInConversation({ topic: "t" }, {}, question)).rejects.toThrow(
       /No API key configured/,
     );
   });
@@ -83,7 +98,7 @@ describe("conversationsClient", () => {
       status: 400,
       text: async () => '{"detail":"Missing x-base-url header"}',
     });
-    await expect(startConversation({ topic: "t" }, {}, "why?")).rejects.toMatchObject({
+    await expect(askInConversation({ topic: "t" }, {}, question)).rejects.toMatchObject({
       status: 400,
       detail: "Missing x-base-url header",
     });

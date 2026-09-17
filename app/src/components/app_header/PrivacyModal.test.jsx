@@ -69,7 +69,13 @@ describe("with a backend", () => {
   it("says nothing is written to disk when sessions are off", () => {
     const t = text();
     expect(t).toContain("Nothing on disk");
-    expect(t).toContain("30 minutes");
+  });
+
+  it("does not say a discussion is held on the server", () => {
+    // routers/conversations.py keeps nothing between turns.
+    const t = text();
+    expect(t).not.toMatch(/memory|minutes/);
+    expect(t).toContain("A discussion is not kept");
   });
 
   it("says saved sessions are written to disk when they are on", () => {
