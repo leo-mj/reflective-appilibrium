@@ -41,15 +41,42 @@ Anything submitted must pickle both ways. ``HTTPException`` does not — its
 ``__init__`` takes ``status_code``, which unpickling does not pass — so a worker
 must never raise one: validation that can refuse a request runs in the parent,
 before the work is submitted.
+
+Stopping a computation
+----------------------
+
+A ``ProcessPoolExecutor`` cannot stop one task: a running future ignores
+``cancel()``, and a worker that dies — killed, or out of memory — breaks the
+whole pool for good, failing everything else it held. So stopping means killing
+the pool's workers and starting a new pool, and ``run_in_pool`` is arranged so
+that costs nobody but the computation being stopped:
+
+- **Requests queue here, not in the pool.** A per-pool gate admits only as many
+  computations as there are workers, so a pool never holds a queued task that a
+  kill would take down with it. (With more than one worker, whatever else is
+  running at that moment is still lost, and its caller gets a 503.)
+- **Cancelled while running means killed.** Whatever cancels the awaiting
+  coroutine — the timeout below, or a caller that goes away — kills the worker,
+  so the computation stops rather than burning a core for a caller who has
+  given up. Cancelled while still queued, it simply leaves the queue.
+- **The timeout counts computing, not queueing.** Otherwise the third request
+  in line would time out having done nothing.
+
+A pool that breaks on its own is replaced on the next request, and the request
+that found it broken gets a 503.
 """
 
 import asyncio
 import logging
 import multiprocessing
+import weakref
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from threading import Lock
 from typing import Any, Callable, Dict, Literal, TypeVar
+
+from fastapi import HTTPException
 
 from .config import Settings, get_settings
 from .logging_setup import configure_backend_logging
@@ -62,6 +89,12 @@ PoolName = Literal["simulation", "scoring"]
 
 _pools: Dict[str, ProcessPoolExecutor] = {}
 _lock = Lock()
+
+# One gate per pool per event loop. An asyncio.Semaphore belongs to the loop it
+# is first used on, and the suite runs many loops in one process.
+_gates: (
+    "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, Dict[str, asyncio.Semaphore]]"
+) = weakref.WeakKeyDictionary()
 
 
 def _workers(name: PoolName, settings: Settings) -> int:
@@ -102,22 +135,98 @@ def get_pool(name: PoolName) -> ProcessPoolExecutor:
         return _pools[name]
 
 
+def _gate(name: PoolName) -> asyncio.Semaphore:
+    gates = _gates.setdefault(asyncio.get_running_loop(), {})
+    if name not in gates:
+        gates[name] = asyncio.Semaphore(_workers(name, get_settings()))
+    return gates[name]
+
+
+def _kill(pool: ProcessPoolExecutor) -> None:
+    # No public way to reach the workers before Python 3.14's kill_workers();
+    # _processes is the executor's own pid -> Process map.
+    for process in list((getattr(pool, "_processes", None) or {}).values()):
+        process.kill()
+    pool.shutdown(wait=False, cancel_futures=True)
+
+
+def _discard(name: PoolName, pool: ProcessPoolExecutor, kill: bool) -> None:
+    """Drop ``pool`` so the next request starts a fresh one.
+
+    Only if it is still the current pool: two requests can find the same pool
+    broken, and the second must not throw away the replacement the first caused.
+    """
+    with _lock:
+        if _pools.get(name) is pool:
+            del _pools[name]
+    if kill:
+        _kill(pool)
+    else:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
 async def run_in_pool(
-    name: PoolName, fn: Callable[..., T], *args: Any, **kwargs: Any
+    name: PoolName,
+    fn: Callable[..., T],
+    *args: Any,
+    timeout: float = 0,
+    **kwargs: Any,
 ) -> T:
     """Run ``fn(*args, **kwargs)`` in a worker of pool ``name`` and await it.
 
     ``fn`` must be a module-level function, and its arguments and return value
     must pickle. See the module docstring for what must never be raised inside,
     and for which pool a computation belongs in.
+
+    ``timeout`` is seconds of computing, 0 for none; ``fn`` therefore cannot take
+    a keyword argument of that name. Past it the worker is killed and the caller
+    gets a 504. A worker that dies gets it a 503. Cancelling the call while the
+    computation runs kills the worker too.
     """
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(get_pool(name), partial(fn, *args, **kwargs))
+    async with _gate(name):
+        pool = get_pool(name)
+        future = asyncio.get_running_loop().run_in_executor(
+            pool, partial(fn, *args, **kwargs)
+        )
+        try:
+            return await asyncio.wait_for(future, timeout or None)
+        except asyncio.TimeoutError:
+            logger.warning(
+                "A %s computation ran past %ss and was stopped.", name, timeout
+            )
+            _discard(name, pool, kill=True)
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    f"The computation took longer than this instance allows "
+                    f"({timeout:g}s) and was stopped. Try fewer elements, or run "
+                    f"the backend locally."
+                ),
+            )
+        except asyncio.CancelledError:
+            logger.info("A %s computation was cancelled and stopped.", name)
+            _discard(name, pool, kill=True)
+            raise
+        except BrokenProcessPool:
+            logger.error("A %s worker died; starting a new pool.", name)
+            _discard(name, pool, kill=False)
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "The computation's worker process stopped unexpectedly, "
+                    "possibly out of memory. Please try again."
+                ),
+            )
 
 
 def shutdown_pools() -> None:
-    """Stop every worker that was started. Called from the app's lifespan."""
+    """Stop every worker that was started. Called from the app's lifespan.
+
+    Killed rather than waited for: a computation has no state worth finishing,
+    and waiting would hold a server restart for as long as the longest one runs.
+    """
     with _lock:
-        for pool in _pools.values():
-            pool.shutdown(wait=True, cancel_futures=True)
+        pools = list(_pools.values())
         _pools.clear()
+    for pool in pools:
+        _kill(pool)

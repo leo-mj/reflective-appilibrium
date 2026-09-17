@@ -119,7 +119,10 @@ async def simulate_rethon(
             request.local,
             request.weights,
             request.neighbourhood_depth,
+            timeout=settings.simulation_timeout,
         )
+    except HTTPException:
+        raise  # a timeout or a lost worker, already logged by the pool
     except Exception as e:
         logger.error("Simulation failed: %s", e, exc_info=True)
         raise
@@ -158,9 +161,12 @@ async def simulate_rethon_step(
             request.local,
             request.weights,
             request.neighbourhood_depth,
+            timeout=settings.simulation_timeout,
         )
     except SimulationFinished as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Step simulation failed: %s", e, exc_info=True)
         raise
@@ -194,6 +200,7 @@ async def score_per_round(
         request.round,
         request.local,
         request.weights,
+        timeout=settings.simulation_timeout,
     )
     return ScorePerRoundResponse(round_scores=round_scores)
 
@@ -222,6 +229,7 @@ async def score_changes(
         request.local,
         request.weights,
         settings.simulation_max_elements,
+        timeout=settings.simulation_timeout,
     )
 
 
@@ -248,4 +256,5 @@ async def quick_score(
         request.relations,
         request.weights,
         settings.simulation_max_elements,
+        timeout=settings.simulation_timeout,
     )

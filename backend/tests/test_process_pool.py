@@ -11,6 +11,7 @@ import random
 import time
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from backend import process_pool
@@ -313,13 +314,17 @@ def test_each_endpoint_uses_the_pool_for_its_kind(monkeypatch):
     """A score lookup sent to the simulation pool would queue behind simulations
     again — the thing the split exists to prevent — and pass every other test."""
     used = []
+    timeouts = set()
 
-    async def record(name, fn, *args, **kwargs):
+    async def record(name, fn, *args, timeout=0, **kwargs):
         used.append((fn.__name__, name))
+        timeouts.add(timeout)
         return fn(*args, **kwargs)
 
     monkeypatch.setattr("backend.routers.simulate_rethon.run_in_pool", record)
-    app.dependency_overrides[get_settings] = lambda: make_settings()
+    app.dependency_overrides[get_settings] = lambda: make_settings(
+        simulation_timeout_seconds=7
+    )
     try:
         client = TestClient(app)
         client.post("/api/simulate_rethon/quick_score", json=_payload())
@@ -338,6 +343,157 @@ def test_each_endpoint_uses_the_pool_for_its_kind(monkeypatch):
         ("simulate_to_fixed_point", "simulation"),
         ("simulate_one_step", "simulation"),
     ]
+    assert timeouts == {7}, "an endpoint left without a timeout can run forever"
+
+
+# ── Stopping a computation ────────────────────────────────────────────────────
+
+
+def _worker_processes(name):
+    return list(process_pool._pools[name]._processes.values())
+
+
+def _assert_stopped(processes):
+    """A killed worker is reaped by the executor's own thread, a moment later."""
+    deadline = time.monotonic() + 5
+    while any(p.is_alive() for p in processes) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not any(p.is_alive() for p in processes)
+
+
+def test_a_computation_past_its_timeout_is_stopped_with_a_504():
+    async def scenario():
+        await process_pool.run_in_pool("simulation", _hold_the_gil, 0)  # warm
+        workers = _worker_processes("simulation")
+        started = time.monotonic()
+        with pytest.raises(HTTPException) as refused:
+            await process_pool.run_in_pool(
+                "simulation", _hold_the_gil, 30 * _ONE_SECOND_OF_WORK, timeout=0.5
+            )
+        return refused.value, time.monotonic() - started, workers
+
+    refused, took, workers = asyncio.run(scenario())
+    assert refused.status_code == 504
+    assert took < 3, "the caller waited for the computation after all"
+    _assert_stopped(workers)
+
+
+def test_a_worker_that_dies_gets_a_503_and_the_next_request_succeeds():
+    async def scenario():
+        await process_pool.run_in_pool("simulation", _hold_the_gil, 0)  # warm
+        (worker,) = _worker_processes("simulation")
+        job = asyncio.ensure_future(
+            process_pool.run_in_pool(
+                "simulation", _hold_the_gil, 30 * _ONE_SECOND_OF_WORK
+            )
+        )
+        await asyncio.sleep(0.3)
+        worker.kill()  # what the kernel's OOM killer would do
+        with pytest.raises(HTTPException) as refused:
+            await job
+        after = await process_pool.run_in_pool("simulation", _hold_the_gil, 10)
+        return refused.value, after
+
+    refused, after = asyncio.run(scenario())
+    assert refused.status_code == 503
+    assert after == 45
+
+
+def test_cancelling_a_running_computation_kills_its_worker():
+    """What a caller going away will use: without the kill, a request nobody is
+    waiting for any more would go on holding the only worker to its end."""
+
+    async def scenario():
+        await process_pool.run_in_pool("simulation", _hold_the_gil, 0)  # warm
+        workers = _worker_processes("simulation")
+        job = asyncio.ensure_future(
+            process_pool.run_in_pool(
+                "simulation", _hold_the_gil, 30 * _ONE_SECOND_OF_WORK
+            )
+        )
+        await asyncio.sleep(0.3)
+        job.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await job
+        return workers
+
+    _assert_stopped(asyncio.run(scenario()))
+
+
+def test_stopping_one_computation_spares_the_ones_queued_behind_it():
+    """Why requests queue in front of the pool rather than inside it: a queued
+    task inside a pool that gets killed would fail along with the one stopped."""
+
+    async def scenario():
+        await process_pool.run_in_pool("simulation", _hold_the_gil, 0)  # warm
+        runaway = asyncio.ensure_future(
+            process_pool.run_in_pool(
+                "simulation", _hold_the_gil, 30 * _ONE_SECOND_OF_WORK, timeout=0.5
+            )
+        )
+        await asyncio.sleep(0.1)
+        queued = asyncio.ensure_future(
+            process_pool.run_in_pool("simulation", _hold_the_gil, 10)
+        )
+        outcomes = await asyncio.gather(runaway, queued, return_exceptions=True)
+        return outcomes
+
+    runaway, queued = asyncio.run(scenario())
+    assert isinstance(runaway, HTTPException) and runaway.status_code == 504
+    assert queued == 45
+
+
+def test_the_timeout_counts_computing_not_waiting_in_line():
+    async def scenario():
+        await process_pool.run_in_pool("simulation", _hold_the_gil, 0)  # warm
+        ahead = asyncio.ensure_future(
+            process_pool.run_in_pool(
+                "simulation", _hold_the_gil, 2 * _ONE_SECOND_OF_WORK
+            )
+        )
+        await asyncio.sleep(0.1)
+        started = time.monotonic()
+        behind = await process_pool.run_in_pool(
+            "simulation", _hold_the_gil, 10, timeout=0.5
+        )
+        waited = time.monotonic() - started
+        await ahead
+        return behind, waited
+
+    behind, waited = asyncio.run(scenario())
+    assert waited > 0.5, "nothing was ahead of it, so this proved nothing"
+    assert behind == 45
+
+
+def test_shutdown_does_not_wait_for_a_running_computation():
+    async def scenario():
+        await process_pool.run_in_pool("simulation", _hold_the_gil, 0)  # warm
+        job = asyncio.ensure_future(
+            process_pool.run_in_pool(
+                "simulation", _hold_the_gil, 30 * _ONE_SECOND_OF_WORK
+            )
+        )
+        await asyncio.sleep(0.3)
+        started = time.monotonic()
+        process_pool.shutdown_pools()
+        took = time.monotonic() - started
+        await asyncio.gather(job, return_exceptions=True)
+        return took
+
+    assert asyncio.run(scenario()) < 1
+
+
+@pytest.mark.parametrize(
+    "overrides, expected",
+    [
+        ({}, 0),
+        ({"deployment": "hosted"}, 60),
+        ({"deployment": "hosted", "simulation_timeout_seconds": 0}, 0),
+        ({"simulation_timeout_seconds": 5}, 5),
+    ],
+)
+def test_the_timeout_follows_the_deployment(overrides, expected):
+    assert make_settings(**overrides).simulation_timeout == expected
 
 
 @pytest.mark.parametrize("field", ["simulation_workers", "scoring_workers"])

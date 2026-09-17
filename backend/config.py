@@ -37,6 +37,7 @@ Deployment = Literal["local", "hosted"]
 # stepping rate limit          none              30/min per caller
 # scoring rate limit           none              300/min per caller
 # LLM call timeout             600s (SDK)        90s
+# rethon computation timeout   none              60s
 # session storage on disk      on                off (browser keeps state)
 #
 # Four limits rather than one, because the endpoints they cover cost wildly
@@ -91,9 +92,17 @@ _SDK_DEFAULT_LLM_TIMEOUT = 600.0
 # simulation in a thread stalled the loop by at most 0.1s. The real cost is that
 # rethon computations run in single-worker pools (process_pool), so one large
 # request holds up every other visitor's computation of the same kind for as long
-# as it runs, and nothing yet stops one that runs too long. Set where a request
-# stays about a second; raise it once wall-clock timeouts can cut a long one off.
+# as it runs. Set where a request stays about a second. The timeout below now
+# bounds the worst case, so this can be raised; each element added roughly
+# multiplies how long everyone behind a large request may wait, up to that bound.
 _HOSTED_MAX_ELEMENTS = 20
+
+# Seconds a single rethon computation may run before its worker is killed and
+# the caller gets a 504. What lets a cap above be wrong without a request running
+# forever. Seconds of computing, not of queueing; a /score_per_round request is
+# one computation, however many rounds it simulates. None locally, where the one
+# caller can watch a long simulation and decide for themselves.
+_HOSTED_COMPUTATION_TIMEOUT = 60.0
 
 
 class Settings(BaseSettings):
@@ -163,6 +172,9 @@ class Settings(BaseSettings):
     # cap, which is right on a machine whose only user can watch it work and
     # wrong anywhere a stranger can send a payload.
     max_simulation_elements: Optional[int] = None
+
+    # Seconds one rethon computation may run; 0 disables the limit.
+    simulation_timeout_seconds: Optional[float] = Field(default=None, ge=0)
 
     # ── Simulation workers ────────────────────────────────────────────────────
 
@@ -346,6 +358,13 @@ class Settings(BaseSettings):
         if self.max_simulation_elements is not None:
             return self.max_simulation_elements
         return _HOSTED_MAX_ELEMENTS if self.is_hosted else 0
+
+    @property
+    def simulation_timeout(self) -> float:
+        """Seconds a rethon computation may run before it is stopped; 0 = none."""
+        if self.simulation_timeout_seconds is not None:
+            return self.simulation_timeout_seconds
+        return _HOSTED_COMPUTATION_TIMEOUT if self.is_hosted else 0
 
     @property
     def sessions_on(self) -> bool:
