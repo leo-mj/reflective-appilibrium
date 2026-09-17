@@ -44,10 +44,20 @@ describe("in the demo build", () => {
 });
 
 describe("with a backend", () => {
-  it("says where the key goes and that it is not kept", () => {
+  it("says where the key goes and that the server does not keep it", () => {
+    expect(text()).toContain("does not store it or log it");
+  });
+
+  it("does not promise the key is gone when the tab closes", () => {
+    // Browsers restore sessionStorage with a reopened tab or session.
     const t = text();
-    expect(t).toContain("forgotten when the tab closes");
-    expect(t).toContain("does not store it or log it");
+    expect(t).not.toContain("forgotten when the tab closes");
+    expect(t).toContain("reopening a closed tab");
+    expect(t).toContain("press Clear");
+  });
+
+  it("advises a key with a spending limit", () => {
+    expect(text()).toContain("spending limit");
   });
 
   it("names the provider and Crossref as the places reasoning can go", () => {

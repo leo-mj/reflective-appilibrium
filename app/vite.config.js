@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { contentSecurityPolicy } from "./vite-plugins/contentSecurityPolicy.js";
 
 // GitHub Pages serves a project site from /<repo>/, so a build bound for it must
 // prefix every asset URL with the repo name — a mismatch 404s every asset and
@@ -18,7 +19,8 @@ const PAGES_MODES = ["production", "backend"];
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   base: PAGES_MODES.includes(mode) ? `/${repoName ?? "reflective-appilibrium"}/` : "/",
-  plugins: [react()],
+  // The CSP is written into built pages only; see vite-plugins/contentSecurityPolicy.js.
+  plugins: [react(), contentSecurityPolicy()],
   test: {
     environment: "node",
     // The e2e suite is Playwright's, and it needs a real browser. Vitest's

@@ -66,7 +66,11 @@ function privacySections({ backend, capabilities }) {
   return [
     {
       heading: "Your API key",
-      text: "Kept in this browser tab only, and forgotten when the tab closes. It is sent to this app's server with each AI request and passed straight on to the provider you chose. The server does not store it or log it.",
+      // Not "forgotten when the tab closes": browsers restore sessionStorage
+      // with a reopened tab or a restored session, and copy it into a
+      // duplicated one. On a shared computer that is the difference that
+      // matters, so the text says what to do about it.
+      text: "Kept in this browser tab rather than saved permanently. Closing the tab usually forgets it, but reopening a closed tab or restoring a browser session can bring it back — on a shared computer, press Clear in LLM settings when you are done. It is sent to this app's server with each AI request and passed straight on to the provider you chose. The server does not store it or log it. Use a key with a spending limit, which your provider lets you set, and revoke it if you think it has leaked.",
     },
     {
       heading: "Your reasoning",

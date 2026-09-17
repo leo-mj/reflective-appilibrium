@@ -71,7 +71,7 @@ describe("in the demo build", () => {
 
   it("makes no claim about where a key goes, since none can be entered", () => {
     open();
-    expect(document.body.textContent).not.toContain("Kept in this tab only");
+    expect(document.body.textContent).not.toContain("not saved permanently");
   });
 
   it("asks the backend for nothing on open", () => {
@@ -111,8 +111,11 @@ describe("when BYOK is available", () => {
   it("says, beside the key, how long it is kept and where it goes", () => {
     open();
     const t = document.body.textContent;
-    expect(t).toContain("Kept in this tab only and forgotten when it closes");
+    // Not "forgotten when it closes": a reopened tab brings sessionStorage back.
+    expect(t).toContain("not saved permanently");
+    expect(t).toContain("reopening a closed tab");
     expect(t).toContain("does not store or log it");
+    expect(t).toContain("spending limit");
   });
 
   it("looks up which providers the server already has keys for", () => {
