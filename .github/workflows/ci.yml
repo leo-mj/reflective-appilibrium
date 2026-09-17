@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    # `deploy` is the release branch: every push to it publishes to GitHub Pages.
     branches: [main, visualisation, deploy]
   pull_request:
     branches: [main]
@@ -179,7 +180,9 @@ jobs:
 
   deploy:
     name: Deploy to GitHub Pages
-    needs: [test, test-backend, e2e]
+    # backend-image too: the site and the image are released from the same commit,
+    # so a site should not go out on a commit whose backend image does not start.
+    needs: [test, test-backend, backend-image, e2e]
     if: github.ref == 'refs/heads/deploy' && github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -194,7 +197,23 @@ jobs:
         working-directory: app
 
     steps:
+      # Full history, so main is there to compare against below.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # `deploy` is a release point on main, and trailing main is its normal state
+      # — so this does not ask whether it is up to date. It asks whether every
+      # commit about to be published is on main, which catches a fix or experiment
+      # committed straight to `deploy`: code that would go public never having been
+      # merged, and would be silently lost from the site at the next release.
+      - name: Check every commit being published is on main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::deploy has commits that are not on main. Merge them into main, then reset deploy to a commit on main."
+            git log --oneline origin/main..HEAD
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:
@@ -205,8 +224,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The public site is the BYOK build, and it needs to know where the backend
+      # is. VITE_BACKEND_URL is a repository *variable* rather than a secret: it
+      # ends up in the bundle in plain text either way. Checked before building
+      # because app/.env.backend carries a placeholder, and a build that fell back
+      # to it would publish a site whose every request fails.
+      - name: Check the backend URL is configured
+        env:
+          VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
+        run: |
+          case "$VITE_BACKEND_URL" in
+            https://*) echo "Building against $VITE_BACKEND_URL" ;;
+            *) echo "::error::Set the VITE_BACKEND_URL repository variable (Settings → Secrets and variables → Actions → Variables) to the backend's https:// address."
+               exit 1 ;;
+          esac
+
+      # An environment variable wins over the placeholder in app/.env.backend.
       - name: Build
-        run: npm run build
+        env:
+          VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
+        run: npm run build:backend
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
