@@ -9,10 +9,15 @@ from ..models.re_state import REElement, RERelation
 from ..routers.rethon_schemas import (
     ModelWeights,
     ElementDelta,
+    RoundScores,
     ScoreChangesResponse,
     QuickScoreResponse,
 )
-from .rethon_simulation import build_numerical_arguments, enforce_element_cap
+from .rethon_simulation import (
+    build_numerical_arguments,
+    enforce_element_cap,
+    get_final_score,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +175,49 @@ def compute_score_changes(
         return ScoreChangesResponse(withdrawal_deltas=withdrawal_deltas)
     except Exception:
         return empty
+
+
+def compute_score_per_round(
+    elements: List[REElement],
+    relations: List[RERelation],
+    rounds: int,
+    local: bool = True,
+    weights: Optional[ModelWeights] = None,
+) -> List[RoundScores]:
+    """The final equilibrium Z-score at each workflow round from 1 to ``rounds``.
+
+    Elements and relations are filtered to those present at each round before a
+    full simulation is run over them. A round the simulation cannot score — too
+    few elements, no arguments yet — gets ``scores=None``, since
+    ``get_final_score`` turns every failure into one.
+
+    Module-level, and the element cap left to the caller, so it can run in a
+    simulation worker: a closure does not pickle, and neither does the
+    ``HTTPException`` the cap raises. It used to be a closure in the router.
+    """
+    results: List[RoundScores] = []
+    for r in range(1, rounds + 1):
+        elements_at_r = [
+            el
+            for el in elements
+            if (el.added_round or 1) <= r
+            and not (el.withdrawn_round and el.withdrawn_round <= r)
+        ]
+        el_ids = {el.id for el in elements_at_r}
+        relations_at_r = [
+            rel
+            for rel in relations
+            if (rel.added_round or 1) <= r
+            and rel.from_id in el_ids
+            and rel.to_id in el_ids
+        ]
+        results.append(
+            RoundScores(
+                round=r,
+                scores=get_final_score(elements_at_r, relations_at_r, local, weights),
+            )
+        )
+    return results
 
 
 def compute_quick_score(

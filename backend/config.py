@@ -21,7 +21,7 @@ from pathlib import Path  # used in default value for sessions_dir
 from typing import Literal, Optional
 from urllib.parse import urlsplit
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).parent / ".env"
@@ -84,13 +84,15 @@ _SDK_DEFAULT_LLM_TIMEOUT = 600.0
 # A rate limit of 5/min is no protection against any of those; 200, which is what
 # the schema permits, is not a long wait but an unbounded one.
 #
-# 20 rather than 25 because of what a slow request currently costs *other*
-# callers. `dd` ships no compiled _cudd extension here, so the BDD is pure Python
-# and holds the GIL: one 13-second computation freezes the event loop, and with
-# it /api/health and every other visitor's in-flight LLM call. Until Epic E moves
-# these into a worker process with a wall-clock timeout, the cap is the only
-# thing standing between one large request and a server-wide stall — so it is set
-# where a request stays about a second. Raise it once the pool lands.
+# 20 rather than 25 because of what a slow request costs *other* callers — which
+# is waiting, not a frozen server. An earlier version of this comment said a long
+# computation froze the event loop; measured, it does not: rethon is pure Python,
+# the interpreter hands the GIL back every few milliseconds, and a 16-second
+# simulation in a thread stalled the loop by at most 0.1s. The real cost is that
+# rethon computations run in single-worker pools (process_pool), so one large
+# request holds up every other visitor's computation of the same kind for as long
+# as it runs, and nothing yet stops one that runs too long. Set where a request
+# stays about a second; raise it once wall-clock timeouts can cut a long one off.
 _HOSTED_MAX_ELEMENTS = 20
 
 
@@ -161,6 +163,18 @@ class Settings(BaseSettings):
     # cap, which is right on a machine whose only user can watch it work and
     # wrong anywhere a stranger can send a payload.
     max_simulation_elements: Optional[int] = None
+
+    # ── Simulation workers ────────────────────────────────────────────────────
+
+    # Worker processes for rethon computations, in two pools — see process_pool.
+    # Full simulations (/simulate, /step, /score_per_round) and score lookups
+    # (/quick_score, /score_changes) are kept apart so the badges never queue
+    # behind a simulation. One each is right almost everywhere: the workers exist
+    # so a computation can be stopped, not to run several at once, and each holds
+    # its own copy of rethon in memory. Raising one lets that many of its kind run
+    # at the same time, at a core each.
+    simulation_workers: int = Field(default=1, ge=1)
+    scoring_workers: int = Field(default=1, ge=1)
 
     # Whether /api/sessions may read and write session files on disk.
     sessions_enabled: Optional[bool] = None

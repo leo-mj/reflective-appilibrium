@@ -8,7 +8,8 @@ Interactive docs at http://localhost:8000/docs
 """
 
 import logging
-from typing import Annotated
+from contextlib import asynccontextmanager
+from typing import Annotated, AsyncGenerator
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,28 +37,34 @@ from .routers import (
     theories,
     arguments,
 )
+from .logging_setup import configure_backend_logging
+from .process_pool import shutdown_pools
 from .security_headers import SecurityHeadersMiddleware
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
-_handler = logging.StreamHandler()
-_handler.setFormatter(logging.Formatter("%(levelname)-8s %(name)s: %(message)s"))
-logging.getLogger("backend").addHandler(_handler)
-logging.getLogger("backend").setLevel(logging.INFO)
-
-# `import rethon`, reached above through routers.simulate_rethon, applies a logging
-# configuration with `disable_existing_loggers` left at its default — which switches
-# off every logger that already exists, i.e. every module imported before it. That
-# silently dropped all output from the routers earlier in the import list above, the
-# assist routers among them, including the error logs that say a model returned
-# unparseable JSON. Undo it for our own tree; it must stay after the imports.
-for _name, _logger in logging.Logger.manager.loggerDict.items():
-    if _name.startswith("backend") and isinstance(_logger, logging.Logger):
-        _logger.disabled = False
+# Must stay after the router imports: `import rethon`, reached through
+# routers.simulate_rethon, disables every logger created before it, and this is
+# what switches ours back on. See logging_setup for the whole story — the
+# simulation workers call the same function, so the two cannot drift.
+configure_backend_logging()
 
 # ── App ────────────────────────────────────────────────────────────────────────
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    """Stop the simulation workers on shutdown.
+
+    Only shutdown: the pool is created lazily on first use, not here, because the
+    test suite never runs startup — see process_pool.
+    """
+    yield
+    shutdown_pools()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Reflective Appilibrium API",
     version="0.1.0",
     description="Backend for the V2 local RE tool.",

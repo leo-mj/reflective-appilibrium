@@ -25,7 +25,7 @@ two routers, which share a prefix and differ only in what they cost:
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Annotated, List, Dict
+from typing import Annotated, Dict
 import asyncio
 import logging
 
@@ -37,13 +37,13 @@ from .rethon_schemas import (
     SimulatedRethonResponse,
     ScorePerRoundRequest,
     ScorePerRoundResponse,
-    RoundScores,
     ScoreChangesRequest,
     ScoreChangesResponse,
     QuickScoreRequest,
     QuickScoreResponse,
 )
 from ..config import Settings, get_settings
+from ..process_pool import run_in_pool
 from ..services.rethon_simulation import (
     REProcess,
     enforce_element_cap,
@@ -53,11 +53,11 @@ from ..services.rethon_simulation import (
     reconstruct_re_state,
     compute_evolution_scores,
     translate_re_state,
-    get_final_score,
 )
 from ..services.rethon_scoring import (
     compute_score_changes,
     compute_quick_score,
+    compute_score_per_round,
 )
 
 logger = logging.getLogger(__name__)
@@ -240,36 +240,21 @@ async def score_per_round(
     # subset is a filter of it, so nothing downstream can exceed what this
     # admits. The round count is bounded by the schema — this endpoint runs one
     # simulation per round, so it is the one place where two numbers multiply.
+    #
+    # In this process, not the worker: the refusal is an HTTPException, which
+    # cannot be pickled back out of one.
     enforce_element_cap(len(request.elements), settings.simulation_max_elements)
 
-    def _run() -> List[RoundScores]:
-        results: List[RoundScores] = []
-        for r in range(1, request.round + 1):
-            elements_at_r = [
-                el
-                for el in request.elements
-                if (el.added_round or 1) <= r
-                and not (el.withdrawn_round and el.withdrawn_round <= r)
-            ]
-            el_ids = {el.id for el in elements_at_r}
-            relations_at_r = [
-                rel
-                for rel in request.relations
-                if (rel.added_round or 1) <= r
-                and rel.from_id in el_ids
-                and rel.to_id in el_ids
-            ]
-            results.append(
-                RoundScores(
-                    round=r,
-                    scores=get_final_score(
-                        elements_at_r, relations_at_r, request.local, request.weights
-                    ),
-                )
-            )
-        return results
-
-    return ScorePerRoundResponse(round_scores=await asyncio.to_thread(_run))
+    round_scores = await run_in_pool(
+        "simulation",
+        compute_score_per_round,
+        request.elements,
+        request.relations,
+        request.round,
+        request.local,
+        request.weights,
+    )
+    return ScorePerRoundResponse(round_scores=round_scores)
 
 
 @scoring_router.post("/score_changes", response_model=ScoreChangesResponse)
@@ -284,7 +269,12 @@ async def score_changes(
     computed directly from ``re_obj.achievement(C, T, C₀)`` — no full RE
     simulation is run.
     """
-    return await asyncio.to_thread(
+    # Here as well as inside compute_score_changes: raised in the worker, the
+    # HTTPException would fail to unpickle and surface as a 500. Checked here
+    # first, the worker's own check can never fire.
+    enforce_element_cap(len(request.elements), settings.simulation_max_elements)
+    return await run_in_pool(
+        "scoring",
         compute_score_changes,
         request.elements,
         request.relations,
@@ -308,7 +298,10 @@ async def quick_score(
     Returns ``account=null, systematicity=null`` when there are fewer than 3
     elements, no argument relations, or no active principle/theory elements.
     """
-    return await asyncio.to_thread(
+    # In this process first, for the reason given in score_changes.
+    enforce_element_cap(len(request.elements), settings.simulation_max_elements)
+    return await run_in_pool(
+        "scoring",
         compute_quick_score,
         request.elements,
         request.relations,
