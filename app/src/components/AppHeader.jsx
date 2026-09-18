@@ -50,6 +50,9 @@ import { C } from "../constants/colors.js";
  * @param {function} props.setAssistSidePanel
  * @param {function} props.onDownload
  * @param {function} props.onImportFile
+ * @param {function} [props.onMergeFile] - Merges a second exported process into
+ *   this one; its menu row is offered only when there is a non-questionnaire
+ *   process to merge into.
  * @param {boolean}  props.hasExistingState
  * @param {function} props.onHome
  * @param {boolean}  props.isWide
@@ -90,6 +93,7 @@ export function AppHeader({
   onSave,
   canSaveToServer = false,
   onImportFile,
+  onMergeFile,
   hasExistingState,
   onHome,
   isWide,
@@ -119,6 +123,7 @@ export function AppHeader({
   tourMenuOpen,
 }) {
   const fileInputRef = useRef(null);
+  const mergeInputRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   // The narrow tour walks the ☰ menu's own entries, so it opens and shuts the
   // menu as it goes — but only as it crosses into and out of those sections,
@@ -169,6 +174,18 @@ export function AppHeader({
   };
   const handleImportClick = () => fileInputRef.current.click();
 
+  // Merging needs a process to merge into, and a questionnaire has no room for
+  // a second one — so the row is only offered where it can succeed.
+  const canMerge = !!onMergeFile && hasExistingState && model !== "questionnaire";
+  const doMerge = async (file) => {
+    try {
+      await onMergeFile(file);
+    } catch (e) {
+      setImportError(e.message);
+    }
+  };
+  const handleMergeClick = () => mergeInputRef.current.click();
+
   const ANALYZE_TABS = ["graph", "history", "clusters"];
   const metaTab = ASSIST_TABS.includes(tab)
     ? "assist"
@@ -204,7 +221,7 @@ export function AppHeader({
       )}
       {importError && (
         <ModalShell
-          title="Import failed"
+          title="Could not read file"
           subtitle={importError}
           onCancel={() => setImportError(null)}
           onSave={() => setImportError(null)}
@@ -215,22 +232,38 @@ export function AppHeader({
   );
 
   const hiddenInput = (
-    <input
-      ref={fileInputRef}
-      type="file"
-      accept=".md"
-      style={{ display: "none" }}
-      onChange={(e) => {
-        const file = e.target.files?.[0];
-        e.target.value = "";
-        if (!file) return;
-        if (hasExistingState) {
-          setImportConfirmPending(file);
-        } else {
-          doImport(file);
-        }
-      }}
-    />
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".md"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          if (hasExistingState) {
+            setImportConfirmPending(file);
+          } else {
+            doImport(file);
+          }
+        }}
+      />
+      {/* No confirmation, unlike import: a merge replaces nothing, and undo
+          takes it back. */}
+      <input
+        ref={mergeInputRef}
+        type="file"
+        accept=".md"
+        data-testid="merge-input"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) doMerge(file);
+        }}
+      />
+    </>
   );
 
   const shared = {
@@ -243,6 +276,7 @@ export function AppHeader({
     allExpanded,
     onExpandAll,
     handleImportClick,
+    handleMergeClick: canMerge ? handleMergeClick : null,
     onDownload,
     onSave: handleSave,
     canSaveToServer,

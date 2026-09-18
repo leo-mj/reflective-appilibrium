@@ -123,6 +123,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleDiscardReview,
     handleApplyRethonEquilibrium,
     handleImportFile,
+    handleMergeFile,
     handleCreateGroup,
     handleToggleGroup,
     handleUngroup,
@@ -503,6 +504,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onSave={() => saveSession(state)}
         canSaveToServer={capabilities.sessions}
         onImportFile={handleImportFile}
+        onMergeFile={handleMergeFile}
         hasExistingState={state.elements.length > 0}
         onHome={onHome}
         isWide={isWide}

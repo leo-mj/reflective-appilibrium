@@ -21,6 +21,7 @@ import {
   SIMULATE_TABS,
 } from "../constants/tabConstants.jsx";
 import { linkableElements } from "../utils/stateUtils.js";
+import { processesOf } from "../utils/mergeStates.js";
 import { useHasLLMKey } from "../utils/llmKey.js";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 
@@ -210,6 +211,7 @@ export function GraphPanel({
               hiddenLegendKeys={hiddenLegendKeys}
               setHiddenLegendKeys={setHiddenLegendKeys}
               hideNonEntailsRels={hideNonEntailsRels}
+              processes={processesOf(state)}
             />
           </div>
           {onToggleFullscreen && (

@@ -131,6 +131,64 @@ describe("model weights", () => {
   }
 });
 
+describe("merge", () => {
+  // Offered only where it can succeed: there has to be a process to merge
+  // into, and a questionnaire has no room for a second one.
+  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+  const mergeRow = () => screen.queryByRole("button", { name: /Merge/ });
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+    const withState = { hasExistingState: true, onMergeFile: noop };
+
+    it(`is offered in the ${layout} menu when there is a process`, () => {
+      render(<AppHeader {...PROPS} {...withState} isWide={isWide} />);
+      openMenu();
+      expect(mergeRow()).not.toBeNull();
+    });
+
+    it(`stays out of the ${layout} menu with nothing to merge into`, () => {
+      render(<AppHeader {...PROPS} onMergeFile={noop} isWide={isWide} />);
+      openMenu();
+      expect(mergeRow()).toBeNull();
+    });
+
+    it(`stays out of the ${layout} menu in questionnaire mode`, () => {
+      render(
+        <AppHeader
+          {...PROPS}
+          {...withState}
+          model="questionnaire"
+          tab="questionnaire"
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      expect(mergeRow()).toBeNull();
+    });
+  }
+
+  it("merges the chosen file without asking to replace anything", async () => {
+    const onMergeFile = vi.fn();
+    render(<AppHeader {...PROPS} hasExistingState onMergeFile={onMergeFile} />);
+    const file = new File(["x"], "other.md");
+    fireEvent.change(screen.getByTestId("merge-input"), {
+      target: { files: [file] },
+    });
+    expect(onMergeFile).toHaveBeenCalledWith(file);
+    expect(screen.queryByText("Replace session?")).toBeNull();
+  });
+
+  it("reports a file it could not merge", async () => {
+    const onMergeFile = vi.fn().mockRejectedValue(new Error("Questionnaire sessions cannot be merged."));
+    render(<AppHeader {...PROPS} hasExistingState onMergeFile={onMergeFile} />);
+    fireEvent.change(screen.getByTestId("merge-input"), {
+      target: { files: [new File(["x"], "q.md")] },
+    });
+    expect(await screen.findByText("Questionnaire sessions cannot be merged.")).not.toBeNull();
+  });
+});
+
 describe("what closes the menu", () => {
   // A setting flips in place, and its switch is the only evidence of it.
   // Closing the menu fired the change and then hid that evidence.

@@ -26,6 +26,7 @@ export const MENU_LABELS = {
   navBar: "Section nav bar",
   cards: "Expanded cards",
   import: "Import",
+  merge: "Merge",
   export: "Export",
   save: "Save",
 };
@@ -44,6 +45,7 @@ export const MENU_TOOLTIPS = {
   navBar: "Section links and search, in the text panel.",
   cards: "Every card in the text panel, open or closed.",
   import: "Read a state back from a file.",
+  merge: "Add another exported process to this one, as one round.",
   export: "Write the whole process out to a file.",
   save: "Store this session on the server.",
 };

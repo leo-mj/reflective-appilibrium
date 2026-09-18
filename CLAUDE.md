@@ -173,6 +173,37 @@ writes no log entry, so a review still cannot alter the record it describes.
 `state.reviews` is absent from every state written before the feature existed —
 read it through `reviewsOf(state)`, never directly.
 
+### Merging processes
+
+**Merge** (☰ → Session) reads a second exported file into the open process —
+`utils/mergeStates.js`, `handleMergeFile` in `useREActions`. Unlike Import it
+replaces nothing and is one undo step.
+
+The merge is **one round** of the current process: every incoming item arrives in
+it, as it stands at the end of its own process — withdrawn and rejected items as
+such, a revised one as `active` with the wording it reached. The incoming history,
+log and reviews are not replayed, since none of it happened *here*; playback would
+otherwise show elements before they were brought in. The single log entry the
+merge writes is what survives of it, and it spells out the renumbering (`J1 → J8`)
+because the incoming log's prose names ids that no longer exist.
+
+Elements of the same type and wording (whitespace aside) are **fused**: the current
+copy is kept untouched, incoming relations are re-pointed at it, and each pair is
+named in the log. Relations and arguments that fusing turns into duplicates or
+loops are dropped. Incoming groups are renumbered, and lose any member the current
+process has already grouped. Questionnaire sessions cannot be merged on either side.
+
+**Which process an element came from** stays visible afterwards: `state.processes`
+(`[{ id: "A", label, members }]`, lettered in merge order, labelled by topic) —
+read it through `processesOf(state)`. Each node on the Graph tab wears its letter
+(`"A+B"` when fused), the legend keys the letters, and each text card names its
+process. Letters rather than colours, since node colour already carries type and
+confidence. It lives on the state and **not on the elements**, because the
+backend's element model forbids unknown fields; the backend drops it on a server
+save, as it does groups, while export/import keeps it. An incoming process that
+was itself a merge keeps its own processes apart under letters of their own.
+Elements added after a merge carry no letter.
+
 ### State schema
 
 ```javascript

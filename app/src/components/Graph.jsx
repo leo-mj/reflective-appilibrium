@@ -28,6 +28,7 @@ import {
   groupJointArguments,
 } from "../utils/graphHelpers.js";
 import { groupsOf, projectGroups, selectionIds } from "../utils/groupUtils.js";
+import { processesOf, processTagMap } from "../utils/mergeStates.js";
 import {
   elementsAtRound,
   argumentRelationType,
@@ -476,6 +477,11 @@ export function Graph({
 
   const { active, withdrawn } = elementsAtRound(state.elements, state.round);
   const wIds = new Set(withdrawn.map((e) => e.id));
+  // After a merge, which process each node came from. Empty otherwise.
+  const processTags = useMemo(
+    () => processTagMap(processesOf(state)),
+    [state],
+  );
   const rejectedEls = state.elements.filter((e) => e.status === "rejected");
   const isElVisible = (el) => {
     if (el.status === "possible") return false;
@@ -844,15 +850,18 @@ export function Graph({
           renderNode(
             el,
             displayPositions,
-            graphNodeVisuals(
-              el,
-              wIds,
-              dimNode,
-              selected,
-              undefined,
-              recentlyAdded,
-              equilibriumPreviewWithdrawnIds,
-            ),
+            {
+              ...graphNodeVisuals(
+                el,
+                wIds,
+                dimNode,
+                selected,
+                undefined,
+                recentlyAdded,
+                equilibriumPreviewWithdrawnIds,
+              ),
+              processTag: processTags.get(el.id),
+            },
             isDragging,
             setTooltip,
           ),

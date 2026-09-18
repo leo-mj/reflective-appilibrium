@@ -7,7 +7,29 @@ import { C } from "../../constants/colors.js";
 import { usePalette } from "../../hooks/useTheme.js";
 import { Tooltip } from "../Tooltip.jsx";
 
-export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRels }) {
+/** The HTML twin of the graph's `ProcessTag`: same pill, same chrome colours. */
+const PROCESS_PILL = {
+  fontSize: 9,
+  fontWeight: "bold",
+  lineHeight: "11px",
+  padding: "0 4px",
+  borderRadius: 6,
+  background: C.panel,
+  border: `1px solid ${C.dim}`,
+  color: C.text,
+};
+
+/**
+ * @param {Object} props
+ * @param {{ id: string, label: string }[]} [props.processes] - Set only after a
+ *   merge; its key says which letter on the nodes is which process.
+ */
+export function Legend({
+  hiddenLegendKeys,
+  setHiddenLegendKeys,
+  hideNonEntailsRels,
+  processes = [],
+}) {
   // The element swatches come from the palette in force, not from the fixed
   // accent tones: a legend that keeps showing the default blue while the graph
   // is drawn in the high-contrast one is worse than no legend.
@@ -153,6 +175,17 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRe
             {l.label}
           </div>
         </Tooltip>
+      ))}
+      {/* A key, not a filter: these do not toggle, so they carry no pointer. */}
+      {processes.map((p) => (
+        <div
+          key={`process-${p.id}`}
+          style={{ display: "flex", alignItems: "center", gap: 4 }}
+          data-testid="legend-process"
+        >
+          <span style={PROCESS_PILL}>{p.id}</span>
+          {p.label}
+        </div>
       ))}
     </div>
   );

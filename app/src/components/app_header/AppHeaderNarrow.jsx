@@ -53,6 +53,7 @@ export function AppHeaderNarrow({
   ANALYZE_TABS,
   isTabVisible,
   handleImportClick,
+  handleMergeClick,
   onDownload,
   onSave,
   canSaveToServer,
@@ -460,6 +461,18 @@ export function AppHeaderNarrow({
               <span style={menuIconStyle}>↑</span>
               {MENU_LABELS.import}
             </button>
+            {handleMergeClick && (
+              <button
+                onClick={() => {
+                  handleMergeClick();
+                  setMenuOpen(false);
+                }}
+                style={menuBtn()}
+              >
+                <span style={menuIconStyle}>⊕</span>
+                {MENU_LABELS.merge}
+              </button>
+            )}
             <button
               onClick={close(onDownload)}
               style={{ ...menuBtn(), color: C.theory.text }}

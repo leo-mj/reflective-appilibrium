@@ -18,6 +18,7 @@ import {
 } from "../../constants/textTabStyles.js";
 import { relationTypeLabel, statusTag } from "../../utils/stateUtils.js";
 import { groupOfElement } from "../../utils/groupUtils.js";
+import { processesOf, processesOfElement } from "../../utils/mergeStates.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
 import { Ctx } from "./TextTabContext.js";
 import { Citation, CITATION_CAVEAT } from "../Citation.jsx";
@@ -75,6 +76,13 @@ export function ElementCard({ e, dim }) {
             Confidence: {confidenceLabel(e.confidence).text}
           </MetaChip>
           {e.origin && <MetaChip>Origin: {e.origin}</MetaChip>}
+          {/* After a merge, the process it came from — both, if it was fused.
+              The same letter the node wears. */}
+          {processesOfElement(processesOf(state), e.id).map((p) => (
+            <MetaChip key={p.id} title={p.label}>
+              Process {p.id}: {p.label}
+            </MetaChip>
+          ))}
           <AddedRound round={e.addedRound} />
           <StatusLabel tag={statusTag(e, state.round)} />
           {pCovers[e.id]?.length > 0 && (

@@ -52,6 +52,7 @@ export function AppHeaderWide({
   assistSidePanel,
   setAssistSidePanel,
   handleImportClick,
+  handleMergeClick,
   onDownload,
   onSave,
   canSaveToServer,
@@ -536,6 +537,20 @@ export function AppHeaderWide({
                         {MENU_LABELS.import}
                       </button>
                     </Tooltip>
+                    {handleMergeClick && (
+                      <Tooltip text={MENU_TOOLTIPS.merge}>
+                        <button
+                          onClick={() => {
+                            handleMergeClick();
+                            setMenuOpen(false);
+                          }}
+                          style={menuItem}
+                        >
+                          <span style={menuIconStyle}>⊕</span>
+                          {MENU_LABELS.merge}
+                        </button>
+                      </Tooltip>
+                    )}
                     <Tooltip text={MENU_TOOLTIPS.export}>
                       <button
                         onClick={close(onDownload)}

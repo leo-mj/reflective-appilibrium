@@ -7,6 +7,7 @@
 
 import { useState, useReducer } from "react";
 import { importStateFromFile } from "../utils/importMarkdown.js";
+import { assertMergeable, mergeStates } from "../utils/mergeStates.js";
 import { useElementActions } from "./useElementActions.js";
 import { useGroupActions } from "./useGroupActions.js";
 import { useRelationActions } from "./useRelationActions.js";
@@ -173,6 +174,17 @@ export function useREActions(initialState) {
   };
 
   /**
+   * Merges a second exported process into this one, as one round. Unlike an
+   * import this is a step *in* the current process, so it is undoable.
+   */
+  const handleMergeFile = async (file) => {
+    const incoming = await importStateFromFile(file);
+    assertMergeable(state, incoming);
+    const label = file.name.replace(/\.md$/i, "");
+    mutate((prev) => mergeStates(prev, incoming, { label }));
+  };
+
+  /**
    * Records the user's answer to a questionnaire and propagates conclusion
    * activations throughout the arguments behind the questionnaire (must be pre-set).
    *
@@ -244,6 +256,7 @@ export function useREActions(initialState) {
     ...groupActions,
     ...reviewActions,
     handleImportFile,
+    handleMergeFile,
     handleQuestionnaireSelectAnswer,
   };
 }
