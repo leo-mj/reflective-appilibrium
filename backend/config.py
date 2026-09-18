@@ -280,8 +280,12 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> list[str]:
-        """Return ``cors_origins`` as a list, split on commas."""
-        return [o.strip() for o in self.cors_origins.split(",")]
+        """Return ``cors_origins`` as a list, split on commas.
+
+        Empty when the setting is: a backend behind the same host as its page —
+        one proxy routing ``/api`` to it — has no cross-origin callers to allow.
+        """
+        return [o for o in (o.strip() for o in self.cors_origins.split(",")) if o]
 
     @property
     def access_tokens(self) -> set[str]:

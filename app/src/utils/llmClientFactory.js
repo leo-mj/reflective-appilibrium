@@ -5,11 +5,9 @@
  * @module utils/llmClientFactory
  */
 
-import { LLM_ENABLED } from "../config.js";
+import { LLM_ENABLED, BACKEND_URL } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 import { fetchOk } from "./backendError.js";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 /**
  * @param {Object}   options

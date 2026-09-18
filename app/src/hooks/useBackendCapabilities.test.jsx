@@ -4,7 +4,10 @@ import { renderHook, cleanup, waitFor } from "@testing-library/react";
 
 // BACKEND_ENABLED is a build-time constant, so the demo case has to be
 // simulated by mocking the config module rather than by setting an env var.
-vi.mock("../config.js", () => ({ BACKEND_ENABLED: true }));
+vi.mock("../config.js", () => ({
+  BACKEND_ENABLED: true,
+  BACKEND_URL: "http://localhost:8000",
+}));
 
 const { useBackendCapabilities, resetBackendCapabilities } = await import(
   "./useBackendCapabilities.js"

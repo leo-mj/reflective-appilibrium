@@ -5,12 +5,10 @@
 
 /** @import { REState } from '../types.js' */
 
-import { BACKEND_ENABLED } from "../config.js";
+import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 import { ARGUMENT_RELATION_TYPES } from "./stateUtils.js";
 import { backendError } from "./backendError.js";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 /**
  * The console line for a scoring call that failed.

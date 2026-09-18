@@ -88,6 +88,37 @@ def test_cors_origins_rejects_anything_that_is_not_a_bare_origin(value):
         make_settings(cors_origins=value)
 
 
+@pytest.mark.parametrize("value", ["", "  ", ","])
+def test_cors_origins_may_be_empty_for_a_same_origin_deployment(value):
+    """One proxy serving the page and routing /api to the backend: no browser
+    ever calls from another origin, so there is nothing to allow — and nothing
+    should be, rather than a placeholder origin kept to get past startup."""
+    assert make_settings(cors_origins=value).cors_origins_list == []
+
+
+def test_a_same_origin_deployment_answers_no_cross_origin_caller():
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
+    api = FastAPI()
+    api.add_middleware(
+        CORSMiddleware,
+        allow_origins=make_settings(cors_origins="").cors_origins_list,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @api.get("/api/health")
+    def health():
+        return {"status": "ok"}
+
+    res = TestClient(api).get(
+        "/api/health", headers={"Origin": "https://elsewhere.org"}
+    )
+    assert res.status_code == 200
+    assert "access-control-allow-origin" not in res.headers
+
+
 def test_cors_origins_accepts_a_port():
     assert make_settings(cors_origins="http://127.0.0.1:5173").cors_origins_list == [
         "http://127.0.0.1:5173"

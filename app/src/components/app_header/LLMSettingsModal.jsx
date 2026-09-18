@@ -10,7 +10,7 @@
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { LLM_PROVIDERS } from "../../constants/llmProviders.js";
-import { BYOK_ENABLED } from "../../config.js";
+import { BYOK_ENABLED, BACKEND_URL } from "../../config.js";
 import { btn } from "./appHeaderStyles.js";
 import { getSessionUsage, clearSessionUsage } from "../../utils/openaiClient.js";
 import {
@@ -22,8 +22,6 @@ import { unwrapDetail } from "../../utils/backendError.js";
 
 /** Why the inert controls are inert, for hover and assistive technology. */
 const DEMO_REASON = "Unavailable in the demo — this build has no backend.";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 function getInitialProvider() {
   const saved = readLLMSettings();

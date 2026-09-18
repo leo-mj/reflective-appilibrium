@@ -5,9 +5,8 @@
 
 /** @import { REState } from '../types.js' */
 
+import { BACKEND_URL } from "../config.js";
 import { fetchOk } from "./backendError.js";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 /**
  * @typedef {Object} SessionMeta

@@ -11,9 +11,7 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { BACKEND_ENABLED } from "../config.js";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
 
 /**
  * @typedef {Object} BackendCapabilities

@@ -73,6 +73,23 @@ describe("connect-src", () => {
     expect(backendOrigin({ VITE_APP_ENV: "dev" })).toBe("http://localhost:8000");
   });
 
+  // Behind one proxy, as at a university host: /api on the page's own origin,
+  // which 'self' already allows. Naming it again would be harmless; naming the
+  // localhost default, which is what an empty value used to mean, would not.
+  it.each(["/", "/prefix", "/prefix/"])(
+    "adds nothing beyond 'self' for a backend at %j on the same host",
+    (url) => {
+      const html = built({ VITE_APP_ENV: "backend", VITE_BACKEND_URL: url });
+      expect(directive(policyOf(html), "connect-src")).toEqual(["'self'"]);
+    },
+  );
+
+  it("does not take a protocol-relative address for the same host", () => {
+    expect(() => built({ VITE_APP_ENV: "backend", VITE_BACKEND_URL: "//api.example.org" })).toThrow(
+      /VITE_BACKEND_URL is not a URL/,
+    );
+  });
+
   it("allows no backend at all in the demo build, which has none", () => {
     expect(directive(policyOf(built({ VITE_APP_ENV: "demo" })), "connect-src")).toEqual([
       "'self'",

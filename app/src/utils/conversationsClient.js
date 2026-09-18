@@ -5,10 +5,9 @@
  * @module utils/conversationsClient
  */
 
+import { BACKEND_URL } from "../config.js";
 import { getLLMHeaders } from "./openaiClient.js";
 import { fetchOk } from "./backendError.js";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
 /**
  * Exchanges (a question and its reply) one conversation may hold — MAX_EXCHANGES

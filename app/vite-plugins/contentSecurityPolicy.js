@@ -14,7 +14,7 @@
  *
  * - **The backend origin is only known then.** It comes from VITE_BACKEND_URL,
  *   a repository variable in CI; a policy naming it by hand would be wrong on
- *   every other build.
+ *   every other build. A backend behind the page's own host needs no entry.
  * - **The inline script is allowed by its hash**, not by `'unsafe-inline'`
  *   (which would allow exactly the injected script this exists to stop). A
  *   hash typed in by hand goes stale the first time someone edits the script,
@@ -33,9 +33,7 @@
  */
 
 import { createHash } from "node:crypto";
-
-/** Where the clients fall back to when VITE_BACKEND_URL is unset. Kept in step by hand. */
-const DEFAULT_BACKEND_URL = "http://localhost:8000";
+import { isSameOrigin, resolveBackendUrl } from "../src/backendUrl.js";
 
 /** The environments that talk to a backend — BACKEND_ENABLED in src/config.js. */
 const BACKEND_ENVS = ["dev", "backend"];
@@ -57,14 +55,18 @@ export function inlineScriptHashes(html) {
 }
 
 /**
- * The backend's origin for this build, or null for a build with no backend.
+ * The backend's origin for this build, or null when `'self'` already covers it:
+ * a build with no backend, or one whose backend is behind the same host as the
+ * page. Resolved by src/backendUrl.js, as the clients resolve it, so the policy
+ * allows exactly the address they call.
  *
  * @param {Record<string, string>} env  Vite's resolved env (VITE_* included).
  * @returns {string|null}
  */
 export function backendOrigin(env) {
   if (!BACKEND_ENVS.includes(env.VITE_APP_ENV)) return null;
-  const url = env.VITE_BACKEND_URL || DEFAULT_BACKEND_URL;
+  const url = resolveBackendUrl(env.VITE_BACKEND_URL);
+  if (isSameOrigin(url)) return null;
   try {
     return new URL(url).origin;
   } catch {
@@ -75,7 +77,8 @@ export function backendOrigin(env) {
     throw new Error(
       `VITE_BACKEND_URL is not a URL (${JSON.stringify(url)}), so the Content-Security-Policy ` +
         "cannot allow the backend. Set it to the backend's address, e.g. " +
-        "VITE_BACKEND_URL=https://api.example.org npm run build:backend.",
+        "VITE_BACKEND_URL=https://api.example.org npm run build:backend, or to / " +
+        "when the backend is served from the same host as the page.",
     );
   }
 }
