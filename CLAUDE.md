@@ -194,10 +194,14 @@ loops are dropped. Incoming groups are renumbered, and lose any member the curre
 process has already grouped. Questionnaire sessions cannot be merged on either side.
 
 **Which process an element came from** stays visible afterwards: `state.processes`
-(`[{ id: "A", label, members }]`, lettered in merge order, labelled by topic) —
-read it through `processesOf(state)`. Each node on the Graph tab wears its letter
-(`"A+B"` when fused), the legend keys the letters, and each text card names its
-process. Letters rather than colours, since node colour already carries type and
+(`[{ id: "A", label, members, round }]`, lettered in merge order, labelled by
+topic, stamped with the merge's round) — read it through `processesOf(state)`,
+which leaves out processes merged after the state's own round, so playback and a
+`stateAtRound` projection show no letters before the merge that made them. Every
+node wears its letter (`"A+B"` when fused) on the Graph, History and Cluster tabs
+and in the exported SVGs; the legend and the export's "Merged Processes" section
+key the letters, and text cards and the export's element lines name the process.
+Letters rather than colours, since node colour already carries type and
 confidence. It lives on the state and **not on the elements**, because the
 backend's element model forbids unknown fields; the backend drops it on a server
 save, as it does groups, while export/import keeps it. An incoming process that

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   assertMergeable,
   mergeStates,
+  processesOf,
   processesOfElement,
   processTagMap,
 } from "./mergeStates.js";
@@ -208,8 +209,8 @@ describe("mergeStates", () => {
     const out = mergeStates(current, incoming, { label: "promises-file" });
 
     expect(out.processes).toEqual([
-      { id: "A", label: "Lying", members: ["J1", "P1"] },
-      { id: "B", label: "Promises", members: ["J2", "J1"] },
+      { id: "A", label: "Lying", members: ["J1", "P1"], round: 5 },
+      { id: "B", label: "Promises", members: ["J2", "J1"], round: 5 },
     ]);
     expect(processTagMap(out.processes)).toEqual(
       new Map([["J1", "A+B"], ["P1", "A"], ["J2", "B"]]),
@@ -252,11 +253,25 @@ describe("mergeStates", () => {
     const out = mergeStates(current, inner);
 
     expect(out.processes.slice(1)).toEqual([
-      { id: "B", label: "Ex", members: ["J2"] },
-      { id: "C", label: "Why", members: ["J3"] },
-      { id: "D", label: "Both", members: ["J4"] },
+      { id: "B", label: "Ex", members: ["J2"], round: 5 },
+      { id: "C", label: "Why", members: ["J3"], round: 5 },
+      { id: "D", label: "Both", members: ["J4"], round: 5 },
     ]);
     expect(out.log.at(-1).findings).toContain("as process B, C, D");
+  });
+
+  it("shows no processes before the merge that made them, in playback or the text panel", () => {
+    const once = mergeStates(current, process({ topic: "B", elements: [el("J1", "X.")] }));
+    const twice = mergeStates(
+      { ...once, round: 8 },
+      process({ topic: "C", elements: [el("J1", "Y.")] }),
+    );
+
+    expect(processesOf(twice, 4)).toEqual([]);
+    expect(processesOf(twice, 5).map((p) => p.id)).toEqual(["A", "B"]);
+    expect(processesOf(twice).map((p) => p.id)).toEqual(["A", "B", "C"]);
+    // A state projected back to a round reads its own round by default.
+    expect(processesOf(stateAtRound(twice, 6)).map((p) => p.id)).toEqual(["A", "B"]);
   });
 
   it("does not add a groups key to a state that had none", () => {

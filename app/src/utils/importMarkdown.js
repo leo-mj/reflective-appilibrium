@@ -484,11 +484,13 @@ export function validateState(raw) {
       const members = arr(p.members ?? [], `${ctx}.members`, 1_000)
         .map((m, j) => str(m, `${ctx}.members[${j}]`, 10))
         .filter((m) => elementIds.has(m));
-      return {
+      const result = {
         id: str(p.id, `${ctx}.id`, 10),
         label: str(p.label ?? "", `${ctx}.label`, 200),
         members: [...new Set(members)],
       };
+      if (p.round != null) result.round = num(p.round, `${ctx}.round`);
+      return result;
     });
   }
 

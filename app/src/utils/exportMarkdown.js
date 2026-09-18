@@ -17,6 +17,7 @@ import { citationMarkdown } from "./citation.js";
 import { sortElementIds, historyOf, reviewsOf } from "./stateUtils.js";
 import { groupsOf } from "./groupUtils.js";
 import { generateGraphSVG, svgToDataUrl } from "./generateSVG.js";
+import { processesOf, processTagMap } from "./mergeStates.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ function sourcesLines(el) {
   return `\n\n*Sources (AI-generated, unverified):*${refs}`;
 }
 
-function elementsSection(elements, type, label, pCovers) {
+function elementsSection(elements, type, label, pCovers, processTags) {
   const els = elements.filter((e) => e.type === type);
   if (!els.length) return "";
   const lines = [`### ${label}\n`];
@@ -97,8 +98,11 @@ function elementsSection(elements, type, label, pCovers) {
     const trail = historyEntries(el)
       .map((line) => `\n> ${line}`)
       .join("");
+    const process = processTags.has(el.id)
+      ? ` · process ${processTags.get(el.id)}`
+      : "";
     lines.push(
-      `**${el.id}** · ${el.confidence}${statusTag}\n${bodyText}${covers}${trail}` +
+      `**${el.id}** · ${el.confidence}${process}${statusTag}\n${bodyText}${covers}${trail}` +
         `${sourcesLines(el)}\n`,
     );
   }
@@ -134,15 +138,35 @@ function groupsSection(groups) {
   return "## Groups\n\n" + lines.join("\n");
 }
 
-function graphSection(elements, relations, positions, groups) {
-  const svg = generateGraphSVG(elements, relations, positions, { groups });
+/**
+ * The key to the letters the graph images put on nodes after a merge. A key the
+ * picture lacks, like the canvas's legend, so it is written here in prose.
+ */
+function processesSection(processes) {
+  if (!processes.length) return "";
+  const lines = processes.map(
+    (p) =>
+      `- **${esc(p.id)}** — ${esc(p.label)}` +
+      `${p.round != null ? ` *(merged in round ${p.round})*` : ""}: ${[...p.members].sort(sortElementIds).join(", ")}`,
+  );
+  return (
+    "## Merged Processes\n\nElements fused from two processes carry both letters.\n\n" +
+    lines.join("\n")
+  );
+}
+
+function graphSection(elements, relations, positions, groups, processTags) {
+  const svg = generateGraphSVG(elements, relations, positions, {
+    groups,
+    processTags,
+  });
   if (!svg) return "";
   return (
     '## Graph\n\n<img src="' + svgToDataUrl(svg) + '" style="max-width:100%"/>'
   );
 }
 
-function clustersSection(state, positions) {
+function clustersSection(state, positions, processTags) {
   const clusters = findCoherentClusters(state);
   if (!clusters.length) return "";
 
@@ -153,7 +177,9 @@ function clustersSection(state, positions) {
     const clusterRels = state.relations.filter(
       (r) => cluster.members.has(r.from) && cluster.members.has(r.to),
     );
-    const svg = generateGraphSVG(clusterEls, clusterRels, positions);
+    const svg = generateGraphSVG(clusterEls, clusterRels, positions, {
+      processTags,
+    });
     const imgTag = svg
       ? '\n\n<img src="' + svgToDataUrl(svg) + '" style="max-width:100%"/>'
       : "";
@@ -266,11 +292,13 @@ export function buildMarkdown(state, positions) {
 
   const header = `# Reflective Equilibrium: ${esc(state.topic)}\n\n**Round:** ${state.round} · **Date:** ${date}`;
 
+  const processes = processesOf(state);
+  const processTags = processTagMap(processes);
   const elementsBlock =
     "## Elements\n\n" +
-    elementsSection(state.elements, "judgment", "Judgments", pCovers) +
-    elementsSection(state.elements, "principle", "Principles", pCovers) +
-    elementsSection(state.elements, "theory", "Background Theories", pCovers);
+    elementsSection(state.elements, "judgment", "Judgments", pCovers, processTags) +
+    elementsSection(state.elements, "principle", "Principles", pCovers, processTags) +
+    elementsSection(state.elements, "theory", "Background Theories", pCovers, processTags);
 
   // Machine-readable state block — used by the import feature to restore this session.
   const stateBlock = "```re-state\n" + JSON.stringify(state, null, 2) + "\n```";
@@ -280,11 +308,19 @@ export function buildMarkdown(state, positions) {
     elementsBlock,
     relationsSection(state.relations),
     groupsSection(groupsOf(state)),
+    processesSection(processes),
     // Groups are the user's own filing, so the graph is drawn as they left it.
     // The cluster diagrams below are not: a coherent cluster is computed from
     // the relations, and cuts across the grouping rather than following it.
-    graphSection(state.elements, state.relations, positions, groupsOf(state)),
-    clustersSection(state, positions),
+    // Process letters go on both, being a fact about each element.
+    graphSection(
+      state.elements,
+      state.relations,
+      positions,
+      groupsOf(state),
+      processTags,
+    ),
+    clustersSection(state, positions, processTags),
     coherenceSection(state.coherence),
     reviewsSection(reviewsOf(state)),
     logSection(state.log),
