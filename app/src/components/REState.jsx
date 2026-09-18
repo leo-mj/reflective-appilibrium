@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { C } from "../constants/colors.js";
 import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
@@ -50,6 +50,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [workflowLoops, setWorkflowLoops] = useState(0);
   const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
   const [verifyArguments, setVerifyArguments] = useState(true);
+  // On by default: a merge is asked for, and being able to tell the processes
+  // apart afterwards is the point of the tags.
+  const [showProcessTags, setShowProcessTags] = useState(true);
   // The home page's "Tutorial" button sets this flag and then loads the demo,
   // so the tour opens on the state it describes rather than on the landing page.
   const [tourActive, setTourActive] = useState(() => {
@@ -290,8 +293,19 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     }
   };
 
+  // What the graphs and the text panel are drawn from. Hiding the merge tags
+  // hides the record they are drawn from — every surface reads it through
+  // `processesOf`, so they all go together — while edits, the autosave and the
+  // export keep working from `state` itself, where the record stays intact.
+  const viewState = useMemo(() => {
+    if (showProcessTags || !state.processes) return state;
+    const { processes: _hidden, ...rest } = state;
+    return rest;
+  }, [state, showProcessTags]);
+  const hasMerged = (state.processes?.length ?? 0) > 0;
+
   const textState =
-    tab === "history" ? stateAtRound(state, historyRound) : state;
+    tab === "history" ? stateAtRound(viewState, historyRound) : viewState;
 
   // Props shared by both the assist-side and analyze-mode TextPanel instances.
   // While the tour is running it says whether the text panel belongs on screen.
@@ -345,7 +359,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   };
 
   const graphPanelCommonProps = {
-    state,
+    state: viewState,
     positions,
     hiddenLegendKeys: effectiveHiddenKeys,
     setHiddenLegendKeys,
@@ -525,6 +539,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         }}
         hideNonEntailsRels={hideNonEntailsRels}
         setHideNonEntailsRels={setHideNonEntailsRels}
+        showProcessTags={hasMerged ? showProcessTags : null}
+        setShowProcessTags={setShowProcessTags}
         verifyArguments={verifyArguments}
         setVerifyArguments={setVerifyArguments}
         weights={weights}

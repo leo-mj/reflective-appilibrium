@@ -77,6 +77,8 @@ export function AppHeaderWide({
   onExpandAll,
   hideNonEntailsRels,
   setHideNonEntailsRels,
+  showProcessTags,
+  setShowProcessTags,
   verifyArguments,
   setVerifyArguments,
   weights,
@@ -360,6 +362,18 @@ export function AppHeaderWide({
                       onToggle={() => setHideNonEntailsRels((s) => !s)}
                       style={menuItem}
                     />
+                    {/* Only once there has been a merge: before one, there
+                        is nothing it could show. */}
+                    {showProcessTags != null && (
+                      <MenuToggle
+                        icon="⊕"
+                        label={MENU_LABELS.processTags}
+                        tooltip={MENU_TOOLTIPS.processTags}
+                        on={showProcessTags}
+                        onToggle={() => setShowProcessTags((s) => !s)}
+                        style={menuItem}
+                      />
+                    )}
                     {BACKEND_ENABLED && (
                       <MenuToggle
                         icon="⊨"

@@ -202,7 +202,12 @@ node wears its letter (`"A+B"` when fused) on the Graph, History and Cluster tab
 and in the exported SVGs; the legend and the export's "Merged Processes" section
 key the letters, and text cards and the export's element lines name the process.
 Letters rather than colours, since node colour already carries type and
-confidence. It lives on the state and **not on the elements**, because the
+confidence. **Process tags** in ☰ → Content hides them all at once, and is offered
+only once a merge has happened. It works by handing the graphs and text panel a
+view of the state without `processes` (`viewState` in `REState`) — which is why
+every surface must read the record through `processesOf` — while edits, the
+autosave and the export keep the real state. The export always carries the tags:
+like the palette, it does not follow a reader's view settings. It lives on the state and **not on the elements**, because the
 backend's element model forbids unknown fields; the backend drops it on a server
 save, as it does groups, while export/import keeps it. An incoming process that
 was itself a merge keeps its own processes apart under letters of their own.

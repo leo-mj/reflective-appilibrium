@@ -49,6 +49,9 @@ import { C } from "../constants/colors.js";
  * @param {string}   props.assistSidePanel
  * @param {function} props.setAssistSidePanel
  * @param {function} props.onDownload
+ * @param {boolean|null} [props.showProcessTags] - Whether the merged-process
+ *   letters are drawn; null before any merge, which leaves the row out.
+ * @param {function} [props.setShowProcessTags]
  * @param {function} props.onImportFile
  * @param {function} [props.onMergeFile] - Merges a second exported process into
  *   this one; its menu row is offered only when there is a non-questionnaire
@@ -111,6 +114,8 @@ export function AppHeader({
   onExpandAll,
   hideNonEntailsRels,
   setHideNonEntailsRels,
+  showProcessTags = null,
+  setShowProcessTags,
   verifyArguments,
   setVerifyArguments,
   weights,
@@ -297,6 +302,8 @@ export function AppHeader({
     isTabVisible,
     hideNonEntailsRels,
     setHideNonEntailsRels,
+    showProcessTags,
+    setShowProcessTags,
     verifyArguments,
     setVerifyArguments,
     weights,

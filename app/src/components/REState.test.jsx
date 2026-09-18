@@ -366,3 +366,39 @@ describe("the central divider", () => {
     expect(textPanel(container).style.width).toBe("51%");
   });
 });
+
+describe("merged-process tags", () => {
+  const merged = {
+    ...SAMPLE_STATE,
+    processes: [
+      {
+        id: "A",
+        label: "First",
+        members: SAMPLE_STATE.elements.map((e) => e.id),
+        round: 1,
+      },
+    ],
+  };
+  const chips = () => screen.queryAllByText(/^Process A: First$/);
+  const key = () => screen.queryAllByTestId("legend-process");
+
+  it("has no toggle before a merge", () => {
+    open();
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    expect(screen.queryByText("Process tags")).toBeNull();
+  });
+
+  it("shows the tags after a merge, and the toggle hides them everywhere", () => {
+    open(merged);
+    expect(chips().length).toBeGreaterThan(0);
+    expect(key()).toHaveLength(1);
+
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    fireEvent.click(screen.getByText("Process tags"));
+    expect(chips()).toHaveLength(0);
+    expect(key()).toHaveLength(0);
+
+    fireEvent.click(screen.getByText("Process tags"));
+    expect(chips().length).toBeGreaterThan(0);
+  });
+});

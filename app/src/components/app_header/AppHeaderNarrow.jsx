@@ -75,6 +75,8 @@ export function AppHeaderNarrow({
   onExpandAll,
   hideNonEntailsRels,
   setHideNonEntailsRels,
+  showProcessTags,
+  setShowProcessTags,
   verifyArguments,
   setVerifyArguments,
   weights,
@@ -318,6 +320,16 @@ export function AppHeaderNarrow({
               onToggle={() => setHideNonEntailsRels((s) => !s)}
               style={menuBtn()}
             />
+            {showProcessTags != null && (
+              <MenuToggle
+                icon="⊕"
+                label={MENU_LABELS.processTags}
+                tooltip={MENU_TOOLTIPS.processTags}
+                on={showProcessTags}
+                onToggle={() => setShowProcessTags((s) => !s)}
+                style={menuBtn()}
+              />
+            )}
             {BACKEND_ENABLED && (
               <MenuToggle
                 icon="⊨"

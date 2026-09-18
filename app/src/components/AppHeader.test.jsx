@@ -168,6 +168,32 @@ describe("merge", () => {
     });
   }
 
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+    const tagsRow = () => screen.queryByText("Process tags");
+
+    it(`offers the process-tags toggle in the ${layout} menu only after a merge`, () => {
+      render(<AppHeader {...PROPS} isWide={isWide} />);
+      openMenu();
+      expect(tagsRow()).toBeNull();
+      cleanup();
+
+      const setShowProcessTags = vi.fn();
+      render(
+        <AppHeader
+          {...PROPS}
+          isWide={isWide}
+          showProcessTags={true}
+          setShowProcessTags={setShowProcessTags}
+        />,
+      );
+      openMenu();
+      fireEvent.click(tagsRow());
+      expect(setShowProcessTags).toHaveBeenCalledTimes(1);
+      expect(setShowProcessTags.mock.calls[0][0](true)).toBe(false);
+    });
+  }
+
   it("merges the chosen file without asking to replace anything", async () => {
     const onMergeFile = vi.fn();
     render(<AppHeader {...PROPS} hasExistingState onMergeFile={onMergeFile} />);
