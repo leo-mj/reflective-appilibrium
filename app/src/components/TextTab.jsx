@@ -95,6 +95,7 @@ export function TextTab({
   onReinstateRel,
   onAddElement,
   onAddRelation,
+  onAddNewArgument,
   onToggleGroup,
   onEditGroupRequest,
   onUngroup,
@@ -523,6 +524,7 @@ export function TextTab({
           <MobileAddButton
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
+            onAddNewArgument={onAddNewArgument}
             elements={linkableElements(state.elements)}
             hideNonEntailsRels={hideNonEntailsRels}
           />

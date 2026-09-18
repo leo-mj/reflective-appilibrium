@@ -228,3 +228,49 @@ export function makeArgumentDefaults(elements) {
     explanation: "",
   };
 }
+
+/**
+ * A written argument as it starts, and as Clear and a successful add leave it:
+ * one premise and the conclusion, each a statement still to be written. A
+ * premise opens as a principle and the conclusion as a judgment, the usual
+ * shape of one, and either can be changed.
+ */
+export const WRITTEN_ARGUMENT_DEFAULTS = Object.freeze({
+  premises: [{ type: "judgment", text: "" }],
+  conclusion: { type: "judgment", text: "" },
+});
+
+/**
+ * One line of a written argument: a new statement of `type`, or — when `id` is
+ * set — an element already on the board. The text stays on a line that has
+ * been pointed at an element, so pointing it back at "New" gives it back.
+ *
+ * @typedef {{type: string, text: string, id?: string}} ArgumentSlot
+ */
+
+/** What a line's source picker holds: the element's id, or `new:<type>`. */
+export const slotSource = (slot) => slot.id ?? `new:${slot.type}`;
+
+/**
+ * Whether a written argument can be added, and if not, whether that is worth
+ * saying. An empty statement is not — the element tab does not complain about
+ * its empty field either, and a form that opens complaining reads as broken.
+ * The same element twice is, since nothing on screen shows why Add is dead.
+ *
+ * @param {{premises: ArgumentSlot[], conclusion: ArgumentSlot}} form
+ * @param {Set<string>} available - Ids that can still be picked; a line left
+ *   pointing at an element that has since gone is not a line.
+ * @returns {{valid: boolean, complaint: string|null}}
+ */
+export function checkWrittenArgument(form, available) {
+  const { premises, conclusion } = form;
+  const premiseIds = premises.map((p) => p.id).filter(Boolean);
+  if (new Set(premiseIds).size < premiseIds.length)
+    return { valid: false, complaint: "Premises must differ" };
+  if (conclusion.id && premiseIds.includes(conclusion.id))
+    return { valid: false, complaint: "Premise ≠ conclusion" };
+  const filled = [...premises, conclusion].every((s) =>
+    s.id ? available.has(s.id) : s.text.trim().length > 0,
+  );
+  return { valid: filled, complaint: null };
+}

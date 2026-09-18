@@ -131,6 +131,7 @@ export function GraphPanel({
   onAddElement,
   onReviseElementText,
   onAddRelation,
+  onAddNewArgument,
   onDeleteRelationsByArgId,
   onQuestionnaireSelectAnswer,
   onScrollToRelations,
@@ -275,6 +276,7 @@ export function GraphPanel({
             elements={linkableElements(state.elements)}
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
+            onAddNewArgument={onAddNewArgument}
             hideNonEntailsRels={hideNonEntailsRels}
             preset={ADD_BAR_PRESETS[tab] ?? null}
           />

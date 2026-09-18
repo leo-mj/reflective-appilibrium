@@ -403,7 +403,7 @@ width — any scaled display — is where that fraction comes from.
 **Both bounds, and the floor takes the cap too.** In CSS a minimum wins over a
 maximum, so a floor left uncapped holds the bar past the bottom of the window —
 which is the other way a growing row goes wrong, and the one that gives the whole
-page a scrollbar. `HEIGHT_CAP` is `min(75dvh, 100%)`: the window's share, and the
+page a scrollbar. `HEIGHT_CAP` is `min(50dvh, 100%)`: the window's share, and the
 panel it sits in, whichever is smaller. The statement box keeps the floor
 `TEXT_FIELD_MIN_HEIGHT` puts under every one of them — that floor is what the bar
 grows *by*.
@@ -447,6 +447,19 @@ the one they had. The relation form takes the two ends of the chain, a relation
 being binary — and the graph only offers one for a chain of two anyway. The
 identity rule from the preset applies here too: `REState` holds the array in
 state so a re-render is not a re-apply.
+
+**An argument can be written rather than picked.** The Argument tab's
+Pick/Write switch swaps the pickers for `WrittenArgumentFields`: premises stacked
+over the conclusion, `+ premise` between them. Each line has one source picker —
+New judgment/principle/theory, or an element on the board, which then shows its
+text read-only — so written and existing statements mix freely; a line keeps its
+typed text while pointed at an element. It submits through
+`handleAddNewArgument` (`useRelationActions`), which takes `{ id }` for a picked
+line and adds only the new ones — not a run
+of `onAddElement` calls — one round, one log entry, one undo, and ids numbered
+against the whole element list, since the bar's `linkableElements` leaves out
+`possible` ones whose ids are still taken. The tab opens on Write, which covers
+both; a ctrl+click chain switches to Pick.
 
 **Narrow has no strip.** An add bar and a column of suggestions do not both fit on
 a phone, so `GraphPanel` puts `MobileAddButton` — the text tab's floating + — in

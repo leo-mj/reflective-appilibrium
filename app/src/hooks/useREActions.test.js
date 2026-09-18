@@ -138,6 +138,104 @@ describe("handleAddElement", () => {
   });
 });
 
+// ─── handleAddNewArgument ─────────────────────────────────────────────────────
+
+describe("handleAddNewArgument", () => {
+  const written = (overrides = {}) => ({
+    premises: [
+      { type: "principle", text: "Lying is wrong.", confidence: 0.67 },
+      { type: "judgment", text: "Telling Ann X is lying.", confidence: 0.67 },
+    ],
+    conclusion: { type: "judgment", text: "Don't tell Ann X.", confidence: 0.67 },
+    negated: false,
+    explanation: "Modus ponens",
+    origin: "Leo",
+    ...overrides,
+  });
+
+  it("adds the elements and a joint argument between them, as one round", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleAddNewArgument(written()));
+    const { elements, relations, round, log } = result.current.state;
+
+    expect(elements.slice(1).map((e) => [e.id, e.text, e.origin])).toEqual([
+      ["P1", "Lying is wrong.", "Leo"],
+      ["J2", "Telling Ann X is lying.", "Leo"],
+      ["J3", "Don't tell Ann X.", "Leo"],
+    ]);
+    const added = relations.slice(1);
+    expect(added.map((r) => [r.from, r.to, r.type])).toEqual([
+      ["P1", "J3", "jointly_entails"],
+      ["J2", "J3", "jointly_entails"],
+    ]);
+    expect(added[0].argumentId).toBeTruthy();
+    expect(added[0].argumentId).toBe(added[1].argumentId);
+    expect(added[0].explanation).toBe("Modus ponens");
+    expect(round).toBe(2);
+    expect(log).toHaveLength(1);
+    expect(result.current.recentlyAddedRel).toBe(added[1]);
+  });
+
+  it("is a plain preclusion with one premise, negated", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() =>
+      result.current.handleAddNewArgument(
+        written({ premises: written().premises.slice(0, 1), negated: true }),
+      ),
+    );
+    expect(result.current.state.relations.at(-1).type).toBe("precludes");
+  });
+
+  it("numbers past elements the add bar never sees", () => {
+    // `possible` elements are left out of the bar's list, but their ids are
+    // taken all the same.
+    const { result } = renderHook(() =>
+      useREActions(
+        baseState({ elements: [makeEl(), makeEl({ id: "J2", status: "possible" })] }),
+      ),
+    );
+    act(() => result.current.handleAddNewArgument(written()));
+    expect(result.current.state.elements.slice(2).map((e) => e.id)).toEqual([
+      "P1",
+      "J3",
+      "J4",
+    ]);
+  });
+
+  it("takes elements already on the board by id, adding only the new ones", () => {
+    const { result } = renderHook(() =>
+      useREActions(
+        baseState({
+          elements: [makeEl(), makeEl({ id: "P1", type: "principle" })],
+        }),
+      ),
+    );
+    act(() =>
+      result.current.handleAddNewArgument(
+        written({
+          premises: [{ id: "P1" }, written().premises[0]],
+          conclusion: { id: "J1" },
+        }),
+      ),
+    );
+    const { elements, relations, log } = result.current.state;
+    expect(elements.map((e) => e.id)).toEqual(["J1", "P1", "P2"]);
+    expect(relations.slice(1).map((r) => [r.from, r.to])).toEqual([
+      ["P1", "J1"],
+      ["P2", "J1"],
+    ]);
+    expect(log.at(-1).findings).toContain("with P2");
+  });
+
+  it("is undone in one step", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleAddNewArgument(written()));
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
+    expect(result.current.state.relations).toHaveLength(1);
+  });
+});
+
 // ─── handleAddRelation ────────────────────────────────────────────────────────
 
 describe("handleAddRelation", () => {
