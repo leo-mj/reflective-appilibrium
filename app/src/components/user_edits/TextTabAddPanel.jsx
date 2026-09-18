@@ -49,12 +49,15 @@ import {
   fieldStyle,
   ghostBtn,
   idOptionChars,
+  checkWrittenArgument,
   makeArgumentDefaults,
   makeRelationDefaults,
   pickerWidth,
   selectStyle,
+  WRITTEN_ARGUMENT_DEFAULTS,
 } from "./addPanelShared.js";
 import { Field, PremisePickers } from "./addPanelPrimitives.jsx";
+import { WrittenArgumentFields } from "./WrittenArgumentFields.jsx";
 
 // Origin is deliberately not among them: it is who is adding rather than part
 // of the element being written, and so is kept across a clear, an add and a tab
@@ -79,6 +82,9 @@ const ARGUMENT_ROWS = [
  * @param {REElement[]} props.elements   - Elements that may be referenced; see linkableElements.
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
+ * @param {function}    [props.onAddNewArgument] - Adds an argument whose
+ *   premises and conclusion are written out here, elements and relations as
+ *   one change. Without it the argument tab offers picking only.
  * @param {string|null} [props.selected] - The node selected in the graph, which
  *   fills the first end of a link.
  * @param {string[]|null} [props.ctrlChain] - A ctrl+click chain in the graph,
@@ -100,6 +106,7 @@ export function AddBar({
   elements,
   onAddElement,
   onAddRelation,
+  onAddNewArgument,
   selected,
   ctrlChain,
   hideNonEntailsRels,
@@ -163,6 +170,13 @@ export function AddBar({
   const [argumentForm, setArgumentForm] = useState(() =>
     makeArgumentDefaults(elements),
   );
+  // An argument's premises and conclusion are either picked from the board in
+  // one compact row, or stacked a line each, where every line is written out
+  // new or taken from the board. The stack opens by default, since it covers
+  // both; picking is where a ctrl+click chain lands.
+  const [argumentMode, setArgumentMode] = useState("write");
+  const [writtenForm, setWrittenForm] = useState(WRITTEN_ARGUMENT_DEFAULTS);
+  const writing = !!onAddNewArgument && argumentMode === "write";
 
   // The relation tab can be taken away underneath a reader standing on it, by
   // the setting flipping while the bar is open. Derived rather than corrected
@@ -238,6 +252,9 @@ export function AddBar({
         premises: ctrlChain.slice(0, -1),
         conclusion,
       }));
+      // A chain is a deliberate pick of existing elements, so it is shown as
+      // one. A plain selection is not, and leaves a half-written argument be.
+      setArgumentMode("pick");
     }
   }
 
@@ -290,12 +307,15 @@ export function AddBar({
     conclusion &&
     !duplicatePremises &&
     !conclusionIsPremise;
+  const written = checkWrittenArgument(writtenForm, new Set(ids));
   const canSubmit =
     tab === "element"
       ? isElementValid
       : tab === "relation"
         ? isRelationValid
-        : isArgumentValid;
+        : writing
+          ? written.valid
+          : isArgumentValid;
 
   /**
    * Puts the tab on show back to how it started — one premise again, in the
@@ -307,7 +327,10 @@ export function AddBar({
     if (tab === "element") setElementForm(ELEMENT_DEFAULTS);
     else if (tab === "relation")
       setRelationForm(makeRelationDefaults(elements));
-    else setArgumentForm(makeArgumentDefaults(elements));
+    else {
+      setArgumentForm(makeArgumentDefaults(elements));
+      setWrittenForm(WRITTEN_ARGUMENT_DEFAULTS);
+    }
   };
 
   /**
@@ -325,6 +348,25 @@ export function AddBar({
       onAddElement({ ...elementForm, origin: originOrDefault(origin) });
     } else if (tab === "relation") {
       onAddRelation(relationForm);
+    } else if (writing) {
+      // A line taken from the board goes by its id. A written one is a new
+      // element: added at the element tab's default confidence and under the
+      // same origin, since it is the same reader adding it.
+      const draft = ({ id, type, text }) =>
+        id
+          ? { id }
+          : {
+              type,
+              text: text.trim(),
+              confidence: ELEMENT_DEFAULTS.confidence,
+            };
+      onAddNewArgument({
+        premises: writtenForm.premises.map(draft),
+        conclusion: draft(writtenForm.conclusion),
+        negated,
+        explanation: argumentForm.explanation,
+        origin: originOrDefault(origin),
+      });
     } else {
       // One relation per premise, sharing an argumentId — that grouping is what
       // makes the graph draw them converging on a single arrow, and what lets
@@ -345,6 +387,16 @@ export function AddBar({
       );
     }
     resetTab();
+  };
+
+  /** Every field in the bar submits on ctrl-enter. */
+  const submitOnCtrlEnter = (e) => {
+    // metaKey too: on a Mac the shortcut people reach for is cmd-enter, and the
+    // app's own undo already answers to both.
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && canSubmit) {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   /**
@@ -493,7 +545,7 @@ export function AddBar({
             cursor: "pointer",
           }}
         >
-          Show the add bar
+          Show add bar
           {/* Which tab it is folded on: the one thing worth knowing before
               deciding to open it, and part of the name for the same reason. */}
           <span style={{ opacity: 0.75 }}>· {tab}</span>
@@ -857,22 +909,70 @@ export function AddBar({
             </>
           ) : (
             <>
+              {/* Where the premises and conclusion come from: the board, or
+                  the fields below. A pair of pressed buttons rather than a
+                  picker, since both choices are worth seeing at once. */}
+              {onAddNewArgument && (
+                <span
+                  role="group"
+                  aria-label="Argument from"
+                  style={{ display: "flex", gap: 0, flexShrink: 0 }}
+                >
+                  {[
+                    {
+                      mode: "write",
+                      label: "Write",
+                      title:
+                        "Write premises and conclusion out as new statements, mixed with elements from the board as you like",
+                    },
+                    {
+                      mode: "pick",
+                      label: "Pick",
+                      title: "Build it from elements already on the board",
+                    },
+                  ].map(({ mode, label, title }, i) => {
+                    const on = argumentMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-pressed={on}
+                        title={title}
+                        onClick={() => setArgumentMode(mode)}
+                        style={{
+                          ...ghost,
+                          borderRadius: i === 0 ? "4px 0 0 4px" : "0 4px 4px 0",
+                          marginLeft: i === 0 ? 0 : -1,
+                          background: on ? C.border : "transparent",
+                          color: on ? C.text : C.dim,
+                          fontWeight: on ? "bold" : "normal",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </span>
+              )}
               {/* Premises, joined by +. One argument can rest on several, and
                   they are added a row at a time rather than by a count field.
                   The assist tabs' panel draws the same run from the same
-                  component — see {@link PremisePickers}. */}
-              <PremisePickers
-                premises={premises}
-                options={elementRows}
-                layout={idLayout}
-                selectStyle={linkSel}
-                ghostStyle={ghost}
-                arrowStyle={arrow}
-                onChange={setPremise}
-                onRemove={removePremise}
-                onAdd={addPremise}
-                canAdd={ids.length > premises.length + 1}
-              />
+                  component — see {@link PremisePickers}. Written out, they
+                  are in the stack under this row instead. */}
+              {!writing && (
+                <PremisePickers
+                  premises={premises}
+                  options={elementRows}
+                  layout={idLayout}
+                  selectStyle={linkSel}
+                  ghostStyle={ghost}
+                  arrowStyle={arrow}
+                  onChange={setPremise}
+                  onRemove={removePremise}
+                  onAdd={addPremise}
+                  canAdd={ids.length > premises.length + 1}
+                />
+              )}
               <Dropdown
                 label="Argument type"
                 value={negated ? "precludes" : "entails"}
@@ -887,16 +987,26 @@ export function AddBar({
                 // 9 for "precludes".
                 layout={pickerWidth(9)}
               />
-              <span style={arrow}>→</span>
-              <Dropdown
-                label="Conclusion"
-                value={conclusion}
-                onChange={(v) => setArg("conclusion", v)}
-                options={elementRows}
-                style={linkSel}
-                layout={idLayout}
-              />
-              {tooFewElements ? (
+              {!writing && (
+                <>
+                  <span style={arrow}>→</span>
+                  <Dropdown
+                    label="Conclusion"
+                    value={conclusion}
+                    onChange={(v) => setArg("conclusion", v)}
+                    options={elementRows}
+                    style={linkSel}
+                    layout={idLayout}
+                  />
+                </>
+              )}
+              {writing ? (
+                written.complaint && (
+                  <span role="status" style={complaintStyle(linkSize)}>
+                    {written.complaint}
+                  </span>
+                )
+              ) : tooFewElements ? (
                 needsTwo
               ) : duplicatePremises || conclusionIsPremise ? (
                 <span role="status" style={complaintStyle(linkSize)}>
@@ -920,6 +1030,21 @@ export function AddBar({
         {!roomy && minimiseButton}
       </div>
 
+      {/* ── Written argument: premises over conclusion ── */}
+      {tab === "argument" && writing && (
+        <WrittenArgumentFields
+          form={writtenForm}
+          onChange={setWrittenForm}
+          elements={elements}
+          onKeyDown={submitOnCtrlEnter}
+          selectStyle={sel}
+          ghostStyle={ghostBtn(size)}
+          arrowStyle={arrow}
+          roomy={roomy}
+          generation={generation}
+        />
+      )}
+
       {/* ── Text / explanation ── */}
       <textarea
         // Keyed on the tab as well as the generation: each tab's placeholder is
@@ -941,14 +1066,7 @@ export function AddBar({
               ? setRel("explanation", e.target.value)
               : setArg("explanation", e.target.value)
         }
-        onKeyDown={(e) => {
-          // metaKey too: on a Mac the shortcut people reach for is cmd-enter,
-          // and the app's own undo already answers to both.
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && canSubmit) {
-            e.preventDefault();
-            handleSubmit();
-          }
-        }}
+        onKeyDown={submitOnCtrlEnter}
         placeholder={
           tab === "element"
             ? "Enter statement…"

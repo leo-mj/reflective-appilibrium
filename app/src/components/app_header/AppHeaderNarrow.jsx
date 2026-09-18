@@ -8,7 +8,12 @@ import { C } from "../../constants/colors.js";
 import { useTheme } from "../../hooks/useTheme.js";
 import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
+import {
+  useLLMSettings,
+  useLLMSettingsRequested,
+} from "../../utils/llmKey.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
+import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import {
   ASSIST_TABS,
@@ -80,6 +85,7 @@ export function AppHeaderNarrow({
 }) {
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
   const {
     isDark,
@@ -88,15 +94,16 @@ export function AppHeaderNarrow({
     toggleAccessible,
   } = useTheme();
 
-  const llmSaved = (() => {
-    if (!BYOK_ENABLED) return null;
-    try {
-      const s = JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}");
-      return s?.apiKey ? s : null;
-    } catch {
-      return null;
-    }
-  })();
+  // Both of these are the wide header's, line for line — see the comments there.
+  const settings = useLLMSettings();
+  const llmSaved = BYOK_ENABLED && settings?.apiKey ? settings : null;
+
+  const llmRequests = useLLMSettingsRequested();
+  const [seenLlmRequest, setSeenLlmRequest] = useState(llmRequests);
+  if (seenLlmRequest !== llmRequests) {
+    setSeenLlmRequest(llmRequests);
+    setLlmOpen(true);
+  }
 
   const menuBtn = (active = false) => ({
     ...btn(active),
@@ -161,6 +168,7 @@ export function AppHeaderNarrow({
       </div>
       <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
+      <PrivacyModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       {menuOpen && (
         <div
           style={{
@@ -332,6 +340,16 @@ export function AppHeaderNarrow({
             >
               <span style={menuIconStyle}>⚙</span>
               {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
+            </button>
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setPrivacyOpen(true);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>ⓘ</span>
+              {MENU_LABELS.privacy}
             </button>
             {BACKEND_ENABLED && (
               <>

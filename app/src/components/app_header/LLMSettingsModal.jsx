@@ -1,38 +1,40 @@
 /**
  * @fileoverview BYOK settings modal — lets the user supply their own API key,
  * provider, and model. Values are stored in sessionStorage only (cleared on
- * tab close) and sent as request headers; the backend never persists them.
+ * tab close, but restored with a reopened tab or session) and sent as request headers; the backend never persists them.
+ * The modal says so to the reader beside the key field, and PrivacyModal says
+ * the rest of what leaves the browser.
  * @module components/app_header/LLMSettingsModal
  */
 
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
 import { LLM_PROVIDERS } from "../../constants/llmProviders.js";
-import { BYOK_ENABLED } from "../../config.js";
+import { BYOK_ENABLED, BACKEND_URL } from "../../config.js";
 import { btn } from "./appHeaderStyles.js";
 import { getSessionUsage, clearSessionUsage } from "../../utils/openaiClient.js";
+import {
+  readLLMSettings,
+  useHasLLMKey,
+  notifyLLMKeyChanged,
+} from "../../utils/llmKey.js";
+import { unwrapDetail } from "../../utils/backendError.js";
 
 /** Why the inert controls are inert, for hover and assistive technology. */
 const DEMO_REASON = "Unavailable in the demo — this build has no backend.";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
-
 function getInitialProvider() {
-  const raw = sessionStorage.getItem("llmSettings");
-  if (raw) {
-    const { baseUrl } = JSON.parse(raw);
-    return LLM_PROVIDERS.find((p) => p.baseUrl === baseUrl) ?? LLM_PROVIDERS[0];
+  const saved = readLLMSettings();
+  if (saved) {
+    return LLM_PROVIDERS.find((p) => p.baseUrl === saved.baseUrl) ?? LLM_PROVIDERS[0];
   }
   const defaultId = import.meta.env.VITE_DEFAULT_PROVIDER;
   return LLM_PROVIDERS.find((p) => p.id === defaultId) ?? LLM_PROVIDERS[0];
 }
 
 function getInitialModel(provider) {
-  const raw = sessionStorage.getItem("llmSettings");
-  if (raw) {
-    const { model } = JSON.parse(raw);
-    if (model) return model;
-  }
+  const saved = readLLMSettings();
+  if (saved?.model) return saved.model;
   const defaultModel = import.meta.env.VITE_DEFAULT_MODEL;
   if (defaultModel) return defaultModel;
   return provider.models[0];
@@ -65,15 +67,9 @@ export function LLMSettingsModal({ open, onClose }) {
       .catch(() => {});
   }, [open, demo]);
 
-  const hasSessionKey = Boolean(
-    (() => {
-      try {
-        return JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}")?.apiKey;
-      } catch {
-        return false;
-      }
-    })()
-  );
+  // Subscribed rather than read once: Clear writes and closes, and the "· Key
+  // saved" line beside the field has to have moved by the time it reopens.
+  const hasSessionKey = useHasLLMKey();
   const hasSavedKey = hasSessionKey || serverKeyUrls.has(provider.baseUrl);
 
   const effectiveApiKey = apiKey || provider.defaultApiKey || "";
@@ -107,15 +103,15 @@ export function LLMSettingsModal({ open, onClose }) {
         const data = await res.json();
         setTestStatus({ ok: true, message: `Connected — model: ${data.model}` });
       } else {
+        // This is a connection test, so it is the one place that *should* show
+        // the server's own words — "Unsupported provider URL" is the answer the
+        // reader is looking for. backendError's friendlier rewording would be
+        // wrong here; only the envelope-unwrapping is wanted.
         const raw = await res.text();
-        let message = raw || `Error ${res.status}`;
-        try {
-          const detail = JSON.parse(raw)?.detail;
-          if (detail) message = typeof detail === "string" ? detail : JSON.stringify(detail);
-        } catch {
-          /* not JSON — show the raw text */
-        }
-        setTestStatus({ ok: false, message });
+        setTestStatus({
+          ok: false,
+          message: unwrapDetail(raw) || `Error ${res.status}`,
+        });
       }
     } catch (err) {
       setTestStatus({ ok: false, message: err.message });
@@ -129,11 +125,13 @@ export function LLMSettingsModal({ open, onClose }) {
       "llmSettings",
       JSON.stringify({ apiKey: effectiveApiKey, baseUrl: provider.baseUrl, model })
     );
+    notifyLLMKeyChanged();
     onClose();
   }
 
   function handleClear() {
     sessionStorage.removeItem("llmSettings");
+    notifyLLMKeyChanged();
     clearSessionUsage();
     setApiKey("");
     setTestStatus(null);
@@ -304,6 +302,25 @@ export function LLMSettingsModal({ open, onClose }) {
               }}
               autoComplete="off"
             />
+            {/* Where the key goes, said where it is typed. Not in the demo,
+                where no key can be entered at all. */}
+            {!demo && (
+              <div
+                style={{
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                  color: C.dim,
+                  marginTop: 6,
+                }}
+              >
+                Kept in this browser tab, not saved permanently — though
+                reopening a closed tab can bring it back, so press Clear when
+                you are done. Sent to this app&apos;s server with each AI
+                request and passed on to {provider.label}; the server does not
+                store or log it. Use a key with a spending limit. See Privacy
+                in the menu for what else is sent.
+              </div>
+            )}
           </div>
         )}
 

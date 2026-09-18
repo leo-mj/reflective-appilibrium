@@ -116,7 +116,12 @@ class ScorePerRoundRequest(BaseModel):
 
     elements: list[REElement] = Field(min_length=1, max_length=200)
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)
-    round: int = Field(ge=1)
+    # Bounded, unlike every other integer here, because this one is a loop count:
+    # the endpoint runs one full simulation per round from 1 to this number, so
+    # an unbounded value is a way to ask for arbitrarily much work with a payload
+    # that is otherwise small enough to pass every other check. 500 is far above
+    # any real process — the workflow advances a round at a time, by hand.
+    round: int = Field(ge=1, le=500)
     local: bool = True
     weights: Optional[ModelWeights] = None
 

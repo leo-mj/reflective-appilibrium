@@ -7,6 +7,7 @@ import { quickScore } from "../../utils/simulateRethonClient.js";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { suggestionsUnavailable } from "../../utils/disabledReason.js";
 import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
+import { useBackendCapabilities } from "../../hooks/useBackendCapabilities.js";
 
 /**
  * The ground the header strip is drawn on, pinned to the top of the tab's own
@@ -185,9 +186,17 @@ export function ScoreDeltaBadge({
   weights,
 }) {
   const [delta, setDelta] = useState(null);
+  const { maxElements } = useBackendCapabilities();
+
+  // The question this badge asks is "what would the state *plus this suggestion*
+  // score", so it sends one element more than the state has. At exactly the
+  // server's cap that is one too many: the baseline beside it computes and every
+  // badge 422s. Asking anyway would mean one refused request per card and a
+  // console warning for each, to arrive at the blank badge we can show now.
+  const overCap = maxElements > 0 && state.elements.length + 1 > maxElements;
 
   useEffect(() => {
-    if (baseline == null) return;
+    if (baseline == null || overCap) return;
     let cancelled = false;
     const prefix = type === "principle" ? "P" : "J";
     const maxNum = Math.max(
@@ -218,7 +227,7 @@ export function ScoreDeltaBadge({
     return () => {
       cancelled = true;
     };
-  }, [text, baseline, weights]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [text, baseline, weights, overCap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (delta == null) return null;
 

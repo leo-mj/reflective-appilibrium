@@ -575,7 +575,10 @@ def verify_and_partition(
     for arg in detected:
         result = verify_argument(arg, forms, trim_priority)
         if not result.accepted:
-            logger.info(f"Rejected argument {arg}: {result.reason}")
+            # Up to the colon: "unparseable form: …" goes on to quote the form,
+            # which is model-written and may carry words rather than indices.
+            reason = (result.reason or "").split(":")[0]
+            logger.info(f"Rejected argument {arg}: {reason}")
             rejected += 1
             continue
         trimmed = result.argument
@@ -669,7 +672,7 @@ def parse_added_premises(raw) -> List[AddedPremise]:
             premises.append(AddedPremise.model_validate(item))
         except ValidationError as e:
             logger.warning(
-                f"Skipping malformed added premise at position {i}: {e.error_count()} error(s); {item!r}"
+                f"Skipping malformed added premise at position {i}: {e.error_count()} error(s)."
             )
     return premises
 

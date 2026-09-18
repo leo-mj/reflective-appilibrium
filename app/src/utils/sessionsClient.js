@@ -5,7 +5,8 @@
 
 /** @import { REState } from '../types.js' */
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+import { BACKEND_URL } from "../config.js";
+import { fetchOk } from "./backendError.js";
 
 /**
  * @typedef {Object} SessionMeta
@@ -19,11 +20,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @returns {Promise<SessionMeta[]>} Saved sessions, newest first.
  */
 export async function fetchSessions() {
-  const res = await fetch(`${BACKEND_URL}/api/sessions`);
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Backend error ${res.status}: ${body}`);
-  }
+  const res = await fetchOk(`${BACKEND_URL}/api/sessions`, undefined, "/api/sessions");
   return res.json();
 }
 
@@ -32,11 +29,11 @@ export async function fetchSessions() {
  * @returns {Promise<REState>}
  */
 export async function loadSession(id) {
-  const res = await fetch(`${BACKEND_URL}/api/sessions/${encodeURIComponent(id)}`);
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Backend error ${res.status}: ${body}`);
-  }
+  const res = await fetchOk(
+    `${BACKEND_URL}/api/sessions/${encodeURIComponent(id)}`,
+    undefined,
+    "/api/sessions/{id}",
+  );
   return res.json();
 }
 
@@ -45,14 +42,11 @@ export async function loadSession(id) {
  * @returns {Promise<void>}
  */
 export async function deleteSession(id) {
-  const res = await fetch(
+  await fetchOk(
     `${BACKEND_URL}/api/sessions/${encodeURIComponent(id)}`,
     { method: "DELETE" },
+    "/api/sessions/{id}",
   );
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Backend error ${res.status}: ${body}`);
-  }
 }
 
 /**
@@ -62,14 +56,14 @@ export async function deleteSession(id) {
  * @returns {Promise<SessionMeta>} Metadata for the newly saved session.
  */
 export async function saveSession(state) {
-  const res = await fetch(`${BACKEND_URL}/api/sessions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(state),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Backend error ${res.status}: ${body}`);
-  }
+  const res = await fetchOk(
+    `${BACKEND_URL}/api/sessions`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    },
+    "/api/sessions",
+  );
   return res.json();
 }

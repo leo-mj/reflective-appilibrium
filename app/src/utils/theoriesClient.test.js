@@ -39,7 +39,7 @@ describe("fetchTheorySuggestions", () => {
   it("prod: returns the sample theories, never calls fetch", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: false }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: false, BACKEND_URL: "http://localhost:8000" }));
     const { fetchTheorySuggestions } = await import("./theoriesClient.js");
 
     const result = await fetchTheorySuggestions(aState(), false);
@@ -51,7 +51,7 @@ describe("fetchTheorySuggestions", () => {
   it("dev: honours the sample toggle without calling out", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: true }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: true, BACKEND_URL: "http://localhost:8000" }));
     openaiStub();
     const { fetchTheorySuggestions } = await import("./theoriesClient.js");
 
@@ -65,7 +65,7 @@ describe("fetchTheorySuggestions", () => {
       json: async () => ({ suggestions: [], model: "m" }),
     });
     vi.stubGlobal("fetch", fetchSpy);
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: true }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: true, BACKEND_URL: "http://localhost:8000" }));
     openaiStub();
     const { fetchTheorySuggestions } = await import("./theoriesClient.js");
 
@@ -81,11 +81,16 @@ describe("fetchTheorySuggestions", () => {
       "fetch",
       vi.fn().mockResolvedValue({ ok: false, status: 502, text: async () => "bad" }),
     );
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: true }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: true, BACKEND_URL: "http://localhost:8000" }));
     openaiStub();
     const { fetchTheorySuggestions } = await import("./theoriesClient.js");
 
-    await expect(fetchTheorySuggestions(aState(), false)).rejects.toThrow(/502/);
+    // The message is prose now — the status lives on the error as a property
+    // rather than in the sentence a reader sees.
+    await expect(fetchTheorySuggestions(aState(), false)).rejects.toThrow(/bad/);
+    await expect(fetchTheorySuggestions(aState(), false)).rejects.toMatchObject({
+      status: 502,
+    });
   });
 });
 

@@ -115,6 +115,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleAddElement,
     handleReviseElementText,
     handleAddRelation,
+    handleAddNewArgument,
     handleQuestionnaireSelectAnswer,
     handleRejectElements,
     handleRejectRelations,
@@ -323,6 +324,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onReinstateRel: handleReinstateRelation,
     onAddElement: handleAddElement,
     onAddRelation: handleAddRelation,
+    onAddNewArgument: handleAddNewArgument,
     // The panel is where a collapsed group's members are still spelled out, so
     // it gets the same handles the canvas chips have.
     onToggleGroup: handleToggleGroup,
@@ -357,6 +359,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onWithdrawRequest: handleWithdrawRequest,
     onReinstate: handleReinstateElement,
     onAddRelation: handleAddRelation,
+    onAddNewArgument: handleAddNewArgument,
     onDeleteRelationsByArgId: handleDeleteRelationsByArgId,
     onQuestionnaireSelectAnswer: handleQuestionnaireSelectAnswer,
     recentlyAdded,
@@ -611,6 +614,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           elements={linkableElements(state.elements)}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
+          onAddNewArgument={handleAddNewArgument}
           selected={selected}
           ctrlChain={addBarCtrlChain}
           hideNonEntailsRels={hideNonEntailsRels}

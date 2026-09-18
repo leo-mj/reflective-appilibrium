@@ -34,14 +34,22 @@ describe("fetchSessions", () => {
     expect(options).toBeUndefined();
   });
 
-  it("throws 'Backend error <status>: <body>' on non-OK response", async () => {
+  // The message is written for whoever is looking at the banner, so it is prose
+  // rather than "Backend error 500: ...". The status stays reachable as a
+  // property for anything that wants to branch on it.
+  it("reports a server failure in words, keeping the detail", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(err(500, "Internal error")));
-    await expect(fetchSessions()).rejects.toThrow("Backend error 500: Internal error");
+    await expect(fetchSessions()).rejects.toThrow(/backend failed.*Internal error/i);
   });
 
-  it("includes the exact error body in the thrown message", async () => {
+  it("attaches the status to the error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(err(500, "Internal error")));
+    await expect(fetchSessions()).rejects.toMatchObject({ status: 500 });
+  });
+
+  it("passes a 404's detail through", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(err(404, "Not found")));
-    await expect(fetchSessions()).rejects.toThrow("Backend error 404: Not found");
+    await expect(fetchSessions()).rejects.toThrow("Not found");
   });
 });
 
@@ -69,7 +77,7 @@ describe("loadSession", () => {
 
   it("throws on non-OK response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(err(404, "Session not found")));
-    await expect(loadSession("missing")).rejects.toThrow("Backend error 404: Session not found");
+    await expect(loadSession("missing")).rejects.toThrow("Session not found");
   });
 });
 
@@ -103,8 +111,10 @@ describe("deleteSession", () => {
   });
 
   it("throws on non-OK response", async () => {
+    // 403 is the server declining to lend a key, which reads as a key problem
+    // to the person holding none — not as the word "Forbidden".
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(err(403, "Forbidden")));
-    await expect(deleteSession("abc-123")).rejects.toThrow("Backend error 403: Forbidden");
+    await expect(deleteSession("abc-123")).rejects.toThrow(/No API key configured/);
   });
 });
 
@@ -143,6 +153,6 @@ describe("saveSession", () => {
 
   it("throws on non-OK response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(err(422, "Validation error")));
-    await expect(saveSession(state)).rejects.toThrow("Backend error 422: Validation error");
+    await expect(saveSession(state)).rejects.toThrow("Validation error");
   });
 });

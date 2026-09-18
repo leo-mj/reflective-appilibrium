@@ -16,6 +16,8 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+import anthropic
+import openai
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI, BadRequestError
 
@@ -126,6 +128,15 @@ class LLMConfig:
     base_url: str
     model: str
     max_tokens: int = 4096
+    # Both SDKs default to 600s and two retries, so one slow provider could hold a
+    # request for half an hour. See Settings.llm_timeout.
+    timeout_seconds: float = 600.0
+    max_retries: int = 1
+
+
+# An unreachable host should fail in seconds whatever the total budget, which
+# exists for slow generation, not slow connecting.
+_CONNECT_TIMEOUT_SECONDS = 10.0
 
 
 @dataclass
@@ -151,12 +162,22 @@ class LLMService:
         self.max_tokens = config.max_tokens
         self._anthropic: Optional[AsyncAnthropic] = None
         self._openai: Optional[AsyncOpenAI] = None
+        # Each SDK's own Timeout, never httpx's directly: the SDKs choose their
+        # HTTP library and change it between majors (anthropic 1.x and openai 3.x
+        # moved to httpx2), and reject a Timeout built on a different one.
+        connect = min(_CONNECT_TIMEOUT_SECONDS, config.timeout_seconds)
         if _is_anthropic(config.base_url):
-            self._anthropic = AsyncAnthropic(api_key=config.api_key)
+            self._anthropic = AsyncAnthropic(
+                api_key=config.api_key,
+                timeout=anthropic.Timeout(config.timeout_seconds, connect=connect),
+                max_retries=config.max_retries,
+            )
         else:
             self._openai = AsyncOpenAI(
                 api_key=config.api_key or "placeholder",
                 base_url=config.base_url,
+                timeout=openai.Timeout(config.timeout_seconds, connect=connect),
+                max_retries=config.max_retries,
             )
 
     async def complete(

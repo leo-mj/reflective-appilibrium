@@ -28,6 +28,7 @@ import { AddBar } from "../user_edits/TextTabAddPanel.jsx";
  * @param {REElement[]} props.elements - Elements that may be referenced; see linkableElements.
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
+ * @param {function}    [props.onAddNewArgument]
  * @param {boolean}     [props.hideNonEntailsRels] - Passed through: with plain
  *   relations hidden the bar offers arguments in their place.
  * @param {Object}      [props.preset] - Passed through: what the tab this sits
@@ -37,6 +38,7 @@ export function MobileAddButton({
   elements,
   onAddElement,
   onAddRelation,
+  onAddNewArgument,
   hideNonEntailsRels,
   preset = null,
 }) {
@@ -141,6 +143,7 @@ export function MobileAddButton({
                 elements={elements}
                 onAddElement={onAddElement}
                 onAddRelation={onAddRelation}
+                onAddNewArgument={onAddNewArgument}
                 selected={null}
                 ctrlChain={null}
                 hideNonEntailsRels={hideNonEntailsRels}

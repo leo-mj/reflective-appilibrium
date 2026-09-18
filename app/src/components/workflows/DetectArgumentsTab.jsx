@@ -25,6 +25,7 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { Tooltip } from "../Tooltip.jsx";
@@ -299,6 +300,8 @@ function ArgumentCard({
  * @param {Object}   props
  * @param {REState}  props.state
  * @param {boolean}  [props.useDummy]
+ * @param {boolean}  [props.suggestionsDisabled]  No backend and nothing sample to
+ *   fall back on — the run button is inert and the auto-fetch must not fire.
  * @param {Function} [props.onAddElement]
  * @param {Function} [props.onReviseElementText]  (elementId, text) — rewords an
  *   element already in the state, recorded as a revision.
@@ -308,6 +311,7 @@ function ArgumentCard({
 export function DetectArgumentsTab({
   state,
   useDummy = false,
+  suggestionsDisabled = false,
   verifyArguments = true,
   onAddElement,
   onReviseElementText,
@@ -373,9 +377,13 @@ export function DetectArgumentsTab({
     }
   };
 
+  // The `suggestionsDisabled` guard matches the shape every other phase carries
+  // — this tab was the one without it, so arriving here in a build with no
+  // backend fired a request that could only fail, and did it on arrival rather
+  // than on a press anyone could decline.
   const autoFetchRef = useRef(autoFetch);
   useEffect(() => {
-    if (autoFetchRef.current) detect();
+    if (autoFetchRef.current && !suggestionsDisabled) detect();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAccept = (argIndex, drafts) => {
@@ -563,6 +571,7 @@ export function DetectArgumentsTab({
           </div>
         )}
 
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {result && (

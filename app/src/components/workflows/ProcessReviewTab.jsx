@@ -33,6 +33,7 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { SuggestionToolbar } from "./workflowComponents.jsx";
@@ -417,6 +418,7 @@ export function ProcessReviewTab({
             )
           }
         />
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {state.log.length < 2 && (

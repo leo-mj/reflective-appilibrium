@@ -36,6 +36,7 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { SuggestionToolbar } from "./workflowComponents.jsx";
@@ -344,6 +345,7 @@ export function TheorySuggestTab({
             )
           }
         />
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {principles.length < 1 && (

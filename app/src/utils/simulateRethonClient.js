@@ -5,13 +5,28 @@
 
 /** @import { REState } from '../types.js' */
 
-import { BACKEND_ENABLED } from "../config.js";
+import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
 import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
 import { ARGUMENT_RELATION_TYPES } from "./stateUtils.js";
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+import { backendError } from "./backendError.js";
 
 /**
+ * The console line for a scoring call that failed.
+ *
+ * The two scoring endpoints swallow their failures by design — they decorate,
+ * and a blank badge is the right fallback — so this is the only trace they
+ * leave. Built through `backendError` so the wording matches what a visible
+ * failure would have said.
+ *
+ * @param {Response} res
+ * @param {string} endpoint
+ * @returns {Promise<string>}
+ */
+async function describeScoringFailure(res, endpoint) {
+  const err = await backendError(res, endpoint);
+  return `[${endpoint}] scoring unavailable — ${err.message}`;
+}
+
 /**
  * Advances the step-by-step RE simulation by one step.
  *
@@ -23,12 +38,17 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
  * @param {REState} state
  * @param {boolean} local
  * @param {Array[]|null} evolution  - translated_re_state.evolution from the previous response
+ * @param {Object|null} [weights=null]
+ * @param {number} [neighbourhoodDepth=1]
+ * @param {{signal?: AbortSignal}} [options]  Aborting stops the computation on
+ *   the server too: it watches for the dropped connection and kills the worker.
  * @returns {Promise<{translated_arguments: Array, translated_re_state: Object}>}
  */
-export async function simulateRethonStep(state, local, evolution = null, weights = null, neighbourhoodDepth = 1) {
+export async function simulateRethonStep(state, local, evolution = null, weights = null, neighbourhoodDepth = 1, { signal } = {}) {
   const url = `${BACKEND_URL}/api/simulate_rethon/step`;
   const res = await fetch(url, {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       elements: state.elements,
@@ -42,10 +62,7 @@ export async function simulateRethonStep(state, local, evolution = null, weights
       neighbourhood_depth: neighbourhoodDepth,
     }),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Backend error ${res.status}: ${text}`);
-  }
+  if (!res.ok) throw await backendError(res, url);
   return res.json();
 }
 
@@ -93,10 +110,20 @@ export async function quickScore(elements, relations, weights = null) {
       headers: { "Content-Type": "application/json", ...getLLMHeaders() },
       body: JSON.stringify({ elements, relations, weights }),
     });
-    if (!res.ok) return null;
+    // Still null rather than a throw: this decorates the suggestion cards with a
+    // score badge and fires on every edit, so it must not be able to fail a
+    // render. But null is also what "too few elements to score" looks like, so
+    // without this line a 429 from the scoring bucket or a 422 from the element
+    // cap is indistinguishable from a graph that is simply too small — to the
+    // reader and to whoever is debugging it.
+    if (!res.ok) {
+      console.warn(await describeScoringFailure(res, "quick_score"));
+      return null;
+    }
     const data = await res.json();
     return data.account != null ? { account: data.account, systematicity: data.systematicity } : null;
-  } catch {
+  } catch (e) {
+    console.warn(`[quick_score] ${e.message}`);
     return null;
   }
 }
@@ -114,10 +141,7 @@ export async function scorePerRound(state, local = true, weights = null) {
       weights,
     }),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Backend error ${res.status}: ${text}`);
-  }
+  if (!res.ok) throw await backendError(res, url);
   return res.json();
 }
 
@@ -162,17 +186,27 @@ export async function scoreChanges(state, local = true, weights = null) {
         weights,
       }),
     });
-    if (!res.ok) return null;
+    // Silent for the same reason as quickScore, and logged for the same reason.
+    if (!res.ok) {
+      console.warn(await describeScoringFailure(res, "score_changes"));
+      return null;
+    }
     return res.json();
-  } catch {
+  } catch (e) {
+    console.warn(`[score_changes] ${e.message}`);
     return null;
   }
 }
 
-export async function simulateRethon(state, local, evolution = null, weights = null, neighbourhoodDepth = 1) {
+/**
+ * Runs the RE process to a fixed point, resuming from `evolution` if given.
+ * Takes the same `{ signal }` option as `simulateRethonStep`, to the same effect.
+ */
+export async function simulateRethon(state, local, evolution = null, weights = null, neighbourhoodDepth = 1, { signal } = {}) {
   const url = `${BACKEND_URL}/api/simulate_rethon/simulate`;
   const res = await fetch(url, {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/json", ...getLLMHeaders() },
     body: JSON.stringify({
       elements: state.elements,
@@ -184,10 +218,7 @@ export async function simulateRethon(state, local, evolution = null, weights = n
       neighbourhood_depth: neighbourhoodDepth,
     }),
   });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Backend error ${res.status}: ${body}`);
-  }
+  if (!res.ok) throw await backendError(res, url);
   const data = await res.json();
   accumulateUsage(data);
   return data;

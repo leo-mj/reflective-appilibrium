@@ -13,8 +13,19 @@ import { defineConfig, devices } from "@playwright/test";
  * (app/.env is gitignored, and an unset VITE_APP_ENV disables the same three
  * flags). Without pinning it, a developer whose .env says "backend" would see
  * the Saved-sessions card appear and the assist tabs hit a real API.
+ *
+ * The exception is the `backend` project, which needs what demo turns off: the
+ * Discuss panel exists only in a build with a backend and a saved key. It gets a
+ * second dev server built as "backend", pointed at a backend origin that does
+ * not exist — every call to it is answered by `page.route` in the spec, so a
+ * real server on localhost:8000 is never reached, and neither is any provider.
  */
 const PORT = 5173;
+const BACKEND_BUILD_PORT = 5174;
+export const FAKE_BACKEND = "http://backend.e2e.invalid";
+
+/** Specs that need the backend build rather than the demo. */
+const BACKEND_SPECS = /discuss\.spec\.js/;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -48,7 +59,16 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
       // responsive.spec.js asserts the narrow layout; running it at 1440px
       // would fail on assertions that are only meaningful on a phone.
-      testIgnore: /responsive\.spec\.js/,
+      testIgnore: [/responsive\.spec\.js/, BACKEND_SPECS],
+    },
+    {
+      name: "backend",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+        baseURL: `http://localhost:${BACKEND_BUILD_PORT}/`,
+      },
+      testMatch: BACKEND_SPECS,
     },
     {
       // The narrow layout is a different component tree (AppHeaderNarrow), not
@@ -64,11 +84,22 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: "npm run dev -- --port " + PORT + " --strictPort",
-    url: `http://localhost:${PORT}/`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    env: { VITE_APP_ENV: "demo" },
-  },
+  webServer: [
+    {
+      command: "npm run dev -- --port " + PORT + " --strictPort",
+      url: `http://localhost:${PORT}/`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      env: { VITE_APP_ENV: "demo" },
+    },
+    {
+      // Not reused locally the way the demo server is: a dev server you already
+      // have on this port would carry your own .env, and with it a real backend.
+      command: "npm run dev -- --port " + BACKEND_BUILD_PORT + " --strictPort",
+      url: `http://localhost:${BACKEND_BUILD_PORT}/`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: { VITE_APP_ENV: "backend", VITE_BACKEND_URL: FAKE_BACKEND },
+    },
+  ],
 });

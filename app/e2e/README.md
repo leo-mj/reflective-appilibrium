@@ -35,6 +35,7 @@ and waits for the port, and `reuseExistingServer` is on outside CI, so a
 | `navigation.spec.js` | Analyze tabs, filter chips, search |
 | `persistence.spec.js` | draft resume/discard, export → import round trip |
 | `assist.spec.js` | assist workflow, accepting a suggestion |
+| `discuss.spec.js` | the Discuss panel, against a faked backend — runs only under the `backend` project |
 | `questionnaire.spec.js` | questionnaire mode end to end (skips if no spec present) |
 | `responsive.spec.js` | narrow layout — runs only under the `mobile` project |
 | `a11y.spec.js` | axe-core audit of the composed pages, keyboard reachability |
@@ -49,6 +50,12 @@ and waits for the port, and `reuseExistingServer` is on outside CI, so a
   the backend, the LLM and BYOK. That is what a clean CI checkout gets anyway
   (`app/.env` is gitignored), and it means the assist specs exercise the
   suggestion plumbing against pre-set examples — no API key, no network.
+- **Except where demo cannot reach.** Discuss exists only in a build with a
+  backend and a saved key, so the `backend` project starts a second dev server
+  (port 5174, `VITE_APP_ENV=backend`) whose backend URL is a host that does not
+  exist. The spec answers every call to it with `page.route`, so no real server,
+  key or provider is involved. Add a spec to `BACKEND_SPECS` in
+  `playwright.config.js` only if it needs that build.
 - **Park the mouse before asserting on text.** Playwright leaves the cursor
   where it clicked, and the app opens a tooltip on hover that sits over panel
   headings. `park(page)` moves it out of the way.

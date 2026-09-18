@@ -1,17 +1,19 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
-
-// GitHub Pages serves a project site from /<repo>/, so the production build's
-// asset URLs must be prefixed with the repo name — a mismatch 404s every asset
-// and renders a blank page. Actions sets GITHUB_REPOSITORY to "owner/repo", so
-// deriving it there keeps this correct across repo renames; the literal is only
-// the fallback for a production build run outside CI.
-const repoName = process.env.GITHUB_REPOSITORY?.split("/")[1];
+import { contentSecurityPolicy } from "./vite-plugins/contentSecurityPolicy.js";
+import { basePath } from "./vite-plugins/basePath.js";
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: mode === "production" ? `/${repoName ?? "reflective-appilibrium"}/` : "/",
-  plugins: [react()],
+  // VITE_BASE_PATH if set, else derived for GitHub Pages; see vite-plugins/basePath.js.
+  // Read through loadEnv so a .env file can set it as well as the environment.
+  base: basePath({
+    mode,
+    explicit: loadEnv(mode, process.cwd(), "VITE_").VITE_BASE_PATH,
+    githubRepository: process.env.GITHUB_REPOSITORY,
+  }),
+  // The CSP is written into built pages only; see vite-plugins/contentSecurityPolicy.js.
+  plugins: [react(), contentSecurityPolicy()],
   test: {
     environment: "node",
     // The e2e suite is Playwright's, and it needs a real browser. Vitest's
