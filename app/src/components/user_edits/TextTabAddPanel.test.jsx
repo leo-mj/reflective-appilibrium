@@ -951,7 +951,7 @@ describe("writing an argument out", () => {
     expect(onAddNewArgument).toHaveBeenCalledTimes(1);
     const arg = onAddNewArgument.mock.calls[0][0];
     expect(arg.premises.map(({ type, text }) => [type, text])).toEqual([
-      ["principle", "Lying is wrong."],
+      ["judgment", "Lying is wrong."],
       ["judgment", "Telling Ann X would be lying."],
     ]);
     expect(arg.conclusion).toMatchObject({

@@ -231,9 +231,8 @@ export function makeArgumentDefaults(elements) {
 
 /**
  * A written argument as it starts, and as Clear and a successful add leave it:
- * one premise and the conclusion, each a statement still to be written. A
- * premise opens as a principle and the conclusion as a judgment, the usual
- * shape of one, and either can be changed.
+ * one premise and the conclusion, each a statement still to be written. Both
+ * open as judgments, and either can be changed.
  */
 export const WRITTEN_ARGUMENT_DEFAULTS = Object.freeze({
   premises: [{ type: "judgment", text: "" }],
