@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   assertMergeable,
   mergeStates,
+  previewMerge,
   processesOf,
   processesOfElement,
   processTagMap,
@@ -277,6 +278,27 @@ describe("mergeStates", () => {
   it("does not add a groups key to a state that had none", () => {
     const out = mergeStates(current, process({ elements: [el("J1", "New.")] }));
     expect("groups" in out).toBe(false);
+  });
+});
+
+describe("previewMerge", () => {
+  it("lists the identical elements with the wording they share", () => {
+    const p = previewMerge(
+      current,
+      process({ topic: "Promises", elements: [el("J1", "Keep promises."), el("J7", "Lying is wrong.")] }),
+    );
+    expect(p.label).toBe("Promises");
+    expect(p.added).toBe(1);
+    expect(p.fused).toEqual([{ from: "J7", id: "J1", text: "Lying is wrong." }]);
+  });
+
+  it("describes the merge mergeStates performs", () => {
+    const incoming = process({ elements: [el("J1", "New."), el("P1", "Never deceive.")] });
+    const p = previewMerge(current, incoming);
+    const out = mergeStates(current, incoming);
+    expect(out.elements.length - current.elements.length).toBe(p.added);
+    expect(out.relations.length - current.relations.length).toBe(p.relationsAdded);
+    expect(out.log.at(-1).findings).toContain(`${p.fused[0].from} → ${p.fused[0].id}`);
   });
 });
 

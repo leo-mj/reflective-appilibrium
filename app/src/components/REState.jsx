@@ -126,7 +126,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleDiscardReview,
     handleApplyRethonEquilibrium,
     handleImportFile,
-    handleMergeFile,
+    handlePrepareMerge,
+    handleConfirmMerge,
+    handleMergeElements,
     handleCreateGroup,
     handleToggleGroup,
     handleUngroup,
@@ -360,6 +362,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
   const graphPanelCommonProps = {
     state: viewState,
+    // From the state itself: the Merge tab needs the process record whether or
+    // not the tags drawn from it are showing.
+    processes: state.processes ?? [],
+    onMergeElements: handleMergeElements,
     positions,
     hiddenLegendKeys: effectiveHiddenKeys,
     setHiddenLegendKeys,
@@ -518,7 +524,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onSave={() => saveSession(state)}
         canSaveToServer={capabilities.sessions}
         onImportFile={handleImportFile}
-        onMergeFile={handleMergeFile}
+        onPrepareMerge={handlePrepareMerge}
+        onConfirmMerge={handleConfirmMerge}
         hasExistingState={state.elements.length > 0}
         onHome={onHome}
         isWide={isWide}
@@ -541,6 +548,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         setHideNonEntailsRels={setHideNonEntailsRels}
         showProcessTags={hasMerged ? showProcessTags : null}
         setShowProcessTags={setShowProcessTags}
+        hasMerged={hasMerged}
         verifyArguments={verifyArguments}
         setVerifyArguments={setVerifyArguments}
         weights={weights}

@@ -7,7 +7,12 @@
 
 import { useState, useReducer } from "react";
 import { importStateFromFile } from "../utils/importMarkdown.js";
-import { assertMergeable, mergeStates } from "../utils/mergeStates.js";
+import {
+  assertMergeable,
+  mergeStates,
+  previewMerge,
+} from "../utils/mergeStates.js";
+import { mergeElementPair } from "../utils/elementMerge.js";
 import { useElementActions } from "./useElementActions.js";
 import { useGroupActions } from "./useGroupActions.js";
 import { useRelationActions } from "./useRelationActions.js";
@@ -174,14 +179,44 @@ export function useREActions(initialState) {
   };
 
   /**
-   * Merges a second exported process into this one, as one round. Unlike an
-   * import this is a step *in* the current process, so it is undoable.
+   * Reads a second exported process and says what merging it would do, without
+   * doing it. Throws, with a message for the reader, if it cannot be merged.
+   *
+   * @param {File} file
+   * @returns {Promise<{ incoming: Object, label: string, preview: ReturnType<typeof previewMerge> }>}
    */
-  const handleMergeFile = async (file) => {
+  const handlePrepareMerge = async (file) => {
     const incoming = await importStateFromFile(file);
     assertMergeable(state, incoming);
     const label = file.name.replace(/\.md$/i, "");
+    return { incoming, label, preview: previewMerge(state, incoming, { label }) };
+  };
+
+  /**
+   * Merges a prepared process into this one, as one round. Unlike an import
+   * this is a step *in* the current process, so it is undoable.
+   *
+   * @param {{ incoming: Object, label: string }} prepared - From `handlePrepareMerge`.
+   */
+  const handleConfirmMerge = ({ incoming, label }) => {
     mutate((prev) => mergeStates(prev, incoming, { label }));
+  };
+
+  /**
+   * Merges two elements of a merged process into one, removing `removeId`.
+   * A selection on the removed element, or on one of its relations — which are
+   * replaced by re-pointed copies — would point at nothing, so it is let go.
+   *
+   * @param {{ keepId: string, removeId: string, text: string, confidence: number, reason?: string }} choice
+   */
+  const handleMergeElements = (choice) => {
+    mutate((prev) => mergeElementPair(prev, choice));
+    if (selected === choice.removeId) setSelected(null);
+    if (
+      selectedRel &&
+      (selectedRel.from === choice.removeId || selectedRel.to === choice.removeId)
+    )
+      setSelectedRel(null);
   };
 
   /**
@@ -256,7 +291,9 @@ export function useREActions(initialState) {
     ...groupActions,
     ...reviewActions,
     handleImportFile,
-    handleMergeFile,
+    handlePrepareMerge,
+    handleConfirmMerge,
+    handleMergeElements,
     handleQuestionnaireSelectAnswer,
   };
 }

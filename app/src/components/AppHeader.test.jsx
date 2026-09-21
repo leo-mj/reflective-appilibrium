@@ -139,7 +139,7 @@ describe("merge", () => {
 
   for (const isWide of [true, false]) {
     const layout = isWide ? "wide" : "narrow";
-    const withState = { hasExistingState: true, onMergeFile: noop };
+    const withState = { hasExistingState: true, onPrepareMerge: noop };
 
     it(`is offered in the ${layout} menu when there is a process`, () => {
       render(<AppHeader {...PROPS} {...withState} isWide={isWide} />);
@@ -148,7 +148,7 @@ describe("merge", () => {
     });
 
     it(`stays out of the ${layout} menu with nothing to merge into`, () => {
-      render(<AppHeader {...PROPS} onMergeFile={noop} isWide={isWide} />);
+      render(<AppHeader {...PROPS} onPrepareMerge={noop} isWide={isWide} />);
       openMenu();
       expect(mergeRow()).toBeNull();
     });
@@ -194,20 +194,56 @@ describe("merge", () => {
     });
   }
 
-  it("merges the chosen file without asking to replace anything", async () => {
-    const onMergeFile = vi.fn();
-    render(<AppHeader {...PROPS} hasExistingState onMergeFile={onMergeFile} />);
+  const PREPARED = {
+    incoming: {},
+    label: "other",
+    preview: {
+      label: "Promises",
+      added: 2,
+      relationsAdded: 1,
+      fused: [{ from: "J1", id: "J3", text: "Lying is wrong." }],
+    },
+  };
+  const chooseMergeFile = (props) => {
+    render(<AppHeader {...PROPS} hasExistingState {...props} />);
     const file = new File(["x"], "other.md");
     fireEvent.change(screen.getByTestId("merge-input"), {
       target: { files: [file] },
     });
-    expect(onMergeFile).toHaveBeenCalledWith(file);
+    return file;
+  };
+
+  it("shows what the merge would do, and merges only on confirmation", async () => {
+    const onPrepareMerge = vi.fn().mockResolvedValue(PREPARED);
+    const onConfirmMerge = vi.fn();
+    const file = chooseMergeFile({ onPrepareMerge, onConfirmMerge });
+
+    expect(onPrepareMerge).toHaveBeenCalledWith(file);
+    expect(await screen.findByText("Merge “Promises”?")).not.toBeNull();
+    expect(screen.getByText("Identical elements: 1")).not.toBeNull();
     expect(screen.queryByText("Replace session?")).toBeNull();
+    expect(onConfirmMerge).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    expect(onConfirmMerge).toHaveBeenCalledWith(PREPARED);
+    expect(screen.queryByText("Merge “Promises”?")).toBeNull();
+  });
+
+  it("merges nothing when cancelled", async () => {
+    const onConfirmMerge = vi.fn();
+    chooseMergeFile({
+      onPrepareMerge: vi.fn().mockResolvedValue(PREPARED),
+      onConfirmMerge,
+    });
+    await screen.findByText("Merge “Promises”?");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onConfirmMerge).not.toHaveBeenCalled();
+    expect(screen.queryByText("Merge “Promises”?")).toBeNull();
   });
 
   it("reports a file it could not merge", async () => {
-    const onMergeFile = vi.fn().mockRejectedValue(new Error("Questionnaire sessions cannot be merged."));
-    render(<AppHeader {...PROPS} hasExistingState onMergeFile={onMergeFile} />);
+    const onPrepareMerge = vi.fn().mockRejectedValue(new Error("Questionnaire sessions cannot be merged."));
+    render(<AppHeader {...PROPS} hasExistingState onPrepareMerge={onPrepareMerge} />);
     fireEvent.change(screen.getByTestId("merge-input"), {
       target: { files: [new File(["x"], "q.md")] },
     });

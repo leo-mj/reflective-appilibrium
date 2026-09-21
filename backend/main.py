@@ -29,6 +29,7 @@ from .routers import (
     conversations,
     judgments,
     llm,
+    merge,
     principles,
     relations,
     review,
@@ -101,6 +102,7 @@ app.include_router(arguments.router, dependencies=_gated)
 app.include_router(conversations.router, dependencies=_gated)
 app.include_router(judgments.router, dependencies=_gated)
 app.include_router(llm.router, dependencies=_gated)
+app.include_router(merge.router, dependencies=_gated)
 app.include_router(principles.router, dependencies=_gated)
 app.include_router(relations.router, dependencies=_gated)
 app.include_router(review.router, dependencies=_gated)

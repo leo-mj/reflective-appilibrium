@@ -106,6 +106,11 @@ const ProcessReviewTab = lazy(() =>
     default: m.ProcessReviewTab,
   })),
 );
+const ElementMergeTab = lazy(() =>
+  import("./workflows/ElementMergeTab.jsx").then((m) => ({
+    default: m.ElementMergeTab,
+  })),
+);
 
 const SimulateRethonTab = lazy(() =>
   import("./workflows/SimulateRethonTab.jsx").then((m) => ({
@@ -122,6 +127,8 @@ const QuestionnaireTab = lazy(() =>
 export function GraphPanel({
   tab,
   state,
+  processes = [],
+  onMergeElements,
   positions,
   hiddenLegendKeys,
   setHiddenLegendKeys,
@@ -413,6 +420,19 @@ export function GraphPanel({
               nextPhaseIsEnabled={nextPhaseIsEnabled}
               useDummy={suggestionsAreSample}
               suggestionsAreSample={suggestionsAreSample}
+              suggestionsDisabled={suggestionsDisabled}
+            />
+          </Suspense>
+        )}
+        {tab === "mergeElements" && (
+          <Suspense fallback={null}>
+            {/* Not a phase, and never fetched on arrival: it is asked for once
+                a merge has happened, not every iteration. */}
+            <ElementMergeTab
+              state={state}
+              processes={processes}
+              onMergeElements={onMergeElements}
+              useDummy={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>

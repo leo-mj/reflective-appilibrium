@@ -27,6 +27,7 @@ const SaveIcon = () => (
   </svg>
 );
 import { ModalShell } from "./user_edits/ModalShell.jsx";
+import { MergeModal } from "./user_edits/MergeModal.jsx";
 import {
   ASSIST_TABS,
   SIMULATE_TABS,
@@ -52,10 +53,12 @@ import { C } from "../constants/colors.js";
  * @param {boolean|null} [props.showProcessTags] - Whether the merged-process
  *   letters are drawn; null before any merge, which leaves the row out.
  * @param {function} [props.setShowProcessTags]
+ * @param {boolean} [props.hasMerged] - Offers the Merge assist tab.
  * @param {function} props.onImportFile
- * @param {function} [props.onMergeFile] - Merges a second exported process into
- *   this one; its menu row is offered only when there is a non-questionnaire
- *   process to merge into.
+ * @param {function} [props.onPrepareMerge] - Reads a second exported process and
+ *   resolves to what merging it would do; the Merge row is offered only when
+ *   there is a non-questionnaire process to merge into.
+ * @param {function} [props.onConfirmMerge] - Performs a merge prepared above.
  * @param {boolean}  props.hasExistingState
  * @param {function} props.onHome
  * @param {boolean}  props.isWide
@@ -96,7 +99,8 @@ export function AppHeader({
   onSave,
   canSaveToServer = false,
   onImportFile,
-  onMergeFile,
+  onPrepareMerge,
+  onConfirmMerge,
   hasExistingState,
   onHome,
   isWide,
@@ -116,6 +120,7 @@ export function AppHeader({
   setHideNonEntailsRels,
   showProcessTags = null,
   setShowProcessTags,
+  hasMerged = false,
   verifyArguments,
   setVerifyArguments,
   weights,
@@ -181,10 +186,13 @@ export function AppHeader({
 
   // Merging needs a process to merge into, and a questionnaire has no room for
   // a second one — so the row is only offered where it can succeed.
-  const canMerge = !!onMergeFile && hasExistingState && model !== "questionnaire";
+  const canMerge = !!onPrepareMerge && hasExistingState && model !== "questionnaire";
+  // Reading the file only prepares the merge; nothing changes until the reader
+  // has seen what it would do and said so.
+  const [pendingMerge, setPendingMerge] = useState(null);
   const doMerge = async (file) => {
     try {
-      await onMergeFile(file);
+      setPendingMerge(await onPrepareMerge(file));
     } catch (e) {
       setImportError(e.message);
     }
@@ -199,7 +207,7 @@ export function AppHeader({
       : "analyze";
   // The narrow menu lists all three groups at once, so it needs the predicate
   // rather than the flat list the wide bar renders for the current group.
-  const isTabVisible = tabVisibility({ model, hideNonEntailsRels });
+  const isTabVisible = tabVisibility({ model, hideNonEntailsRels, hasMerged });
   const visibleSubTabs = (
     metaTab === "assist"
       ? ASSIST_TABS
@@ -222,6 +230,16 @@ export function AppHeader({
           }}
           saveLabel="Replace"
           saveDisabled={false}
+        />
+      )}
+      {pendingMerge && (
+        <MergeModal
+          preview={pendingMerge.preview}
+          onCancel={() => setPendingMerge(null)}
+          onConfirm={() => {
+            onConfirmMerge(pendingMerge);
+            setPendingMerge(null);
+          }}
         />
       )}
       {importError && (
@@ -254,8 +272,8 @@ export function AppHeader({
           }
         }}
       />
-      {/* No confirmation, unlike import: a merge replaces nothing, and undo
-          takes it back. */}
+      {/* Confirmed in MergeModal, which says what the merge would do — not
+          the import's "replace?", since a merge replaces nothing. */}
       <input
         ref={mergeInputRef}
         type="file"

@@ -176,8 +176,18 @@ read it through `reviewsOf(state)`, never directly.
 ### Merging processes
 
 **Merge** (☰ → Session) reads a second exported file into the open process —
-`utils/mergeStates.js`, `handleMergeFile` in `useREActions`. Unlike Import it
-replaces nothing and is one undo step.
+`utils/mergeStates.js`. Unlike Import it replaces nothing and is one undo step.
+
+It is two steps, `handlePrepareMerge` and `handleConfirmMerge` in `useREActions`,
+with `MergeModal` between them: before anything changes, the reader sees how much
+the merge adds and which incoming elements are identical to ones here.
+`previewMerge` runs the merge itself to get these, so the preview cannot describe
+a different merge from the one performed.
+
+The modal deliberately does **not** report new conflicts. The merge only copies
+relations, so a tension it could find is one the other process had already drawn
+— never a disagreement between the two that nobody drew — and an empty list would
+read as reassurance it cannot give.
 
 The merge is **one round** of the current process: every incoming item arrives in
 it, as it stands at the end of its own process — withdrawn and rejected items as
@@ -212,6 +222,26 @@ backend's element model forbids unknown fields; the backend drops it on a server
 save, as it does groups, while export/import keeps it. An incoming process that
 was itself a merge keeps its own processes apart under letters of their own.
 Elements added after a merge carry no letter.
+
+**Merging elements.** A process merge fuses only identical wording. The **Merge**
+assist tab (`components/workflows/ElementMergeTab.jsx`, offered only once
+`state.processes` exists, never a workflow phase, never fetched on arrival) asks a
+model for pairs — one element from each of two processes, same type, no process in
+common — that make the *same claim* in different words. `POST /api/merge/pairs`
+(`backend/routers/merge.py`) holds the prompt and drops anything else the model
+returns; a model's say-so never puts a pair on screen. `state.processes` is not in
+the backend's state model, so the client sends it alongside the elements, and the
+tab re-checks each pair with `isMergeablePair` as the state moves on under it.
+Accepting one (`mergeElementPair` in `utils/elementMerge.js`) is one round: the
+reader picks which wording stays, may reword it (recorded as a revision) and sets
+its confidence; the other element is **removed outright**, its relations
+re-pointed at the kept one — loops and duplicates dropped, a joint argument that
+loses a premise retyped — and the kept element joins both processes. Being a
+removal, playback shows the re-pointed relations on the kept element in earlier
+rounds too, and older log entries still name the removed id; that was chosen over
+withdrawing it. Dismissing records nothing.
+
+The demo build and sample mode offer word-overlap pairs (`samplePairs`) instead.
 
 ### State schema
 

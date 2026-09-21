@@ -12,7 +12,7 @@ Tests: `npm test` (Vitest, jsdom) and `npm run test:e2e` (Playwright — see `e2
 
 - `src/App.jsx` — root component
 - `src/components/REState.jsx` — main state management and layout
-- `src/components/workflows/` — JudgmentElicitTab, PrincipleSuggestTab, RelationSuggestTab, ProcessReviewTab, QuestionnaireTab
+- `src/components/workflows/` — JudgmentElicitTab, PrincipleSuggestTab, RelationSuggestTab, ProcessReviewTab, QuestionnaireTab, ElementMergeTab (after a merge only; see the root CLAUDE.md)
 - `src/utils/` — LLM client, workflow utilities, state utilities
 - `src/state.js`, `types.js`, `config.js` — app state and config
 - `src/constants/colors.js` — `C` object with all viz colors

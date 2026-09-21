@@ -4,7 +4,9 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
 
 ## Key files
 - `main.py` — FastAPI entry point
-- `routers/` — judgments, principles, relations, arguments, review, theories, conversations, sessions, simulate_rethon, llm
+- `routers/` — judgments, principles, relations, arguments, review, theories, merge, conversations, sessions, simulate_rethon, llm
+  (`merge` pairs elements of merged processes; the process record is sent with
+  the request, since it is not part of `REState`)
 - `services/llm.py` — LLM service layer
 - `services/crossref.py` — reference checking for the theories router
 - `models/re_state.py` — Pydantic state schema
