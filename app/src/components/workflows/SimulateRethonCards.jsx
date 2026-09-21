@@ -5,6 +5,7 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -156,10 +157,30 @@ export function ScoreRow({ scores, highlight = false, stepType = null }) {
   const fmt = (v) => v.toFixed(3);
   const ACCENT = C.principle.accent;
   const allEntries = [
-    { key: "z", label: "Z-Score", value: scores.z, color: highlight ? ACCENT : C.dim },
-    { key: "account", label: "Account", value: scores.account, color: C.judgment.accent },
-    { key: "systematicity", label: "Systematicity", value: scores.systematicity, color: C.principle.accent },
-    { key: "faithfulness", label: "Faithfulness", value: scores.faithfulness, color: C.theory.accent },
+    {
+      key: "z",
+      label: "Z-Score",
+      value: scores.z,
+      color: highlight ? ACCENT : C.dim,
+    },
+    {
+      key: "account",
+      label: "Account",
+      value: scores.account,
+      color: C.judgment.accent,
+    },
+    {
+      key: "systematicity",
+      label: "Systematicity",
+      value: scores.systematicity,
+      color: C.principle.accent,
+    },
+    {
+      key: "faithfulness",
+      label: "Faithfulness",
+      value: scores.faithfulness,
+      color: C.theory.accent,
+    },
   ];
   const entries = allEntries.filter(({ key }) => {
     if (!stepType) return true;
@@ -168,11 +189,21 @@ export function ScoreRow({ scores, highlight = false, stepType = null }) {
     return true;
   });
   return (
-    <div style={{ display: "flex", gap: 10, fontSize: 11, color: C.dim, flexWrap: "wrap" }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 10,
+        fontSize: 11,
+        color: C.dim,
+        flexWrap: "wrap",
+      }}
+    >
       {entries.map(({ label, value, color }) => (
         <span key={label}>
           <span style={{ color, fontWeight: "bold" }}>{label}</span>{" "}
-          <span style={{ color: highlight ? C.text : C.dim }}>{fmt(value)}</span>
+          <span style={{ color: highlight ? C.text : C.dim }}>
+            {fmt(value)}
+          </span>
         </span>
       ))}
     </div>
@@ -209,22 +240,25 @@ export function EvolutionStep({ step, stepType, position, scores }) {
       >
         {step}
       </span>
-      <span
-        title={isCommitments ? "Commitments position" : "Theory position"}
-        style={{
-          color: typeTextColor,
-          border: `1px solid ${typeColor}`,
-          borderRadius: 3,
-          padding: "0 4px",
-          fontSize: 10,
-          fontWeight: "bold",
-          lineHeight: "17px",
-          flexShrink: 0,
-          opacity: 0.75,
-        }}
+      <Tooltip
+        text={isCommitments ? "Commitments position" : "Theory position"}
       >
-        {typeLabel}
-      </span>
+        <span
+          style={{
+            color: typeTextColor,
+            border: `1px solid ${typeColor}`,
+            borderRadius: 3,
+            padding: "0 4px",
+            fontSize: 10,
+            fontWeight: "bold",
+            lineHeight: "17px",
+            flexShrink: 0,
+            opacity: 0.75,
+          }}
+        >
+          {typeLabel}
+        </span>
+      </Tooltip>
       <div style={{ flex: 1 }}>
         <div
           style={{

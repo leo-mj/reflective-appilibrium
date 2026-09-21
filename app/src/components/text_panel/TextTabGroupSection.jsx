@@ -20,6 +20,7 @@ import {
 } from "../../constants/textTabStyles.js";
 import { Ctx } from "./TextTabContext.js";
 import { Badge, Highlight, SectionHeader } from "./TextTabCards.jsx";
+import { Tooltip } from "../Tooltip.jsx";
 
 /**
  * A group's name, and the way to select it.
@@ -164,22 +165,23 @@ export function GroupSection({
                     <span style={{ minWidth: 0, flex: 1 }}>
                       <Highlight text={el.text} query={search} />
                     </span>
-                    <button
-                      onClick={() => onRemoveFromGroup?.(id)}
-                      aria-label={`Remove ${id} from ${g.label}`}
-                      title={`Remove ${id} from ${g.label}`}
-                      className="tap-target-square"
-                      style={{
-                        ...GHOST_BTN_STYLE,
-                        border: "none",
-                        padding: "0 6px",
-                        fontSize: 14,
-                        lineHeight: 1,
-                        flexShrink: 0,
-                      }}
-                    >
-                      ×
-                    </button>
+                    <Tooltip text={`Remove ${id} from ${g.label}`}>
+                      <button
+                        onClick={() => onRemoveFromGroup?.(id)}
+                        aria-label={`Remove ${id} from ${g.label}`}
+                        className="tap-target-square"
+                        style={{
+                          ...GHOST_BTN_STYLE,
+                          border: "none",
+                          padding: "0 6px",
+                          fontSize: 14,
+                          lineHeight: 1,
+                          flexShrink: 0,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </Tooltip>
                   </div>
                 );
               })}

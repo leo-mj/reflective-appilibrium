@@ -10,6 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { fetchJudgmentElicitations } from "../../utils/judgmentsClient.js";
 import { llmOrigin } from "../../utils/stateUtils.js";
 import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
@@ -25,10 +26,7 @@ import {
   NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
-import {
-  ScoreDeltaBadge,
-  SuggestionToolbar,
-} from "./workflowComponents.jsx";
+import { ScoreDeltaBadge, SuggestionToolbar } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
 
@@ -113,24 +111,25 @@ function SuggestionCard({
                 transition: "background 0.12s",
               }}
             >
-              <span
-                title={confidenceLabel(j.confidence).title}
-                style={{
-                  fontSize: 10,
-                  lineHeight: 1,
-                  color: C.judgment.text,
-                  border: `1px solid ${C.judgment.accent}`,
-                  borderRadius: 4,
-                  padding: "3px 6px",
-                  flexShrink: 0,
-                  marginTop: 3,
-                  width: "7em",
-                  textAlign: "center",
-                  display: "inline-block",
-                }}
-              >
-                {confidenceLabel(j.confidence).text}
-              </span>
+              <Tooltip text={confidenceLabel(j.confidence).title}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    lineHeight: 1,
+                    color: C.judgment.text,
+                    border: `1px solid ${C.judgment.accent}`,
+                    borderRadius: 4,
+                    padding: "3px 6px",
+                    flexShrink: 0,
+                    marginTop: 3,
+                    width: "7em",
+                    textAlign: "center",
+                    display: "inline-block",
+                  }}
+                >
+                  {confidenceLabel(j.confidence).text}
+                </span>
+              </Tooltip>
               {isEditing ? (
                 <ModifyTextarea
                   value={editing.draft}

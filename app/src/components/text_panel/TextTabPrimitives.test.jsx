@@ -10,7 +10,9 @@ import {
   ActionButtons,
   Badge,
   StatusLabel,
-  AddedRound,
+  StatusField,
+  StatField,
+  DeltaBar,
   HistoryRoundBanner,
 } from "./TextTabPrimitives.jsx";
 
@@ -22,14 +24,22 @@ const labels = (c) =>
 describe("ActionButtons", () => {
   it("offers withdraw, not reinstate, for an item in play", () => {
     const { container } = render(
-      <ActionButtons onRevise={() => {}} onWithdraw={() => {}} onReinstate={null} />,
+      <ActionButtons
+        onRevise={() => {}}
+        onWithdraw={() => {}}
+        onReinstate={null}
+      />,
     );
     expect(labels(container)).toEqual(["Revise", "Withdraw"]);
   });
 
   it("offers reinstate, not withdraw, for one that is out", () => {
     const { container } = render(
-      <ActionButtons onRevise={() => {}} onWithdraw={null} onReinstate={() => {}} />,
+      <ActionButtons
+        onRevise={() => {}}
+        onWithdraw={null}
+        onReinstate={() => {}}
+      />,
     );
     expect(labels(container)).toEqual(["Revise", "Reinstate"]);
   });
@@ -169,19 +179,91 @@ describe("Badge", () => {
   });
 });
 
-describe("AddedRound", () => {
-  it("names the round the item first appeared in", () => {
-    const { container } = render(<AddedRound round={4} />);
-    expect(container.textContent).toBe("Added: Round 4");
+describe("StatField", () => {
+  it("writes the caption over the value", () => {
+    const { container } = render(
+      <StatField label="Confidence">Moderate</StatField>,
+    );
+    const field = container.querySelector("[data-stat]");
+    expect(field.firstElementChild.textContent).toBe("Confidence");
+    expect(field.lastElementChild.textContent).toBe("Moderate");
+    // Upper-cased in CSS, so the DOM keeps the word a test or a copied
+    // selection reads.
+    expect(field.firstElementChild.style.textTransform).toBe("uppercase");
   });
 
-  it("renders nothing when the round is missing", () => {
-    // Hand-written and older states are allowed to omit it.
-    for (const round of [undefined, null, 0]) {
-      const { container } = render(<AddedRound round={round} />);
+  it("holds the value to one line, the columns being what lines up", () => {
+    const { container } = render(<StatField label="Origin">user</StatField>);
+    const value = container.querySelector("[data-stat]").lastElementChild;
+    expect(value.style.whiteSpace).toBe("nowrap");
+    expect(value.style.textOverflow).toBe("ellipsis");
+  });
+
+  it("lets a set of chips wrap instead", () => {
+    const { container } = render(
+      <StatField label="Covers" wrap>
+        <span>J5</span>
+      </StatField>,
+    );
+    const value = container.querySelector("[data-stat]").lastElementChild;
+    expect(value.style.flexWrap).toBe("wrap");
+    expect(value.style.whiteSpace).toBe("");
+  });
+});
+
+describe("StatusField", () => {
+  it("names and dates the last event", () => {
+    const { container } = render(
+      <StatusField tag={{ type: "withdrawn", round: 5 }} />,
+    );
+    expect(container.querySelector("[data-stat]").dataset.stat).toBe("Status");
+    expect(container.textContent).toBe("StatusWithdrawn · Round 5");
+  });
+
+  it("omits the round when nothing recorded it", () => {
+    const { container } = render(<StatusField tag={{ type: "revised" }} />);
+    expect(container.textContent).toBe("StatusRevised");
+  });
+
+  it("renders nothing for an item nothing has happened to", () => {
+    for (const tag of [null, undefined, { type: "teleported" }]) {
+      const { container } = render(<StatusField tag={tag} />);
       expect(container.textContent).toBe("");
       cleanup();
     }
+  });
+});
+
+describe("DeltaBar", () => {
+  const width = (container) =>
+    container.querySelector('[aria-hidden="true"]').firstElementChild.style
+      .width;
+
+  it("draws the magnitude against the scale it is given", () => {
+    const { container } = render(
+      <DeltaBar
+        label="Account"
+        value={-0.048}
+        text="-0.048"
+        scale={0.2}
+        color="#000"
+      />,
+    );
+    expect(container.textContent).toBe("Account-0.048");
+    expect(width(container)).toBe("24%");
+  });
+
+  it("caps a value past the top of the scale rather than overflowing", () => {
+    const { container } = render(
+      <DeltaBar
+        label="Account"
+        value={-2.5}
+        text="-2.500"
+        scale={0.2}
+        color="#000"
+      />,
+    );
+    expect(width(container)).toBe("100%");
   });
 });
 
@@ -233,7 +315,9 @@ describe("StatusLabel", () => {
   });
 
   it("dates the status when the round is known", () => {
-    const { container } = render(<StatusLabel tag={{ type: "withdrawn", round: 5 }} />);
+    const { container } = render(
+      <StatusLabel tag={{ type: "withdrawn", round: 5 }} />,
+    );
     expect(container.textContent).toBe("withdrawn · Round 5");
   });
 

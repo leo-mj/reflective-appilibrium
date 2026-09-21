@@ -8,6 +8,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { SpinnerIcon } from "../Icons.jsx";
 import {
   simulateRethon,
@@ -360,34 +361,38 @@ export function SimulateRethonTab({
                     ? "Next Step"
                     : "Step";
               return (
-                <button
-                  onClick={step}
-                  disabled={stepDisabled}
-                  title={
+                <Tooltip
+                  wrap
+                  text={
                     stepFinished
                       ? "The RE process has reached a fixed point"
                       : stepPending
                         ? "Accept or reject this step first"
-                        : undefined
+                        : ""
                   }
-                  style={{
-                    background: "transparent",
-                    border: `1px solid ${stepDisabled ? C.border : ACCENT}`,
-                    color: stepDisabled ? C.dim : ACCENT_TEXT,
-                    borderRadius: 6,
-                    padding: "5px 12px",
-                    fontSize: 12,
-                    fontWeight: "bold",
-                    cursor: stepDisabled ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 2,
-                    flexShrink: 0,
-                  }}
                 >
-                  {loadingMode === "step" ? <SpinnerIcon /> : <span>→</span>}
-                  {stepLabel}
-                </button>
+                  <button
+                    onClick={step}
+                    disabled={stepDisabled}
+                    style={{
+                      background: "transparent",
+                      border: `1px solid ${stepDisabled ? C.border : ACCENT}`,
+                      color: stepDisabled ? C.dim : ACCENT_TEXT,
+                      borderRadius: 6,
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: "bold",
+                      cursor: stepDisabled ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {loadingMode === "step" ? <SpinnerIcon /> : <span>→</span>}
+                    {stepLabel}
+                  </button>
+                </Tooltip>
               );
             })()}
 

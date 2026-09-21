@@ -22,6 +22,7 @@
 import { useState } from "react";
 
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { ARGUMENT_GLOSS } from "../../constants/glosses.js";
 import { inkWeight } from "../../constants/palettes.js";
 import { useAddBarSize } from "../../hooks/useAddBarSize.js";
@@ -452,21 +453,22 @@ export function AddBar({
   );
 
   const clearButton = (
-    <button
-      onClick={handleClear}
-      // Named for what it clears, as the submit button is: which tab is lit is
-      // the only thing saying what either of them acts on.
-      aria-label={`Clear ${tab}`}
-      title="Start this tab over"
-      style={{
-        ...ghostBtn(size),
-        marginLeft: "auto",
-        flexShrink: 0,
-        ...(roomy ? { minHeight: 44 } : null),
-      }}
-    >
-      Clear
-    </button>
+    <Tooltip text="Start this tab over">
+      <button
+        onClick={handleClear}
+        // Named for what it clears, as the submit button is: which tab is lit is
+        // the only thing saying what either of them acts on.
+        aria-label={`Clear ${tab}`}
+        style={{
+          ...ghostBtn(size),
+          marginLeft: "auto",
+          flexShrink: 0,
+          ...(roomy ? { minHeight: 44 } : null),
+        }}
+      >
+        Clear
+      </button>
+    </Tooltip>
   );
 
   /**
@@ -478,20 +480,21 @@ export function AddBar({
    * worse way of closing it.
    */
   const minimiseButton = (
-    <button
-      onClick={toggleCollapsed}
-      aria-expanded
-      aria-label="Minimise the add bar"
-      title="Fold the add bar away — whatever is above it takes the room"
-      style={{
-        ...ghostBtn(size),
-        flexShrink: 0,
-        // Squared off: picker padding around a single glyph leaves a sliver.
-        padding: "3px 8px",
-      }}
-    >
-      ▾
-    </button>
+    <Tooltip text="Fold the add bar away — whatever is above it takes the room">
+      <button
+        onClick={toggleCollapsed}
+        aria-expanded
+        aria-label="Minimise the add bar"
+        style={{
+          ...ghostBtn(size),
+          flexShrink: 0,
+          // Squared off: picker padding around a single glyph leaves a sliver.
+          padding: "3px 8px",
+        }}
+      >
+        ▾
+      </button>
+    </Tooltip>
   );
 
   // Folded away: the bar gives its height back to whatever is above it and
@@ -523,49 +526,50 @@ export function AddBar({
           display: "flex",
         }}
       >
-        <button
-          onClick={toggleCollapsed}
-          aria-expanded={false}
-          title="Bring the add bar back"
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            // The strip's own row, padded to the bar's own left and right edges
-            // so the chevron lands where the minimise button stood.
-            padding: "4px 16px",
-            minHeight: 32,
-            background: "transparent",
-            border: "none",
-            color: C.dim,
-            font: "inherit",
-            fontSize: 12,
-            textAlign: "left",
-            cursor: "pointer",
-          }}
-        >
-          Show add bar
-          {/* Which tab it is folded on: the one thing worth knowing before
-              deciding to open it, and part of the name for the same reason. */}
-          <span style={{ opacity: 0.75 }}>· {tab}</span>
-          <span
-            aria-hidden="true"
+        <Tooltip text="Bring the add bar back">
+          <button
+            onClick={toggleCollapsed}
+            aria-expanded={false}
             style={{
-              ...ghostBtn(size),
-              padding: "3px 8px",
-              // Out to the corner the ▾ was in. Decoration inside the button
-              // rather than a button of its own: the whole line already answers
-              // a click, and a second target inside the first would only be a
-              // smaller way of doing the same thing.
-              marginLeft: "auto",
-              flexShrink: 0,
-              cursor: "inherit",
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              // The strip's own row, padded to the bar's own left and right edges
+              // so the chevron lands where the minimise button stood.
+              padding: "4px 16px",
+              minHeight: 32,
+              background: "transparent",
+              border: "none",
+              color: C.dim,
+              font: "inherit",
+              fontSize: 12,
+              textAlign: "left",
+              cursor: "pointer",
             }}
           >
-            ▴
-          </span>
-        </button>
+            Show add bar
+            {/* Which tab it is folded on: the one thing worth knowing before
+              deciding to open it, and part of the name for the same reason. */}
+            <span style={{ opacity: 0.75 }}>· {tab}</span>
+            <span
+              aria-hidden="true"
+              style={{
+                ...ghostBtn(size),
+                padding: "3px 8px",
+                // Out to the corner the ▾ was in. Decoration inside the button
+                // rather than a button of its own: the whole line already answers
+                // a click, and a second target inside the first would only be a
+                // smaller way of doing the same thing.
+                marginLeft: "auto",
+                flexShrink: 0,
+                cursor: "inherit",
+              }}
+            >
+              ▴
+            </span>
+          </button>
+        </Tooltip>
       </div>
     );
   }
@@ -645,36 +649,37 @@ export function AddBar({
             ...(roomy ? { flexBasis: "100%" } : { flexShrink: 0 }),
           }}
         >
-          <button
-            disabled={!canSubmit}
-            onClick={handleSubmit}
-            // Named in full for anyone who cannot see which tab is lit. The
-            // visible "Add" is inside it, as WCAG 2.5.3 asks of any control
-            // whose label is shorter than its accessible name.
-            aria-label={`Add ${tab}`}
-            title={`Add ${tab} — ⌘/Ctrl + Enter`}
-            {...ACCENT_MARKER}
-            style={{
-              // The auto margin is what holds it to the right of the strip. It
-              // leads the row here, so it starts at the left edge everything
-              // below it lines up against.
-              marginLeft: roomy ? 0 : "auto",
-              padding: roomy ? "11px 18px" : "3px 14px",
-              minHeight: roomy ? 44 : undefined,
-              borderRadius: 4,
-              fontSize: roomy ? 15 : 12,
-              fontWeight: fillWeight,
-              cursor: canSubmit ? "pointer" : "default",
-              border: "none",
-              background: C.supports,
-              color: fillInk,
-              opacity: canSubmit ? 1 : 0.4,
-            }}
-          >
-            {/* Just "Add": the lit tab is what says what is being added, so
+          <Tooltip text={`Add ${tab} — ⌘/Ctrl + Enter`}>
+            <button
+              disabled={!canSubmit}
+              onClick={handleSubmit}
+              // Named in full for anyone who cannot see which tab is lit. The
+              // visible "Add" is inside it, as WCAG 2.5.3 asks of any control
+              // whose label is shorter than its accessible name.
+              aria-label={`Add ${tab}`}
+              {...ACCENT_MARKER}
+              style={{
+                // The auto margin is what holds it to the right of the strip. It
+                // leads the row here, so it starts at the left edge everything
+                // below it lines up against.
+                marginLeft: roomy ? 0 : "auto",
+                padding: roomy ? "11px 18px" : "3px 14px",
+                minHeight: roomy ? 44 : undefined,
+                borderRadius: 4,
+                fontSize: roomy ? 15 : 12,
+                fontWeight: fillWeight,
+                cursor: canSubmit ? "pointer" : "default",
+                border: "none",
+                background: C.supports,
+                color: fillInk,
+                opacity: canSubmit ? 1 : 0.4,
+              }}
+            >
+              {/* Just "Add": the lit tab is what says what is being added, so
                 repeating it here only costs the tabs room on the line. */}
-            Add
-          </button>
+              Add
+            </button>
+          </Tooltip>
           {/* On the phone it shares this line, at the far end of it — a row of
               its own for one button was a waste of a screen that has none to
               spare, and opposite ends of a row is distance enough. On a wide
@@ -815,54 +820,55 @@ export function AddBar({
                         { l: "M", v: 0.67, name: "Moderate" },
                         { l: "H", v: 1.0, name: "High" },
                       ].map(({ l, v, name }) => (
-                        <button
-                          key={l}
-                          type="button"
-                          onClick={() => setEl("confidence", v)}
-                          aria-label={`${name} confidence`}
-                          title={`${name} confidence`}
-                          aria-pressed={
-                            Math.abs(elementForm.confidence - v) < 0.01
-                          }
-                          style={{
-                            ...box,
-                            // Single letters, so they are squared off rather
-                            // than left as the slivers picker padding makes.
-                            padding: roomy ? 0 : "3px 7px",
-                            minWidth: roomy ? 38 : undefined,
-                            background:
+                        <Tooltip key={l} text={`${name} confidence`}>
+                          <button
+                            type="button"
+                            onClick={() => setEl("confidence", v)}
+                            aria-label={`${name} confidence`}
+                            aria-pressed={
                               Math.abs(elementForm.confidence - v) < 0.01
-                                ? C.border
-                                : "transparent",
-                            fontWeight:
-                              Math.abs(elementForm.confidence - v) < 0.01
-                                ? "bold"
-                                : "normal",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {l}
-                        </button>
+                            }
+                            style={{
+                              ...box,
+                              // Single letters, so they are squared off rather
+                              // than left as the slivers picker padding makes.
+                              padding: roomy ? 0 : "3px 7px",
+                              minWidth: roomy ? 38 : undefined,
+                              background:
+                                Math.abs(elementForm.confidence - v) < 0.01
+                                  ? C.border
+                                  : "transparent",
+                              fontWeight:
+                                Math.abs(elementForm.confidence - v) < 0.01
+                                  ? "bold"
+                                  : "normal",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {l}
+                          </button>
+                        </Tooltip>
                       ))}
-                      <input
-                        type="number"
-                        aria-label="Confidence, 0 to 1"
-                        title="Or any value between 0 and 1"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={elementForm.confidence}
-                        onChange={(e) => {
-                          const v = parseFloat(e.target.value);
-                          if (!Number.isNaN(v))
-                            setEl("confidence", Math.max(0, Math.min(1, v)));
-                        }}
-                        // The spinner is worth its width on a mouse and nothing
-                        // at all under a thumb, where it was crowding the value
-                        // it steps out of the field altogether.
-                        className={roomy ? "no-spinner" : undefined}
-                        style={{ ...box, width: roomy ? 72 : 55 }}
-                      />
+                      <Tooltip text="Or any value between 0 and 1">
+                        <input
+                          type="number"
+                          aria-label="Confidence, 0 to 1"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={elementForm.confidence}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            if (!Number.isNaN(v))
+                              setEl("confidence", Math.max(0, Math.min(1, v)));
+                          }}
+                          // The spinner is worth its width on a mouse and nothing
+                          // at all under a thumb, where it was crowding the value
+                          // it steps out of the field altogether.
+                          className={roomy ? "no-spinner" : undefined}
+                          style={{ ...box, width: roomy ? 72 : 55 }}
+                        />
+                      </Tooltip>
                     </span>
                   </Field>
                 </span>
@@ -933,23 +939,24 @@ export function AddBar({
                   ].map(({ mode, label, title }, i) => {
                     const on = argumentMode === mode;
                     return (
-                      <button
-                        key={mode}
-                        type="button"
-                        aria-pressed={on}
-                        title={title}
-                        onClick={() => setArgumentMode(mode)}
-                        style={{
-                          ...ghost,
-                          borderRadius: i === 0 ? "4px 0 0 4px" : "0 4px 4px 0",
-                          marginLeft: i === 0 ? 0 : -1,
-                          background: on ? C.border : "transparent",
-                          color: on ? C.text : C.dim,
-                          fontWeight: on ? "bold" : "normal",
-                        }}
-                      >
-                        {label}
-                      </button>
+                      <Tooltip key={mode} text={title}>
+                        <button
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setArgumentMode(mode)}
+                          style={{
+                            ...ghost,
+                            borderRadius:
+                              i === 0 ? "4px 0 0 4px" : "0 4px 4px 0",
+                            marginLeft: i === 0 ? 0 : -1,
+                            background: on ? C.border : "transparent",
+                            color: on ? C.text : C.dim,
+                            fontWeight: on ? "bold" : "normal",
+                          }}
+                        >
+                          {label}
+                        </button>
+                      </Tooltip>
                     );
                   })}
                 </span>

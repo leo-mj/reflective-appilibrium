@@ -110,7 +110,7 @@ export const TAB_LABELS = {
   suggestRelations: "Relations",
   suggestTheories: "Theories",
   processReview: "Review",
-  mergeElements: "Merge",
+  mergeElements: "Merge Elements",
   simulateRethon: "Simulate",
 };
 

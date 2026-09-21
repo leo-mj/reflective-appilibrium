@@ -205,7 +205,9 @@ function ArgumentCard({
           element={p}
           isAdded={addedIds.has(p.id)}
           draft={editingDrafts?.[p.id]}
-          onDraftChange={isEditing ? (text) => onModifyChange(p.id, text) : null}
+          onDraftChange={
+            isEditing ? (text) => onModifyChange(p.id, text) : null
+          }
         />
       ))}
       <div
@@ -486,7 +488,8 @@ export function DetectArgumentsTab({
   const disabled = loading || activeCount < 3;
   const why = suggestionsUnavailable({
     loading,
-    needs: activeCount < 3 ? "Add at least three active elements first." : undefined,
+    needs:
+      activeCount < 3 ? "Add at least three active elements first." : undefined,
   });
 
   return (
@@ -504,7 +507,11 @@ export function DetectArgumentsTab({
           <div style={{ fontSize: 12, lineHeight: 1.5 }}>
             <span
               {...header.marker}
-              style={{ ...header.badge, color: header.ink, fontWeight: header.weight }}
+              style={{
+                ...header.badge,
+                color: header.ink,
+                fontWeight: header.weight,
+              }}
             >
               Detect Arguments
             </span>
@@ -520,11 +527,12 @@ export function DetectArgumentsTab({
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <Tooltip text={sendsToLlmText()}>
+            {/* As in SuggestionToolbar: the reason it cannot run, or what
+                running sends — one tooltip either way. */}
+            <Tooltip text={why || sendsToLlmText()} wrap>
               <button
                 onClick={detect}
                 disabled={disabled}
-                title={why}
                 style={{
                   background: "transparent",
                   ...(disabled ? {} : header.badge),

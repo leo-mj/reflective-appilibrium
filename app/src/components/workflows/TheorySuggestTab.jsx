@@ -29,6 +29,7 @@ import { fetchTheorySuggestions } from "../../utils/theoriesClient.js";
 import { llmOrigin } from "../../utils/stateUtils.js";
 import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
 import { Citation, CITATION_CAVEAT } from "../Citation.jsx";
+import { Tooltip } from "../Tooltip.jsx";
 import {
   AcceptButton,
   RejectButton,
@@ -57,7 +58,8 @@ const VERIFICATION = {
   matched: {
     label: "found in Crossref",
     color: C.supports,
-    title: "A work with these details exists. Whether it says what is claimed here is not checked.",
+    title:
+      "A work with these details exists. Whether it says what is claimed here is not checked.",
   },
   not_found: {
     label: "not found in Crossref",
@@ -101,7 +103,8 @@ function Sources({ sources, onRemove }) {
         Sources
       </div>
       {sources.map((source, i) => {
-        const state = VERIFICATION[source.verification] ?? VERIFICATION.unchecked;
+        const state =
+          VERIFICATION[source.verification] ?? VERIFICATION.unchecked;
         return (
           <div
             key={i}
@@ -116,33 +119,34 @@ function Sources({ sources, onRemove }) {
           >
             <div style={{ flex: 1 }}>
               <Citation source={source} />{" "}
-              <span title={state.title} style={{ color: state.color, whiteSpace: "nowrap" }}>
-                · {state.label}
-              </span>
+              <Tooltip text={state.title}>
+                <span style={{ color: state.color, whiteSpace: "nowrap" }}>
+                  · {state.label}
+                </span>
+              </Tooltip>
             </div>
             {onRemove && (
-              // Named directly rather than through `Tooltip`, which leaves a
-              // trigger with visible text alone so as not to override what is on
-              // screen (WCAG 2.5.3). "×" is a symbol rather than a text label,
-              // so it has nothing to preserve — the same case as the "+" in
-              // SectionHeader, which names itself the same way.
-              <button
-                onClick={() => onRemove(i)}
-                aria-label="Remove this reference"
-                title="Remove this reference"
-                className="tap-target-square"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: C.dim,
-                  cursor: "pointer",
-                  fontSize: 13,
-                  lineHeight: 1,
-                  flexShrink: 0,
-                }}
-              >
-                ×
-              </button>
+              // `aria-label` is kept beside the tooltip rather than left to it:
+              // Tooltip only names a trigger that has no visible text of its
+              // own, and "×" counts as text to it.
+              <Tooltip text="Remove this reference">
+                <button
+                  onClick={() => onRemove(i)}
+                  aria-label="Remove this reference"
+                  className="tap-target-square"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: C.dim,
+                    cursor: "pointer",
+                    fontSize: 13,
+                    lineHeight: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  ×
+                </button>
+              </Tooltip>
             )}
           </div>
         );
@@ -194,12 +198,24 @@ function SuggestionCard({
             accentColor={C.theory.accent}
           />
         ) : (
-          <div style={{ flex: 1, fontWeight: "bold", color: C.text, lineHeight: 1.5 }}>
+          <div
+            style={{
+              flex: 1,
+              fontWeight: "bold",
+              color: C.text,
+              lineHeight: 1.5,
+            }}
+          >
             {suggestion.text}
           </div>
         )}
         <div
-          style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            flexShrink: 0,
+          }}
         >
           <AcceptButton onClick={onAccept} accentColor={C.theory.accent} />
           <RejectButton onClick={onReject} />
@@ -210,7 +226,10 @@ function SuggestionCard({
           )}
         </div>
       </div>
-      <Sources sources={sources} onRemove={isEditing ? onRemoveSource : undefined} />
+      <Sources
+        sources={sources}
+        onRemove={isEditing ? onRemoveSource : undefined}
+      />
     </div>
   );
 }
@@ -251,7 +270,10 @@ export function TheorySuggestTab({
   // phase runs after the one that suggests them; with nothing to bear on there
   // is nothing for one to do.
   const principles = state.elements.filter(
-    (e) => e.status !== "withdrawn" && e.status !== "rejected" && e.type === "principle",
+    (e) =>
+      e.status !== "withdrawn" &&
+      e.status !== "rejected" &&
+      e.type === "principle",
   );
 
   const suggest = () => run(state, useDummy);
@@ -356,7 +378,9 @@ export function TheorySuggestTab({
         )}
 
         {hasResult && suggestions.length === 0 && (
-          <div style={{ fontSize: 12, color: C.dim }}>No suggestions remaining.</div>
+          <div style={{ fontSize: 12, color: C.dim }}>
+            No suggestions remaining.
+          </div>
         )}
 
         {suggestions?.map((s, i) => (
@@ -373,7 +397,10 @@ export function TheorySuggestTab({
               })
             }
             onModifyChange={(text) =>
-              setEditing((prev) => ({ ...prev, draft: { ...prev.draft, text } }))
+              setEditing((prev) => ({
+                ...prev,
+                draft: { ...prev.draft, text },
+              }))
             }
             // Removal only, and only while editing. A user who rewrites the
             // theory can otherwise leave it carrying a reference that no longer

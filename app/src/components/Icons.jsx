@@ -146,7 +146,12 @@ export function ReviewIcon({ size = "2em" }) {
         <line x1="140" y1="196" x2="240" y2="196" />
         <line x1="140" y1="254" x2="210" y2="254" />
       </g>
-      <g stroke="currentColor" strokeWidth="26" strokeLinecap="round" fill="none">
+      <g
+        stroke="currentColor"
+        strokeWidth="26"
+        strokeLinecap="round"
+        fill="none"
+      >
         <circle cx="286" cy="316" r="72" />
         <line x1="338" y1="368" x2="418" y2="448" />
       </g>
@@ -306,9 +311,17 @@ export function AddIcon({ size = "2em" }) {
 
 export function CheckIcon({ size = "1em" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-      strokeLinejoin="round" style={{ display: "block" }}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block" }}
+    >
       <polyline points="20 6 9 17 4 12" />
     </svg>
   );
@@ -316,20 +329,61 @@ export function CheckIcon({ size = "1em" }) {
 
 export function XIcon({ size = "1em" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-      style={{ display: "block" }}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      style={{ display: "block" }}
+    >
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }
 
+/**
+ * A counter-clockwise arrow, for leaving an edit as it was.
+ *
+ * Deliberately not the ✕ that {@link XIcon} gives Reject: the two sit side by
+ * side on every suggestion card while one is being edited, where an ✕ on both
+ * says "discard this suggestion" twice and means it once.
+ */
+export function RevertIcon({ size = "1em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block" }}
+    >
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.9-6.4" />
+      <polyline points="3 3 3 6.5 6.5 6.5" />
+    </svg>
+  );
+}
+
 export function EditIcon({ size = "1em" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-      strokeLinejoin="round" style={{ display: "block" }}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block" }}
+    >
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
@@ -338,8 +392,19 @@ export function EditIcon({ size = "1em" }) {
 
 export function SimulateIcon({ size = "2em" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 512 512" style={{ display: "block" }}>
-      <g stroke="currentColor" strokeWidth="28" strokeLinecap="round" strokeLinejoin="round" fill="none">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <g
+        stroke="currentColor"
+        strokeWidth="28"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      >
         <path d="M360 150 A140 140 0 1 0 390 320" />
         <polyline points="365,288 390,320 358,338" />
       </g>
@@ -369,9 +434,17 @@ export function ChatIcon({ size = "1em" }) {
 /** A lid, a bin and two strokes: throw this away. */
 export function TrashIcon({ size = "1em" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-      strokeLinejoin="round" style={{ display: "block" }}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block" }}
+    >
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
       <line x1="10" y1="11" x2="10" y2="17" />
@@ -383,9 +456,17 @@ export function TrashIcon({ size = "1em" }) {
 /** Arrows pushing out to opposite corners: expand to fill. */
 export function ExpandIcon({ size = "1em" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-      strokeLinejoin="round" style={{ display: "block" }}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block" }}
+    >
       <polyline points="15 3 21 3 21 9" />
       <polyline points="9 21 3 21 3 15" />
       <line x1="21" y1="3" x2="14" y2="10" />
@@ -397,9 +478,17 @@ export function ExpandIcon({ size = "1em" }) {
 /** The same arrows pulled back in: leave the expanded view. */
 export function CollapseIcon({ size = "1em" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-      strokeLinejoin="round" style={{ display: "block" }}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block" }}
+    >
       <polyline points="4 14 10 14 10 20" />
       <polyline points="20 10 14 10 14 4" />
       <line x1="14" y1="10" x2="21" y2="3" />

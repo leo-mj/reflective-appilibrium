@@ -164,6 +164,100 @@ A guided RE mode where all elements and argument relations are pre-populated fro
 - **`QuestionnaireTab`** (`src/components/workflows/QuestionnaireTab.jsx`) renders the participant questions (those whose `question` starts with `"Q"`) and calls `onQuestionnaireSelectAnswer` on selection.
 - **`handleQuestionnaireSelectAnswer`** in `useREActions.js` activates the chosen element, resets siblings to `"possible"`, and auto-activates pure-conclusion elements whenever all premises of any argument leading to them become active.
 
+## Text panel cards
+
+A card is the claim first and everything said about it second, and the layout
+says so: the id badge and the two action buttons on one line, the statement
+under them, a rule, and then the stats. `text_panel/TextTabCards.jsx` builds
+them out of the primitives in `TextTabPrimitives.jsx`.
+
+- **A stat is a caption over a value** (`StatField`), not a bordered chip. A
+  chip has to carry its own name inside it — "Confidence: Moderate" — which
+  spends the width twice and leaves a row of pills that all look alike to be
+  read one at a time. With the names on their own line the values line up down
+  the column and can be scanned without them. `MetaChip` is still right for a
+  *set* of short values, where the name belongs to the set: the ids a principle
+  covers, a cluster's members. **Its border is the chip colour at a third only
+  when that colour is a hex** — `C.dim` is `var(--c-dim)` and `var(--c-dim)55`
+  is not a colour, so the declaration was dropped and the default chip had no
+  border at all; those take `C.border` instead.
+- **The fields are a grid, not a row** (`cardStats`), of `auto-fill` columns at
+  a 110px minimum. Packed in a row, every field's position depends on the width
+  of the text before it, so a column of cards had its origins and rounds in a
+  different place on every line. Values are held to one ellipsised line for the
+  same reason — a value that wraps moves the rows under it — which is why
+  anything that might not fit passes `title`. `Covers` is the exception and
+  takes `span={2}` with `wrap`: the ids *are* the content, so that is the one
+  field whose tail must not be eaten.
+- **The details fold is one answer for the whole panel**, not one per card —
+  `text_panel/cardDetails.js`, a module store on `storedPref` in the shape
+  `tourWidth.js` uses, read by every card through `useCardDetails()`. The
+  statement is what a reader scans a list for and the stats are what they look
+  at once they have found one, so folding is them saying how they want to read
+  the *list*; per card it took two dozen presses to mean it. It outlives the
+  panel too, since leaving the text tab and coming back is not an instruction
+  to unfold everything again. The region is hidden with `display` rather than
+  unmounted.
+- **A revision is announced by the previous-wording panel, not by a stat.** Its
+  heading carries the round ("Revised in round 4 · Previous wording"), so a
+  `Status: Revised` field beside it would say the same thing twice. Every other
+  event — withdrawn, rejected, reinstated — gets the `Status` field, coloured by
+  the event. A revision that left no `previousText` behind, which hand-written
+  and imported states allow, falls back to the field.
+- **The withdrawal scores are bars** (`StatSection`, `DeltaBar`). The number is
+  what a reader acts on, so it is written out and the bar is `aria-hidden`. The
+  bar takes the graph hue and the number takes that hue's foreground tone
+  (`C.supportsText`), the teal being illegible as type on the light panel.
+- **Their scale is `utils/withdrawalScale.js`, and it is neither 0–1 nor a
+  fixed maximum.** Withdrawing an element moves account by `(2D ± 1)/N²` — a
+  few hundredths on any real process, and *smaller the larger the process gets*
+  (the sample's own numbers are 0.014–0.048 for account and 0.052–0.172 for
+  systematicity), so a 0–1 bar spent 95% of its width on unreachable ground.
+  That `1/N²` is also why no fixed maximum serves: generous enough for a
+  six-element process leaves a forty-element one flat. So the maximum is the
+  smallest of `[0.05, 0.1, 0.2, 0.5, 1]` that holds every delta on screen,
+  memoised in `TextTab` and handed to every card through the context — **one
+  scale for the whole panel**, which is what makes the lengths a comparison
+  between elements, the question the bars are actually asked. Quantised because
+  an unrounded peer maximum redraws every bar on each recompute and always
+  leaves one element at full width, which reads as a verdict; floored at 0.05 so
+  a panel whose largest score moves by 0.002 shows empty tracks rather than full
+  ones. The scale is named in each bar's `title`, there being no visible axis.
+- **`data-stat` and `data-card="element"` are structural hooks, and the tests
+  depend on them.** The e2e helpers used to find a card by climbing from a
+  "Revise" button while the ancestor held one "Confidence:" label; the fold can
+  now hide that label, so the climb ran to the whole list. `elementCardTexts`
+  and the "↑ Top" overlap test query the card root directly.
+
+## One tooltip
+
+`components/Tooltip.jsx` is the app's only tooltip, and **nothing sets a DOM
+`title`**. A native tooltip is a different box in a different font on a different
+delay, it cannot be reached by a finger at all, and having both meant a disabled
+run button was explained twice at once — the native box over the app's own. The
+shared primitives take the hover text as a `title` *prop* and render a `Tooltip`
+with it (`MetaChip`, `StatField`, `DeltaBar`, `SectionHeader`'s add button), so
+most call sites never mention it.
+
+Two things to know before adding one:
+
+- **A disabled control needs `wrap`.** A disabled button fires no mouse events,
+  so a tooltip bound to it never opens — and "why can't I press this?" is
+  exactly when it is wanted. `wrap` listens on a span around the child instead
+  and leaves the child alone, which also means the child must carry its own
+  accessible name. That is what the run buttons, the step button, the LLM
+  modal's Test/Save and the sample-data checkbox pass. It is also why `title`
+  survived beside a `Tooltip` on those buttons for so long: the native box was
+  the only one that showed.
+- **Tooltip names an icon-only trigger for free.** It sets `aria-label` from the
+  text when the child has no visible text of its own and no label already. A
+  trigger whose visible text is a symbol — `×`, `✕` — counts as text to it, so
+  those keep their own `aria-label` beside the tooltip.
+
+A test cannot read a `title` any more: `components/tooltipTestUtils.js` has
+`tooltipText(node)`, which hovers, waits out the delay and returns what the
+portal says.
+
 ## Visualization conventions
 
 Colorblind-safe palette. Two modules, and the split matters:

@@ -34,8 +34,14 @@ const MOUSE_ECHO_MS = 800;
  * @param {string}          props.text       - Tooltip content.
  * @param {React.ReactNode} props.children   - Single child element to attach to.
  * @param {number}          [props.delay=400] - Hover delay in ms.
+ * @param {boolean}         [props.wrap]     - Listen on a span *around* the
+ *   child rather than on the child itself. Required for a control that can be
+ *   **disabled**: a disabled button fires no mouse events at all, so a tooltip
+ *   bound to it cannot open — and a tooltip saying why a button is disabled is
+ *   wanted at exactly that moment. The child is then left entirely alone, which
+ *   also means it must carry its own accessible name.
  */
-export function Tooltip({ text, children, delay = 400 }) {
+export function Tooltip({ text, children, delay = 400, wrap = false }) {
   const [pos, setPos] = useState(null);
   const timer = useRef(null);
   /** Set while a touch is in progress, or its trailing mouse events still could be. */
@@ -99,36 +105,25 @@ export function Tooltip({ text, children, delay = 400 }) {
     (c) => typeof c === "string" && c.trim(),
   );
 
-  // react-hooks/refs flags any ref-touching function handed to a call during
-  // render, and show/hide touch the timer ref. cloneElement does not invoke
-  // them: React attaches them as DOM handlers and calls them on hover, which is
-  // exactly where a ref is meant to be read.
-  // eslint-disable-next-line react-hooks/refs
-  const trigger = cloneElement(child, {
-    // The icon-only buttons this wraps have no accessible name of their own, so
-    // a screen reader announces a row of anonymous buttons. The tooltip text is
-    // exactly the name they are missing. Naming them here rather than at each
-    // call site means the next icon button is named by construction.
-    //
-    // Two triggers are left alone: one that already carries its own aria-label,
-    // and one with visible text, where an aria-label would override what is on
-    // screen with wording that may not match it.
-    "aria-label":
-      child.props["aria-label"] ?? (hasVisibleText ? undefined : text),
+  // Wrapped, the child keeps its own handlers and the span carries only these;
+  // cloned, each of these has to call the child's first.
+  const own = wrap ? {} : child.props;
+
+  const handlers = {
     onMouseEnter(e) {
-      child.props.onMouseEnter?.(e);
+      own.onMouseEnter?.(e);
       if (touching.current) return;
       show(e.currentTarget, delay);
     },
     onMouseLeave(e) {
-      child.props.onMouseLeave?.(e);
+      own.onMouseLeave?.(e);
       hide();
     },
     // Pointer events only handle touch here. A mouse is left to the hover
     // handlers above, where a click has never dismissed the tooltip and should
     // not start doing so.
     onPointerDown(e) {
-      child.props.onPointerDown?.(e);
+      own.onPointerDown?.(e);
       if (e.pointerType !== "touch") return;
       markTouched();
       longPressed.current = false;
@@ -137,7 +132,7 @@ export function Tooltip({ text, children, delay = 400 }) {
       });
     },
     onPointerUp(e) {
-      child.props.onPointerUp?.(e);
+      own.onPointerUp?.(e);
       if (e.pointerType !== "touch") return;
       markTouched();
       hide();
@@ -145,23 +140,63 @@ export function Tooltip({ text, children, delay = 400 }) {
     // Fired when the browser claims the gesture — a press that turned into a
     // scroll. The finger never lifts, so this is the only end that arrives.
     onPointerCancel(e) {
-      child.props.onPointerCancel?.(e);
+      own.onPointerCancel?.(e);
       if (e.pointerType !== "touch") return;
       markTouched();
       hide();
     },
-    onClick(e) {
-      // A long press asked what the button does. Letting the click through as
-      // well would answer by doing it.
-      if (longPressed.current) {
-        longPressed.current = false;
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-      child.props.onClick?.(e);
-    },
-  });
+  };
+
+  /**
+   * A long press asked what the control does. Letting the click through as well
+   * would answer by doing it.
+   *
+   * On the span this has to run in the *capture* phase: a click on the child
+   * reaches the child's own handler before it bubbles to the span, so stopping
+   * it on the way back up would be too late.
+   */
+  function eatLongPressClick(e) {
+    if (!longPressed.current) return false;
+    longPressed.current = false;
+    e.preventDefault();
+    e.stopPropagation();
+    return true;
+  }
+
+  const trigger = wrap ? (
+    <span
+      {...handlers}
+      onClickCapture={eatLongPressClick}
+      // Transparent to layout: takes the child's own size and passes flex and
+      // grid sizing through, so wrapping a button does not move it.
+      style={{ display: "inline-flex", minWidth: 0 }}
+    >
+      {child}
+    </span>
+  ) : (
+    // react-hooks/refs flags any ref-touching function handed to a call during
+    // render, and show/hide touch the timer ref. cloneElement does not invoke
+    // them: React attaches them as DOM handlers and calls them on hover, which
+    // is exactly where a ref is meant to be read.
+    // eslint-disable-next-line react-hooks/refs
+    cloneElement(child, {
+      // The icon-only buttons this wraps have no accessible name of their own,
+      // so a screen reader announces a row of anonymous buttons. The tooltip
+      // text is exactly the name they are missing. Naming them here rather than
+      // at each call site means the next icon button is named by construction.
+      //
+      // Two triggers are left alone: one that already carries its own
+      // aria-label, and one with visible text, where an aria-label would
+      // override what is on screen with wording that may not match it.
+      "aria-label":
+        child.props["aria-label"] ?? (hasVisibleText ? undefined : text),
+      ...handlers,
+      onClick(e) {
+        if (eatLongPressClick(e)) return;
+        child.props.onClick?.(e);
+      },
+    })
+  );
 
   // Half the widest the box may get, plus a margin, so a tooltip opened at the
   // edge of the window ends just short of it rather than flush against it.

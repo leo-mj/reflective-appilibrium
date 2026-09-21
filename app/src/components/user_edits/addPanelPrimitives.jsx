@@ -14,6 +14,7 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { Dropdown } from "./Dropdown.jsx";
 
 /**
@@ -81,10 +82,7 @@ export function PremisePickers({
   return (
     <>
       {premises.map((premise, i) => (
-        <span
-          key={i}
-          style={{ display: "flex", alignItems: "center", gap: 4 }}
-        >
+        <span key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <Dropdown
             // Numbered, because there may be several: "Premise" alone would
             // give every one of them the same name, which is what a screen
@@ -97,14 +95,15 @@ export function PremisePickers({
             layout={layout}
           />
           {premises.length > 1 && (
-            <button
-              onClick={() => onRemove(i)}
-              aria-label={`Remove premise ${i + 1}`}
-              title={`Remove premise ${i + 1}`}
-              style={ghostStyle}
-            >
-              ✕
-            </button>
+            <Tooltip text={`Remove premise ${i + 1}`}>
+              <button
+                onClick={() => onRemove(i)}
+                aria-label={`Remove premise ${i + 1}`}
+                style={ghostStyle}
+              >
+                ✕
+              </button>
+            </Tooltip>
           )}
           {i < premises.length - 1 && <span style={arrowStyle}>+</span>}
         </span>

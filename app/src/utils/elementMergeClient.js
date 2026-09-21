@@ -11,13 +11,14 @@
  */
 
 import { makeLLMClient } from "./llmClientFactory.js";
-import { samplePairs } from "./elementMerge.js";
+import sampleMergePairs from "../sample-data/sample-merge-pairs.js";
 
 export const fetchMergePairs = makeLLMClient({
   endpoint: "/api/merge/pairs",
-  // No model to ask: pairs by overlapping wording, labelled as samples.
+  // No model to ask: the fixture's own pairs for the sample processes, and word
+  // overlap for anything else.
   dummyData: (state) => ({
-    suggestions: samplePairs(state, state.processes ?? []),
+    suggestions: sampleMergePairs(state, state.processes ?? []),
     model: "sample",
   }),
   buildBody: (state) => ({

@@ -13,6 +13,7 @@ import {
 import { BACKEND_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { groupsOf } from "../utils/groupUtils.js";
+import { withdrawalScale } from "../utils/withdrawalScale.js";
 import { useTextTabData } from "../hooks/useTextTabData.js";
 import { useActiveSection } from "../hooks/useActiveSection.js";
 import { Ctx } from "./text_panel/TextTabContext.js";
@@ -44,7 +45,6 @@ const TOP_BUTTON_CLEARANCE = 48;
 
 /** How far down the list must be scrolled before "↑ Top" has anything to do. */
 const TOP_BUTTON_AT = 200;
-
 
 const DEFAULT_COLLAPSED_SECTIONS = {
   judgments: false,
@@ -156,6 +156,13 @@ export function TextTab({
         .sort()
         .join(","),
     [state.elements, state.relations],
+  );
+
+  // Quantised, so it holds still while the numbers move under it — see
+  // {@link module:utils/withdrawalScale}.
+  const deltaScale = useMemo(
+    () => withdrawalScale(withdrawalDeltas),
+    [withdrawalDeltas],
   );
 
   useEffect(() => {
@@ -362,6 +369,8 @@ export function TextTab({
         pCovers,
         search,
         withdrawalDeltas,
+        // One scale for every card, so the bars can be read down the list.
+        withdrawalScale: deltaScale,
         groups,
         onToggleGroup,
         onEditGroupRequest,

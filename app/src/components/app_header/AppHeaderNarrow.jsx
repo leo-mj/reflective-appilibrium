@@ -8,10 +8,7 @@ import { C } from "../../constants/colors.js";
 import { useTheme } from "../../hooks/useTheme.js";
 import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
-import {
-  useLLMSettings,
-  useLLMSettingsRequested,
-} from "../../utils/llmKey.js";
+import { useLLMSettings, useLLMSettingsRequested } from "../../utils/llmKey.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
@@ -54,6 +51,7 @@ export function AppHeaderNarrow({
   isTabVisible,
   handleImportClick,
   handleMergeClick,
+  handleMergeSampleClick,
   onDownload,
   onSave,
   canSaveToServer,
@@ -369,10 +367,15 @@ export function AppHeaderNarrow({
                 <button
                   onClick={() => setWeightsOpen((o) => !o)}
                   aria-expanded={weightsOpen}
-                  style={{
-                    ...menuBtn(),
-                    color: weightsChanged ? C.principle.accent : undefined,
-                  }}
+                  // Spread in rather than `color: changed ? accent : undefined`
+                  // — see the same row in AppHeaderWide.jsx: that form wipes
+                  // the menu row's own colour and leaves the browser's default
+                  // button ink in its place.
+                  style={
+                    weightsChanged
+                      ? { ...menuBtn(), color: C.principle.accent }
+                      : menuBtn()
+                  }
                 >
                   <span style={menuIconStyle}>⚖</span>
                   {MENU_LABELS.weights}
@@ -483,6 +486,18 @@ export function AppHeaderNarrow({
               >
                 <span style={menuIconStyle}>⊕</span>
                 {MENU_LABELS.merge}
+              </button>
+            )}
+            {handleMergeSampleClick && (
+              <button
+                onClick={() => {
+                  handleMergeSampleClick();
+                  setMenuOpen(false);
+                }}
+                style={menuBtn()}
+              >
+                <span style={menuIconStyle}>⊕</span>
+                {MENU_LABELS.mergeSample}
               </button>
             )}
             <button

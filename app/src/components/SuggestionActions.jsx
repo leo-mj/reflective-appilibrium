@@ -6,7 +6,7 @@
  */
 
 import { C } from "../constants/colors.js";
-import { CheckIcon, XIcon, EditIcon, ChatIcon } from "./Icons.jsx";
+import { CheckIcon, XIcon, EditIcon, RevertIcon, ChatIcon } from "./Icons.jsx";
 import { Tooltip } from "./Tooltip.jsx";
 import { requestLLMSettings, useKeyMissing } from "../utils/llmKey.js";
 
@@ -91,12 +91,19 @@ export function ModifyButton({ onClick }) {
 }
 
 /**
+ * Leaves an edit in progress, putting the wording back as it was.
+ *
+ * A revert arrow rather than an ✕. It takes the Modify button's place while
+ * editing, so it sits next to Reject — and with an ✕ on both, the two buttons
+ * were the same button twice, one of which throws the suggestion away and one
+ * of which throws only the rewording away.
+ *
  * @param {Object}   props
  * @param {Function} props.onClick
  */
 export function CancelButton({ onClick }) {
   return (
-    <Tooltip text="Cancel">
+    <Tooltip text="Cancel edit">
       <button
         onClick={onClick}
         style={{
@@ -106,7 +113,7 @@ export function CancelButton({ onClick }) {
           color: C.dim,
         }}
       >
-        <XIcon size="11px" />
+        <RevertIcon size="11px" />
       </button>
     </Tooltip>
   );
@@ -125,6 +132,9 @@ export function ModifyTextarea({ value, onChange, accentColor }) {
     <textarea
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      // This box only ever appears in answer to Modify on one card, so the
+      // cursor belongs in it. Rendering one per card unasked would put the
+      // focus — and with it the scroll position — at the last card in the list.
       autoFocus
       style={{
         flex: 1,

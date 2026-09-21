@@ -8,6 +8,7 @@
  */
 
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { FIELD_STYLE, LABEL_STYLE } from "../../constants/modalConstants.js";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
@@ -111,22 +112,23 @@ export function ModalShell({
           }}
         >
           {onClear && (
-            <button
-              onClick={onClear}
-              title="Start this form over"
-              style={{
-                marginRight: "auto",
-                padding: "7px 18px",
-                borderRadius: 4,
-                border: `1px solid ${C.border}`,
-                background: "transparent",
-                color: C.dim,
-                cursor: "pointer",
-                fontSize: 12,
-              }}
-            >
-              Clear
-            </button>
+            <Tooltip text="Start this form over">
+              <button
+                onClick={onClear}
+                style={{
+                  marginRight: "auto",
+                  padding: "7px 18px",
+                  borderRadius: 4,
+                  border: `1px solid ${C.border}`,
+                  background: "transparent",
+                  color: C.dim,
+                  cursor: "pointer",
+                  fontSize: 12,
+                }}
+              >
+                Clear
+              </button>
+            </Tooltip>
           )}
           <button
             onClick={onCancel}

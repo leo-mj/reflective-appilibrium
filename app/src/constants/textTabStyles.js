@@ -83,11 +83,62 @@ export const cardIdentity = {
 };
 
 /**
- * A card's metadata chips: confidence, origin, round, status.
+ * A card's metadata chips: confidence, origin, round, status, the process a
+ * merge brought it from, and the scores the simulation adds.
  *
- * @param {boolean} isWide - Narrow gives them a line of their own. `order` puts
- *   them after the buttons in the visual flow, and a full-width basis makes
- *   them start that line rather than squeeze onto the end of the first.
+ * Below the content, not in the header row. They kept arriving — a merge adds a
+ * process chip, the simulation a withdrawal score apiece — and any row holding
+ * both them and the buttons ends up either two lines deep or with the buttons
+ * pushed off onto a line of their own. Under the statement they have the whole
+ * width to wrap into, and the header stays what it was worth keeping: the id
+ * and the two buttons, which is what the eye is looking for down a list of
+ * cards. It is also where `ArgumentCard` has always put its own.
+ *
+ * Both widths, now: the chips no longer compete with anything for the row, so
+ * there is nothing left for a narrow screen to do differently.
+ */
+/**
+ * A grid rather than a row, so the fields line up *down* the list as well as
+ * across one card. Packed in a row, every field's position depends on the width
+ * of the text before it — "Moderate" is wider than "High", so a column of cards
+ * had its origins and rounds at a different place on every line. Equal columns
+ * of a fixed minimum put each field in the same place in every card, whatever
+ * it says.
+ *
+ * `auto-fill` rather than a fixed count: the panel is dragged to whatever width
+ * the reader likes, and the columns are the same in every card at any of them.
+ * A value too long for its cell is cut with an ellipsis and keeps its full text
+ * in `title` — see {@link module:components/TextTabPrimitives.StatField}.
+ *
+ * Fields *stretch* to their column, unlike the chips that came before them: a
+ * caption over a value is already as narrow as its content looks, and the cell
+ * is what the ellipsis needs to measure against. `alignItems: start` because a
+ * field whose value wraps — the covered judgments — must not centre itself
+ * against the single-line ones beside it.
+ */
+export const cardStats = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+  alignItems: "start",
+  columnGap: 10,
+  rowGap: 8,
+};
+
+/**
+ * The rule under a card's claim, with the details control sitting on it. What
+ * is above it is the statement; what is below is everything said about it.
+ */
+export const cardDivider = {
+  marginTop: 8,
+  paddingTop: 4,
+  borderTop: `1px solid ${C.border}`,
+};
+
+/**
+ * The one chip that stays in a header row: the status of a single premise in an
+ * argument card, which belongs to its own line rather than to the card.
+ *
+ * @param {boolean} isWide - Narrow gives it a line of its own.
  */
 export const cardChips = (isWide) => ({
   display: "flex",
@@ -97,8 +148,13 @@ export const cardChips = (isWide) => ({
   ...(isWide ? null : { order: 1, flexBasis: "100%" }),
 });
 
-/** A card's action buttons, held against the trailing edge of the first line. */
-export const cardActions = { marginLeft: "auto" };
+/**
+ * A card's action buttons, held against the trailing edge of the first line.
+ *
+ * Never shrunk: they are the row's fixed point, and squeezing them is how
+ * "Withdraw" comes to wrap mid-word.
+ */
+export const cardActions = { marginLeft: "auto", flexShrink: 0 };
 
 export const META_LABEL_STYLE = {
   fontSize: 11,

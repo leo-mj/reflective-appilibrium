@@ -13,7 +13,7 @@
 
 /** @import { REState } from '../../types.js' */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchMergePairs } from "../../utils/elementMergeClient.js";
 import { isMergeablePair, mergePool } from "../../utils/elementMerge.js";
@@ -21,6 +21,8 @@ import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
 import {
   AcceptButton,
   RejectButton,
+  ModifyButton,
+  CancelButton,
   ModifyTextarea,
   ErrorBanner,
   NeedsKeyNotice,
@@ -88,15 +90,21 @@ function PairCard({ pair, state, lettersOf, defaultKeep, onMerge, onDismiss }) {
   const byId = (id) => state.elements.find((e) => e.id === id);
   const [keepId, setKeepId] = useState(defaultKeep);
   const kept = byId(keepId);
-  const [text, setText] = useState(kept.text);
+  // The wording is the kept element's until the reader opens Modify, exactly as
+  // a judgment's is: the box is the answer to pressing Modify, not a field
+  // sitting open on every card asking to be understood.
+  const [draft, setDraft] = useState(null);
   const [confidence, setConfidence] = useState(kept.confidence);
   const removeId = keepId === pair.a ? pair.b : pair.a;
+  const isEditing = draft !== null;
+  const text = draft ?? kept.text;
 
-  // Choosing the other side starts from its wording and confidence.
+  // Choosing the other side starts from its wording and confidence, and drops
+  // a draft written against the side just abandoned.
   const choose = (id) => {
     const el = byId(id);
     setKeepId(id);
-    setText(el.text);
+    setDraft(null);
     setConfidence(el.confidence);
   };
 
@@ -112,7 +120,14 @@ function PairCard({ pair, state, lettersOf, defaultKeep, onMerge, onDismiss }) {
         fontSize: 12,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 8,
+        }}
+      >
         <span style={{ color: C.text, fontWeight: "bold" }}>
           Same claim? {pair.a} · {pair.b}
         </span>
@@ -121,15 +136,24 @@ function PairCard({ pair, state, lettersOf, defaultKeep, onMerge, onDismiss }) {
             onClick={() => onMerge({ keepId, removeId, text, confidence })}
           />
           <RejectButton onClick={onDismiss} />
+          {isEditing ? (
+            <CancelButton onClick={() => setDraft(null)} />
+          ) : (
+            <ModifyButton onClick={() => setDraft(kept.text)} />
+          )}
         </div>
       </div>
       {pair.reason && (
-        <div style={{ ...MUTED, lineHeight: 1.5, marginBottom: 8 }}>{pair.reason}</div>
+        <div style={{ ...MUTED, lineHeight: 1.5, marginBottom: 8 }}>
+          {pair.reason}
+        </div>
       )}
       <div style={{ ...MUTED, marginBottom: 4 }}>
         Keep the wording of — the other is removed and its relations move here:
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+      <div
+        style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}
+      >
         {[pair.a, pair.b].map((id) => (
           <Side
             key={id}
@@ -141,7 +165,26 @@ function PairCard({ pair, state, lettersOf, defaultKeep, onMerge, onDismiss }) {
           />
         ))}
       </div>
-      <ModifyTextarea value={text} onChange={setText} accentColor={C.supports} />
+      {isEditing && (
+        <>
+          <div style={{ ...MUTED, marginBottom: 4 }}>
+            The wording the merged element keeps:
+          </div>
+          {/* In a flex row so the box fills the card, flush with the two
+              statements above it: `ModifyTextarea` is a `flex: 1` child, and a
+              textarea left in a block container falls back to its default
+              twenty-odd characters. A row rather than `width: 100%`, which is
+              a fraction of a fractional content box and paints a horizontal
+              scrollbar on the panel — see app/CLAUDE.md. */}
+          <div style={{ display: "flex", marginBottom: 8 }}>
+            <ModifyTextarea
+              value={draft}
+              onChange={setDraft}
+              accentColor={C.supports}
+            />
+          </div>
+        </>
+      )}
       <ConfidenceInput value={confidence} onChange={setConfidence} />
     </div>
   );
@@ -164,17 +207,10 @@ export function ElementMergeTab({
   useDummy = false,
   suggestionsDisabled = false,
 }) {
-  const {
-    suggestions,
-    setSuggestions,
-    loading,
-    error,
-    model,
-    hasResult,
-    run,
-  } = useSuggestionWorkflow((s, dummy) =>
-    fetchMergePairs({ ...s, processes }, dummy),
-  );
+  const { suggestions, setSuggestions, loading, error, model, hasResult, run } =
+    useSuggestionWorkflow((s, dummy) =>
+      fetchMergePairs({ ...s, processes }, dummy),
+    );
 
   const lettersOf = new Map();
   for (const p of processes)
@@ -184,8 +220,13 @@ export function ElementMergeTab({
   // The side from the earliest process is offered as the one kept: it is the
   // one that was on the board first.
   const earliest = (id) =>
-    Math.min(...(lettersOf.get(id) ?? "").split("+").map((l) => order.get(l) ?? Infinity));
-  const defaultKeep = (pair) => (earliest(pair.b) < earliest(pair.a) ? pair.b : pair.a);
+    Math.min(
+      ...(lettersOf.get(id) ?? "")
+        .split("+")
+        .map((l) => order.get(l) ?? Infinity),
+    );
+  const defaultKeep = (pair) =>
+    earliest(pair.b) < earliest(pair.a) ? pair.b : pair.a;
 
   // A merge can make other pairs moot — one of their elements is gone, or both
   // now share a process — so what is shown is re-checked against the state.
@@ -193,7 +234,18 @@ export function ElementMergeTab({
     isMergeablePair(state, processes, p.a, p.b),
   );
 
-  const drop = (pair) => setSuggestions((prev) => prev.filter((p) => p !== pair));
+  // A fresh set of pairs is read from the top. Only when a run finishes, not
+  // whenever the list changes: dropping a card must leave the reader where they
+  // were rather than send them back up.
+  const listRef = useRef(null);
+  const wasLoading = useRef(false);
+  useEffect(() => {
+    if (wasLoading.current && !loading) listRef.current?.scrollTo?.({ top: 0 });
+    wasLoading.current = loading;
+  }, [loading]);
+
+  const drop = (pair) =>
+    setSuggestions((prev) => prev.filter((p) => p !== pair));
   const poolSize = mergePool(state, processes).length;
   const needs = !processes.length
     ? "Merge another process first."
@@ -203,7 +255,10 @@ export function ElementMergeTab({
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}>
+      <div
+        ref={listRef}
+        style={{ overflowY: "auto", flex: 1, padding: "0 4px 24px" }}
+      >
         <SuggestionToolbar
           tab="mergeElements"
           title="Merge Elements"

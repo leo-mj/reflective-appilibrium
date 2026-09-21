@@ -24,6 +24,7 @@
 /** @import { DropdownOption } from './Dropdown.jsx' */
 
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { Dropdown } from "./Dropdown.jsx";
 import { elementOptions } from "./ElementOptions.jsx";
 import {
@@ -196,14 +197,15 @@ export function WrittenArgumentFields({
           placeholder: `Premise ${i + 1}…`,
           remove:
             premises.length > 1 ? (
-              <button
-                onClick={() => removePremise(i)}
-                aria-label={`Remove premise ${i + 1}`}
-                title={`Remove premise ${i + 1}`}
-                style={{ ...ghostStyle, flexShrink: 0 }}
-              >
-                ✕
-              </button>
+              <Tooltip text={`Remove premise ${i + 1}`}>
+                <button
+                  onClick={() => removePremise(i)}
+                  aria-label={`Remove premise ${i + 1}`}
+                  style={{ ...ghostStyle, flexShrink: 0 }}
+                >
+                  ✕
+                </button>
+              </Tooltip>
             ) : null,
         }),
       )}

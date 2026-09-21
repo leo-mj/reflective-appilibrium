@@ -121,11 +121,15 @@ export function SuggestionToolbar({
         {model && <span style={{ color: C.dim }}> · {model}</span>}
       </div>
       <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <Tooltip text={sendsToLlmText()}>
+        {/* One tooltip, not two: the button used to carry `why` as a DOM
+            `title` *inside* this Tooltip, so a disabled run button had the
+            native box and the app's own both trying to explain it. Whichever
+            the reader needs — the reason it cannot run, or what running sends
+            — is the text. */}
+        <Tooltip text={why || sendsToLlmText()} wrap>
           <button
             onClick={onRun}
             disabled={isDisabled}
-            title={why}
             {...(isDisabled ? {} : marker)}
             style={{
               background: "transparent",

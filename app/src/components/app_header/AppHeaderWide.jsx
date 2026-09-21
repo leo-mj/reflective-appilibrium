@@ -29,10 +29,7 @@ import { MenuToggle } from "./MenuToggle.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
-import {
-  useLLMSettings,
-  useLLMSettingsRequested,
-} from "../../utils/llmKey.js";
+import { useLLMSettings, useLLMSettingsRequested } from "../../utils/llmKey.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
@@ -53,6 +50,7 @@ export function AppHeaderWide({
   setAssistSidePanel,
   handleImportClick,
   handleMergeClick,
+  handleMergeSampleClick,
   onDownload,
   onSave,
   canSaveToServer,
@@ -400,9 +398,7 @@ export function AppHeaderWide({
                         style={menuItem}
                       >
                         <span style={menuIconStyle}>⚙</span>
-                        {llmSaved
-                          ? `LLM: ${llmSaved.model}`
-                          : MENU_LABELS.llm}
+                        {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
                       </button>
                     </Tooltip>
                     <Tooltip text={MENU_TOOLTIPS.privacy}>
@@ -424,12 +420,18 @@ export function AppHeaderWide({
                           <button
                             onClick={() => setWeightsOpen((o) => !o)}
                             aria-expanded={weightsOpen}
-                            style={{
-                              ...menuItem,
-                              color: weightsChanged
-                                ? C.principle.accent
-                                : undefined,
-                            }}
+                            // The override is spread in rather than written as
+                            // `color: changed ? accent : undefined`: that form
+                            // overwrites `menuItem`'s own colour with
+                            // `undefined`, React then sets no colour at all,
+                            // and the row falls back to the browser's default
+                            // button ink — which is how this one row came to be
+                            // brighter than every other item in the menu.
+                            style={
+                              weightsChanged
+                                ? { ...menuItem, color: C.principle.accent }
+                                : menuItem
+                            }
                           >
                             <span style={menuIconStyle}>⚖</span>
                             {MENU_LABELS.weights}
@@ -562,6 +564,20 @@ export function AppHeaderWide({
                         >
                           <span style={menuIconStyle}>⊕</span>
                           {MENU_LABELS.merge}
+                        </button>
+                      </Tooltip>
+                    )}
+                    {handleMergeSampleClick && (
+                      <Tooltip text={MENU_TOOLTIPS.mergeSample}>
+                        <button
+                          onClick={() => {
+                            handleMergeSampleClick();
+                            setMenuOpen(false);
+                          }}
+                          style={menuItem}
+                        >
+                          <span style={menuIconStyle}>⊕</span>
+                          {MENU_LABELS.mergeSample}
                         </button>
                       </Tooltip>
                     )}

@@ -25,6 +25,7 @@ import {
 } from "../../utils/groupUtils.js";
 import { NodeShape } from "./NodeShape.jsx";
 import { NodeTooltip } from "./NodeTooltip.jsx";
+import { Tooltip } from "../Tooltip.jsx";
 
 // ─── GraphEdge ────────────────────────────────────────────────────────────────
 
@@ -315,7 +316,6 @@ export function ProcessTag({ label, radius }) {
  */
 const GROUP_INK = { fill: C.panel, stroke: C.dim, label: C.text };
 
-
 /**
  * The dashed box drawn around an expanded group.
  *
@@ -547,22 +547,16 @@ export function GraphCanvas({
             gap: 3,
           }}
         >
-          <button
-            style={ZOOM_BTN}
-            onClick={zoomIn}
-            aria-label="Zoom in"
-            title="Zoom in"
-          >
-            +
-          </button>
-          <button
-            style={ZOOM_BTN}
-            onClick={zoomOut}
-            aria-label="Zoom out"
-            title="Zoom out"
-          >
-            −
-          </button>
+          <Tooltip text="Zoom in">
+            <button style={ZOOM_BTN} onClick={zoomIn} aria-label="Zoom in">
+              +
+            </button>
+          </Tooltip>
+          <Tooltip text="Zoom out">
+            <button style={ZOOM_BTN} onClick={zoomOut} aria-label="Zoom out">
+              −
+            </button>
+          </Tooltip>
         </div>
       )}
       <NodeTooltip tooltip={tooltip} actions={tooltipActions} />

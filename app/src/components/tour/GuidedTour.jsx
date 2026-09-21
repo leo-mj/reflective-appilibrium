@@ -28,6 +28,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { C, typeTokens } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { LLM_ENABLED } from "../../config.js";
 import { buildTourSections } from "./tourSections.js";
 import { TOUR_Z, sheetHeight } from "./tourZ.js";
@@ -225,58 +226,64 @@ function ColumnResizer({ width }) {
   };
 
   return (
-    <div
-      className="resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize tour column"
-      aria-valuenow={width}
-      aria-valuemin={TOUR_MIN_W}
-      aria-valuemax={TOUR_MAX_W}
-      tabIndex={0}
-      title="Drag to resize the tour — double-click to reset, or arrow keys"
-      style={{
-        position: "absolute",
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: 7,
-        background: C.dim,
-        cursor: "ew-resize",
-        touchAction: "none",
-        zIndex: 1,
-      }}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        // Or the pointer picks up the prose beside it instead.
-        e.preventDefault();
-        drag.current = { x: e.clientX, width };
-        setTourResizing(true);
-        e.currentTarget.setPointerCapture?.(e.pointerId);
-      }}
-      onPointerMove={(e) => {
-        if (!drag.current) return;
-        setTourWidth(drag.current.width + (e.clientX - drag.current.x));
-      }}
-      onPointerUp={(e) => {
-        if (!drag.current) return;
-        drag.current = null;
-        setTourResizing(false);
-        e.currentTarget.releasePointerCapture?.(e.pointerId);
-        storeTourWidth();
-      }}
-      onPointerCancel={() => {
-        drag.current = null;
-        setTourResizing(false);
-      }}
-      onDoubleClick={resetTourWidth}
-      onKeyDown={(e) => {
-        if (e.key === "ArrowLeft") nudge(-KEY_STEP);
-        else if (e.key === "ArrowRight") nudge(KEY_STEP);
-        else return;
-        e.preventDefault();
-      }}
-    />
+    // The one trigger whose own handlers matter: Tooltip adds pointer handlers
+    // of its own and calls the child's first, so the drag is unaffected. On a
+    // touchscreen a press held here will still open the tooltip mid-drag, which
+    // is the price of the app having one tooltip rather than two — and this
+    // handle is wide-layout only, where the pointer is a mouse.
+    <Tooltip text="Drag to resize the tour — double-click to reset, or arrow keys">
+      <div
+        className="resize-handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize tour column"
+        aria-valuenow={width}
+        aria-valuemin={TOUR_MIN_W}
+        aria-valuemax={TOUR_MAX_W}
+        tabIndex={0}
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 7,
+          background: C.dim,
+          cursor: "ew-resize",
+          touchAction: "none",
+          zIndex: 1,
+        }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          // Or the pointer picks up the prose beside it instead.
+          e.preventDefault();
+          drag.current = { x: e.clientX, width };
+          setTourResizing(true);
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          if (!drag.current) return;
+          setTourWidth(drag.current.width + (e.clientX - drag.current.x));
+        }}
+        onPointerUp={(e) => {
+          if (!drag.current) return;
+          drag.current = null;
+          setTourResizing(false);
+          e.currentTarget.releasePointerCapture?.(e.pointerId);
+          storeTourWidth();
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+          setTourResizing(false);
+        }}
+        onDoubleClick={resetTourWidth}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowLeft") nudge(-KEY_STEP);
+          else if (e.key === "ArrowRight") nudge(KEY_STEP);
+          else return;
+          e.preventDefault();
+        }}
+      />
+    </Tooltip>
   );
 }
 

@@ -128,6 +128,19 @@ describe("model weights", () => {
       openMenu();
       expect(screen.queryByText(/Model weights/)).not.toBeNull();
     });
+
+    // Was: the row set `color: changed ? accent : undefined` over the menu
+    // row's own style, which overwrites the colour with `undefined`. React then
+    // sets none, and the row inherits the browser's default button ink — one
+    // row brighter than the rest of the menu, in dark mode most visibly.
+    it(`is written in the same ink as the rest of the ${layout} menu`, () => {
+      flags.backend = true;
+      render(<AppHeader {...PROPS} isWide={isWide} />);
+      openMenu();
+      const row = (name) => screen.getByRole("button", { name });
+      expect(row(/Model weights/).style.color).toBe(row(/Privacy/).style.color);
+      expect(row(/Model weights/).style.color).not.toBe("");
+    });
   }
 });
 
@@ -229,6 +242,56 @@ describe("merge", () => {
     expect(screen.queryByText("Merge “Promises”?")).toBeNull();
   });
 
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+    const demoRow = () => screen.queryByText("Merge (demo)");
+
+    it(`offers the demo merge in the ${layout} menu on the sample process only`, () => {
+      render(
+        <AppHeader
+          {...PROPS}
+          hasExistingState
+          onPrepareMerge={noop}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      expect(demoRow()).toBeNull();
+      cleanup();
+
+      render(
+        <AppHeader
+          {...PROPS}
+          hasExistingState
+          isSample
+          onPrepareMerge={noop}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      expect(demoRow()).not.toBeNull();
+    });
+  }
+
+  it("prepares the demo merge from the bundled sample process", async () => {
+    const onPrepareMerge = vi.fn().mockResolvedValue(PREPARED);
+    render(
+      <AppHeader
+        {...PROPS}
+        hasExistingState
+        isSample
+        onPrepareMerge={onPrepareMerge}
+      />,
+    );
+    openMenu();
+    fireEvent.click(screen.getByText("Merge (demo)"));
+
+    expect(await screen.findByText("Merge “Promises”?")).not.toBeNull();
+    const file = onPrepareMerge.mock.calls[0][0];
+    expect(file.name).toBe("sample-process-climate-duties.md");
+    expect(await file.text()).toContain("```re-state");
+  });
+
   it("merges nothing when cancelled", async () => {
     const onConfirmMerge = vi.fn();
     chooseMergeFile({
@@ -242,12 +305,18 @@ describe("merge", () => {
   });
 
   it("reports a file it could not merge", async () => {
-    const onPrepareMerge = vi.fn().mockRejectedValue(new Error("Questionnaire sessions cannot be merged."));
-    render(<AppHeader {...PROPS} hasExistingState onPrepareMerge={onPrepareMerge} />);
+    const onPrepareMerge = vi
+      .fn()
+      .mockRejectedValue(new Error("Questionnaire sessions cannot be merged."));
+    render(
+      <AppHeader {...PROPS} hasExistingState onPrepareMerge={onPrepareMerge} />,
+    );
     fireEvent.change(screen.getByTestId("merge-input"), {
       target: { files: [new File(["x"], "q.md")] },
     });
-    expect(await screen.findByText("Questionnaire sessions cannot be merged.")).not.toBeNull();
+    expect(
+      await screen.findByText("Questionnaire sessions cannot be merged."),
+    ).not.toBeNull();
   });
 });
 

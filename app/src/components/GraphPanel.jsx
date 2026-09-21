@@ -249,17 +249,18 @@ export function GraphPanel({
             {/* Forced on and inert without a key: unticking it would promise
                 live suggestions the tab cannot fetch, leaving the checkbox
                 saying one thing and the panel below it doing another. */}
-            <input
-              type="checkbox"
-              checked={useDummyAssist || keyMissing}
-              disabled={keyMissing}
-              onChange={(e) => setUseDummyAssist(e.target.checked)}
-              title={keyMissing ? "No API key configured." : undefined}
-              style={{
-                accentColor: C.supports,
-                cursor: keyMissing ? "not-allowed" : "pointer",
-              }}
-            />
+            <Tooltip text={keyMissing ? "No API key configured." : ""} wrap>
+              <input
+                type="checkbox"
+                checked={useDummyAssist || keyMissing}
+                disabled={keyMissing}
+                onChange={(e) => setUseDummyAssist(e.target.checked)}
+                style={{
+                  accentColor: C.supports,
+                  cursor: keyMissing ? "not-allowed" : "pointer",
+                }}
+              />
+            </Tooltip>
             Use sample data
           </label>
         )}

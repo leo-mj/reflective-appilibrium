@@ -59,6 +59,8 @@ import { C } from "../constants/colors.js";
  *   resolves to what merging it would do; the Merge row is offered only when
  *   there is a non-questionnaire process to merge into.
  * @param {function} [props.onConfirmMerge] - Performs a merge prepared above.
+ * @param {boolean} [props.isSample] - Whether the open process is the sample
+ *   one, which is what the "Merge (demo)" row is offered on.
  * @param {boolean}  props.hasExistingState
  * @param {function} props.onHome
  * @param {boolean}  props.isWide
@@ -102,6 +104,7 @@ export function AppHeader({
   onPrepareMerge,
   onConfirmMerge,
   hasExistingState,
+  isSample = false,
   onHome,
   isWide,
   workflowPhase,
@@ -186,7 +189,8 @@ export function AppHeader({
 
   // Merging needs a process to merge into, and a questionnaire has no room for
   // a second one — so the row is only offered where it can succeed.
-  const canMerge = !!onPrepareMerge && hasExistingState && model !== "questionnaire";
+  const canMerge =
+    !!onPrepareMerge && hasExistingState && model !== "questionnaire";
   // Reading the file only prepares the merge; nothing changes until the reader
   // has seen what it would do and said so.
   const [pendingMerge, setPendingMerge] = useState(null);
@@ -198,6 +202,25 @@ export function AppHeader({
     }
   };
   const handleMergeClick = () => mergeInputRef.current.click();
+
+  // The second sample process, brought in without a trip through the file
+  // system. Offered on the sample process only: in someone's own process a
+  // demo's judgments are not a merge anyone asked for. Imported on the press
+  // rather than with the module, so the fixture stays out of the main bundle.
+  const canMergeSample = canMerge && isSample;
+  const handleMergeSampleClick = async () => {
+    try {
+      const { default: text } =
+        await import("../sample-data/sample-process-climate-duties.md?raw");
+      await doMerge(
+        new File([text], "sample-process-climate-duties.md", {
+          type: "text/markdown",
+        }),
+      );
+    } catch (e) {
+      setImportError(e.message);
+    }
+  };
 
   const ANALYZE_TABS = ["graph", "history", "clusters"];
   const metaTab = ASSIST_TABS.includes(tab)
@@ -300,6 +323,7 @@ export function AppHeader({
     onExpandAll,
     handleImportClick,
     handleMergeClick: canMerge ? handleMergeClick : null,
+    handleMergeSampleClick: canMergeSample ? handleMergeSampleClick : null,
     onDownload,
     onSave: handleSave,
     canSaveToServer,

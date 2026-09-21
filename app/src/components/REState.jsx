@@ -526,6 +526,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onImportFile={handleImportFile}
         onPrepareMerge={handlePrepareMerge}
         onConfirmMerge={handleConfirmMerge}
+        isSample={isSample}
         hasExistingState={state.elements.length > 0}
         onHome={onHome}
         isWide={isWide}

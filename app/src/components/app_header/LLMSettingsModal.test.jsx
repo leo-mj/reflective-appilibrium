@@ -24,6 +24,7 @@ vi.mock("../../config.js", async (importOriginal) => ({
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { useLLMSettings } from "../../utils/llmKey.js";
 import { getLLMHeaders } from "../../utils/openaiClient.js";
+import { tooltipText } from "../tooltipTestUtils.js";
 
 let fetchMock;
 
@@ -65,7 +66,7 @@ describe("in the demo build", () => {
     open();
     for (const label of ["Test connection", "Save"]) {
       expect(button(label).disabled, label).toBe(true);
-      expect(button(label).title, label).toContain("demo");
+      expect(tooltipText(button(label)), label).toContain("demo");
     }
   });
 

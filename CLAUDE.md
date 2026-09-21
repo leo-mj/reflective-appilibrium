@@ -241,7 +241,21 @@ removal, playback shows the re-pointed relations on the kept element in earlier
 rounds too, and older log entries still name the removed id; that was chosen over
 withdrawing it. Dismissing records nothing.
 
-The demo build and sample mode offer word-overlap pairs (`samplePairs`) instead.
+**The samples.** `sample-data/sample-process-climate-duties.md` is a second
+process in export format, written to be merged into the one the app opens with:
+nothing is worded identically, so nothing fuses automatically and every pair is
+the reader's to decide. ☰ → Session → **Merge (demo)** brings it in through the
+same preview modal a picked file goes through, and is offered on the sample
+process only (`isSample`) — in someone's own process a demo's judgments are not a
+merge anyone asked for. It is `import(…?raw)`ed on the press, so the fixture is a
+chunk of its own rather than part of the main bundle; that is also why it lives
+in `sample-data/` rather than `public/`, one copy that both the button and the
+test read. `sample-data/sample-merge-pairs.js` holds the five pairs
+the tab then offers without a model, **keyed by wording rather than by id** —
+which ids the second process lands on depends on the first — and falling back to
+word overlap (`samplePairs`) for any other process. All three drift apart
+silently, so `sample-merge-pairs.test.js` reads the file as the app does, merges
+it and checks the pairs still resolve.
 
 ### State schema
 

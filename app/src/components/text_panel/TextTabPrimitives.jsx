@@ -14,6 +14,7 @@ import {
   WITHDRAW_BTN_STYLE,
 } from "../../constants/textTabStyles.js";
 import { Ctx } from "./TextTabContext.js";
+import { Tooltip } from "../Tooltip.jsx";
 
 // ─── Highlight ────────────────────────────────────────────────────────────────
 
@@ -43,24 +44,51 @@ export function Highlight({ text, query }) {
 
 // ─── MetaChip ─────────────────────────────────────────────────────────────────
 
-/** Consistently-styled bordered pill for element metadata (confidence, status, scores). */
+/**
+ * Consistently-styled bordered pill for a *set* of short values — the ids a
+ * principle covers, a cluster's members.
+ *
+ * It is no longer how a card's own metadata is drawn: a chip has to carry its
+ * own name inside it ("Confidence: Moderate"), which spends the width twice and
+ * leaves a row of pills that look alike. Those are {@link StatField}s now, and
+ * what is left for a chip is the case it was always right for — several values
+ * of one kind, where the name belongs to the set rather than to each.
+ *
+ * As wide as its text, capped at its container and cut with an ellipsis if it
+ * does not fit, so `title` is worth passing on anything long. That text goes
+ * through {@link module:components/Tooltip}, not the DOM's `title` — the app
+ * has one tooltip, and a native one differs from it in look, in delay and in
+ * being unreachable by a finger.
+ *
+ * The border is the chip's own colour at a third, *when that colour can be
+ * faded* — a status tag's hex can, and the theme tokens cannot: `C.dim` is
+ * `var(--c-dim)`, and `var(--c-dim)55` is not a colour, so the whole
+ * declaration was dropped and the default chip had no border at all. Those fall
+ * back to the panel's border token, which is the line they wanted in the first
+ * place.
+ */
 export function MetaChip({ color = C.dim, title, children }) {
   return (
-    <span
-      title={title}
-      style={{
-        fontSize: 10,
-        padding: "2px 6px",
-        borderRadius: 4,
-        border: `1px solid ${color}55`,
-        color,
-        lineHeight: 1.6,
-        flexShrink: 0,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}
-    </span>
+    <Tooltip text={title}>
+      <span
+        style={{
+          fontSize: 10,
+          padding: "1px 4px",
+          borderRadius: 4,
+          border: `1px solid ${color.startsWith("#") ? `${color}55` : C.border}`,
+          color,
+          lineHeight: 1.5,
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+          minWidth: 0,
+          maxWidth: "100%",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {children}
+      </span>
+    </Tooltip>
   );
 }
 
@@ -117,25 +145,26 @@ export function SectionHeader({ title, onAdd, addLabel, collapsed, onToggle }) {
         {title}
       </span>
       {onAdd && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAdd();
-          }}
-          aria-label={addLabel ?? `Add to ${title}`}
-          title={addLabel ?? `Add to ${title}`}
-          className="tap-target-square"
-          style={{
-            ...GHOST_BTN_STYLE,
-            fontSize: 13,
-            padding: "0 5px 1px",
-            fontWeight: "bold",
-            letterSpacing: 0,
-            textTransform: "none",
-          }}
-        >
-          +
-        </button>
+        <Tooltip text={addLabel ?? `Add to ${title}`}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+            aria-label={addLabel ?? `Add to ${title}`}
+            className="tap-target-square"
+            style={{
+              ...GHOST_BTN_STYLE,
+              fontSize: 13,
+              padding: "0 5px 1px",
+              fontWeight: "bold",
+              letterSpacing: 0,
+              textTransform: "none",
+            }}
+          >
+            +
+          </button>
+        </Tooltip>
       )}
     </div>
   );
@@ -230,15 +259,304 @@ export function StatusLabel({ tag }) {
 }
 
 /**
- * The round an element or relation first appeared in. Renders nothing when the
- * round is missing, which older hand-written states allow.
+ * What last happened to the item, as a stat field: "Status / Withdrawn ·
+ * Round 8", coloured by the event. Renders nothing for an item nothing has
+ * happened to, so an untouched card carries no such column at all.
  *
- * @param {Object}  props
+ * @param {Object} props
+ * @param {{ type: string, round?: number }|null} [props.tag] - From `statusTag`.
+ */
+export function StatusField({ tag }) {
+  const color = TAG_COLOR[tag?.type];
+  if (!color) return null;
+  const word = `${tag.type[0].toUpperCase()}${tag.type.slice(1)}`;
+  const text = `${word}${tag.round ? ` · Round ${tag.round}` : ""}`;
+  return (
+    <StatField label="Status" color={color} title={text}>
+      {text}
+    </StatField>
+  );
+}
+
+// ─── Stat fields ──────────────────────────────────────────────────────────────
+
+/**
+ * A stat's caption: the field name over the value, and the header of a stat
+ * section. Small, spaced and upper-cased *in CSS* rather than in the string —
+ * the DOM keeps "Confidence", which is what a test or a copied selection reads.
+ */
+const STAT_LABEL_STYLE = {
+  fontSize: 9,
+  fontWeight: 600,
+  letterSpacing: 0.9,
+  textTransform: "uppercase",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+/**
+ * One of a card's stats: its name above, its value below.
+ *
+ * A caption and a value rather than the bordered chip this used to be. A chip
+ * has to carry its own name inside it — "Confidence: Moderate" — which spends
+ * the width twice and leaves a row of pills that all look alike to be read one
+ * by one. With the names on their own line the values line up down the column
+ * and can be scanned without them.
+ *
+ * The value is one ellipsised line by default, since the columns are what the
+ * uniformity is made of and a value that wraps moves the rows under it. `wrap`
+ * is for the fields whose value is a set of chips rather than a phrase.
+ *
+ * @param {Object} props
+ * @param {string} props.label
+ * @param {string} [props.color] - The event colour, for a status. Tints both
+ *   lines; the default is a dim caption over the panel's own text colour.
+ * @param {string} [props.title] - Worth passing on anything that may not fit.
+ * @param {boolean} [props.wrap] - Let the value wrap as a flex row.
+ * @param {number} [props.span] - Columns to take, for a value needing two.
+ */
+export function StatField({ label, color, title, wrap, span, children }) {
+  return (
+    <Tooltip text={title}>
+      <div
+        // The stats' one structural hook, so a test can ask for a field by name
+        // rather than matching the run-together text of a caption and its value.
+        data-stat={label}
+        style={{
+          minWidth: 0,
+          ...(span ? { gridColumn: `span ${span}` } : null),
+        }}
+      >
+        <div style={{ ...STAT_LABEL_STYLE, color: color ?? C.dim }}>
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: CONTENT_FONT_SIZE,
+            lineHeight: 1.5,
+            color: color ?? C.text,
+            minWidth: 0,
+            ...(wrap
+              ? {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  flexWrap: "wrap",
+                }
+              : {
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }),
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </Tooltip>
+  );
+}
+
+/**
+ * A run of stats under a heading of their own — the withdrawal scores, which
+ * are a reading of the element rather than a fact about it.
+ *
+ * @param {Object} props
+ * @param {string} props.label
+ */
+export function StatSection({ label, children }) {
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ ...STAT_LABEL_STYLE, color: C.dim, marginBottom: 2 }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A named value with a bar drawn beside it: the change in one coherence measure
+ * if this element were withdrawn.
+ *
+ * The number is what the reader acts on, so it is written out and the bar is
+ * `aria-hidden` — it is there to make a column of these comparable at a glance,
+ * which three decimal places on their own are not. Its length is the magnitude
+ * against `scale`, which every bar in the panel shares, so what the lengths
+ * compare is one element with the next. `title` is where the scale is named,
+ * this being a bar with no visible axis.
+ *
+ * @param {Object} props
+ * @param {string} props.label
+ * @param {number} props.value
+ * @param {string} props.text  - The value as it should read.
+ * @param {number} props.scale - Full width, from {@link module:utils/withdrawalScale}.
+ * @param {string} props.color - The bar's fill: a graph hue, read as colour.
+ * @param {string} [props.textColor] - The number's ink, where that hue does not
+ *   read as type on the panel. Defaults to the bar's own colour.
+ * @param {string} [props.title]
+ */
+export function DeltaBar({
+  label,
+  value,
+  text,
+  scale,
+  color,
+  textColor,
+  title,
+}) {
+  // Rounded before it reaches CSS: 0.132 / 0.2 × 100 is 66.00000000000001 in
+  // binary floating point, and that goes into the style attribute verbatim.
+  const pct =
+    Math.round(Math.min(100, (Math.abs(value) / scale) * 100) * 100) / 100;
+  return (
+    <Tooltip text={title}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2.2fr) auto",
+          alignItems: "center",
+          gap: 8,
+          fontSize: CONTENT_FONT_SIZE,
+          lineHeight: 1.7,
+        }}
+      >
+        <span
+          style={{
+            color: C.text,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {label}
+        </span>
+        <span
+          aria-hidden="true"
+          style={{
+            position: "relative",
+            height: 6,
+            borderRadius: 3,
+            background: `${C.border}`,
+            overflow: "hidden",
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: `${pct}%`,
+              background: color,
+              borderRadius: 3,
+            }}
+          />
+        </span>
+        <span
+          style={{
+            color: textColor ?? color,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {text}
+        </span>
+      </div>
+    </Tooltip>
+  );
+}
+
+// ─── Details disclosure ───────────────────────────────────────────────────────
+
+/**
+ * The card's own "Hide details" control, on the rule that separates the claim
+ * from everything said about it.
+ *
+ * The statement is what a reader scans a list of cards for; the stats are what
+ * they look at once they have found one. Folding them away is how a panel of
+ * two dozen cards stays a list of claims — and it is per card rather than a
+ * global setting because it is the one card in hand that is being examined.
+ *
+ * The visible words are the accessible name (WCAG 2.5.3), the chevron is
+ * decorative, and `aria-expanded` carries the state that the rotation shows.
+ *
+ * @param {Object} props
+ * @param {boolean} props.open
+ * @param {Function} props.onToggle
+ * @param {string} props.controls - Id of the region it opens.
+ */
+export function DetailsToggle({ open, onToggle, controls }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={controls}
+      className="tap-target"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        background: "none",
+        border: "none",
+        padding: "2px 0",
+        margin: 0,
+        color: C.dim,
+        cursor: "pointer",
+        fontSize: 10,
+        lineHeight: 1.6,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          fontSize: 9,
+          display: "inline-block",
+          transition: "transform 0.15s",
+          transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+        }}
+      >
+        ▼
+      </span>
+      {open ? "Hide details" : "Show details"}
+    </button>
+  );
+}
+
+/**
+ * The wording an item had before it was last revised, in a panel of the revised
+ * colour.
+ *
+ * Its own block rather than a stat: it is a sentence, and the one piece of a
+ * card's metadata that is as long as the claim above it. The heading carries the
+ * round, which is why a revision needs no `Status` field beside it.
+ *
+ * @param {Object} props
+ * @param {string} props.text
  * @param {number} [props.round]
  */
-export function AddedRound({ round }) {
-  if (!round) return null;
-  return <MetaChip>Added: Round {round}</MetaChip>;
+export function PreviousWording({ text, round }) {
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        padding: "6px 8px",
+        borderRadius: 4,
+        background: `${C.revised}14`,
+        border: `1px solid ${C.revised}33`,
+      }}
+    >
+      <div style={{ ...STAT_LABEL_STYLE, color: C.revised, marginBottom: 2 }}>
+        {round ? `Revised in round ${round} · ` : ""}Previous wording
+      </div>
+      <div
+        style={{ fontSize: CONTENT_FONT_SIZE, color: C.dim, lineHeight: 1.6 }}
+      >
+        {text}
+      </div>
+    </div>
+  );
 }
 
 // ─── History round banner ─────────────────────────────────────────────────────
