@@ -19,6 +19,17 @@ stages:
   - test
   - images
 
+variables:
+  # This instance's runner reuses a build directory between jobs and cleans it
+  # with `git clean` first. It could not delete the wheels pip compiled into
+  # .cache/pip — while deleting every other file jobs left, root's included.
+  # Those wheels are the files pip built in the container's own /tmp and moved
+  # in, which fits a host where each container's files carry their own
+  # security label (SELinux) and no other container may remove them. The pip
+  # cache is no longer kept in the build directory (see .python); this keeps
+  # `git clean` away from the ones earlier runs left behind.
+  GIT_CLEAN_FLAGS: -ffdx -e .cache/
+
 default:
   interruptible: true
 
@@ -29,13 +40,11 @@ default:
   # wheel for Python 3.12 and is compiled with g++ (see the Dockerfile).
   image: python:3.12
   variables:
-    PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
     # A throwaway container: root is all there is, and nothing else shares it.
     PIP_ROOT_USER_ACTION: ignore
-  cache:
-    key:
-      files: [backend/requirements.txt]
-    paths: [.cache/pip]
+  # No pip cache. A cache has to live in the build directory, and the wheels pip
+  # compiles there are what the next job's checkout could not delete (see
+  # GIT_CLEAN_FLAGS). The price is compiling pypblib each run, about 45s.
   before_script:
     # The image's own pip lags behind, and pip-audit audits the whole
     # environment — so an old pip is reported as though it were a dependency.
