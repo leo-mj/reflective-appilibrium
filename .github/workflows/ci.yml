@@ -24,8 +24,12 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
+      # pip first: pip-audit audits the whole environment, so the runner's own
+      # older pip would be reported as though it were one of ours.
       - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
 
       - name: Run tests
         run: pytest backend/

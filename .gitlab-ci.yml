@@ -24,38 +24,39 @@ default:
 
 # ── Backend ─────────────────────────────────────────────────────────────────────
 
-backend-tests:
-  stage: test
+.python:
   # The full Debian image, not -slim: theodias needs pypblib, which has no Linux
   # wheel for Python 3.12 and is compiled with g++ (see the Dockerfile).
   image: python:3.12
-  timeout: 15m
   variables:
     PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
+    # A throwaway container: root is all there is, and nothing else shares it.
+    PIP_ROOT_USER_ACTION: ignore
   cache:
     key:
       files: [backend/requirements.txt]
     paths: [.cache/pip]
-  script:
+  before_script:
+    # The image's own pip lags behind, and pip-audit audits the whole
+    # environment — so an old pip is reported as though it were a dependency.
+    - python -m pip install --upgrade pip
     - pip install -r backend/requirements.txt
+
+backend-tests:
+  extends: .python
+  stage: test
+  timeout: 15m
+  script:
     - pytest backend/
 
 # Informational, as on GitHub: most advisories are transitive and not ours to
 # fix on the day they appear. Read it when it is red.
 backend-audit:
+  extends: .python
   stage: test
-  image: python:3.12
   timeout: 15m
   allow_failure: true
-  variables:
-    PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
-  cache:
-    key:
-      files: [backend/requirements.txt]
-    paths: [.cache/pip]
-    policy: pull
   script:
-    - pip install -r backend/requirements.txt
     - pip-audit
 
 # ── Frontend ────────────────────────────────────────────────────────────────────
