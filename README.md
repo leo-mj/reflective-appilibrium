@@ -14,15 +14,17 @@ The app ships in two configurations. Both are the same React SPA — the demo is
 | ------------------------------------------------------------------------------------------- | ---------------------- | -------- |
 | Graph, Text, History and Clusters tabs; manual editing of elements, relations and arguments | ✓                      | ✓        |
 | Markdown import / export (with the graph embedded as SVG)                                   | ✓                      | ✓        |
-| Questionnaire mode — guided RE from a pre-populated argument graph                          | ✓                      | ✓        |
+| Questionnaire mode — guided RE from a pre-populated argument graph                          | ✓²                     | ✓²       |
 | Guided tour and tutorial overlays                                                           | ✓                      | ✓        |
-| Assist tabs (Judgments, Principles, Arguments, Relations)                                   | pre-set examples only¹ | live LLM |
+| Assist tabs (Judgments, Principles, Theories, Arguments, Relations, Review; Merge after a merge) | pre-set examples only¹ | live LLM |
 | Discuss panel — follow-up conversation about a suggestion                                   | ✗                      | ✓        |
 | Simulate tab — formal rethon RE process and equilibrium scores                              | ✗                      | ✓        |
 | Equilibrium scores in the Text tab (per round, per withdrawal)                              | ✗                      | ✓        |
 | LLM settings — provider, model, bring-your-own-key                                          | ✗                      | ✓        |
 
 ¹ In the demo, the Assist tabs return pre-set example suggestions when you are working on the sample process, and are disabled on a process of your own. A banner at the top of the app says so.
+
+² Only with a questionnaire spec in `app/src/questionnaires/`, which is gitignored: a build from a fresh checkout has none, and the home page then shows no questionnaire cards.
 
 Neither version stores anything on a server. Both autosave the working state to the browser, and both export the full state to Markdown to re-import later.
 
@@ -38,7 +40,7 @@ npm install
 npm run build
 ```
 
-Deploy the resulting `dist/` folder to any static host. Note that the production build sets a base path of `/reflective-appilibrium/` (see [app/vite.config.js](app/vite.config.js)); change it if you deploy at a different path.
+Deploy the resulting `dist/` folder to any static host. Note that the production build is served from `/reflective-appilibrium/` by default, the path GitHub Pages uses; set `VITE_BASE_PATH` (e.g. `/` for a site served from its root) if you deploy at a different path. See [app/vite-plugins/basePath.js](app/vite-plugins/basePath.js).
 
 ## Backend version
 
@@ -46,8 +48,8 @@ The FastAPI backend exposes the LLM endpoints and the rethon simulation. It must
 
 ### Prerequisites
 
-- Python 3.10+
-- Node 20+
+- Python 3.12 (what CI and the Docker image use)
+- Node 24 (what CI uses)
 - An API key for at least one provider — OpenAI, Anthropic, Mistral, or an OpenAI-compatible local endpoint (Ollama, vLLM)
 
 ### 1. Create and activate a virtual environment
@@ -127,12 +129,14 @@ The app runs at `http://localhost:5173` with all backend features enabled.
 
 Set `DEPLOYMENT=hosted` in `backend/.env`. Whether anyone but you can reach the
 server cannot be detected at runtime — behind a reverse proxy `request.client` is
-the proxy, not the caller — so it is declared, and two protections follow:
+the proxy, not the caller — so it is declared, and these protections follow:
 
 | | `local` (default) | `hosted` |
 | --- | --- | --- |
 | Server-side API keys | lent to callers on localhost | never; every user brings their own |
-| Rate limit | none | 60/min per caller, separately for LLM calls and simulations |
+| Rate limits, per caller per minute | none | 60 LLM calls, 5 simulations, 30 steps, 300 score lookups |
+| LLM call timeout | 600s (SDK default) | 90s |
+| rethon computation | no size cap, no timeout | at most 20 elements, stopped after 60s |
 
 The server writes nothing to disk in either mode — see "Where your work lives"
 below.
@@ -173,12 +177,16 @@ cd app
 npm run build:backend
 ```
 
-This needs an `app/.env.backend` file:
+This reads `app/.env.backend`, which is tracked and carries a placeholder for the
+backend address. Supply the real one in the environment at build time, where it
+takes priority over the file:
 
-```env
-VITE_APP_ENV=backend
-VITE_BACKEND_URL=https://<your-deployed-backend>
+```bash
+VITE_BACKEND_URL=https://<your-deployed-backend> npm run build:backend
 ```
+
+A build that falls back to the placeholder logs an error at load, and every
+backend request from it fails.
 
 See [app/README.md](app/README.md) for the full build-target and feature-flag tables.
 

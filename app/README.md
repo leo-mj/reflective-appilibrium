@@ -35,11 +35,10 @@ Produces a static site with all tabs present. LLM-dependent features (Assist wor
 npm run build:backend
 ```
 
-Includes all LLM features. Users can enter their own API key (BYOK) via the LLM settings modal, or rely on server-side keys configured in the backend. Create `app/.env.backend`:
+Includes all LLM features. Users enter their own API key (BYOK) in the LLM settings modal: a backend deployed with `DEPLOYMENT=hosted` never lends its server-side keys. `.env.backend` is tracked with a placeholder address, so supply the real one in the environment at build time:
 
-```env
-VITE_APP_ENV=backend
-VITE_BACKEND_URL=https://<your-deployed-backend>
+```bash
+VITE_BACKEND_URL=https://<your-deployed-backend> npm run build:backend
 ```
 
 ## Feature flags
@@ -58,7 +57,7 @@ All LLM features are controlled by a single variable:
 
 API keys are **never stored in the frontend bundle**. All LLM calls go through the FastAPI backend at `VITE_BACKEND_URL`. The browser never contacts a provider directly.
 
-- **Server-side keys** (`dev` mode): keys live in `backend/.env`. The backend rejects LLM requests from non-localhost clients that do not include an `x-api-key` header.
+- **Server-side keys** (a backend in `local` mode only): keys live in `backend/.env` and are lent only to callers on localhost. A `hosted` backend never lends them.
 - **BYOK**: the user enters a key in the LLM settings modal. It is held in `sessionStorage` and forwarded as an `x-api-key` header on each request to the backend. Never persisted server-side.
 
 ## Tests

@@ -8,8 +8,8 @@ OpenAI-compatible endpoint without code changes.
 ``DEPLOYMENT`` is the one setting that matters most. Whether the backend is
 reachable by anyone other than the person running it cannot be detected —
 ``request.client`` is the socket peer, which behind a reverse proxy is the proxy
-itself, usually on loopback — so it has to be declared, and four separate
-protections follow from it. Setting it wrong is the difference between a
+itself, usually on loopback — so it has to be declared, and every protection in
+the table below follows from it. Setting it wrong is the difference between a
 convenient local tool and an open LLM relay, which is why it is a single flag
 rather than four independent ones to remember.
 """
@@ -38,7 +38,9 @@ Deployment = Literal["local", "hosted"]
 # scoring rate limit           none              300/min per caller
 # LLM call timeout             600s (SDK)        90s
 # rethon computation timeout   none              60s
-# session storage on disk      on                off (browser keeps state)
+# rethon element cap           none              20
+#
+# Nothing is written to disk in either mode; the browser keeps the state.
 #
 # Four limits rather than one, because the endpoints they cover cost wildly
 # different amounts and are reached in wildly different ways.
