@@ -329,10 +329,13 @@ def _client_with(settings) -> TestClient:
     return TestClient(app)
 
 
+_GATED = "/api/llm/configured-providers"
+
+
 def test_no_token_configured_means_no_gate():
     """The localhost default: nothing to authenticate, so nothing is demanded."""
     try:
-        res = _client_with(make_settings()).get("/api/sessions")
+        res = _client_with(make_settings()).get(_GATED)
         assert res.status_code != 401
     finally:
         app.dependency_overrides.clear()
@@ -341,15 +344,9 @@ def test_no_token_configured_means_no_gate():
 def test_a_configured_token_is_required():
     try:
         client = _client_with(make_settings(app_access_tokens="s3cret"))
-        assert client.get("/api/sessions").status_code == 401
-        assert (
-            client.get("/api/sessions", headers={"x-app-token": "wrong"}).status_code
-            == 401
-        )
-        assert (
-            client.get("/api/sessions", headers={"x-app-token": "s3cret"}).status_code
-            == 200
-        )
+        assert client.get(_GATED).status_code == 401
+        assert client.get(_GATED, headers={"x-app-token": "wrong"}).status_code == 401
+        assert client.get(_GATED, headers={"x-app-token": "s3cret"}).status_code == 200
     finally:
         app.dependency_overrides.clear()
 
@@ -363,17 +360,26 @@ def test_health_stays_open_so_uptime_checks_need_no_credential():
 
 
 @pytest.mark.parametrize(
-    "path",
+    "method, path",
     [
-        "/api/sessions",
-        "/api/llm/configured-providers",
+        ("get", "/api/llm/configured-providers"),
+        ("post", "/api/judgments/elicit"),
+        ("post", "/api/review/analyze"),
+        ("post", "/api/simulate_rethon/simulate"),
     ],
 )
-def test_the_gate_covers_routers_generally(path):
-    """Applied at include_router, so a new route is gated without being listed."""
+def test_the_gate_covers_routers_generally(method, path):
+    """Applied at include_router, so a new route is gated without being listed.
+
+    The POST bodies are empty on purpose: the gate has to answer before the
+    request is validated, or an unauthenticated caller learns the schema by
+    being told what is wrong with their payload.
+    """
     try:
         client = _client_with(make_settings(app_access_tokens="s3cret"))
-        assert client.get(path).status_code == 401
+        call = getattr(client, method)
+        res = call(path) if method == "get" else call(path, json={})
+        assert res.status_code == 401
     finally:
         app.dependency_overrides.clear()
 

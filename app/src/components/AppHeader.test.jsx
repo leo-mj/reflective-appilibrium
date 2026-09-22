@@ -38,7 +38,6 @@ const PROPS = {
   assistSidePanel: "graph",
   setAssistSidePanel: noop,
   onDownload: noop,
-  onSave: noop,
   onImportFile: noop,
   hasExistingState: false,
   onHome: noop,

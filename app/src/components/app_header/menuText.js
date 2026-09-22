@@ -30,7 +30,6 @@ export const MENU_LABELS = {
   merge: "Merge",
   mergeSample: "Merge (demo)",
   export: "Export",
-  save: "Save",
 };
 
 /** One line each, keyed as above. */
@@ -51,7 +50,6 @@ export const MENU_TOOLTIPS = {
   merge: "Add another exported process to this one, as one round.",
   mergeSample: "Merge a second sample process into this one, to try the feature.",
   export: "Write the whole process out to a file.",
-  save: "Store this session on the server.",
 };
 
 /** Headings over the menu's blocks, in the order they appear. */

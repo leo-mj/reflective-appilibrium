@@ -53,11 +53,6 @@ export function AppHeaderNarrow({
   handleMergeClick,
   handleMergeSampleClick,
   onDownload,
-  onSave,
-  canSaveToServer,
-  saveLabel,
-  saveColor,
-  saveBusy,
   onHome,
   onUndo,
   canUndo,
@@ -507,21 +502,6 @@ export function AppHeaderNarrow({
               <span style={menuIconStyle}>↓</span>
               {MENU_LABELS.export}
             </button>
-            {BACKEND_ENABLED && canSaveToServer && (
-              <button
-                onClick={close(onSave)}
-                disabled={saveBusy}
-                style={{
-                  ...menuBtn(),
-                  ...(saveColor
-                    ? { color: saveColor, borderColor: saveColor }
-                    : {}),
-                }}
-              >
-                <span style={menuIconStyle}>{saveLabel}</span>
-                {MENU_LABELS.save}
-              </button>
-            )}
           </div>
         </div>
       )}

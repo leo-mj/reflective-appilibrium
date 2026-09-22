@@ -2,10 +2,9 @@
  * @fileoverview Asks the backend what it can actually do, once per mount.
  *
  * Build-time flags say whether a backend exists; they cannot say what that
- * backend is configured to allow. Server-side session storage in particular is
- * on for a local install and off for a hosted one, and the browser has no way
- * to know which it is talking to. Offering Save and then failing with a 403 is
- * worse than not offering it, so the controls are gated on this.
+ * backend is configured to allow. The element cap in particular is a server
+ * setting, and a browser that guesses it asks for work the server can only
+ * refuse — so the controls that depend on it are gated on this.
  *
  * @module hooks/useBackendCapabilities
  */
@@ -17,7 +16,6 @@ import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
  * @typedef {Object} BackendCapabilities
  * @property {boolean} loaded      False until the health check settles either way.
  * @property {boolean} reachable   Whether the backend answered at all.
- * @property {boolean} sessions    Whether it persists sessions to disk.
  * @property {number}  maxElements Largest sentence pool it will compute over;
  *   0 means no cap, which is also what an older backend is assumed to have.
  */
@@ -26,7 +24,6 @@ import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
 const UNAVAILABLE = {
   loaded: false,
   reachable: false,
-  sessions: false,
   maxElements: 0,
 };
 
@@ -68,10 +65,6 @@ function load() {
       settle({
         loaded: true,
         reachable: data !== null,
-        // `?? false`: an older backend has no `sessions` field, and treating
-        // absence as "yes" would put the Save button back on a server that
-        // may refuse it.
-        sessions: data?.sessions ?? false,
         // `?? 0`: absence means "no cap known", and guessing a number would
         // hide badges a backend would have answered.
         maxElements: data?.max_simulation_elements ?? 0,

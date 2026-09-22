@@ -8,7 +8,6 @@ import hashlib
 import logging
 import secrets
 from functools import lru_cache
-from pathlib import Path
 from typing import Annotated, Optional
 
 from fastapi import Depends, Header, HTTPException, Request
@@ -16,7 +15,6 @@ from fastapi import Depends, Header, HTTPException, Request
 from .config import Settings, get_settings
 from .ratelimit import FixedWindowLimiter
 from .services.llm import LLMConfig, LLMService
-from .storage import MarkdownSessionStore
 
 # Must stay in sync with LLM_PROVIDERS in app/src/constants/llmProviders.js.
 # This is the security boundary — the frontend list is UX only.
@@ -28,38 +26,6 @@ ALLOWED_BASE_URLS = {
 }
 
 logger = logging.getLogger(__name__)
-
-
-def require_sessions_enabled(
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> None:
-    """Gate the sessions router on ``SESSIONS_ENABLED``.
-
-    Off by default when hosted. Storing other people's moral reasoning on a
-    shared machine makes the server a data controller for it, and the browser
-    already keeps the working state — so a hosted instance holds nothing, and
-    participants keep their own sessions via localStorage and Markdown export.
-    A local install keeps disk storage: that is the researcher's own machine.
-    """
-    if not settings.sessions_on:
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                "Server-side session storage is disabled on this instance. "
-                "Your work is kept in this browser; use Export to save a copy."
-            ),
-        )
-
-
-@lru_cache
-def get_session_store() -> MarkdownSessionStore:
-    """Return the singleton session store backed by the configured directory.
-
-    Override in tests with ``app.dependency_overrides[get_session_store]``.
-    To swap for a SQLite backend, change the return type and body here; the
-    router depends only on the ``SessionStore`` protocol, not this concrete type.
-    """
-    return MarkdownSessionStore(Path(get_settings().sessions_dir))
 
 
 _LOOPBACK = {"127.0.0.1", "::1", "localhost"}

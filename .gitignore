@@ -22,8 +22,6 @@ build/
 .DS_Store
 Thumbs.db
 
-sessions/*
-
 # Questionnaire data files
 app/src/questionnaires/*
 

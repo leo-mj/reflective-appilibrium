@@ -4,7 +4,7 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
 
 ## Key files
 - `main.py` — FastAPI entry point
-- `routers/` — judgments, principles, relations, arguments, review, theories, merge, conversations, sessions, simulate_rethon, llm
+- `routers/` — judgments, principles, relations, arguments, review, theories, merge, conversations, simulate_rethon, llm
   (`merge` pairs elements of merged processes; the process record is sent with
   the request, since it is not part of `REState`)
 - `services/llm.py` — LLM service layer
@@ -12,6 +12,15 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
 - `models/re_state.py` — Pydantic state schema
 
 ## Notes
+- **The server writes nothing to disk, and that is a property to keep.** There
+  was a `/api/sessions` router storing RE states as Markdown files under a
+  configured directory, gated on `SESSIONS_ENABLED`; it was removed rather than
+  left switched off, because a gate is one setting away from holding strangers'
+  moral reasoning on a shared machine. The browser keeps the working state
+  (`localStorage`, offered back as "Continue where you left off") and Markdown
+  export is the way out of it. `test_deployment_mode.py` pins the absence — a
+  404 on every `/api/sessions` verb — and `PrivacyModal.jsx` tells the reader
+  "Nothing on disk" unconditionally, which only stays true while this holds.
 - API key lives server-side only (replaces `dangerouslyAllowBrowser` in the frontend)
 - `services/crossref.py` is the one place this server calls a third party that is
   not an LLM provider. Three properties are deliberate and each has a test:

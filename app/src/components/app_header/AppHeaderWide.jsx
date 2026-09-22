@@ -52,11 +52,6 @@ export function AppHeaderWide({
   handleMergeClick,
   handleMergeSampleClick,
   onDownload,
-  onSave,
-  canSaveToServer,
-  saveLabel,
-  saveColor,
-  saveBusy,
   onHome,
   onUndo,
   canUndo,
@@ -590,23 +585,6 @@ export function AppHeaderWide({
                         {MENU_LABELS.export}
                       </button>
                     </Tooltip>
-                    {BACKEND_ENABLED && canSaveToServer && (
-                      <Tooltip text={MENU_TOOLTIPS.save}>
-                        <button
-                          onClick={close(onSave)}
-                          disabled={saveBusy}
-                          style={{
-                            ...menuItem,
-                            ...(saveColor
-                              ? { color: saveColor, borderColor: saveColor }
-                              : {}),
-                          }}
-                        >
-                          <span style={menuIconStyle}>{saveLabel}</span>
-                          {MENU_LABELS.save}
-                        </button>
-                      </Tooltip>
-                    )}
                   </div>
                 </div>
               </>

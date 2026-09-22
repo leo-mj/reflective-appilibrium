@@ -9,7 +9,7 @@ import { render, cleanup } from "@testing-library/react";
 
 const flags = vi.hoisted(() => ({
   backend: true,
-  capabilities: { loaded: true, reachable: true, sessions: false, maxElements: 0 },
+  capabilities: { loaded: true, reachable: true, maxElements: 0 },
 }));
 vi.mock("../../config.js", async (importOriginal) => ({
   ...(await importOriginal()),
@@ -26,7 +26,7 @@ import { PrivacyModal } from "./PrivacyModal.jsx";
 afterEach(() => {
   cleanup();
   flags.backend = true;
-  flags.capabilities = { loaded: true, reachable: true, sessions: false, maxElements: 0 };
+  flags.capabilities = { loaded: true, reachable: true, maxElements: 0 };
 });
 
 const text = () => {
@@ -66,7 +66,8 @@ describe("with a backend", () => {
     expect(t).toContain("Crossref");
   });
 
-  it("says nothing is written to disk when sessions are off", () => {
+  it("says nothing is written to disk", () => {
+    // Unconditional: the server has no route that writes one.
     const t = text();
     expect(t).toContain("Nothing on disk");
   });
@@ -78,22 +79,15 @@ describe("with a backend", () => {
     expect(t).toContain("A discussion is not kept");
   });
 
-  it("says saved sessions are written to disk when they are on", () => {
-    flags.capabilities = { ...flags.capabilities, sessions: true };
-    const t = text();
-    expect(t).toContain("written to its disk");
-    expect(t).not.toContain("Nothing on disk");
-  });
-
   it("claims nothing about retention before the server has answered", () => {
-    flags.capabilities = { loaded: false, reachable: false, sessions: false, maxElements: 0 };
+    flags.capabilities = { loaded: false, reachable: false, maxElements: 0 };
     const t = text();
     expect(t).toContain("Checking what this server keeps");
     expect(t).not.toContain("Nothing on disk");
   });
 
   it("claims nothing about retention when the server cannot be reached", () => {
-    flags.capabilities = { loaded: true, reachable: false, sessions: false, maxElements: 0 };
+    flags.capabilities = { loaded: true, reachable: false, maxElements: 0 };
     const t = text();
     expect(t).toContain("could not be checked");
     expect(t).not.toContain("Nothing on disk");

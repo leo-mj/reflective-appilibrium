@@ -23,7 +23,6 @@ from .dependencies import (
     rate_limit_simulation,
     rate_limit_stepping,
     require_access_token,
-    require_sessions_enabled,
 )
 from .routers import (
     conversations,
@@ -33,7 +32,6 @@ from .routers import (
     principles,
     relations,
     review,
-    sessions,
     simulate_rethon,
     theories,
     arguments,
@@ -106,9 +104,6 @@ app.include_router(merge.router, dependencies=_gated)
 app.include_router(principles.router, dependencies=_gated)
 app.include_router(relations.router, dependencies=_gated)
 app.include_router(review.router, dependencies=_gated)
-app.include_router(
-    sessions.router, dependencies=_gated + [Depends(require_sessions_enabled)]
-)
 # Three routers over one prefix, each with its own allowance, because "how
 # expensive is one call" and "how often is it called" are independent here and a
 # single bucket can only express one of them.
@@ -173,11 +168,10 @@ async def health(
     """Return service status, the active model, and which features are on.
 
     Deliberately outside the access-token gate so an uptime check needs no
-    credential. ``sessions`` is what lets the frontend hide the save and load
-    controls rather than offer them and fail: the browser cannot otherwise know
-    whether this instance persists anything.
+    credential.
 
-    ``max_simulation_elements`` is here for the same reason, and 0 means no cap.
+    ``max_simulation_elements`` is what lets the frontend stop asking rather
+    than ask and be refused, and 0 means no cap.
     The score-delta badges ask what the state *plus one suggested element* would
     score, so at exactly the cap every badge asks for one element too many and
     gets a 422 while the baseline beside it succeeds. Telling the browser the
@@ -191,6 +185,5 @@ async def health(
         "status": "ok",
         "model": settings.default_model,
         "deployment": settings.deployment,
-        "sessions": settings.sessions_on,
         "max_simulation_elements": settings.simulation_max_elements,
     }

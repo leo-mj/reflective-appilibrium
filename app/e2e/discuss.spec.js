@@ -41,7 +41,7 @@ async function fakeBackend(page, { conversation } = {}) {
     if (method === "OPTIONS") return route.fulfill({ status: 204, headers: cors() });
 
     if (pathname === "/api/health") {
-      return json(route, 200, { status: "ok", sessions: false, max_elements: 0 });
+      return json(route, 200, { status: "ok", max_elements: 0 });
     }
     if (pathname === "/api/judgments/elicit") {
       return json(route, 200, {
@@ -59,7 +59,7 @@ async function fakeBackend(page, { conversation } = {}) {
       const question = body.messages.at(-1).content;
       return json(route, 200, { reply: `Reply to: ${question}`, model: "e2e-model" });
     }
-    // Scores, providers, sessions: nothing this spec is about. A failure is
+    // Scores and providers: nothing this spec is about. A failure is
     // what the app already tolerates from each of them.
     return json(route, 503, { detail: "not part of this test" });
   });

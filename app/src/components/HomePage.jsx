@@ -4,22 +4,15 @@
  * @module components/HomePage
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { C, inkOn } from "../constants/colors.js";
 import { Tooltip } from "./Tooltip.jsx";
 import { useTheme, usePalette } from "../hooks/useTheme.js";
-import {
-  fetchSessions,
-  loadSession,
-  deleteSession,
-} from "../utils/sessionsClient.js";
 import {
   clearDraft,
   isWorthResuming,
   loadDraft,
 } from "../utils/draftStorage.js";
-import { useBackendCapabilities } from "../hooks/useBackendCapabilities.js";
-import { BACKEND_ENABLED } from "../config.js";
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -272,169 +265,6 @@ function QuestionnaireCard({ spec, onLoad }) {
   );
 }
 
-// ─── SessionsCard ─────────────────────────────────────────────────────────────
-
-/**
- * Card listing saved backend sessions with load and delete actions.
- *
- * @param {Object}   props
- * @param {Function} props.onLoad - Called with a loaded REState object.
- */
-function SessionsCard({ onLoad }) {
-  const [sessions, setSessions] = useState(null); // null = not yet fetched
-  const [error, setError] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
-  const [loadingId, setLoadingId] = useState(null);
-
-  const refresh = useCallback(() => {
-    setError(null);
-    fetchSessions()
-      .then(setSessions)
-      .catch((e) => setError(e.message));
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  const handleLoad = async (id) => {
-    setLoadingId(id);
-    try {
-      const state = await loadSession(id);
-      onLoad(state);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    setDeletingId(id);
-    try {
-      await deleteSession(id);
-      setSessions((prev) => prev.filter((s) => s.session_id !== id));
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const formatDate = (iso) =>
-    new Date(iso).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-  let body;
-  if (sessions === null) {
-    body = <div style={{ fontSize: 12, color: C.dim }}>Loading…</div>;
-  } else if (error) {
-    body = <div style={{ fontSize: 12, color: C.conflicts }}>{error}</div>;
-  } else if (sessions.length === 0) {
-    body = <div style={{ fontSize: 12, color: C.dim }}>No saved sessions.</div>;
-  } else {
-    body = sessions.map((s) => (
-      <div
-        key={s.session_id}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "7px 10px",
-          borderRadius: 6,
-          background: C.bg,
-          border: `1px solid ${C.border}`,
-        }}
-      >
-        {/* Topic + meta */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 12,
-              color: C.text,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {s.topic || "(untitled)"}
-          </div>
-          <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
-            Round {s.round} · {formatDate(s.saved_at)}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <button
-          style={{
-            ...BTN_STYLE,
-            padding: "4px 12px",
-            fontSize: 11,
-            background: loadingId === s.session_id ? C.border : C.supports,
-            color: C.onFill,
-          }}
-          disabled={loadingId === s.session_id || deletingId === s.session_id}
-          onClick={() => handleLoad(s.session_id)}
-        >
-          {loadingId === s.session_id ? "…" : "Load"}
-        </button>
-        <Tooltip text="Delete session">
-          <button
-            style={{
-              ...BTN_STYLE,
-              padding: "4px 8px",
-              fontSize: 11,
-              background: "transparent",
-              color: deletingId === s.session_id ? C.dim : C.dim,
-              border: `1px solid ${C.border}`,
-            }}
-            disabled={loadingId === s.session_id || deletingId === s.session_id}
-            onClick={() => handleDelete(s.session_id)}
-          >
-            {deletingId === s.session_id ? "…" : "×"}
-          </button>
-        </Tooltip>
-      </div>
-    ));
-  }
-
-  return (
-    <div style={{ ...CARD_STYLE, flexBasis: "100%", gap: 8 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <h2 style={TITLE_STYLE}>Saved sessions</h2>
-        {sessions !== null && (
-          <button
-            style={{
-              ...BTN_STYLE,
-              padding: "3px 8px",
-              fontSize: 11,
-              background: "transparent",
-              color: C.dim,
-              border: `1px solid ${C.border}`,
-            }}
-            onClick={refresh}
-          >
-            Refresh
-          </button>
-        )}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {body}
-      </div>
-    </div>
-  );
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 /**
@@ -443,7 +273,8 @@ function SessionsCard({ onLoad }) {
  * @param {Object}   props
  * @param {Function} props.onStartFresh   - Called with a topic string to start a blank RE process.
  * @param {Function} props.onLoadSample   - Called to load the sample RE process.
- * @param {Function} props.onLoadSession  - Called with a full REState loaded from the backend.
+ * @param {Function} props.onLoadSession  - Called with a full REState — the
+ *   autosaved draft this page offers back under "Continue where you left off".
  */
 export function HomePage({
   onStartFresh,
@@ -452,7 +283,6 @@ export function HomePage({
   onLoadSession,
 }) {
   const { isDark, toggle: toggleTheme } = useTheme();
-  const capabilities = useBackendCapabilities();
   // Read once on mount: the draft is written by the editor, so it cannot change
   // while this page is on screen, and re-reading would fight the Discard button.
   const [draft, setDraft] = useState(() => loadDraft());
@@ -593,11 +423,6 @@ export function HomePage({
             onLoad={() => onLoadQuestionnaire(spec)}
           />
         ))}
-        {/* Only when this backend actually stores sessions — a hosted instance
-            keeps nothing, so the card would list an empty 403. */}
-        {BACKEND_ENABLED && capabilities.sessions && (
-          <SessionsCard onLoad={onLoadSession} />
-        )}
       </section>
       <div
         style={{

@@ -28,21 +28,19 @@ def test_local_is_the_default():
     assert make_settings().deployment == "local"
 
 
-def test_local_lends_keys_runs_unlimited_and_stores_sessions():
+def test_local_lends_keys_and_runs_unlimited():
     s = make_settings()
     assert s.server_keys_allowed is True
     assert s.llm_rate_limit == 0
     assert s.simulation_rate_limit == 0
     assert s.stepping_rate_limit == 0
     assert s.scoring_rate_limit == 0
-    assert s.sessions_on is True
 
 
-def test_hosted_flips_all_three():
+def test_hosted_flips_them():
     s = make_settings(deployment="hosted")
     assert s.server_keys_allowed is False
     assert s.llm_rate_limit == 60
-    assert s.sessions_on is False
 
 
 def test_hosted_caps_the_four_features_separately():
@@ -122,7 +120,6 @@ def test_an_unknown_deployment_value_is_rejected():
         ("stepping_rate_limit_per_minute", 0, "stepping_rate_limit", 0),
         ("scoring_rate_limit_per_minute", 10, "scoring_rate_limit", 10),
         ("scoring_rate_limit_per_minute", 0, "scoring_rate_limit", 0),
-        ("sessions_enabled", True, "sessions_on", True),
     ],
 )
 def test_hosted_defaults_can_be_overridden(field, value, prop, expected):
@@ -137,7 +134,6 @@ def test_hosted_defaults_can_be_overridden(field, value, prop, expected):
         ("llm_rate_limit_per_minute", 10, "llm_rate_limit", 10),
         ("simulation_rate_limit_per_minute", 2, "simulation_rate_limit", 2),
         ("scoring_rate_limit_per_minute", 30, "scoring_rate_limit", 30),
-        ("sessions_enabled", False, "sessions_on", False),
     ],
 )
 def test_local_defaults_can_be_overridden(field, value, prop, expected):
@@ -159,79 +155,42 @@ def test_a_local_install_is_not_rate_limited_end_to_end(mock_llm_complete):
     assert codes == {200}
 
 
-# ── Session storage follows the mode ──────────────────────────────────────────
-
-
-def a_state() -> dict:
-    return {
-        "topic": "t",
-        "round": 1,
-        "elements": [],
-        "relations": [],
-        "coherence": {"tensions": [], "orphans": [], "clusters": []},
-        "log": [],
-    }
+# ── Nothing is written to disk, in either mode ────────────────────────────────
 
 
 @pytest.mark.parametrize(
     "method, path",
     [
+        ("post", "/api/sessions"),
         ("get", "/api/sessions"),
         ("get", "/api/sessions/anything"),
         ("delete", "/api/sessions/anything"),
     ],
 )
-def test_hosted_refuses_to_read_or_delete_sessions(method, path):
+def test_there_is_no_session_storage_endpoint(method, path):
+    """Server-side session storage was removed, not gated.
+
+    A gate is a setting away from writing strangers' moral reasoning to a
+    shared machine's disk; a missing route is not. The browser keeps the
+    working state and Markdown export is the way out of it.
+    """
     try:
-        client = _client_with(make_settings(deployment="hosted"))
+        client = _client_with(make_settings())
         res = getattr(client, method)(path)
     finally:
         app.dependency_overrides.clear()
-    assert res.status_code == 403
+    assert res.status_code == 404
 
 
-def test_hosted_refuses_to_write_a_session():
-    """Nothing of a participant's reasoning is written to a shared machine."""
-    try:
-        client = _client_with(make_settings(deployment="hosted"))
-        res = client.post("/api/sessions", json=a_state())
-    finally:
-        app.dependency_overrides.clear()
-    assert res.status_code == 403
+# ── Health advertises the mode ────────────────────────────────────────────────
 
 
-def test_the_refusal_tells_the_user_where_their_work_is():
-    try:
-        client = _client_with(make_settings(deployment="hosted"))
-        detail = client.get("/api/sessions").json()["detail"]
-    finally:
-        app.dependency_overrides.clear()
-    assert "browser" in detail and "Export" in detail
-
-
-def test_a_hosted_instance_may_still_opt_into_disk_storage(tmp_path):
-    try:
-        client = _client_with(
-            make_settings(
-                deployment="hosted", sessions_enabled=True, sessions_dir=str(tmp_path)
-            )
-        )
-        assert client.get("/api/sessions").status_code == 200
-    finally:
-        app.dependency_overrides.clear()
-
-
-# ── Health advertises the capability ──────────────────────────────────────────
-
-
-def test_health_reports_the_mode_and_session_capability():
-    """This is how the browser knows whether to offer save and load at all."""
+def test_health_reports_the_mode():
     try:
         local = _client_with(make_settings()).get("/api/health").json()
     finally:
         app.dependency_overrides.clear()
     assert local["deployment"] == "local"
-    assert local["sessions"] is True
 
     try:
         hosted = (
@@ -240,7 +199,6 @@ def test_health_reports_the_mode_and_session_capability():
     finally:
         app.dependency_overrides.clear()
     assert hosted["deployment"] == "hosted"
-    assert hosted["sessions"] is False
 
 
 def test_health_needs_no_token_even_when_one_is_configured():

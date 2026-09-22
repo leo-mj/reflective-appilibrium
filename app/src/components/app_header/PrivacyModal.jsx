@@ -9,9 +9,14 @@
  *
  * Every sentence here has to be true of the build and server the reader is
  * actually using, so the wording follows what can be known: whether this build
- * has a backend at all, and — from the health check — whether that backend
- * writes sessions to disk. Where the check has not answered, it says so rather
- * than guessing in the reassuring direction.
+ * has a backend at all, and — from the health check — whether that backend is
+ * answering. Where the check has not answered, it says so rather than guessing
+ * in the reassuring direction.
+ *
+ * "Nothing on disk" is unconditional because the server has no route that
+ * writes one: session storage was removed rather than switched off. If
+ * anything on the server ever does persist, this is the sentence that has to
+ * change first.
  *
  * Kept in step with the backend by hand. If a claim below stops being true —
  * a new log line with content, a new third party, a longer retention — this is
@@ -51,10 +56,8 @@ function privacySections({ backend, capabilities }) {
     kept = "The server could not be reached, so what it keeps could not be checked.";
   } else {
     kept =
-      (capabilities.sessions
-        ? "Sessions you store with Save are written to its disk. Nothing else is."
-        : "Nothing on disk.") +
-      " A discussion is not kept either: this page sends it whole with each question. " +
+      "Nothing on disk. " +
+      "A discussion is not kept either: this page sends it whole with each question. " +
       "Where rate limits are on, the address or access token you connect from is counted for a minute. " +
       "Its logs record counts, ids and model names, never what you wrote. " +
       "The service hosting it may keep its own connection logs.";

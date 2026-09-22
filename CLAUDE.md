@@ -10,12 +10,20 @@ Phase 3 = Integration of rethon (computational RE).
 - `app/` — the React SPA (Vite). See `app/CLAUDE.md`.
 - `backend/` — FastAPI: LLM proxy plus the Python RE computation layer. See `backend/CLAUDE.md`.
 - `skill/` — Phase 1 Claude Skill, and the prose reference the domain model below follows.
-- `plans/`, `sessions/` — design notes and captured runs.
+- `plans/` — design notes.
 
 One codebase ships two ways, selected by `VITE_APP_ENV` (`app/src/config.js`):
 `demo` is the public static build with no backend and no LLM; `dev` and `backend`
 turn on the backend, the LLM features and the BYOK settings modal. State files are
 interchangeable between them — export/import is the handoff.
+
+**Nothing is stored on a server, in either build.** The working state is
+autosaved to the browser (`localStorage`, offered back as "Continue where you
+left off") and Markdown export is the only way out of it. There was a
+`/api/sessions` router writing RE states to a directory on disk; it was removed
+rather than switched off, since a gate is one setting away from holding
+strangers' moral reasoning on a shared machine. See `backend/CLAUDE.md` for what
+pins that.
 
 Frontend tests are Vitest (`npm test` in `app/`) plus Playwright (`npm run test:e2e`,
 see `app/e2e/README.md`); the backend is pytest from the repo root.

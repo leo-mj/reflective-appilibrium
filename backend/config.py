@@ -17,7 +17,7 @@ rather than four independent ones to remember.
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path  # used in default value for sessions_dir
+from pathlib import Path  # used to locate the .env file
 from typing import Literal, Optional
 from urllib.parse import urlsplit
 
@@ -112,8 +112,8 @@ class Settings(BaseSettings):
 
     The ``Optional`` fields below mean "follow ``deployment``" when unset. Read
     them through the resolved properties (``server_keys_allowed``,
-    ``llm_rate_limit``, ``simulation_rate_limit``, ``scoring_rate_limit``,
-    ``sessions_on``) rather than directly, or the mode is silently ignored.
+    ``llm_rate_limit``, ``simulation_rate_limit``, ``scoring_rate_limit``)
+    rather than directly, or the mode is silently ignored.
     """
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
@@ -127,7 +127,6 @@ class Settings(BaseSettings):
     llm_api_keys: dict[str, str] = {}
     default_model: str = "gpt-4o-mini"
     cors_origins: str = "http://localhost:5173"
-    sessions_dir: str = str(Path(__file__).parent.parent / "sessions")
 
     # Comma-separated. When non-empty, every /api route except /api/health
     # requires one of these values in an x-app-token header.
@@ -187,9 +186,6 @@ class Settings(BaseSettings):
     # at the same time, at a core each.
     simulation_workers: int = Field(default=1, ge=1)
     scoring_workers: int = Field(default=1, ge=1)
-
-    # Whether /api/sessions may read and write session files on disk.
-    sessions_enabled: Optional[bool] = None
 
     # ── Provider mechanics ────────────────────────────────────────────────────
 
@@ -369,18 +365,6 @@ class Settings(BaseSettings):
         if self.simulation_timeout_seconds is not None:
             return self.simulation_timeout_seconds
         return _HOSTED_COMPUTATION_TIMEOUT if self.is_hosted else 0
-
-    @property
-    def sessions_on(self) -> bool:
-        """Whether the server persists sessions to disk.
-
-        Off when hosted: storing other people's reasoning on a shared box makes
-        the server a data controller, and the browser keeps the working state
-        anyway. Local installs keep it — that is the researcher's own machine.
-        """
-        if self.sessions_enabled is not None:
-            return self.sessions_enabled
-        return not self.is_hosted
 
 
 @lru_cache

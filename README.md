@@ -8,7 +8,7 @@ It is part of a research project exploring in how far LLMs can assist in RE proc
 The app ships in two configurations. Both are the same React SPA — the demo is not a reduced build, it is the full interface with the AI and simulation features switched off and replaced by pre-set examples.
 
 - **Demo version** — a static site. No server, no API key, nothing leaves the browser. Live at <https://leo-mj.github.io/reflective-appilibrium/>.
-- **Backend version** — the SPA plus a FastAPI server that provides LLM access, session storage, and the rethon RE simulation. Run it locally or deploy the backend yourself.
+- **Backend version** — the SPA plus a FastAPI server that provides LLM access and the rethon RE simulation. The server keeps nothing: your work stays in the browser and leaves it as a Markdown export. Run it locally or deploy the backend yourself.
 
 | Capability                                                                                  | Demo                   | Backend  |
 | ------------------------------------------------------------------------------------------- | ---------------------- | -------- |
@@ -20,11 +20,11 @@ The app ships in two configurations. Both are the same React SPA — the demo is
 | Discuss panel — follow-up conversation about a suggestion                                   | ✗                      | ✓        |
 | Simulate tab — formal rethon RE process and equilibrium scores                              | ✗                      | ✓        |
 | Equilibrium scores in the Text tab (per round, per withdrawal)                              | ✗                      | ✓        |
-| Saving and reloading sessions on the server                                                 | ✗²                     | ✓        |
 | LLM settings — provider, model, bring-your-own-key                                          | ✗                      | ✓        |
 
 ¹ In the demo, the Assist tabs return pre-set example suggestions when you are working on the sample process, and are disabled on a process of your own. A banner at the top of the app says so.
-² The demo can still export the full state to Markdown and re-import it later.
+
+Neither version stores anything on a server. Both autosave the working state to the browser, and both export the full state to Markdown to re-import later.
 
 ## Demo version
 
@@ -42,7 +42,7 @@ Deploy the resulting `dist/` folder to any static host. Note that the production
 
 ## Backend version
 
-The FastAPI backend exposes the LLM endpoints, session persistence, and the rethon simulation. It must be running for the Assist tabs, the Discuss panel, the Simulate tab and session storage to work.
+The FastAPI backend exposes the LLM endpoints and the rethon simulation. It must be running for the Assist tabs, the Discuss panel and the Simulate tab to work.
 
 ### Prerequisites
 
@@ -84,9 +84,6 @@ DEFAULT_MODEL=gpt-4o-mini
 
 # Allowed CORS origins (no wildcards).
 CORS_ORIGINS=http://localhost:5173
-
-# Where RE sessions are stored. Defaults to <repo-root>/sessions.
-# SESSIONS_DIR=/var/data/reflective-appilibrium/sessions
 ```
 
 To run against a local model only (e.g. Ollama):
@@ -130,13 +127,15 @@ The app runs at `http://localhost:5173` with all backend features enabled.
 
 Set `DEPLOYMENT=hosted` in `backend/.env`. Whether anyone but you can reach the
 server cannot be detected at runtime — behind a reverse proxy `request.client` is
-the proxy, not the caller — so it is declared, and three protections follow:
+the proxy, not the caller — so it is declared, and two protections follow:
 
 | | `local` (default) | `hosted` |
 | --- | --- | --- |
 | Server-side API keys | lent to callers on localhost | never; every user brings their own |
 | Rate limit | none | 60/min per caller, separately for LLM calls and simulations |
-| Session storage | on, to disk under `SESSIONS_DIR` | off; the browser keeps the working state |
+
+The server writes nothing to disk in either mode — see "Where your work lives"
+below.
 
 "Local" means uvicorn and the browser on the same machine. A LAN, a tunnel, a VPS
 or a container behind nginx is `hosted`. Each protection can still be set
@@ -148,8 +147,8 @@ port. Issue **one token per participant** for a class or study: the rate limiter
 buckets by whichever token matched, so distinct tokens give each person their own
 allowance, whereas a single shared token puts a whole seminar room into one.
 
-The rate limiter, the session store and the discussion sessions all live in one
-process, so run **one** uvicorn worker unless you replace them with a shared store.
+The rate limiter lives in one process, so run **one** uvicorn worker unless you
+replace it with a shared store.
 
 **Behind a reverse proxy, tell uvicorn to trust it.** Without tokens the rate
 limiter identifies callers by address, and an untrusted proxy's address is the
@@ -159,13 +158,13 @@ either useless or a site-wide outage. Start uvicorn with
 default). The backend logs a warning at startup when this applies, and a second,
 once per process, when a request shows a proxy uvicorn is ignoring.
 
-### Where a session lives
+### Where your work lives
 
 The working state is written to the browser's `localStorage` as you go, and the
 home page offers it back under "Continue where you left off". That is the only
-persistence a `hosted` instance provides — nothing of a participant's reasoning
-is written to the server — so encourage exporting to Markdown for anything that
-needs to outlive a browser profile.
+persistence there is, in either deployment mode: the server has no endpoint that
+writes to disk, so nothing of anyone's reasoning is stored on it. Encourage
+exporting to Markdown for anything that needs to outlive a browser profile.
 
 Then build the frontend:
 

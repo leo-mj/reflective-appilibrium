@@ -8,14 +8,12 @@ import { useSplitRatio } from "../hooks/useSplitRatio.js";
 import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { useAutosaveDraft } from "../hooks/useAutosaveDraft.js";
-import { useBackendCapabilities } from "../hooks/useBackendCapabilities.js";
 import {
   ADD_BAR_PRESETS,
   ASSIST_TABS,
   SIMULATE_TABS,
 } from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
-import { saveSession } from "../utils/sessionsClient.js";
 import {
   completesIteration,
   nextPhaseEnabled,
@@ -142,9 +140,6 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleRedo,
     canRedo,
   } = useREActions(initialState);
-
-  // What this backend actually allows, which build-time flags cannot say.
-  const capabilities = useBackendCapabilities();
 
   // Not the sample: it is a fixed demonstration anyone can reload from the home
   // page, and autosaving it would bury the visitor's own work under it.
@@ -521,8 +516,6 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         onDownload={() => downloadMarkdown(state, positions)}
-        onSave={() => saveSession(state)}
-        canSaveToServer={capabilities.sessions}
         onImportFile={handleImportFile}
         onPrepareMerge={handlePrepareMerge}
         onConfirmMerge={handleConfirmMerge}
