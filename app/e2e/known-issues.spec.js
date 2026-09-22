@@ -147,47 +147,67 @@ test.describe("Fixed defects", () => {
     ).toEqual([]);
   });
 
-  test('the "↑ Top" button does not cover list content', async ({ page }) => {
+  test('the "↑ Top" button leaves the end of the list uncovered', async ({ page }) => {
     // Was: the jump-to-top control is painted over the scroll container at
-    // bottom-left with no space reserved for it, so it sat on whichever card
-    // was scrolled underneath — J5's statement in the demo, the sort toggle
-    // elsewhere. Fixed by padding the list and only showing the button once
-    // there is something to scroll back from (TextTab.jsx).
+    // bottom-left with no space reserved for it, so the last card sat under it
+    // for good — scrolling could never bring it out. Fixed by padding the list
+    // by TOP_BUTTON_CLEARANCE and only showing the button once there is
+    // something to scroll back from (TextTab.jsx).
+    //
+    // What the padding guarantees is the end of the list, so that is what is
+    // checked. Mid-list the button does sit over whichever card is scrolled
+    // under it, and that is accepted: a floating control covers something
+    // wherever it floats, and every line of every card can still be scrolled
+    // clear of it. This used to scroll a fixed 1200px and pass only while that
+    // happened to reach the end; taller cards moved the end, and it failed on
+    // exactly that mid-list overlap.
     await gotoHome(page);
     await loadSample(page);
 
-    // Scroll far enough for the button to appear in the first place.
-    const list = page.locator('button:text-is("Revise")').first();
-    await list.scrollIntoViewIfNeeded();
-    await page.mouse.wheel(0, 1200);
+    // To the very end of the list's own scroll container.
+    const scrolled = await page.evaluate(() => {
+      let box = document.querySelector('[data-card="element"]');
+      while (box && getComputedStyle(box).overflowY !== "auto") box = box.parentElement;
+      if (!box || box.scrollHeight <= box.clientHeight) return false;
+      box.scrollTop = box.scrollHeight;
+      return true;
+    });
+    expect(scrolled, "no scrollable element list found").toBe(true);
     await park(page);
 
     const topButton = page.locator('button:text-is("↑ Top")');
     await expect(topButton).toBeVisible();
 
-    // Geometric overlap against the cards themselves. `elementsFromPoint` is no
-    // use here: it also returns every ancestor of the button, which trivially
-    // "contains" the whole page and would report an overlap either way.
+    // Geometric overlap against every line of text in the list, not only the
+    // cards: at the end of the list what sits lowest is the folded section
+    // headers, and a check against cards alone passed with the padding taken
+    // out. Text boxes come from Range rects, so a line counts as covered only
+    // where its words are. `elementsFromPoint` is no use here: it also returns
+    // every ancestor of the button, which trivially "contains" the whole page.
     const covered = await page.evaluate(() => {
       const top = [...document.querySelectorAll("button")].find(
         (b) => b.textContent.trim() === "↑ Top",
       );
       const b = top.getBoundingClientRect();
-      return [...document.querySelectorAll('[data-card="element"]')]
-        .filter((card) => {
-          const r = card.getBoundingClientRect();
-          return (
-            r.left < b.right &&
-            r.right > b.left &&
-            r.top < b.bottom &&
-            r.bottom > b.top
-          );
-        })
-        .map((card) => card.innerText.replace(/\s+/g, " ").trim().slice(0, 60));
+      let box = document.querySelector('[data-card="element"]');
+      while (box && getComputedStyle(box).overflowY !== "auto") box = box.parentElement;
+
+      const hits = [];
+      const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent.trim() || top.contains(node)) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const overlaps = [...range.getClientRects()].some(
+          (r) => r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top,
+        );
+        if (overlaps) hits.push(node.textContent.replace(/\s+/g, " ").trim().slice(0, 60));
+      }
+      return hits;
     });
     expect(
       covered,
-      `'↑ Top' overlaps a card: ${JSON.stringify(covered[0])}`,
+      `'↑ Top' covers list text at the end of the list: ${JSON.stringify(covered[0])}`,
     ).toEqual([]);
   });
 

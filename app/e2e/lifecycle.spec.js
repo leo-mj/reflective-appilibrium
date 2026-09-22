@@ -40,8 +40,11 @@ test.describe("Element lifecycle", () => {
     await park(page);
 
     await expect(page.locator("body")).toContainText("usually wrong");
-    await expect(page.locator("body")).toContainText(/Previously/i);
+    // The card's previous-wording panel, headed "Revised in round N · Previous
+    // wording", with the old text under it.
+    await expect(page.locator("body")).toContainText(/Previous wording/i);
     await expect(page.locator("body")).toContainText(/revised/i);
+    await expect(page.locator("body")).toContainText("Breaking a promise to a friend is wrong.");
   });
 
   test("an argument links premises to a conclusion", async ({ page }) => {
@@ -51,6 +54,8 @@ test.describe("Element lifecycle", () => {
     await addElement(page, "principle", "Promises must always be kept.");
 
     await ensureAddTab(page, "Argument");
+    // The tab opens on Write; this test links existing elements, which is Pick.
+    await page.getByRole("button", { name: "Pick", exact: true }).click();
     await expect(
       page.getByRole("combobox", { name: "Premise 1" }),
     ).toBeVisible();

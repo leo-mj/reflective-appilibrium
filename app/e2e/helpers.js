@@ -109,6 +109,19 @@ export async function loadSample(page) {
 }
 
 /**
+ * The landing page's light/dark switch.
+ *
+ * Found by its accessible name. The app sets no DOM `title` anywhere any more
+ * (components/Tooltip.jsx), and the button is an icon, so the name is what
+ * Tooltip gives it — "Switch to light mode" or "Switch to dark mode".
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+export function themeToggle(page) {
+  return page.getByRole("button", { name: /^Switch to (light|dark) mode$/ });
+}
+
+/**
  * The add bar's textarea — the only textarea on screen when no modal is open.
  *
  * @param {import('@playwright/test').Page} page
@@ -140,7 +153,10 @@ export function modalTextarea(page) {
  * @param {"Element"|"Argument"} tab
  */
 export async function ensureAddTab(page, tab) {
-  const wanted = tab === "Element" ? /Enter statement/ : /premises/;
+  // The Argument tab has two modes, and opens on Write, whose first field is
+  // "Premise 1…"; Pick's is the explanation, "Why do these premises…". Either
+  // one means the bar is on the Argument tab — which mode is the caller's call.
+  const wanted = tab === "Element" ? /Enter statement/ : /premises|^Premise \d/;
   const current = (await addBar(page).getAttribute("placeholder")) ?? "";
   if (!wanted.test(current)) {
     await page.locator(`button:text-is("${tab}")`).click();
