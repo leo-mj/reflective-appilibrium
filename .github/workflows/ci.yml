@@ -77,6 +77,54 @@ jobs:
         if: failure()
         run: docker logs backend || true
 
+  # The single-host setup from docker-compose.yml: nginx serving the page and
+  # forwarding /api to the backend. Checked over HTTP rather than trusted,
+  # because each thing it promises fails silently — a wrong base path is a blank
+  # page, a missing fallback is a 404 on reload, a policy naming the wrong
+  # backend refuses every request.
+  stack:
+    name: Frontend image and single-host stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and start
+        run: docker compose up -d --build
+
+      - name: Check the page and the proxy
+        run: |
+          base=http://127.0.0.1:8080
+          for _ in $(seq 60); do
+            curl -fsS "$base/api/health" -o health.json && break
+            sleep 2
+          done
+          test -s health.json || { echo "::error::/api/health did not answer through nginx within two minutes."; exit 1; }
+
+          # /api reaches the backend, in the hosted posture.
+          cat health.json
+          grep -q '"deployment":"hosted"' health.json
+
+          # The page, built for its own origin: connect-src names nothing else.
+          curl -fsS "$base/" -o index.html
+          grep -o "connect-src [^;]*" index.html | grep -qx "connect-src 'self'"
+
+          # A deep link or a reload falls back to the app instead of 404ing.
+          curl -fsS "$base/some/deep/link" | grep -q '<div id="root">'
+
+          # frame-ancestors, which the meta tag cannot carry, comes as a header.
+          curl -fsSI "$base/" | grep -qi "^content-security-policy: frame-ancestors 'none'"
+
+          # Hashed assets are cached for good; the page itself never is.
+          asset=$(grep -o '/assets/[^"]*\.js' index.html | head -1)
+          curl -fsSI "$base$asset" | grep -qi '^cache-control: public, max-age=31536000, immutable'
+          curl -fsSI "$base/" | grep -qi '^cache-control: no-cache'
+
+      - name: Container logs
+        if: failure()
+        run: docker compose logs
+
   test:
     name: Frontend tests
     runs-on: ubuntu-latest

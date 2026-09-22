@@ -1,0 +1,27 @@
+# The page and the backend behind one host — the shape a university or any
+# single-server host runs — on your own machine:
+#
+#   docker compose up --build
+#
+# then http://localhost:8080. The frontend container serves the app and forwards
+# /api to the backend, which publishes no port of its own: every request reaches
+# it through nginx, so the browser only ever talks to one origin.
+
+services:
+  backend:
+    build: .
+    environment:
+      DEPLOYMENT: hosted
+      # Same origin throughout, so no cross-origin caller to allow.
+      CORS_ORIGINS: ""
+
+  frontend:
+    build: ./app
+    ports:
+      - "8080:8080"
+    environment:
+      BACKEND_UPSTREAM: backend:8000
+    # Started after, not healthy after: nginx resolves the backend per request,
+    # so it can serve the page while the backend is still importing rethon.
+    depends_on:
+      - backend

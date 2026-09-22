@@ -1,0 +1,69 @@
+# The frontend container's server. A template: ${BACKEND_UPSTREAM},
+# ${TRUSTED_PROXY} and ${NGINX_LOCAL_RESOLVERS} are filled in from the
+# environment when the container starts (see app/Dockerfile).
+
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    server_tokens off;
+
+    gzip on;
+    gzip_min_length 1024;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    # Who the visitor is. The backend rate-limits by the address it is handed,
+    # so that address must be the visitor's rather than a proxy's, and must not
+    # be one the visitor made up. Only a proxy at TRUSTED_PROXY is believed about
+    # X-Forwarded-For; anyone else is taken to be the visitor, whatever the
+    # header says.
+    set_real_ip_from ${TRUSTED_PROXY};
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
+    # ── /api → the backend ───────────────────────────────────────────────────
+
+    location /api/ {
+        # A variable in proxy_pass makes nginx resolve the name per request, so
+        # a restarted backend on a new address is found rather than 502ing
+        # until this container restarts too. The request URI passes unchanged.
+        resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
+        set $backend http://${BACKEND_UPSTREAM};
+        proxy_pass $backend;
+
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # Replaced, not appended to: $remote_addr is the visitor as settled
+        # above, and anything a visitor put in the header themselves stops here.
+        proxy_set_header X-Forwarded-For $remote_addr;
+
+        # A simulation may run for 60s when hosted, and a provider call for 90s
+        # plus a retry. A stopped simulation still ends at once: when the browser
+        # hangs up, nginx closes the backend connection, and the backend kills
+        # the computation (routers/simulate_rethon.py).
+        proxy_read_timeout 300s;
+
+        # A discussion carries the whole RE state and every earlier turn.
+        client_max_body_size 10m;
+    }
+
+    # ── The page ─────────────────────────────────────────────────────────────
+
+    # Built files carry a content hash in their name, so a changed file is a new
+    # URL and these can be kept for a year.
+    location /assets/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    # Everything else: a real file if there is one, otherwise the app itself.
+    # index.html is revalidated on every load, so a deploy reaches visitors at
+    # once rather than when a cached copy expires.
+    location / {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        try_files $uri /index.html;
+    }
+}
