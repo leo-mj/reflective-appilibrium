@@ -140,6 +140,23 @@ class Settings(BaseSettings):
     # dependencies.client_identity.
     app_access_tokens: str = ""
 
+    # How many proxies in front of uvicorn append to x-forwarded-for. With no
+    # tokens, a rate-limited caller is identified by address, and this says
+    # which address: the entry that many places from the *right* of the header,
+    # the one the outermost trusted proxy wrote. 0 means use the socket peer and
+    # read no header at all.
+    #
+    # Counted from the right because proxies append: everything left of what
+    # they wrote is whatever the caller chose to send. uvicorn's
+    # --forwarded-allow-ips="*" takes the *leftmost* entry instead, which is why
+    # the image no longer passes it — under it, a caller rotating the header got
+    # a fresh allowance on every request.
+    #
+    # Cloud Run, Fly and Render each put one proxy in front: 1. Behind a load
+    # balancer that also appends, 2. Never set it on a port reachable directly,
+    # where the caller writes the rightmost entry too.
+    trusted_proxy_hops: int = Field(default=0, ge=0)
+
     # ── Mode-derived (None = follow `deployment`) ─────────────────────────────
 
     # Whether a caller that sends no key of its own may spend a server-side one.
@@ -148,7 +165,10 @@ class Settings(BaseSettings):
     #
     # If you terminate at a proxy and still want the loopback rule, run uvicorn
     # with --forwarded-allow-ips set to the proxy's address so request.client
-    # reflects the real caller, and set this to true explicitly.
+    # reflects the real caller, and set this to true explicitly. Never with
+    # --forwarded-allow-ips="*": that takes request.client from the header, so
+    # "x-forwarded-for: 127.0.0.1" would read as local. get_llm_service also
+    # refuses any request whose forwarded chain names a non-loopback address.
     allow_loopback_server_keys: Optional[bool] = None
 
     # Per-caller caps per minute, one bucket each. 0 disables that bucket.

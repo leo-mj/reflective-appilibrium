@@ -252,3 +252,42 @@ and `.env.example` should say so.
   tag, from the one directive list, rather than the list being written twice.
 - `__pycache__/` at the repository root is caught by no `.gitignore`;
   `backend/.gitignore` covers only the one inside `backend/`. One line fixes it.
+
+## Decision — 2026-09-22
+
+The frontend moves after all, and splits. From one commit on `deploy`, once CI's
+test jobs pass:
+
+| Target | Build | Talks to |
+| --- | --- | --- |
+| GitHub Pages | `npm run build` — the demo | nothing; no backend, no LLM |
+| Cloudflare Pages | `npm run build:backend`, `VITE_BASE_PATH=/`, `VITE_BACKEND_URL` = the Cloud Run URL | Cloud Run |
+| Cloud Run | the existing `Dockerfile` | — |
+
+This settles the third open question above, and makes the README's "the Pages
+URL is the demo" true.
+
+- **Cloudflare is built in GitHub Actions** and uploaded with
+  `wrangler pages deploy`, not by Cloudflare's Git integration, which would
+  build every push to the branch whether or not the tests passed.
+- **The CSP plugin emits a `_headers` file as well as the meta tag**, from one
+  directive list. That is the reason to be on Cloudflare at all; without it the
+  move gains nothing on the security side.
+- **`CORS_ORIGINS` names the Cloudflare origin only.** The demo never calls the
+  backend.
+- **Cloud Run**, as recommended above: `--max-instances=1`, 1 GiB, startup CPU
+  boost, a budget alert, and no minimum instance — the `/api/health` fetch on
+  page load already hides the cold start, and an always-on instance would
+  spend the free tier idling. Plus `TRUSTED_PROXY_HOPS=1`, below.
+- Whether Cloud Run is deployed from CI or by hand is still open.
+
+**Both defects are fixed on `backend-server`.** The image no longer passes
+`--forwarded-allow-ips="*"`. A new setting, `TRUSTED_PROXY_HOPS`, makes
+`client_identity` read the caller from the *right* of `X-Forwarded-For` — the
+entry the platform's proxy appended — so forged entries to its left no longer
+buy a fresh allowance. The loopback grant now also requires every address in
+the forwarded chain to be loopback, so `X-Forwarded-For: 127.0.0.1` cannot
+unlock server keys through a proxy even if someone reinstates the `*`.
+
+Order of work: that fix; the `_headers` output; `ci.yml`; Cloud Run; then
+`RELEASING.md` rewritten for three targets.

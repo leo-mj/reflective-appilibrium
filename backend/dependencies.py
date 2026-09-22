@@ -92,9 +92,38 @@ def client_identity(
     if token:
         return "t:" + hashlib.sha256(token.encode()).hexdigest()[:16]
     host = request.client.host if request.client else "unknown"
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if settings.trusted_proxy_hops:
+        return "ip:" + caller_address(forwarded_for, host, settings.trusted_proxy_hops)
     if settings.is_hosted:
-        _warn_if_proxy_untrusted(request.headers.get("x-forwarded-for"), host)
+        _warn_if_proxy_untrusted(forwarded_for, host)
     return "ip:" + host
+
+
+def forwarded_hosts(forwarded_for: Optional[str]) -> list[str]:
+    """The addresses in an ``x-forwarded-for`` header, in order, blanks dropped."""
+    if not forwarded_for:
+        return []
+    return [h for h in (h.strip() for h in forwarded_for.split(",")) if h]
+
+
+def caller_address(forwarded_for: Optional[str], peer: str, hops: int) -> str:
+    """The address ``hops`` trusted proxies say they received the request from.
+
+    Read from the right, because each proxy appends the address it saw: the
+    last ``hops`` entries were written by proxies we trust, and the one furthest
+    left of those is the caller as the outermost of them saw it. Anything
+    further left was sent by the caller and is worth nothing — taking the
+    leftmost entry, as uvicorn does when told to trust every proxy, let a caller
+    pick a fresh rate-limit identity per request.
+
+    A header shorter than ``hops`` did not pass through that many proxies, so
+    it says nothing trustworthy and the socket peer is used instead.
+    """
+    hosts = forwarded_hosts(forwarded_for)
+    if len(hosts) < hops:
+        return peer
+    return hosts[-hops]
 
 
 _proxy_warning_logged = False
@@ -111,7 +140,7 @@ def untrusted_proxy_evident(forwarded_for: Optional[str], peer: str) -> bool:
     """
     if not forwarded_for:
         return False
-    return peer not in {h.strip() for h in forwarded_for.split(",")}
+    return peer not in forwarded_hosts(forwarded_for)
 
 
 def _warn_if_proxy_untrusted(forwarded_for: Optional[str], peer: str) -> None:
@@ -122,9 +151,10 @@ def _warn_if_proxy_untrusted(forwarded_for: Optional[str], peer: str) -> None:
     _proxy_warning_logged = True
     logger.warning(
         "Request from %s carries x-forwarded-for, but uvicorn is not trusting it: "
-        "every visitor behind this proxy shares one rate-limit allowance. Run "
-        "uvicorn with --forwarded-allow-ips=<proxy address>. (A client sending the "
-        "header directly, with no proxy in front, also triggers this once.)",
+        "every visitor behind this proxy shares one rate-limit allowance. Set "
+        "TRUSTED_PROXY_HOPS to the number of proxies in front (1 on Cloud Run), or "
+        "run uvicorn with --forwarded-allow-ips=<proxy address>. (A client sending "
+        "the header directly, with no proxy in front, also triggers this once.)",
         peer,
     )
 
@@ -143,13 +173,18 @@ def proxy_startup_warning(settings: Settings) -> Optional[str]:
         settings.stepping_rate_limit,
         settings.scoring_rate_limit,
     )
-    if not settings.is_hosted or not any(limits) or settings.access_tokens:
+    if (
+        not settings.is_hosted
+        or not any(limits)
+        or settings.access_tokens
+        or settings.trusted_proxy_hops
+    ):
         return None
     return (
-        "Hosted with rate limits on and no APP_ACCESS_TOKENS: callers are "
-        "identified by peer address. Behind a reverse proxy, start uvicorn with "
-        "--forwarded-allow-ips=<proxy address>, or every visitor shares one "
-        "allowance."
+        "Hosted with rate limits on, no APP_ACCESS_TOKENS and no "
+        "TRUSTED_PROXY_HOPS: callers are identified by peer address. Behind a "
+        "reverse proxy, set TRUSTED_PROXY_HOPS to the number of proxies in front "
+        "(1 on Cloud Run), or every visitor shares one allowance."
     )
 
 
@@ -247,13 +282,22 @@ def get_llm_service(
                 status_code=403,
                 detail="This server does not lend out API keys; supply your own.",
             )
-        # request.client is the socket peer, so this cannot be spoofed by a
-        # header — but behind a reverse proxy the peer is the proxy. See
+        # request.client is the socket peer under plain uvicorn — but behind a
+        # reverse proxy the peer is the proxy, and under
+        # --forwarded-allow-ips="*" it has already been overwritten from
+        # x-forwarded-for, so "x-forwarded-for: 127.0.0.1" reads as local. So
+        # every address in the forwarded chain must be loopback too: a real
+        # remote caller behind any proxy appears in it. See
         # Settings.allow_loopback_server_keys.
         #
         # Absent peer means we cannot establish the caller is local, so refuse:
         # this used to default to 127.0.0.1, which failed open.
-        if request.client is None or request.client.host not in _LOOPBACK:
+        forwarded = forwarded_hosts(request.headers.get("x-forwarded-for"))
+        if (
+            request.client is None
+            or request.client.host not in _LOOPBACK
+            or any(h not in _LOOPBACK for h in forwarded)
+        ):
             raise HTTPException(
                 status_code=403,
                 detail="Server-side API keys are only accessible from localhost",

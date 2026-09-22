@@ -270,6 +270,65 @@ def test_no_tokens_configured_means_an_empty_set():
     assert make_settings().access_tokens == set()
 
 
+# ── Identity behind trusted proxies ───────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "forwarded_for, hops, expected",
+    [
+        # One proxy, as on Cloud Run: it appended the caller's real address.
+        ("198.51.100.9", 1, "198.51.100.9"),
+        # The caller forged entries; the proxy's own is still the last one.
+        ("1.1.1.1, 2.2.2.2, 198.51.100.9", 1, "198.51.100.9"),
+        # Two proxies: the outer one wrote the caller, the inner one the outer.
+        ("1.1.1.1, 198.51.100.9, 10.0.0.2", 2, "198.51.100.9"),
+        # Shorter than the hops claimed: nothing in it is trustworthy.
+        ("198.51.100.9", 2, "10.0.0.1"),
+        (None, 1, "10.0.0.1"),
+        (" , 198.51.100.9 ", 1, "198.51.100.9"),
+    ],
+)
+def test_the_caller_is_read_from_the_right(forwarded_for, hops, expected):
+    assert dependencies.caller_address(forwarded_for, "10.0.0.1", hops) == expected
+
+
+def test_a_forged_header_cannot_buy_a_fresh_allowance():
+    """The defect this setting fixes.
+
+    uvicorn's --forwarded-allow-ips="*" takes the leftmost entry, which is the
+    caller's to write, so rotating it gave a new rate-limit bucket per request.
+    Read from the right, every forgery lands on the same identity.
+    """
+    s = make_settings(deployment="hosted", trusted_proxy_hops=1)
+    ids = {
+        _identity(
+            s, "10.0.0.1", headers={"x-forwarded-for": f"{n}.0.0.1, 198.51.100.9"}
+        )
+        for n in range(1, 6)
+    }
+    assert ids == {"ip:198.51.100.9"}
+
+
+def test_without_hops_the_header_is_ignored():
+    s = make_settings(deployment="hosted")
+    assert (
+        _identity(s, "10.0.0.1", headers={"x-forwarded-for": "198.51.100.9"})
+        == "ip:10.0.0.1"
+    )
+
+
+def test_a_matched_token_still_wins_over_the_address():
+    s = make_settings(app_access_tokens="alice", trusted_proxy_hops=1)
+    via_a = _identity(s, "10.0.0.1", "alice", {"x-forwarded-for": "198.51.100.9"})
+    via_b = _identity(s, "10.0.0.1", "alice", {"x-forwarded-for": "203.0.113.7"})
+    assert via_a == via_b and via_a.startswith("t:")
+
+
+def test_hops_cannot_be_negative():
+    with pytest.raises(ValueError):
+        make_settings(trusted_proxy_hops=-1)
+
+
 # ── An untrusted proxy in front ───────────────────────────────────────────────
 
 
@@ -313,6 +372,13 @@ def test_a_local_instance_does_not_warn_about_proxies(fresh_proxy_warning, caplo
     assert not caplog.records
 
 
+def test_trusted_hops_silence_the_proxy_warning(fresh_proxy_warning, caplog):
+    s = make_settings(deployment="hosted", trusted_proxy_hops=1)
+    with caplog.at_level("WARNING", logger="backend.dependencies"):
+        _identity(s, "10.0.0.2", headers={"x-forwarded-for": "203.0.113.7"})
+    assert not caplog.records
+
+
 def test_a_matched_token_makes_the_proxy_irrelevant(fresh_proxy_warning, caplog):
     s = make_settings(deployment="hosted", app_access_tokens="alice")
     with caplog.at_level("WARNING", logger="backend.dependencies"):
@@ -326,6 +392,7 @@ def test_a_matched_token_makes_the_proxy_irrelevant(fresh_proxy_warning, caplog)
         ({"deployment": "hosted"}, True),
         ({}, False),
         ({"deployment": "hosted", "app_access_tokens": "alice"}, False),
+        ({"deployment": "hosted", "trusted_proxy_hops": 1}, False),
         (
             {
                 "deployment": "hosted",

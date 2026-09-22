@@ -67,11 +67,11 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # --workers 1 is required, not a tuning choice: the rate limiter (ratelimit.py)
 # lives in process memory, so a second worker would double every allowance.
 #
-# --forwarded-allow-ips=* trusts x-forwarded-for from any peer. That is only safe
-# because the platform's proxy is the sole way into the container; publish the
-# port directly to the internet and any caller can pick its own rate-limit
-# identity. Narrow it to the proxy's address wherever that is known.
+# No --forwarded-allow-ips="*". Trusting every peer makes uvicorn take the
+# *leftmost* x-forwarded-for entry, which is the one the caller writes, so any
+# caller could pick a fresh rate-limit identity per request. Behind the platform's
+# proxy, set TRUSTED_PROXY_HOPS instead (1 on Cloud Run, Fly, Render): the backend
+# then reads the entry that proxy appended. See Settings.trusted_proxy_hops.
 #
 # Shell form for $PORT, with exec so uvicorn receives the platform's SIGTERM.
-CMD exec uvicorn backend.main:app --host 0.0.0.0 --port "$PORT" \
-    --workers 1 --forwarded-allow-ips="*"
+CMD exec uvicorn backend.main:app --host 0.0.0.0 --port "$PORT" --workers 1

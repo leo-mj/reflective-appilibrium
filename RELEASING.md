@@ -67,8 +67,9 @@ The e2e suite runs against the **dev** server, so none of this is tested:
 - [ ] No `LLM_API_KEYS` in the hosted environment. Hosted instances never lend
       them, so they would only add risk.
 - [ ] One uvicorn worker. The rate limiter is in-process.
-- [ ] `--forwarded-allow-ips` is narrowed to the proxy's address where it is
-      known, and the port is not also published directly.
+- [ ] `TRUSTED_PROXY_HOPS` matches the proxies in front (1 on Cloud Run), the
+      port is not also published directly, and uvicorn is not started with
+      `--forwarded-allow-ips="*"`. No proxy warning in the startup log.
 - [ ] `CROSSREF_MAILTO` is the operator's address, or empty. It is never a
       user's address.
 - [ ] Rate limits, the timeout and the element cap follow the hosted defaults

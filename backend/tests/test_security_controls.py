@@ -186,7 +186,7 @@ def settings_with_server_key():
     )
 
 
-def _request_from(client_host):
+def _request_from(client_host, forwarded_for=None):
     """A stand-in for a Request with a chosen peer — TestClient cannot vary it."""
 
     class _Client:
@@ -194,13 +194,14 @@ def _request_from(client_host):
 
     class _Request:
         client = _Client() if client_host is not None else None
+        headers = {"x-forwarded-for": forwarded_for} if forwarded_for else {}
 
     return _Request()
 
 
-def _call(settings, client_host, **headers):
+def _call(settings, client_host, forwarded_for=None, **headers):
     """Invoke the dependency directly, deriving identity as production does."""
-    request = _request_from(client_host)
+    request = _request_from(client_host, forwarded_for)
     identity = client_identity(
         request, settings, x_app_token=headers.get("x_app_token")
     )
@@ -230,6 +231,39 @@ def test_an_absent_peer_is_not_treated_as_local(settings_with_server_key):
     with pytest.raises(Exception) as exc:
         _call(settings_with_server_key, None)
     assert exc.value.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "forwarded_for",
+    [
+        # The shape a proxy leaves when the caller forged the header: the forged
+        # entry first, the real address appended after it.
+        "127.0.0.1, 203.0.113.7",
+        # A remote caller forwarded by a proxy on the same machine.
+        "203.0.113.7",
+    ],
+)
+def test_a_forwarded_remote_caller_is_not_local(
+    settings_with_server_key, forwarded_for
+):
+    """The loopback rule reads the whole forwarded chain, not only the peer.
+
+    Under uvicorn's --forwarded-allow-ips="*" the peer has already been
+    rewritten from the header's leftmost entry, so "x-forwarded-for: 127.0.0.1"
+    arrives as a loopback peer. What the caller cannot do is remove the address
+    its proxy appended, and that address is what refuses it here.
+    """
+    with pytest.raises(Exception) as exc:
+        _call(settings_with_server_key, "127.0.0.1", forwarded_for)
+    assert exc.value.status_code == 403
+
+
+def test_a_local_proxy_forwarding_a_local_caller_is_still_local(
+    settings_with_server_key,
+):
+    assert isinstance(
+        _call(settings_with_server_key, "127.0.0.1", "127.0.0.1"), LLMService
+    )
 
 
 def test_loopback_grant_can_be_switched_off_for_deployments(settings_with_server_key):

@@ -152,15 +152,19 @@ buckets by whichever token matched, so distinct tokens give each person their ow
 allowance, whereas a single shared token puts a whole seminar room into one.
 
 The rate limiter lives in one process, so run **one** uvicorn worker unless you
-replace it with a shared store.
+replace it with a shared store — and, on a platform that autoscales, one
+instance (`--max-instances=1` on Cloud Run).
 
-**Behind a reverse proxy, tell uvicorn to trust it.** Without tokens the rate
-limiter identifies callers by address, and an untrusted proxy's address is the
-same for every visitor — so all of them share one allowance, and the caps become
-either useless or a site-wide outage. Start uvicorn with
-`--forwarded-allow-ips=<proxy address>` (uvicorn trusts only `127.0.0.1` by
-default). The backend logs a warning at startup when this applies, and a second,
-once per process, when a request shows a proxy uvicorn is ignoring.
+**Behind a reverse proxy, set `TRUSTED_PROXY_HOPS`.** Without tokens the rate
+limiter identifies callers by address, and a proxy's address is the same for
+every visitor — so all of them share one allowance, and the caps become either
+useless or a site-wide outage. Set it to the number of proxies in front that
+append to `X-Forwarded-For` (1 on Cloud Run, Fly or Render); the backend then
+reads the entry that proxy wrote. **Do not** start uvicorn with
+`--forwarded-allow-ips="*"`: it takes the leftmost entry, which the caller
+writes, so anyone can pick a fresh allowance per request. The backend logs a
+warning at startup when neither tokens nor `TRUSTED_PROXY_HOPS` are set, and a
+second, once per process, when a request shows a proxy it is ignoring.
 
 ### Where your work lives
 
