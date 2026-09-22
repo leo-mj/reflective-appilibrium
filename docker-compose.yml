@@ -10,6 +10,8 @@
 services:
   backend:
     build: .
+    # Named so CI can tag and push what it built (.gitlab-ci.yml).
+    image: appilibrium-backend
     environment:
       DEPLOYMENT: hosted
       # Same origin throughout, so no cross-origin caller to allow.
@@ -17,6 +19,7 @@ services:
 
   frontend:
     build: ./app
+    image: appilibrium-frontend
     ports:
       - "8080:8080"
     environment:

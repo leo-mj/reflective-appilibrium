@@ -93,33 +93,9 @@ jobs:
       - name: Build and start
         run: docker compose up -d --build
 
+      # The same script .gitlab-ci.yml runs, so the two pipelines check one thing.
       - name: Check the page and the proxy
-        run: |
-          base=http://127.0.0.1:8080
-          for _ in $(seq 60); do
-            curl -fsS "$base/api/health" -o health.json && break
-            sleep 2
-          done
-          test -s health.json || { echo "::error::/api/health did not answer through nginx within two minutes."; exit 1; }
-
-          # /api reaches the backend, in the hosted posture.
-          cat health.json
-          grep -q '"deployment":"hosted"' health.json
-
-          # The page, built for its own origin: connect-src names nothing else.
-          curl -fsS "$base/" -o index.html
-          grep -o "connect-src [^;]*" index.html | grep -qx "connect-src 'self'"
-
-          # A deep link or a reload falls back to the app instead of 404ing.
-          curl -fsS "$base/some/deep/link" | grep -q '<div id="root">'
-
-          # frame-ancestors, which the meta tag cannot carry, comes as a header.
-          curl -fsSI "$base/" | grep -qi "^content-security-policy: frame-ancestors 'none'"
-
-          # Hashed assets are cached for good; the page itself never is.
-          asset=$(grep -o '/assets/[^"]*\.js' index.html | head -1)
-          curl -fsSI "$base$asset" | grep -qi '^cache-control: public, max-age=31536000, immutable'
-          curl -fsSI "$base/" | grep -qi '^cache-control: no-cache'
+        run: ci/check-stack.sh http://127.0.0.1:8080
 
       - name: Container logs
         if: failure()

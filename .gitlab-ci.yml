@@ -1,0 +1,149 @@
+# GitLab pipeline — the same checks as .github/workflows/ci.yml, for whoever
+# reviews or hosts the project from GitLab without opening the GitHub repo.
+# The GitHub Pages deploy has no counterpart here; the images job instead pushes
+# the two containers to this project's registry, which is what a host pulls.
+#
+# Keep the two in step by hand: a check added to one belongs in the other. The
+# container checks already share one script, ci/check-stack.sh.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # A branch push, unless a merge request for it is open — that pipeline runs
+    # instead, rather than both.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+stages:
+  - test
+  - images
+
+default:
+  interruptible: true
+
+# ── Backend ─────────────────────────────────────────────────────────────────────
+
+backend-tests:
+  stage: test
+  # The full Debian image, not -slim: theodias needs pypblib, which has no Linux
+  # wheel for Python 3.12 and is compiled with g++ (see the Dockerfile).
+  image: python:3.12
+  timeout: 15m
+  variables:
+    PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
+  cache:
+    key:
+      files: [backend/requirements.txt]
+    paths: [.cache/pip]
+  script:
+    - pip install -r backend/requirements.txt
+    - pytest backend/
+
+# Informational, as on GitHub: most advisories are transitive and not ours to
+# fix on the day they appear. Read it when it is red.
+backend-audit:
+  stage: test
+  image: python:3.12
+  timeout: 15m
+  allow_failure: true
+  variables:
+    PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
+  cache:
+    key:
+      files: [backend/requirements.txt]
+    paths: [.cache/pip]
+    policy: pull
+  script:
+    - pip install -r backend/requirements.txt
+    - pip-audit
+
+# ── Frontend ────────────────────────────────────────────────────────────────────
+
+.node:
+  image: node:24
+  variables:
+    npm_config_cache: $CI_PROJECT_DIR/.cache/npm
+  cache:
+    key:
+      files: [app/package-lock.json]
+    paths: [.cache/npm]
+  before_script:
+    - cd app
+    - npm ci --prefer-offline
+
+frontend-tests:
+  extends: .node
+  stage: test
+  timeout: 15m
+  script:
+    # Warnings do not fail the build; only rules configured as errors do.
+    - npm run lint
+    - npm test
+    # Blocking: these are the packages that end up in the bundle a visitor
+    # downloads.
+    - npm audit --omit=dev --audit-level=high
+
+# Informational: the dev toolchain does not ship.
+frontend-audit-dev:
+  extends: .node
+  stage: test
+  timeout: 10m
+  allow_failure: true
+  script:
+    - npm audit --audit-level=high
+
+frontend-e2e:
+  extends: .node
+  stage: test
+  # Playwright's own image carries the browsers and their system libraries, so
+  # nothing is downloaded at run time. The tag must match @playwright/test in
+  # app/package-lock.json exactly; after a bump, a mismatch fails with
+  # "Executable doesn't exist", which is the cue to update it here.
+  image: mcr.microsoft.com/playwright:v1.62.1-noble
+  # Generous next to a green run, but retries: 2 in playwright.config.js mean a
+  # genuinely failing suite takes three passes.
+  timeout: 25m
+  script:
+    - npm run test:e2e
+  # The report holds the trace and screenshot of every failure.
+  artifacts:
+    when: always
+    paths: [app/playwright-report/]
+    expire_in: 14 days
+
+# ── Containers ──────────────────────────────────────────────────────────────────
+
+# Builds both images, starts them as docker-compose.yml wires them, and checks
+# the pair over HTTP. On the default branch it then pushes them to this
+# project's registry, tagged with the commit and as `latest`.
+#
+# Needs a runner that can run Docker-in-Docker, which means a privileged one.
+# If this instance's runners are not, this is the job to change (Buildah or
+# Kaniko build without the daemon); every other job runs on any runner.
+images:
+  stage: images
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: /certs
+  timeout: 25m
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - docker compose up -d --build
+    # Published ports live on the dind service, not on this container.
+    - ci/check-stack.sh http://docker:8080
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+        for name in backend frontend; do
+          for tag in "$CI_COMMIT_SHORT_SHA" latest; do
+            docker tag "appilibrium-$name" "$CI_REGISTRY_IMAGE/$name:$tag"
+            docker push "$CI_REGISTRY_IMAGE/$name:$tag"
+          done
+        done
+      fi
+  after_script:
+    - docker compose logs || true
