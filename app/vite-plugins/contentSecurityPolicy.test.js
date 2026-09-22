@@ -5,7 +5,9 @@
 // theme, and the console says why), or the backend's origin is missing from
 // connect-src (every API call is refused). Both are pinned here against the
 // real index.html, since a hash of a copy would prove nothing.
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
 
@@ -13,6 +15,7 @@ import {
   backendOrigin,
   buildPolicy,
   contentSecurityPolicy,
+  headersFile,
   inlineScriptHashes,
 } from "./contentSecurityPolicy.js";
 
@@ -114,6 +117,57 @@ describe("the tag", () => {
 
   it("is added to builds only, never to the dev server", () => {
     expect(contentSecurityPolicy().apply).toBe("build");
+  });
+});
+
+describe("_headers", () => {
+  /** Run a whole build through the plugin and return the _headers it wrote. */
+  function writtenHeaders(env) {
+    const dir = mkdtempSync(join(tmpdir(), "csp-"));
+    try {
+      const plugin = contentSecurityPolicy();
+      plugin.configResolved({ env });
+      const html = plugin.transformIndexHtml.handler(INDEX_HTML);
+      plugin.writeBundle({ dir });
+      return { html, headers: readFileSync(join(dir, "_headers"), "utf8") };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  const headerPolicy = (headers) =>
+    headers.match(/^ {2}Content-Security-Policy: (.*)$/m)[1];
+
+  it("carries the page's own policy, plus frame-ancestors", () => {
+    // The point of generating both from one list: the header is the meta tag's
+    // policy and one directive more, never a second policy to keep in step.
+    const { html, headers } = writtenHeaders({
+      VITE_APP_ENV: "backend",
+      VITE_BACKEND_URL: "https://api.example.org",
+    });
+    expect(headerPolicy(headers)).toBe(`${policyOf(html)}; frame-ancestors 'none'`);
+  });
+
+  it("applies to every path, with the headers the backend sends", () => {
+    const { headers } = writtenHeaders({ VITE_APP_ENV: "demo" });
+    expect(headers.split("\n")[0]).toBe("/*");
+    expect(headers).toContain("  X-Content-Type-Options: nosniff\n");
+    expect(headers).toContain("  Referrer-Policy: no-referrer\n");
+  });
+
+  it("keeps frame-ancestors out of the meta tag, where browsers ignore it", () => {
+    expect(policyOf(built({ VITE_APP_ENV: "demo" }))).not.toContain("frame-ancestors");
+  });
+
+  it("refuses to write a file when no page was built to take a policy from", () => {
+    const plugin = contentSecurityPolicy();
+    plugin.configResolved({ env: { VITE_APP_ENV: "demo" } });
+    expect(() => plugin.writeBundle({ dir: tmpdir() })).toThrow(/index.html was not built/);
+  });
+
+  it("is one header per line, indented under its path", () => {
+    const lines = headersFile("default-src 'self'").trimEnd().split("\n");
+    expect(lines.slice(1).every((l) => /^ {2}[A-Za-z-]+: \S/.test(l))).toBe(true);
   });
 });
 
