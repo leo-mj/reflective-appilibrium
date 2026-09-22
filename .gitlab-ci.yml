@@ -129,8 +129,12 @@ frontend-e2e:
 # project's registry, tagged with the commit and as `latest`.
 #
 # Needs a runner that can run Docker-in-Docker, which means a privileged one.
-# If this instance's runners are not, this is the job to change (Buildah or
-# Kaniko build without the daemon); every other job runs on any runner.
+# This instance's shared runners are not: the dind service stops at "mount:
+# permission denied" and its daemon never starts. So the job is manual until
+# a privileged runner exists — press ▶ in the pipeline to run it then — and it
+# cannot fail a pipeline meanwhile. The stack it would check is checked on
+# every push by the `stack` job in .github/workflows/ci.yml, from the same
+# ci/check-stack.sh.
 images:
   stage: images
   image: docker:27
@@ -139,6 +143,9 @@ images:
   variables:
     DOCKER_TLS_CERTDIR: /certs
   timeout: 25m
+  rules:
+    - when: manual
+  allow_failure: true
   before_script:
     - apk add --no-cache curl
   script:
