@@ -128,6 +128,21 @@ describe("generateGraphSVG", () => {
 
 // ─── svgToDataUrl ─────────────────────────────────────────────────────────────
 
+describe("generateGraphSVG — merged processes", () => {
+  it("puts each node's process letters on it, and still parses", () => {
+    const svg = generateGraphSVG([el("J1"), el("P1")], [], POSITIONS, {
+      processTags: new Map([["J1", "A+B"], ["P1", "B"]]),
+    });
+    const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+    expect(doc.querySelector("parsererror")).toBeNull();
+    expect(labelsIn(svg)).toEqual(["A+B", "B", "J1", "P1"]);
+  });
+
+  it("draws no tag for a process never merged", () => {
+    expect(labelsIn(generateGraphSVG([el("J1")], [], POSITIONS))).toEqual(["J1"]);
+  });
+});
+
 describe("svgToDataUrl", () => {
   it("produces a base64 image/svg+xml data URL", () => {
     const url = svgToDataUrl("<svg></svg>");

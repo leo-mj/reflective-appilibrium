@@ -126,6 +126,76 @@ Respond with valid JSON only, in exactly this format:
 If no new relations are found, return {{"relations": []}}."""
 
 
+def build_merge_pairs_prompt(
+    topic: str,
+    pool: list[tuple[REElement, list[str]]],
+    process_labels: dict[str, str],
+) -> str:
+    """Build the LLM prompt for finding elements of merged processes that make
+    the same claim.
+
+    ``pool`` pairs each candidate element with the letters of the processes it
+    came from. Sameness of *claim* is the test, and the prompt spells out what
+    does not meet it — related, compatible, one a special case of the other —
+    since those are what a model asked for "similar" statements offers first. It
+    is told not to judge the claims: whether one is right has no bearing on
+    whether two statements make it. Returning nothing is stated to be expected,
+    so the model is not pushed into finding pairs that are not there.
+
+    The process labels are the users' own topics or file names, so they are
+    fenced with the statements rather than written into the instructions.
+    """
+    kind = {
+        "judgment": "judgment",
+        "principle": "principle",
+        "theory": "background theory",
+    }
+    element_lines = "\n".join(
+        f"{e.id} [process {'+'.join(ps)}] ({kind.get(e.type, e.type)}): {e.text}"
+        for e, ps in pool
+    )
+    process_lines = "\n".join(
+        f"{pid}: {label}" for pid, label in process_labels.items()
+    )
+
+    return f"""\
+You are assisting a reflective equilibrium (RE) analysis in ethics that was put \
+together by merging several separate processes. Each statement below is labelled \
+with the process (a letter) it came from.
+Topic: "{topic}"
+
+{DATA_RULE}
+
+Processes:
+{fence(process_lines)}
+
+Statements:
+{fence(element_lines)}
+
+Task: find pairs of statements that make the same claim in different words, so that \
+a person holding one holds the other: the same moral judgment, the same principle, or \
+the same background theory.
+
+Rules:
+- Each pair takes one statement from each of two different processes. Never pair two \
+statements that share a process letter.
+- Both statements must be of the same kind (judgment with judgment, principle with \
+principle, theory with theory).
+- Do not pair statements that are merely related, on the same topic, compatible, or \
+where one is a special case, a consequence, or a qualified version of the other. \
+Those are different claims.
+- Do not judge whether the claims are correct.
+- If no pair qualifies, return an empty list. Returning none is expected when the \
+processes do not overlap.
+
+Respond with valid JSON only, in exactly this format:
+{{
+  "pairs": [
+    {{"a": "J1", "b": "J7", "reason": "One sentence on why these make the same claim."}}
+  ]
+}}"""
+
+
 def build_judgments_prompt(
     topic: str,
     elements: list[REElement],

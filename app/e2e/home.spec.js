@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoHome, loadSample, park } from "./helpers.js";
+import { gotoHome, loadSample, park, themeToggle } from "./helpers.js";
 
 test.describe("Landing page", () => {
   test("renders the title, both logos, and the entry cards", async ({ page }) => {
@@ -24,11 +24,11 @@ test.describe("Landing page", () => {
     const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
     const before = await bg();
-    await page.click('button[title*="Switch to"]');
+    await themeToggle(page).click();
     await expect.poll(bg).not.toBe(before);
 
     // and back again
-    await page.click('button[title*="Switch to"]');
+    await themeToggle(page).click();
     await expect.poll(bg).toBe(before);
   });
 

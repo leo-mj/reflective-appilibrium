@@ -1,38 +1,46 @@
 /**
  * @fileoverview BYOK settings modal — lets the user supply their own API key,
  * provider, and model. Values are stored in sessionStorage only (cleared on
- * tab close) and sent as request headers; the backend never persists them.
+ * tab close, but restored with a reopened tab or session) and sent as request headers; the backend never persists them.
+ * The modal says so to the reader beside the key field, and PrivacyModal says
+ * the rest of what leaves the browser.
  * @module components/app_header/LLMSettingsModal
  */
 
 import { useState, useEffect } from "react";
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { LLM_PROVIDERS } from "../../constants/llmProviders.js";
-import { BYOK_ENABLED } from "../../config.js";
+import { BYOK_ENABLED, BACKEND_URL } from "../../config.js";
 import { btn } from "./appHeaderStyles.js";
-import { getSessionUsage, clearSessionUsage } from "../../utils/openaiClient.js";
+import {
+  getSessionUsage,
+  clearSessionUsage,
+} from "../../utils/openaiClient.js";
+import {
+  readLLMSettings,
+  useHasLLMKey,
+  notifyLLMKeyChanged,
+} from "../../utils/llmKey.js";
+import { unwrapDetail } from "../../utils/backendError.js";
 
 /** Why the inert controls are inert, for hover and assistive technology. */
 const DEMO_REASON = "Unavailable in the demo — this build has no backend.";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
-
 function getInitialProvider() {
-  const raw = sessionStorage.getItem("llmSettings");
-  if (raw) {
-    const { baseUrl } = JSON.parse(raw);
-    return LLM_PROVIDERS.find((p) => p.baseUrl === baseUrl) ?? LLM_PROVIDERS[0];
+  const saved = readLLMSettings();
+  if (saved) {
+    return (
+      LLM_PROVIDERS.find((p) => p.baseUrl === saved.baseUrl) ?? LLM_PROVIDERS[0]
+    );
   }
   const defaultId = import.meta.env.VITE_DEFAULT_PROVIDER;
   return LLM_PROVIDERS.find((p) => p.id === defaultId) ?? LLM_PROVIDERS[0];
 }
 
 function getInitialModel(provider) {
-  const raw = sessionStorage.getItem("llmSettings");
-  if (raw) {
-    const { model } = JSON.parse(raw);
-    if (model) return model;
-  }
+  const saved = readLLMSettings();
+  if (saved?.model) return saved.model;
   const defaultModel = import.meta.env.VITE_DEFAULT_MODEL;
   if (defaultModel) return defaultModel;
   return provider.models[0];
@@ -48,7 +56,9 @@ export function LLMSettingsModal({ open, onClose }) {
   // made, is inert.
   const demo = !BYOK_ENABLED;
   const [provider, setProvider] = useState(getInitialProvider);
-  const [model, setModel] = useState(() => getInitialModel(getInitialProvider()));
+  const [model, setModel] = useState(() =>
+    getInitialModel(getInitialProvider()),
+  );
   const [apiKey, setApiKey] = useState("");
   const [testStatus, setTestStatus] = useState(null); // null | { ok: boolean, message: string }
   const [testing, setTesting] = useState(false);
@@ -65,15 +75,9 @@ export function LLMSettingsModal({ open, onClose }) {
       .catch(() => {});
   }, [open, demo]);
 
-  const hasSessionKey = Boolean(
-    (() => {
-      try {
-        return JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}")?.apiKey;
-      } catch {
-        return false;
-      }
-    })()
-  );
+  // Subscribed rather than read once: Clear writes and closes, and the "· Key
+  // saved" line beside the field has to have moved by the time it reopens.
+  const hasSessionKey = useHasLLMKey();
   const hasSavedKey = hasSessionKey || serverKeyUrls.has(provider.baseUrl);
 
   const effectiveApiKey = apiKey || provider.defaultApiKey || "";
@@ -105,17 +109,20 @@ export function LLMSettingsModal({ open, onClose }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setTestStatus({ ok: true, message: `Connected — model: ${data.model}` });
+        setTestStatus({
+          ok: true,
+          message: `Connected — model: ${data.model}`,
+        });
       } else {
+        // This is a connection test, so it is the one place that *should* show
+        // the server's own words — "Unsupported provider URL" is the answer the
+        // reader is looking for. backendError's friendlier rewording would be
+        // wrong here; only the envelope-unwrapping is wanted.
         const raw = await res.text();
-        let message = raw || `Error ${res.status}`;
-        try {
-          const detail = JSON.parse(raw)?.detail;
-          if (detail) message = typeof detail === "string" ? detail : JSON.stringify(detail);
-        } catch {
-          /* not JSON — show the raw text */
-        }
-        setTestStatus({ ok: false, message });
+        setTestStatus({
+          ok: false,
+          message: unwrapDetail(raw) || `Error ${res.status}`,
+        });
       }
     } catch (err) {
       setTestStatus({ ok: false, message: err.message });
@@ -127,13 +134,19 @@ export function LLMSettingsModal({ open, onClose }) {
   function handleSave() {
     sessionStorage.setItem(
       "llmSettings",
-      JSON.stringify({ apiKey: effectiveApiKey, baseUrl: provider.baseUrl, model })
+      JSON.stringify({
+        apiKey: effectiveApiKey,
+        baseUrl: provider.baseUrl,
+        model,
+      }),
     );
+    notifyLLMKeyChanged();
     onClose();
   }
 
   function handleClear() {
     sessionStorage.removeItem("llmSettings");
+    notifyLLMKeyChanged();
     clearSessionUsage();
     setApiKey("");
     setTestStatus(null);
@@ -304,6 +317,25 @@ export function LLMSettingsModal({ open, onClose }) {
               }}
               autoComplete="off"
             />
+            {/* Where the key goes, said where it is typed. Not in the demo,
+                where no key can be entered at all. */}
+            {!demo && (
+              <div
+                style={{
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                  color: C.dim,
+                  marginTop: 6,
+                }}
+              >
+                Kept in this browser tab, not saved permanently — though
+                reopening a closed tab can bring it back, so press Clear when
+                you are done. Sent to this app&apos;s server with each AI
+                request and passed on to {provider.label}; the server does not
+                store or log it. Use a key with a spending limit. See Privacy in
+                the menu for what else is sent.
+              </div>
+            )}
           </div>
         )}
 
@@ -324,7 +356,8 @@ export function LLMSettingsModal({ open, onClose }) {
         {/* Session usage */}
         {(usage.input > 0 || usage.output > 0) && (
           <div style={{ fontSize: 11, color: C.dim, marginBottom: 12 }}>
-            Session: {usage.input.toLocaleString()} in · {usage.output.toLocaleString()} out tokens
+            Session: {usage.input.toLocaleString()} in ·{" "}
+            {usage.output.toLocaleString()} out tokens
           </div>
         )}
 
@@ -332,34 +365,45 @@ export function LLMSettingsModal({ open, onClose }) {
         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
           <button
             onClick={handleClear}
-            style={{ ...btn(false), color: C.conflicts, borderColor: C.conflicts }}
+            style={{
+              ...btn(false),
+              color: C.conflicts,
+              borderColor: C.conflicts,
+            }}
           >
             Clear
           </button>
-          <button
-            onClick={handleTest}
-            disabled={testing || demo}
-            title={demo ? DEMO_REASON : undefined}
-            style={{
-              ...btn(false),
-              opacity: testing || demo ? 0.4 : 1,
-            }}
-          >
-            {testing ? "Testing…" : "Test connection"}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave}
-            title={demo ? DEMO_REASON : undefined}
-            style={{
-              ...btn(false),
-              opacity: canSave ? 1 : 0.4,
-              color: canSave ? C.supports : undefined,
-              borderColor: canSave ? C.supports : undefined,
-            }}
-          >
-            Save
-          </button>
+          <Tooltip text={demo ? DEMO_REASON : ""} wrap>
+            <button
+              onClick={handleTest}
+              disabled={testing || demo}
+              style={{
+                ...btn(false),
+                opacity: testing || demo ? 0.4 : 1,
+              }}
+            >
+              {testing ? "Testing…" : "Test connection"}
+            </button>
+          </Tooltip>
+          <Tooltip text={demo ? DEMO_REASON : ""} wrap>
+            <button
+              onClick={handleSave}
+              disabled={!canSave}
+              // The accent is spread in, not written as `canSave ? … :
+              // undefined`: that form overwrites `btn()`'s own colour and border
+              // with `undefined`, and a disabled Save then takes the browser's
+              // default button ink instead of the dim one.
+              style={{
+                ...btn(false),
+                opacity: canSave ? 1 : 0.4,
+                ...(canSave
+                  ? { color: C.supports, borderColor: C.supports }
+                  : null),
+              }}
+            >
+              Save
+            </button>
+          </Tooltip>
         </div>
       </div>
     </>

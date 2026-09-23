@@ -50,8 +50,12 @@ const KEY = "addBarSize";
 const MIN_HEIGHT = 110;
 /** Narrower and an argument's pickers cannot make a row between them. */
 const MIN_WIDTH = 360;
-/** The graph above it has the better claim on the rest of the window. */
-const MAX_HEIGHT_FRACTION = 0.75;
+/**
+ * The graph above it has the better claim on the rest of the window: past half
+ * of it the bar scrolls rather than growing. A written argument of several
+ * premises, each a field of its own, is what reaches this.
+ */
+const MAX_HEIGHT_FRACTION = 0.5;
 /** How far one arrow key moves an edge. */
 const KEY_STEP = 16;
 

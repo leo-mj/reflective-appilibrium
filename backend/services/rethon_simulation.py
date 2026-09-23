@@ -14,7 +14,12 @@ from rethon import (
 )
 from ..models.re_state import REElement, RERelation
 from ..routers.arguments_schemas import DetectArgumentsResponse, translate_from_lookup
-from ..routers.rethon_schemas import ModelWeights, ZScores, SimulatedRethonState
+from ..routers.rethon_schemas import (
+    ModelWeights,
+    ZScores,
+    SimulatedRethonResponse,
+    SimulatedRethonState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -297,17 +302,49 @@ def translate_re_state(
     return result
 
 
+def enforce_element_cap(n: int, max_elements: int) -> None:
+    """Refuse a sentence pool too large to compute over, or return quietly.
+
+    ``max_elements`` of 0 means unlimited, which is how a local install opts out.
+
+    Every rethon computation here builds a BDD whose size grows exponentially in
+    the sentence pool, so this is a wall-clock guard, not a fairness one: past
+    some width a single request stops being slow and starts being one that never
+    returns, taking the worker with it. 422 rather than 413, because the payload
+    is well-formed and the right size for a different deployment — it is this
+    server that cannot answer it.
+
+    Called by every entry point that builds a structure, including the two in
+    ``rethon_scoring`` that build their own rather than going through
+    ``validate_and_build``.
+    """
+    if max_elements and n > max_elements:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"This instance computes over at most {max_elements} elements; "
+                f"the request has {n}. Run the backend locally to lift the cap."
+            ),
+        )
+
+
 def validate_and_build(
     elements: List[REElement],
     relations: List[RERelation],
     sentence_pool_minimum: int = 3,
+    max_elements: int = 0,
 ) -> tuple[DetectArgumentsResponse, Dict[int, REElement], int]:
     """Validate the request payload and build the numerical argument structures.
 
     Raises HTTPException on invalid input.  Returns the built arguments, the
     negated lookup, and the sentence pool size.
+
+    ``max_elements`` is passed in rather than read from settings so this stays a
+    pure function of its arguments — which is what lets it be called from a
+    worker process without carrying configuration across the pipe.
     """
     n = len(elements)
+    enforce_element_cap(n, max_elements)
     if n < sentence_pool_minimum:
         raise HTTPException(
             status_code=422,
@@ -326,3 +363,119 @@ def validate_and_build(
     )
     lookup_w_negated = _add_negated_to_lookup(lookup=built_arguments.lookup)
     return built_arguments, lookup_w_negated, n
+
+
+# ── Worker entry points ───────────────────────────────────────────────────────
+#
+# /simulate and /step run these in the simulation pool (see process_pool.py).
+# Each takes what validate_and_build returned in the parent, so no check that
+# can refuse a request runs here, and each returns the finished response rather
+# than the REProcess: that object does pickle, but it carries the whole BDD
+# manager, which would be serialised across the pipe only to be thrown away.
+
+
+class SimulationFinished(Exception):
+    """A step was asked of a process that has already reached its fixed point.
+
+    Raised in a worker in place of an ``HTTPException``, which cannot be
+    unpickled; the router turns it back into a 400.
+    """
+
+
+def _index_by_id(elements: List[REElement]) -> Dict[str, int]:
+    return {el.id: i + 1 for i, el in enumerate(elements)}
+
+
+def _respond(
+    re: REProcess,
+    built_arguments: DetectArgumentsResponse,
+    lookup_w_negated: Dict[int, REElement],
+) -> SimulatedRethonResponse:
+    scores = compute_evolution_scores(re)
+    return SimulatedRethonResponse(
+        translated_arguments=built_arguments.translated_arguments,
+        translated_re_state=translate_re_state(re.state(), lookup_w_negated, scores),
+    )
+
+
+def simulate_to_fixed_point(
+    built_arguments: DetectArgumentsResponse,
+    lookup_w_negated: Dict[int, REElement],
+    n: int,
+    elements: List[REElement],
+    evolution: Optional[List[List[REElement]]],
+    local: bool = True,
+    weights: Optional[ModelWeights] = None,
+    neighbourhood_depth: int = 1,
+) -> SimulatedRethonResponse:
+    """Run the RE process to a fixed point, resuming from ``evolution`` if given."""
+    if evolution:
+        reconstructed = reconstruct_re_state(evolution, _index_by_id(elements), n)
+        re = build_re(
+            built_arguments.num_arguments,
+            n,
+            reconstructed.initial_commitments(),
+            local,
+            weights,
+            neighbourhood_depth,
+        )
+        re.set_state(reconstructed)
+        re.re_process()
+    else:
+        re = get_rethon_final_state(
+            numerical_arguments=built_arguments.num_arguments,
+            n_unnegated_sentence_pool=n,
+            lookup=built_arguments.lookup,
+            local=local,
+            weights=weights,
+            neighbourhood_depth=neighbourhood_depth,
+        )
+    return _respond(re, built_arguments, lookup_w_negated)
+
+
+def simulate_one_step(
+    built_arguments: DetectArgumentsResponse,
+    lookup_w_negated: Dict[int, REElement],
+    n: int,
+    elements: List[REElement],
+    evolution: Optional[List[List[REElement]]],
+    local: bool = True,
+    weights: Optional[ModelWeights] = None,
+    neighbourhood_depth: int = 1,
+) -> SimulatedRethonResponse:
+    """Advance the RE process by one step from ``evolution``, or from the element
+    statuses when there is none.
+
+    Raises ``SimulationFinished`` if the process is already at a fixed point.
+    """
+    id_to_index = _index_by_id(elements)
+    if evolution:
+        reconstructed = reconstruct_re_state(evolution, id_to_index, n)
+        init_coms = reconstructed.initial_commitments()
+    else:
+        init_coms = StandardPosition.from_set(
+            position={
+                (
+                    id_to_index[el.id]
+                    if el.status in ("active", "revised")
+                    else -id_to_index[el.id]
+                )
+                for el in elements
+                if el.status in ("active", "revised", "rejected")
+            },
+            n_unnegated_sentence_pool=n,
+        )
+    re = build_re(
+        numerical_arguments=built_arguments.num_arguments,
+        n_unnegated_sentence_pool=n,
+        init_coms=init_coms,
+        local=local,
+        weights=weights,
+        neighbourhood_depth=neighbourhood_depth,
+    )
+    if evolution:
+        re.set_state(reconstructed)
+    if re.state().finished:
+        raise SimulationFinished("The RE process has already reached a fixed point.")
+    re.next_step()
+    return _respond(re, built_arguments, lookup_w_negated)

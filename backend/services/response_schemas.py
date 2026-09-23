@@ -33,6 +33,44 @@ assert set(SUGGESTIBLE_RELATION_TYPES) <= set(
 ), "SUGGESTIBLE_RELATION_TYPES must be a subset of the RelationType literal"
 
 
+MERGE_PAIRS_SCHEMA = ResponseSchema(
+    name="record_merge_pairs",
+    description=(
+        "Record pairs of statements, one from each of two merged processes, that "
+        "make the same claim in different words."
+    ),
+    schema={
+        "type": "object",
+        "properties": {
+            "pairs": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "a": {
+                            "type": "string",
+                            "description": "Element ID from one process, e.g. 'J1'.",
+                        },
+                        "b": {
+                            "type": "string",
+                            "description": "Element ID from another process, e.g. 'J7'.",
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": "One sentence on why the two make the same claim.",
+                        },
+                    },
+                    "required": ["a", "b", "reason"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["pairs"],
+        "additionalProperties": False,
+    },
+)
+
+
 RELATIONS_SCHEMA = ResponseSchema(
     name="record_relations",
     description=(

@@ -18,7 +18,13 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { gotoHome, loadSample, park, clickNode, fadedCardContrast } from "./helpers.js";
+import {
+  gotoHome,
+  loadSample,
+  park,
+  clickNode,
+  fadedCardContrast,
+} from "./helpers.js";
 
 /**
  * Assert that a faded card is still failing AA, and that we actually looked.
@@ -44,7 +50,7 @@ test.describe("Open defects", () => {
     // src/components/text_panel/TextTabCards.jsx — the "All elements" listing
     // and the cluster member cards de-emphasise with `opacity: 0.4`, which puts
     // everything inside them under AA: element id badges land at 2.81:1 and the
-    // confidence chips at 2.98:1.
+    // stat captions and values at 2.98:1.
     //
     // Left open deliberately. Opacity is doing real work here — it is what
     // separates the focused element from the rest — so the fix is a design
@@ -67,8 +73,8 @@ test.describe("Open defects", () => {
   test("withdrawn cards are still under AA", async ({ page }) => {
     // The same defect as above at the other opacity: a withdrawn or rejected
     // element card is drawn at `opacity: 0.55` (TextTabCards.jsx), which takes
-    // its id badge to 2.81:1 and its chips, status label and action buttons to
-    // 2.98:1 — everything in the card at once, whatever size the type is.
+    // its id badge to 2.81:1 and its stats and action buttons to 2.98:1 —
+    // everything in the card at once, whatever size the type is.
     //
     // Recorded separately because it needs no selection to reproduce: the
     // sample ships J6 withdrawn, so it is on screen from the moment the editor
@@ -98,14 +104,17 @@ test.describe("Fixed defects", () => {
     await loadSample(page);
     await park(page);
 
-    const inks = await page.evaluate(() =>
-      [...new Set(
+    const inks = await page.evaluate(() => [
+      ...new Set(
         [...document.querySelectorAll("svg text")]
           .filter((t) => /^[JPT]\d+$/.test(t.textContent.trim()))
           .map((t) => getComputedStyle(t).fill),
-      )],
-    );
-    expect(inks.length, `labels use ${inks.length} inks: ${inks.join(", ")}`).toBe(1);
+      ),
+    ]);
+    expect(
+      inks.length,
+      `labels use ${inks.length} inks: ${inks.join(", ")}`,
+    ).toBe(1);
   });
 
   test("confidence does not fade the node", async ({ page }) => {
@@ -123,56 +132,83 @@ test.describe("Fixed defects", () => {
         .filter((t) => /^[JPT]\d+$/.test(t.textContent.trim()))
         .map((t) => {
           const g = t.closest("g");
-          return { id: t.textContent.trim(), opacity: Number(getComputedStyle(g).opacity) };
+          return {
+            id: t.textContent.trim(),
+            opacity: Number(getComputedStyle(g).opacity),
+          };
         }),
     );
     // Elements in play sit at full group opacity whatever their confidence;
     // withdrawn and rejected ones still fade as a whole, which is intended.
     const faded = groups.filter((g) => g.opacity > 0.4 && g.opacity < 1);
-    expect(faded, `partially faded label groups: ${JSON.stringify(faded)}`).toEqual([]);
+    expect(
+      faded,
+      `partially faded label groups: ${JSON.stringify(faded)}`,
+    ).toEqual([]);
   });
 
-  test('the "↑ Top" button does not cover list content', async ({ page }) => {
+  test('the "↑ Top" button leaves the end of the list uncovered', async ({ page }) => {
     // Was: the jump-to-top control is painted over the scroll container at
-    // bottom-left with no space reserved for it, so it sat on whichever card
-    // was scrolled underneath — J5's statement in the demo, the sort toggle
-    // elsewhere. Fixed by padding the list and only showing the button once
-    // there is something to scroll back from (TextTab.jsx).
+    // bottom-left with no space reserved for it, so the last card sat under it
+    // for good — scrolling could never bring it out. Fixed by padding the list
+    // by TOP_BUTTON_CLEARANCE and only showing the button once there is
+    // something to scroll back from (TextTab.jsx).
+    //
+    // What the padding guarantees is the end of the list, so that is what is
+    // checked. Mid-list the button does sit over whichever card is scrolled
+    // under it, and that is accepted: a floating control covers something
+    // wherever it floats, and every line of every card can still be scrolled
+    // clear of it. This used to scroll a fixed 1200px and pass only while that
+    // happened to reach the end; taller cards moved the end, and it failed on
+    // exactly that mid-list overlap.
     await gotoHome(page);
     await loadSample(page);
 
-    // Scroll far enough for the button to appear in the first place.
-    const list = page.locator('button:text-is("Revise")').first();
-    await list.scrollIntoViewIfNeeded();
-    await page.mouse.wheel(0, 1200);
+    // To the very end of the list's own scroll container.
+    const scrolled = await page.evaluate(() => {
+      let box = document.querySelector('[data-card="element"]');
+      while (box && getComputedStyle(box).overflowY !== "auto") box = box.parentElement;
+      if (!box || box.scrollHeight <= box.clientHeight) return false;
+      box.scrollTop = box.scrollHeight;
+      return true;
+    });
+    expect(scrolled, "no scrollable element list found").toBe(true);
     await park(page);
 
     const topButton = page.locator('button:text-is("↑ Top")');
     await expect(topButton).toBeVisible();
 
-    // Geometric overlap against the cards themselves. `elementsFromPoint` is no
-    // use here: it also returns every ancestor of the button, which trivially
-    // "contains" the whole page and would report an overlap either way.
+    // Geometric overlap against every line of text in the list, not only the
+    // cards: at the end of the list what sits lowest is the folded section
+    // headers, and a check against cards alone passed with the padding taken
+    // out. Text boxes come from Range rects, so a line counts as covered only
+    // where its words are. `elementsFromPoint` is no use here: it also returns
+    // every ancestor of the button, which trivially "contains" the whole page.
     const covered = await page.evaluate(() => {
       const top = [...document.querySelectorAll("button")].find(
         (b) => b.textContent.trim() === "↑ Top",
       );
       const b = top.getBoundingClientRect();
-      const cardsOf = (el) => (el.textContent.match(/Confidence:/g) ?? []).length;
-      return [...document.querySelectorAll("button")]
-        .filter((x) => x.textContent.trim() === "Revise")
-        .map((x) => {
-          let card = x;
-          while (card.parentElement && cardsOf(card.parentElement) <= 1) card = card.parentElement;
-          return card;
-        })
-        .filter((card) => {
-          const r = card.getBoundingClientRect();
-          return r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top;
-        })
-        .map((card) => card.innerText.replace(/\s+/g, " ").trim().slice(0, 60));
+      let box = document.querySelector('[data-card="element"]');
+      while (box && getComputedStyle(box).overflowY !== "auto") box = box.parentElement;
+
+      const hits = [];
+      const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent.trim() || top.contains(node)) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const overlaps = [...range.getClientRects()].some(
+          (r) => r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top,
+        );
+        if (overlaps) hits.push(node.textContent.replace(/\s+/g, " ").trim().slice(0, 60));
+      }
+      return hits;
     });
-    expect(covered, `'↑ Top' overlaps a card: ${JSON.stringify(covered[0])}`).toEqual([]);
+    expect(
+      covered,
+      `'↑ Top' covers list text at the end of the list: ${JSON.stringify(covered[0])}`,
+    ).toEqual([]);
   });
 
   test('"↑ Top" is absent until the list is scrolled', async ({ page }) => {
@@ -201,19 +237,22 @@ test.describe("Fixed defects", () => {
       ).toBeVisible();
     }
 
-    const unnamed = await page.evaluate(() =>
-      [...document.querySelectorAll("button")].filter(
-        (b) =>
-          b.offsetWidth > 0 &&
-          !b.textContent.trim() &&
-          !b.getAttribute("aria-label") &&
-          !b.getAttribute("title"),
-      ).length,
+    const unnamed = await page.evaluate(
+      () =>
+        [...document.querySelectorAll("button")].filter(
+          (b) =>
+            b.offsetWidth > 0 &&
+            !b.textContent.trim() &&
+            !b.getAttribute("aria-label") &&
+            !b.getAttribute("title"),
+        ).length,
     );
     expect(unnamed, `${unnamed} buttons still have no accessible name`).toBe(0);
   });
 
-  test("the confidence field in the add bar under an assist tab is labelled", async ({ page }) => {
+  test("the confidence field in the add bar under an assist tab is labelled", async ({
+    page,
+  }) => {
     // Was: the numeric confidence input had no aria-label, while its own L/M/H
     // siblings did. That was in the cut-down panel the assist tabs used to carry;
     // they have the strip under them now, and this walks whatever is there.
@@ -237,6 +276,8 @@ test.describe("Fixed defects", () => {
         )
         .map((el) => `${el.tagName}[type=${el.getAttribute("type") ?? "-"}]`),
     );
-    expect(unlabelled, `unlabelled fields: ${unlabelled.join(", ")}`).toEqual([]);
+    expect(unlabelled, `unlabelled fields: ${unlabelled.join(", ")}`).toEqual(
+      [],
+    );
   });
 });

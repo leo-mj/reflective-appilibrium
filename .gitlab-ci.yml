@@ -1,0 +1,166 @@
+# GitLab pipeline — the same checks as .github/workflows/ci.yml, for whoever
+# reviews or hosts the project from GitLab without opening the GitHub repo.
+# The GitHub Pages deploy has no counterpart here; the images job instead pushes
+# the two containers to this project's registry, which is what a host pulls.
+#
+# Keep the two in step by hand: a check added to one belongs in the other. The
+# container checks already share one script, ci/check-stack.sh.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # A branch push, unless a merge request for it is open — that pipeline runs
+    # instead, rather than both.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+stages:
+  - test
+  - images
+
+variables:
+  # This instance's runner reuses a build directory between jobs and cleans it
+  # with `git clean` first. It could not delete the wheels pip compiled into
+  # .cache/pip — while deleting every other file jobs left, root's included.
+  # Those wheels are the files pip built in the container's own /tmp and moved
+  # in, which fits a host where each container's files carry their own
+  # security label (SELinux) and no other container may remove them. The pip
+  # cache is no longer kept in the build directory (see .python); this keeps
+  # `git clean` away from the ones earlier runs left behind.
+  GIT_CLEAN_FLAGS: -ffdx -e .cache/
+
+default:
+  interruptible: true
+
+# ── Backend ─────────────────────────────────────────────────────────────────────
+
+.python:
+  # The full Debian image, not -slim: theodias needs pypblib, which has no Linux
+  # wheel for Python 3.12 and is compiled with g++ (see the Dockerfile).
+  image: python:3.12
+  variables:
+    # A throwaway container: root is all there is, and nothing else shares it.
+    PIP_ROOT_USER_ACTION: ignore
+  # No pip cache. A cache has to live in the build directory, and the wheels pip
+  # compiles there are what the next job's checkout could not delete (see
+  # GIT_CLEAN_FLAGS). The price is compiling pypblib each run, about 45s.
+  before_script:
+    # The image's own pip lags behind, and pip-audit audits the whole
+    # environment — so an old pip is reported as though it were a dependency.
+    - python -m pip install --upgrade pip
+    - pip install -r backend/requirements.txt
+
+backend-tests:
+  extends: .python
+  stage: test
+  timeout: 15m
+  script:
+    - pytest backend/
+
+# Informational, as on GitHub: most advisories are transitive and not ours to
+# fix on the day they appear. Read it when it is red.
+backend-audit:
+  extends: .python
+  stage: test
+  timeout: 15m
+  allow_failure: true
+  script:
+    - pip-audit
+
+# ── Frontend ────────────────────────────────────────────────────────────────────
+
+.node:
+  image: node:24
+  variables:
+    npm_config_cache: $CI_PROJECT_DIR/.cache/npm
+  cache:
+    key:
+      files: [app/package-lock.json]
+    paths: [.cache/npm]
+  before_script:
+    - cd app
+    - npm ci --prefer-offline
+
+frontend-tests:
+  extends: .node
+  stage: test
+  timeout: 15m
+  script:
+    # Warnings do not fail the build; only rules configured as errors do.
+    - npm run lint
+    - npm test
+    # Blocking: these are the packages that end up in the bundle a visitor
+    # downloads.
+    - npm audit --omit=dev --audit-level=high
+
+# Informational: the dev toolchain does not ship.
+frontend-audit-dev:
+  extends: .node
+  stage: test
+  timeout: 10m
+  allow_failure: true
+  script:
+    - npm audit --audit-level=high
+
+frontend-e2e:
+  extends: .node
+  stage: test
+  # Playwright's own image carries the browsers and their system libraries, so
+  # nothing is downloaded at run time. The tag must match @playwright/test in
+  # app/package-lock.json exactly; after a bump, a mismatch fails with
+  # "Executable doesn't exist", which is the cue to update it here.
+  image: mcr.microsoft.com/playwright:v1.62.1-noble
+  # Generous next to a green run, but retries: 2 in playwright.config.js mean a
+  # genuinely failing suite takes three passes.
+  timeout: 25m
+  script:
+    - npm run test:e2e
+  # The report holds the trace and screenshot of every failure.
+  artifacts:
+    when: always
+    paths: [app/playwright-report/]
+    expire_in: 14 days
+
+# ── Containers ──────────────────────────────────────────────────────────────────
+
+# Builds both images, starts them as docker-compose.yml wires them, and checks
+# the pair over HTTP. On the default branch it then pushes them to this
+# project's registry, tagged with the commit and as `latest`.
+#
+# Needs a runner that can run Docker-in-Docker, which means a privileged one.
+# This instance's shared runners are not: the dind service stops at "mount:
+# permission denied" and its daemon never starts. So the job is manual until
+# a privileged runner exists — press ▶ in the pipeline to run it then — and it
+# cannot fail a pipeline meanwhile. The stack it would check is checked on
+# every push by the `stack` job in .github/workflows/ci.yml, from the same
+# ci/check-stack.sh.
+images:
+  stage: images
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: /certs
+  timeout: 25m
+  rules:
+    - when: manual
+  allow_failure: true
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - docker compose up -d --build
+    # Published ports live on the dind service, not on this container.
+    - ci/check-stack.sh http://docker:8080
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+        for name in backend frontend; do
+          for tag in "$CI_COMMIT_SHORT_SHA" latest; do
+            docker tag "appilibrium-$name" "$CI_REGISTRY_IMAGE/$name:$tag"
+            docker push "$CI_REGISTRY_IMAGE/$name:$tag"
+          done
+        done
+      fi
+  after_script:
+    - docker compose logs || true

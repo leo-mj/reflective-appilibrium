@@ -30,6 +30,7 @@ import {
   historyNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
 
+import { processesOf, processTagMap } from "../utils/mergeStates.js";
 import { PlaybackControls } from "./history/HistoryPlaybackControls.jsx";
 import { LogOverlay } from "./history/LogOverlay.jsx";
 
@@ -94,6 +95,12 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
 
   const { withdrawn } = elementsAtRound(state.elements, snappedRound);
   const wIds = new Set(withdrawn.map((e) => e.id));
+  // Only the processes merged by the round being played: before the first
+  // merge there is one process and nothing to tell apart.
+  const processTags = useMemo(
+    () => processTagMap(processesOf(state, snappedRound)),
+    [state, snappedRound],
+  );
   const newIds = new Set(
     snappedRound > 0
       ? state.elements
@@ -178,7 +185,10 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
           renderNode(
             el,
             positions,
-            historyNodeVisuals(el, wIds, newIds, snappedRound),
+            {
+              ...historyNodeVisuals(el, wIds, newIds, snappedRound),
+              processTag: processTags.get(el.id),
+            },
             isDragging,
             setTooltip,
           ),

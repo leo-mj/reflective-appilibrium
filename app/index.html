@@ -49,6 +49,10 @@
       content="A graph of judgments, principles and background theories linked by arguments."
     />
     <meta name="twitter:card" content="summary_large_image" />
+    <!-- The site's Content-Security-Policy allows this script by the hash of its
+         exact text, computed at build time (vite-plugins/contentSecurityPolicy.js), so
+         editing it needs nothing else. Inline event handlers (onclick="…") are
+         another matter: a hash cannot allow them, and the policy blocks them. -->
     <script>
       (function () {
         var map = {

@@ -29,7 +29,9 @@ import { MenuToggle } from "./MenuToggle.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
+import { useLLMSettings, useLLMSettingsRequested } from "../../utils/llmKey.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
+import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
 
 /**
@@ -47,12 +49,9 @@ export function AppHeaderWide({
   assistSidePanel,
   setAssistSidePanel,
   handleImportClick,
+  handleMergeClick,
+  handleMergeSampleClick,
   onDownload,
-  onSave,
-  canSaveToServer,
-  saveLabel,
-  saveColor,
-  saveBusy,
   onHome,
   onUndo,
   canUndo,
@@ -71,6 +70,8 @@ export function AppHeaderWide({
   onExpandAll,
   hideNonEntailsRels,
   setHideNonEntailsRels,
+  showProcessTags,
+  setShowProcessTags,
   verifyArguments,
   setVerifyArguments,
   weights,
@@ -83,6 +84,7 @@ export function AppHeaderWide({
   const [menuOpen, setMenuOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
   const {
     isDark,
@@ -103,15 +105,22 @@ export function AppHeaderWide({
     setMenuOpen(!!tourMenuOpen);
   }
 
-  const llmSaved = (() => {
-    if (!BYOK_ENABLED) return null;
-    try {
-      const s = JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}");
-      return s?.apiKey ? s : null;
-    } catch {
-      return null;
-    }
-  })();
+  // The BYOK_ENABLED test stays here rather than in the store: whether to name
+  // the model in the menu is a display question, and llmKey.js does not know
+  // which build it is in.
+  const settings = useLLMSettings();
+  const llmSaved = BYOK_ENABLED && settings?.apiKey ? settings : null;
+
+  // A tab that needs a key asks for this modal rather than having `llmOpen`
+  // lifted out through ten components. Adjusted during render, as the tour's
+  // menu above is and for the same reason — an effect would open it a paint
+  // later than the press that asked for it.
+  const llmRequests = useLLMSettingsRequested();
+  const [seenLlmRequest, setSeenLlmRequest] = useState(llmRequests);
+  if (seenLlmRequest !== llmRequests) {
+    setSeenLlmRequest(llmRequests);
+    setLlmOpen(true);
+  }
 
   const menuItem = {
     ...btn(false),
@@ -346,6 +355,18 @@ export function AppHeaderWide({
                       onToggle={() => setHideNonEntailsRels((s) => !s)}
                       style={menuItem}
                     />
+                    {/* Only once there has been a merge: before one, there
+                        is nothing it could show. */}
+                    {showProcessTags != null && (
+                      <MenuToggle
+                        icon="⊕"
+                        label={MENU_LABELS.processTags}
+                        tooltip={MENU_TOOLTIPS.processTags}
+                        on={showProcessTags}
+                        onToggle={() => setShowProcessTags((s) => !s)}
+                        style={menuItem}
+                      />
+                    )}
                     {BACKEND_ENABLED && (
                       <MenuToggle
                         icon="⊨"
@@ -372,9 +393,19 @@ export function AppHeaderWide({
                         style={menuItem}
                       >
                         <span style={menuIconStyle}>⚙</span>
-                        {llmSaved
-                          ? `LLM: ${llmSaved.model}`
-                          : MENU_LABELS.llm}
+                        {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
+                      </button>
+                    </Tooltip>
+                    <Tooltip text={MENU_TOOLTIPS.privacy}>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setPrivacyOpen(true);
+                        }}
+                        style={menuItem}
+                      >
+                        <span style={menuIconStyle}>ⓘ</span>
+                        {MENU_LABELS.privacy}
                       </button>
                     </Tooltip>
 
@@ -384,12 +415,18 @@ export function AppHeaderWide({
                           <button
                             onClick={() => setWeightsOpen((o) => !o)}
                             aria-expanded={weightsOpen}
-                            style={{
-                              ...menuItem,
-                              color: weightsChanged
-                                ? C.principle.accent
-                                : undefined,
-                            }}
+                            // The override is spread in rather than written as
+                            // `color: changed ? accent : undefined`: that form
+                            // overwrites `menuItem`'s own colour with
+                            // `undefined`, React then sets no colour at all,
+                            // and the row falls back to the browser's default
+                            // button ink — which is how this one row came to be
+                            // brighter than every other item in the menu.
+                            style={
+                              weightsChanged
+                                ? { ...menuItem, color: C.principle.accent }
+                                : menuItem
+                            }
                           >
                             <span style={menuIconStyle}>⚖</span>
                             {MENU_LABELS.weights}
@@ -511,6 +548,34 @@ export function AppHeaderWide({
                         {MENU_LABELS.import}
                       </button>
                     </Tooltip>
+                    {handleMergeClick && (
+                      <Tooltip text={MENU_TOOLTIPS.merge}>
+                        <button
+                          onClick={() => {
+                            handleMergeClick();
+                            setMenuOpen(false);
+                          }}
+                          style={menuItem}
+                        >
+                          <span style={menuIconStyle}>⊕</span>
+                          {MENU_LABELS.merge}
+                        </button>
+                      </Tooltip>
+                    )}
+                    {handleMergeSampleClick && (
+                      <Tooltip text={MENU_TOOLTIPS.mergeSample}>
+                        <button
+                          onClick={() => {
+                            handleMergeSampleClick();
+                            setMenuOpen(false);
+                          }}
+                          style={menuItem}
+                        >
+                          <span style={menuIconStyle}>⊕</span>
+                          {MENU_LABELS.mergeSample}
+                        </button>
+                      </Tooltip>
+                    )}
                     <Tooltip text={MENU_TOOLTIPS.export}>
                       <button
                         onClick={close(onDownload)}
@@ -520,23 +585,6 @@ export function AppHeaderWide({
                         {MENU_LABELS.export}
                       </button>
                     </Tooltip>
-                    {BACKEND_ENABLED && canSaveToServer && (
-                      <Tooltip text={MENU_TOOLTIPS.save}>
-                        <button
-                          onClick={close(onSave)}
-                          disabled={saveBusy}
-                          style={{
-                            ...menuItem,
-                            ...(saveColor
-                              ? { color: saveColor, borderColor: saveColor }
-                              : {}),
-                          }}
-                        >
-                          <span style={menuIconStyle}>{saveLabel}</span>
-                          {MENU_LABELS.save}
-                        </button>
-                      </Tooltip>
-                    )}
                   </div>
                 </div>
               </>
@@ -547,6 +595,7 @@ export function AppHeaderWide({
 
       <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
+      <PrivacyModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
 
       {/* Row 2: tab bar */}
       {!hideTabBar && (

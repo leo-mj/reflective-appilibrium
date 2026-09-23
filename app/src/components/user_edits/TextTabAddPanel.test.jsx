@@ -889,6 +889,175 @@ describe("adding an argument", () => {
   });
 });
 
+describe("writing an argument out", () => {
+  const openWrite = (props = {}) => {
+    const onAddNewArgument = vi.fn();
+    renderBar({ hideNonEntailsRels: true, onAddNewArgument, ...props });
+    fireEvent.click(screen.getByText("Argument"));
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
+    return onAddNewArgument;
+  };
+  const type = (name, text) =>
+    fireEvent.change(screen.getByRole("textbox", { name }), {
+      target: { value: text },
+    });
+  const add = () => screen.getByRole("button", { name: "Add argument" });
+
+  it("starts with one premise over the conclusion", () => {
+    openWrite();
+    const fields = within(
+      screen.getByRole("group", { name: "Written argument" }),
+    ).getAllByRole("textbox");
+    expect(fields.map((f) => f.getAttribute("aria-label"))).toEqual([
+      "Premise 1",
+      "Conclusion",
+    ]);
+    // The pickers make way for it.
+    expect(screen.queryByRole("combobox", { name: "Premise 1" })).toBeNull();
+  });
+
+  it("adds a premise field above the conclusion", () => {
+    openWrite();
+    fireEvent.click(screen.getByText("+ premise"));
+    const fields = within(
+      screen.getByRole("group", { name: "Written argument" }),
+    ).getAllByRole("textbox");
+    expect(fields.map((f) => f.getAttribute("aria-label"))).toEqual([
+      "Premise 1",
+      "Premise 2",
+      "Conclusion",
+    ]);
+  });
+
+  it("will not add until every statement says something", () => {
+    openWrite();
+    fireEvent.click(screen.getByText("+ premise"));
+    type("Premise 1", "Lying is wrong.");
+    type("Conclusion", "I should not lie to Ann.");
+    expect(add().disabled).toBe(true);
+    type("Premise 2", "Telling Ann X would be lying.");
+    expect(add().disabled).toBe(false);
+  });
+
+  it("hands over the statements, typed, and resets", () => {
+    const onAddNewArgument = openWrite({ onAddRelation: vi.fn() });
+    fireEvent.click(screen.getByText("+ premise"));
+    type("Premise 1", "  Lying is wrong. ");
+    choose("Premise 2 source", "new:judgment");
+    type("Premise 2", "Telling Ann X would be lying.");
+    type("Conclusion", "I should not tell Ann X.");
+    fireEvent.click(add());
+
+    expect(onAddNewArgument).toHaveBeenCalledTimes(1);
+    const arg = onAddNewArgument.mock.calls[0][0];
+    expect(arg.premises.map(({ type, text }) => [type, text])).toEqual([
+      ["judgment", "Lying is wrong."],
+      ["judgment", "Telling Ann X would be lying."],
+    ]);
+    expect(arg.conclusion).toMatchObject({
+      type: "judgment",
+      text: "I should not tell Ann X.",
+    });
+    expect(arg.negated).toBe(false);
+    expect(screen.getByRole("textbox", { name: "Premise 1" }).value).toBe("");
+    expect(screen.queryByRole("textbox", { name: "Premise 2" })).toBeNull();
+  });
+
+  it("mixes a written premise with elements from the board", () => {
+    const onAddNewArgument = openWrite({
+      elements: [
+        ...ELEMENTS.slice(0, 2),
+        { id: "P1", type: "principle", status: "active", text: "Keep promises." },
+      ],
+    });
+    fireEvent.click(screen.getByText("+ premise"));
+    choose("Premise 1 source", "P1");
+    type("Premise 2", "I promised Ann.");
+    choose("Conclusion source", "J1");
+    // The picked element's words stand in for the field, and cannot be edited.
+    expect(
+      screen.getByLabelText("Premise 1", { selector: "div" }).textContent,
+    ).toBe("Keep promises.");
+    fireEvent.click(add());
+
+    const arg = onAddNewArgument.mock.calls[0][0];
+    expect(arg.premises[0]).toEqual({ id: "P1" });
+    expect(arg.premises[1]).toMatchObject({
+      type: "principle",
+      text: "I promised Ann.",
+    });
+    expect(arg.conclusion).toEqual({ id: "J1" });
+  });
+
+  it("keeps what was written when a line goes back to new", () => {
+    openWrite();
+    type("Premise 1", "Half a thought");
+    choose("Premise 1 source", "J1");
+    choose("Premise 1 source", "new:principle");
+    expect(screen.getByRole("textbox", { name: "Premise 1" }).value).toBe(
+      "Half a thought",
+    );
+  });
+
+  it("says why when the same element is used twice", () => {
+    openWrite();
+    type("Conclusion", "x");
+    choose("Premise 1 source", "J1");
+    choose("Conclusion source", "J1");
+    expect(add().disabled).toBe(true);
+    expect(screen.getByText("Premise ≠ conclusion")).toBeTruthy();
+
+    choose("Conclusion source", "new:judgment");
+    fireEvent.click(screen.getByText("+ premise"));
+    choose("Premise 2 source", "J1");
+    expect(screen.getByText("Premises must differ")).toBeTruthy();
+  });
+
+  it("opens on writing even with elements to pick", () => {
+    renderBar({ hideNonEntailsRels: true, onAddNewArgument: vi.fn() });
+    fireEvent.click(screen.getByText("Argument"));
+    expect(screen.getByRole("textbox", { name: "Premise 1" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Write" }).getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  it("opens on writing when the board has nothing to pick", () => {
+    renderBar({
+      elements: [],
+      hideNonEntailsRels: true,
+      onAddNewArgument: vi.fn(),
+    });
+    fireEvent.click(screen.getByText("Argument"));
+    expect(screen.getByRole("textbox", { name: "Premise 1" })).toBeTruthy();
+    expect(screen.queryByText("Add two elements first")).toBeNull();
+  });
+
+  it("goes back to picking when a ctrl+click chain arrives", () => {
+    const onAddNewArgument = vi.fn();
+    const { rerender } = renderBar({ onAddNewArgument });
+    fireEvent.click(screen.getByText("Argument"));
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
+    rerender(
+      <AddBar
+        elements={ELEMENTS}
+        onAddElement={() => {}}
+        onAddRelation={() => {}}
+        onAddNewArgument={onAddNewArgument}
+        selected={null}
+        ctrlChain={["J1", "P1"]}
+      />,
+    );
+    expect(pickerValue("Conclusion")).toBe("P1");
+  });
+
+  it("is not offered without a handler for it", () => {
+    renderBar({ hideNonEntailsRels: true });
+    fireEvent.click(screen.getByText("Argument"));
+    expect(screen.queryByRole("button", { name: "Write" })).toBeNull();
+  });
+});
+
 // ─── The filled buttons ───────────────────────────────────────────────────────
 // Add and whichever tab is lit carry the same fill, and are written in the ink
 // the viewing mode puts on a fill — white and bold in the default palette, the
@@ -1053,7 +1222,7 @@ describe("minimising the bar", () => {
   const minimise = () =>
     screen.getByRole("button", { name: "Minimise the add bar" });
   const restore = () =>
-    screen.getByRole("button", { name: /^Show the add bar/ });
+    screen.getByRole("button", { name: /^Show add bar/ });
 
   it("folds the form away, leaving the way back", () => {
     const { container } = renderBar();

@@ -23,6 +23,7 @@ import {
 import { findCoherentClusters } from "../utils/clusterUtils.js";
 import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
+import { processesOf, processTagMap } from "../utils/mergeStates.js";
 
 // ─── ClusterGraph ─────────────────────────────────────────────────────────────
 
@@ -87,6 +88,11 @@ function ClusterGraph({
   const wIds = new Set(
     state.elements.filter((e) => e.status === "withdrawn").map((e) => e.id),
   );
+  // A cluster spanning both sides of a merge is exactly what is worth seeing.
+  const processTags = useMemo(
+    () => processTagMap(processesOf(state)),
+    [state],
+  );
 
   return (
     <GraphCanvas
@@ -126,7 +132,10 @@ function ClusterGraph({
         renderNode(
           el,
           positions,
-          graphNodeVisuals(el, wIds, () => false, null),
+          {
+            ...graphNodeVisuals(el, wIds, () => false, null),
+            processTag: processTags.get(el.id),
+          },
           isDragging,
           setTooltip,
         ),

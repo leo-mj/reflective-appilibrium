@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { fetchPrincipleSuggestions } from "../../utils/principlesClient.js";
 import { llmOrigin } from "../../utils/stateUtils.js";
 import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
@@ -21,13 +22,11 @@ import {
   ChatButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { nextPhaseEnabled } from "../../utils/workflowUtils.js";
-import {
-  ScoreDeltaBadge,
-  SuggestionToolbar,
-} from "./workflowComponents.jsx";
+import { ScoreDeltaBadge, SuggestionToolbar } from "./workflowComponents.jsx";
 import { ConversationPanel } from "./ConversationPanel.jsx";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
 
@@ -139,19 +138,20 @@ function SuggestionCard({
           marginBottom: 6,
         }}
       >
-        <span
-          title={confidenceLabel(suggestion.confidence).title}
-          style={{
-            fontSize: 10,
-            lineHeight: 1,
-            color: C.principle.text,
-            border: `1px solid ${C.principle.accent}`,
-            borderRadius: 4,
-            padding: "3px 6px",
-          }}
-        >
-          {confidenceLabel(suggestion.confidence).text}
-        </span>
+        <Tooltip text={confidenceLabel(suggestion.confidence).title}>
+          <span
+            style={{
+              fontSize: 10,
+              lineHeight: 1,
+              color: C.principle.text,
+              border: `1px solid ${C.principle.accent}`,
+              borderRadius: 4,
+              padding: "3px 6px",
+            }}
+          >
+            {confidenceLabel(suggestion.confidence).text}
+          </span>
+        </Tooltip>
         {suggestion.covers.length > 0 && (
           <span style={{ fontSize: 10, color: C.dim }}>
             covers: {suggestion.covers.join(", ")}
@@ -274,6 +274,7 @@ export function PrincipleSuggestTab({
             suggestions.length > 0 && <AiDisclosureBanner model={model} />
           }
         />
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {jAndPCount <= 1 && (

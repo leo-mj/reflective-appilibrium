@@ -25,6 +25,7 @@ import {
 } from "../../utils/groupUtils.js";
 import { NodeShape } from "./NodeShape.jsx";
 import { NodeTooltip } from "./NodeTooltip.jsx";
+import { Tooltip } from "../Tooltip.jsx";
 
 // ─── GraphEdge ────────────────────────────────────────────────────────────────
 
@@ -201,6 +202,7 @@ function labelSize(type) {
  * @param {string}          [props.cursor]
  * @param {Function}        [props.onMouseEnter]
  * @param {Function}        [props.onMouseLeave]
+ * @param {string}          [props.processTag] - Which merged process(es) it came from, e.g. `"A+B"`.
  * @param {React.ReactNode} [props.children]
  */
 export function GraphNode({
@@ -213,6 +215,7 @@ export function GraphNode({
   cursor,
   onMouseEnter,
   onMouseLeave,
+  processTag,
   children,
 }) {
   const palette = usePalette();
@@ -251,6 +254,49 @@ export function GraphNode({
       >
         {element.id}
       </text>
+      {processTag && <ProcessTag label={processTag} radius={radius} />}
+    </g>
+  );
+}
+
+/**
+ * The letter of the merged process an element came from, pinned to the node's
+ * upper right. Letters rather than a colour per process: the node's colour
+ * already carries type and confidence, and a letter reads the same in every mode
+ * and to every reader. Chrome colours, for the reason groups take them — a
+ * process is not an element type. On top of the shape, since the selection ring
+ * and pulse that arrive as `children` are drawn behind it.
+ *
+ * @param {{ label: string, radius: number }} props
+ */
+export function ProcessTag({ label, radius }) {
+  const h = 13;
+  const w = 7 + label.length * 6;
+  return (
+    <g
+      transform={`translate(${radius * 0.7},${-radius * 0.95})`}
+      style={{ pointerEvents: "none" }}
+      data-testid="process-tag"
+    >
+      <rect
+        x={-w / 2}
+        y={-h / 2}
+        width={w}
+        height={h}
+        rx={h / 2}
+        fill={C.panel}
+        stroke={C.dim}
+        strokeWidth={1}
+      />
+      <text
+        textAnchor="middle"
+        dy="0.35em"
+        fontSize={9}
+        fontWeight="bold"
+        fill={C.text}
+      >
+        {label}
+      </text>
     </g>
   );
 }
@@ -269,7 +315,6 @@ export function GraphNode({
  * guarantees on both grounds.
  */
 const GROUP_INK = { fill: C.panel, stroke: C.dim, label: C.text };
-
 
 /**
  * The dashed box drawn around an expanded group.
@@ -502,22 +547,16 @@ export function GraphCanvas({
             gap: 3,
           }}
         >
-          <button
-            style={ZOOM_BTN}
-            onClick={zoomIn}
-            aria-label="Zoom in"
-            title="Zoom in"
-          >
-            +
-          </button>
-          <button
-            style={ZOOM_BTN}
-            onClick={zoomOut}
-            aria-label="Zoom out"
-            title="Zoom out"
-          >
-            −
-          </button>
+          <Tooltip text="Zoom in">
+            <button style={ZOOM_BTN} onClick={zoomIn} aria-label="Zoom in">
+              +
+            </button>
+          </Tooltip>
+          <Tooltip text="Zoom out">
+            <button style={ZOOM_BTN} onClick={zoomOut} aria-label="Zoom out">
+              −
+            </button>
+          </Tooltip>
         </div>
       )}
       <NodeTooltip tooltip={tooltip} actions={tooltipActions} />

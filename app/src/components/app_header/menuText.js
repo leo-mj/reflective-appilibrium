@@ -16,34 +16,40 @@
 export const MENU_LABELS = {
   home: "Home",
   llm: "LLM settings",
+  privacy: "Privacy",
   weights: "Model weights",
   relations: "All relations",
   checker: "Argument checker",
+  processTags: "Process tags",
   font: "Select Font",
   theme: "Dark mode",
   contrast: "High-contrast",
   navBar: "Section nav bar",
   cards: "Expanded cards",
   import: "Import",
+  merge: "Merge",
+  mergeSample: "Merge (demo)",
   export: "Export",
-  save: "Save",
 };
 
 /** One line each, keyed as above. */
 export const MENU_TOOLTIPS = {
   home: "Back to the start screen. Unsaved work is lost.",
   llm: "Your provider, model and API key.",
+  privacy: "What leaves your browser, and what is kept.",
   weights: "What the rethon simulation optimises for.",
   relations: "Adds supports, conflicts, undermines and depends.",
   checker: "Detected arguments are tested for validity first.",
+  processTags: "Letters marking which merged process each element came from.",
   font: "Includes a face drawn for dyslexic readers.",
   theme: "Dark or light background.",
   contrast: "Stronger node colours, AAA throughout.",
   navBar: "Section links and search, in the text panel.",
   cards: "Every card in the text panel, open or closed.",
   import: "Read a state back from a file.",
+  merge: "Add another exported process to this one, as one round.",
+  mergeSample: "Merge a second sample process into this one, to try the feature.",
   export: "Write the whole process out to a file.",
-  save: "Store this session on the server.",
 };
 
 /** Headings over the menu's blocks, in the order they appear. */

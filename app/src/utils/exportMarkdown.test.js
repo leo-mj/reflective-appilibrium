@@ -306,3 +306,30 @@ describe("buildMarkdown element sources", () => {
     expect(parsed.elements[0].sources[0].title).toBe("Reasons and persons");
   });
 });
+
+describe("buildMarkdown merged processes", () => {
+  const merged = makeState({
+    processes: [
+      { id: "A", label: "Lying", members: ["J1"], round: 5 },
+      { id: "B", label: "Promises", members: ["J1"], round: 5 },
+    ],
+  });
+
+  it("names each element's process in the prose", () => {
+    expect(elementsBlock(buildMarkdown(merged, {}))).toContain(
+      "**J1** · 1 · process A+B",
+    );
+  });
+
+  it("keys the letters the graph images carry", () => {
+    const md = buildMarkdown(merged, {});
+    expect(md).toContain("## Merged Processes");
+    expect(md).toContain("- **A** — Lying *(merged in round 5)*: J1");
+  });
+
+  it("says nothing about processes when there was no merge", () => {
+    const md = buildMarkdown(makeState(), {});
+    expect(md).not.toContain("Merged Processes");
+    expect(elementsBlock(md)).not.toContain("process");
+  });
+});

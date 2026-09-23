@@ -10,12 +10,30 @@ Phase 3 = Integration of rethon (computational RE).
 - `app/` — the React SPA (Vite). See `app/CLAUDE.md`.
 - `backend/` — FastAPI: LLM proxy plus the Python RE computation layer. See `backend/CLAUDE.md`.
 - `skill/` — Phase 1 Claude Skill, and the prose reference the domain model below follows.
-- `plans/`, `sessions/` — design notes and captured runs.
+- `plans/` — design notes.
 
 One codebase ships two ways, selected by `VITE_APP_ENV` (`app/src/config.js`):
 `demo` is the public static build with no backend and no LLM; `dev` and `backend`
 turn on the backend, the LLM features and the BYOK settings modal. State files are
 interchangeable between them — export/import is the handoff.
+
+**The two are published as separate sites**, and which host serves each is a
+deployment decision the code does not know about. The demo carries no key and
+makes no requests; the `backend` build holds a visitor's API key in the tab, so
+it gets an address of its own rather than sharing one with unrelated pages. A
+build is aimed by three values — `VITE_APP_ENV`, `VITE_BACKEND_URL` and
+`VITE_BASE_PATH` — plus `CORS_ORIGINS` on the server; `app/src/backendUrl.js`
+defines what the backend URL may say, including `/` for the case where one host
+serves the page and routes `/api` to the backend. Don't write a host's name into
+the app: the workflows hold the examples, and they read repository variables.
+
+**Nothing is stored on a server, in either build.** The working state is
+autosaved to the browser (`localStorage`, offered back as "Continue where you
+left off") and Markdown export is the only way out of it. There was a
+`/api/sessions` router writing RE states to a directory on disk; it was removed
+rather than switched off, since a gate is one setting away from holding
+strangers' moral reasoning on a shared machine. See `backend/CLAUDE.md` for what
+pins that.
 
 Frontend tests are Vitest (`npm test` in `app/`) plus Playwright (`npm run test:e2e`,
 see `app/e2e/README.md`); the backend is pytest from the repo root.
@@ -172,6 +190,90 @@ writes no log entry, so a review still cannot alter the record it describes.
 
 `state.reviews` is absent from every state written before the feature existed —
 read it through `reviewsOf(state)`, never directly.
+
+### Merging processes
+
+**Merge** (☰ → Session) reads a second exported file into the open process —
+`utils/mergeStates.js`. Unlike Import it replaces nothing and is one undo step.
+
+It is two steps, `handlePrepareMerge` and `handleConfirmMerge` in `useREActions`,
+with `MergeModal` between them: before anything changes, the reader sees how much
+the merge adds and which incoming elements are identical to ones here.
+`previewMerge` runs the merge itself to get these, so the preview cannot describe
+a different merge from the one performed.
+
+The modal deliberately does **not** report new conflicts. The merge only copies
+relations, so a tension it could find is one the other process had already drawn
+— never a disagreement between the two that nobody drew — and an empty list would
+read as reassurance it cannot give.
+
+The merge is **one round** of the current process: every incoming item arrives in
+it, as it stands at the end of its own process — withdrawn and rejected items as
+such, a revised one as `active` with the wording it reached. The incoming history,
+log and reviews are not replayed, since none of it happened *here*; playback would
+otherwise show elements before they were brought in. The single log entry the
+merge writes is what survives of it, and it spells out the renumbering (`J1 → J8`)
+because the incoming log's prose names ids that no longer exist.
+
+Elements of the same type and wording (whitespace aside) are **fused**: the current
+copy is kept untouched, incoming relations are re-pointed at it, and each pair is
+named in the log. Relations and arguments that fusing turns into duplicates or
+loops are dropped. Incoming groups are renumbered, and lose any member the current
+process has already grouped. Questionnaire sessions cannot be merged on either side.
+
+**Which process an element came from** stays visible afterwards: `state.processes`
+(`[{ id: "A", label, members, round }]`, lettered in merge order, labelled by
+topic, stamped with the merge's round) — read it through `processesOf(state)`,
+which leaves out processes merged after the state's own round, so playback and a
+`stateAtRound` projection show no letters before the merge that made them. Every
+node wears its letter (`"A+B"` when fused) on the Graph, History and Cluster tabs
+and in the exported SVGs; the legend and the export's "Merged Processes" section
+key the letters, and text cards and the export's element lines name the process.
+Letters rather than colours, since node colour already carries type and
+confidence. **Process tags** in ☰ → Content hides them all at once, and is offered
+only once a merge has happened. It works by handing the graphs and text panel a
+view of the state without `processes` (`viewState` in `REState`) — which is why
+every surface must read the record through `processesOf` — while edits, the
+autosave and the export keep the real state. The export always carries the tags:
+like the palette, it does not follow a reader's view settings. It lives on the state and **not on the elements**, because the
+backend's element model forbids unknown fields; the backend drops it on a server
+save, as it does groups, while export/import keeps it. An incoming process that
+was itself a merge keeps its own processes apart under letters of their own.
+Elements added after a merge carry no letter.
+
+**Merging elements.** A process merge fuses only identical wording. The **Merge**
+assist tab (`components/workflows/ElementMergeTab.jsx`, offered only once
+`state.processes` exists, never a workflow phase, never fetched on arrival) asks a
+model for pairs — one element from each of two processes, same type, no process in
+common — that make the *same claim* in different words. `POST /api/merge/pairs`
+(`backend/routers/merge.py`) holds the prompt and drops anything else the model
+returns; a model's say-so never puts a pair on screen. `state.processes` is not in
+the backend's state model, so the client sends it alongside the elements, and the
+tab re-checks each pair with `isMergeablePair` as the state moves on under it.
+Accepting one (`mergeElementPair` in `utils/elementMerge.js`) is one round: the
+reader picks which wording stays, may reword it (recorded as a revision) and sets
+its confidence; the other element is **removed outright**, its relations
+re-pointed at the kept one — loops and duplicates dropped, a joint argument that
+loses a premise retyped — and the kept element joins both processes. Being a
+removal, playback shows the re-pointed relations on the kept element in earlier
+rounds too, and older log entries still name the removed id; that was chosen over
+withdrawing it. Dismissing records nothing.
+
+**The samples.** `sample-data/sample-process-climate-duties.md` is a second
+process in export format, written to be merged into the one the app opens with:
+nothing is worded identically, so nothing fuses automatically and every pair is
+the reader's to decide. ☰ → Session → **Merge (demo)** brings it in through the
+same preview modal a picked file goes through, and is offered on the sample
+process only (`isSample`) — in someone's own process a demo's judgments are not a
+merge anyone asked for. It is `import(…?raw)`ed on the press, so the fixture is a
+chunk of its own rather than part of the main bundle; that is also why it lives
+in `sample-data/` rather than `public/`, one copy that both the button and the
+test read. `sample-data/sample-merge-pairs.js` holds the five pairs
+the tab then offers without a model, **keyed by wording rather than by id** —
+which ids the second process lands on depends on the first — and falling back to
+word overlap (`samplePairs`) for any other process. All three drift apart
+silently, so `sample-merge-pairs.test.js` reads the file as the app does, merges
+it and checks the pairs still resolve.
 
 ### State schema
 

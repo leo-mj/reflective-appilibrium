@@ -38,7 +38,6 @@ const PROPS = {
   assistSidePanel: "graph",
   setAssistSidePanel: noop,
   onDownload: noop,
-  onSave: noop,
   onImportFile: noop,
   hasExistingState: false,
   onHome: noop,
@@ -128,7 +127,196 @@ describe("model weights", () => {
       openMenu();
       expect(screen.queryByText(/Model weights/)).not.toBeNull();
     });
+
+    // Was: the row set `color: changed ? accent : undefined` over the menu
+    // row's own style, which overwrites the colour with `undefined`. React then
+    // sets none, and the row inherits the browser's default button ink — one
+    // row brighter than the rest of the menu, in dark mode most visibly.
+    it(`is written in the same ink as the rest of the ${layout} menu`, () => {
+      flags.backend = true;
+      render(<AppHeader {...PROPS} isWide={isWide} />);
+      openMenu();
+      const row = (name) => screen.getByRole("button", { name });
+      expect(row(/Model weights/).style.color).toBe(row(/Privacy/).style.color);
+      expect(row(/Model weights/).style.color).not.toBe("");
+    });
   }
+});
+
+describe("merge", () => {
+  // Offered only where it can succeed: there has to be a process to merge
+  // into, and a questionnaire has no room for a second one.
+  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+  const mergeRow = () => screen.queryByRole("button", { name: /Merge/ });
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+    const withState = { hasExistingState: true, onPrepareMerge: noop };
+
+    it(`is offered in the ${layout} menu when there is a process`, () => {
+      render(<AppHeader {...PROPS} {...withState} isWide={isWide} />);
+      openMenu();
+      expect(mergeRow()).not.toBeNull();
+    });
+
+    it(`stays out of the ${layout} menu with nothing to merge into`, () => {
+      render(<AppHeader {...PROPS} onPrepareMerge={noop} isWide={isWide} />);
+      openMenu();
+      expect(mergeRow()).toBeNull();
+    });
+
+    it(`stays out of the ${layout} menu in questionnaire mode`, () => {
+      render(
+        <AppHeader
+          {...PROPS}
+          {...withState}
+          model="questionnaire"
+          tab="questionnaire"
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      expect(mergeRow()).toBeNull();
+    });
+  }
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+    const tagsRow = () => screen.queryByText("Process tags");
+
+    it(`offers the process-tags toggle in the ${layout} menu only after a merge`, () => {
+      render(<AppHeader {...PROPS} isWide={isWide} />);
+      openMenu();
+      expect(tagsRow()).toBeNull();
+      cleanup();
+
+      const setShowProcessTags = vi.fn();
+      render(
+        <AppHeader
+          {...PROPS}
+          isWide={isWide}
+          showProcessTags={true}
+          setShowProcessTags={setShowProcessTags}
+        />,
+      );
+      openMenu();
+      fireEvent.click(tagsRow());
+      expect(setShowProcessTags).toHaveBeenCalledTimes(1);
+      expect(setShowProcessTags.mock.calls[0][0](true)).toBe(false);
+    });
+  }
+
+  const PREPARED = {
+    incoming: {},
+    label: "other",
+    preview: {
+      label: "Promises",
+      added: 2,
+      relationsAdded: 1,
+      fused: [{ from: "J1", id: "J3", text: "Lying is wrong." }],
+    },
+  };
+  const chooseMergeFile = (props) => {
+    render(<AppHeader {...PROPS} hasExistingState {...props} />);
+    const file = new File(["x"], "other.md");
+    fireEvent.change(screen.getByTestId("merge-input"), {
+      target: { files: [file] },
+    });
+    return file;
+  };
+
+  it("shows what the merge would do, and merges only on confirmation", async () => {
+    const onPrepareMerge = vi.fn().mockResolvedValue(PREPARED);
+    const onConfirmMerge = vi.fn();
+    const file = chooseMergeFile({ onPrepareMerge, onConfirmMerge });
+
+    expect(onPrepareMerge).toHaveBeenCalledWith(file);
+    expect(await screen.findByText("Merge “Promises”?")).not.toBeNull();
+    expect(screen.getByText("Identical elements: 1")).not.toBeNull();
+    expect(screen.queryByText("Replace session?")).toBeNull();
+    expect(onConfirmMerge).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    expect(onConfirmMerge).toHaveBeenCalledWith(PREPARED);
+    expect(screen.queryByText("Merge “Promises”?")).toBeNull();
+  });
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+    const demoRow = () => screen.queryByText("Merge (demo)");
+
+    it(`offers the demo merge in the ${layout} menu on the sample process only`, () => {
+      render(
+        <AppHeader
+          {...PROPS}
+          hasExistingState
+          onPrepareMerge={noop}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      expect(demoRow()).toBeNull();
+      cleanup();
+
+      render(
+        <AppHeader
+          {...PROPS}
+          hasExistingState
+          isSample
+          onPrepareMerge={noop}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      expect(demoRow()).not.toBeNull();
+    });
+  }
+
+  it("prepares the demo merge from the bundled sample process", async () => {
+    const onPrepareMerge = vi.fn().mockResolvedValue(PREPARED);
+    render(
+      <AppHeader
+        {...PROPS}
+        hasExistingState
+        isSample
+        onPrepareMerge={onPrepareMerge}
+      />,
+    );
+    openMenu();
+    fireEvent.click(screen.getByText("Merge (demo)"));
+
+    expect(await screen.findByText("Merge “Promises”?")).not.toBeNull();
+    const file = onPrepareMerge.mock.calls[0][0];
+    expect(file.name).toBe("sample-process-climate-duties.md");
+    expect(await file.text()).toContain("```re-state");
+  });
+
+  it("merges nothing when cancelled", async () => {
+    const onConfirmMerge = vi.fn();
+    chooseMergeFile({
+      onPrepareMerge: vi.fn().mockResolvedValue(PREPARED),
+      onConfirmMerge,
+    });
+    await screen.findByText("Merge “Promises”?");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onConfirmMerge).not.toHaveBeenCalled();
+    expect(screen.queryByText("Merge “Promises”?")).toBeNull();
+  });
+
+  it("reports a file it could not merge", async () => {
+    const onPrepareMerge = vi
+      .fn()
+      .mockRejectedValue(new Error("Questionnaire sessions cannot be merged."));
+    render(
+      <AppHeader {...PROPS} hasExistingState onPrepareMerge={onPrepareMerge} />,
+    );
+    fireEvent.change(screen.getByTestId("merge-input"), {
+      target: { files: [new File(["x"], "q.md")] },
+    });
+    expect(
+      await screen.findByText("Questionnaire sessions cannot be merged."),
+    ).not.toBeNull();
+  });
 });
 
 describe("what closes the menu", () => {

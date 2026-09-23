@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { C } from "../constants/colors.js";
 import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
@@ -8,14 +8,12 @@ import { useSplitRatio } from "../hooks/useSplitRatio.js";
 import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { useAutosaveDraft } from "../hooks/useAutosaveDraft.js";
-import { useBackendCapabilities } from "../hooks/useBackendCapabilities.js";
 import {
   ADD_BAR_PRESETS,
   ASSIST_TABS,
   SIMULATE_TABS,
 } from "../constants/tabConstants.jsx";
 import { downloadMarkdown } from "../utils/exportMarkdown.js";
-import { saveSession } from "../utils/sessionsClient.js";
 import {
   completesIteration,
   nextPhaseEnabled,
@@ -50,6 +48,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [workflowLoops, setWorkflowLoops] = useState(0);
   const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
   const [verifyArguments, setVerifyArguments] = useState(true);
+  // On by default: a merge is asked for, and being able to tell the processes
+  // apart afterwards is the point of the tags.
+  const [showProcessTags, setShowProcessTags] = useState(true);
   // The home page's "Tutorial" button sets this flag and then loads the demo,
   // so the tour opens on the state it describes rather than on the landing page.
   const [tourActive, setTourActive] = useState(() => {
@@ -115,6 +116,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleAddElement,
     handleReviseElementText,
     handleAddRelation,
+    handleAddNewArgument,
     handleQuestionnaireSelectAnswer,
     handleRejectElements,
     handleRejectRelations,
@@ -122,6 +124,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleDiscardReview,
     handleApplyRethonEquilibrium,
     handleImportFile,
+    handlePrepareMerge,
+    handleConfirmMerge,
+    handleMergeElements,
     handleCreateGroup,
     handleToggleGroup,
     handleUngroup,
@@ -135,9 +140,6 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleRedo,
     canRedo,
   } = useREActions(initialState);
-
-  // What this backend actually allows, which build-time flags cannot say.
-  const capabilities = useBackendCapabilities();
 
   // Not the sample: it is a fixed demonstration anyone can reload from the home
   // page, and autosaving it would bury the visitor's own work under it.
@@ -288,8 +290,19 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     }
   };
 
+  // What the graphs and the text panel are drawn from. Hiding the merge tags
+  // hides the record they are drawn from — every surface reads it through
+  // `processesOf`, so they all go together — while edits, the autosave and the
+  // export keep working from `state` itself, where the record stays intact.
+  const viewState = useMemo(() => {
+    if (showProcessTags || !state.processes) return state;
+    const { processes: _hidden, ...rest } = state;
+    return rest;
+  }, [state, showProcessTags]);
+  const hasMerged = (state.processes?.length ?? 0) > 0;
+
   const textState =
-    tab === "history" ? stateAtRound(state, historyRound) : state;
+    tab === "history" ? stateAtRound(viewState, historyRound) : viewState;
 
   // Props shared by both the assist-side and analyze-mode TextPanel instances.
   // While the tour is running it says whether the text panel belongs on screen.
@@ -323,6 +336,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onReinstateRel: handleReinstateRelation,
     onAddElement: handleAddElement,
     onAddRelation: handleAddRelation,
+    onAddNewArgument: handleAddNewArgument,
     // The panel is where a collapsed group's members are still spelled out, so
     // it gets the same handles the canvas chips have.
     onToggleGroup: handleToggleGroup,
@@ -342,7 +356,11 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   };
 
   const graphPanelCommonProps = {
-    state,
+    state: viewState,
+    // From the state itself: the Merge tab needs the process record whether or
+    // not the tags drawn from it are showing.
+    processes: state.processes ?? [],
+    onMergeElements: handleMergeElements,
     positions,
     hiddenLegendKeys: effectiveHiddenKeys,
     setHiddenLegendKeys,
@@ -357,6 +375,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onWithdrawRequest: handleWithdrawRequest,
     onReinstate: handleReinstateElement,
     onAddRelation: handleAddRelation,
+    onAddNewArgument: handleAddNewArgument,
     onDeleteRelationsByArgId: handleDeleteRelationsByArgId,
     onQuestionnaireSelectAnswer: handleQuestionnaireSelectAnswer,
     recentlyAdded,
@@ -497,9 +516,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
         onDownload={() => downloadMarkdown(state, positions)}
-        onSave={() => saveSession(state)}
-        canSaveToServer={capabilities.sessions}
         onImportFile={handleImportFile}
+        onPrepareMerge={handlePrepareMerge}
+        onConfirmMerge={handleConfirmMerge}
+        isSample={isSample}
         hasExistingState={state.elements.length > 0}
         onHome={onHome}
         isWide={isWide}
@@ -520,6 +540,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         }}
         hideNonEntailsRels={hideNonEntailsRels}
         setHideNonEntailsRels={setHideNonEntailsRels}
+        showProcessTags={hasMerged ? showProcessTags : null}
+        setShowProcessTags={setShowProcessTags}
+        hasMerged={hasMerged}
         verifyArguments={verifyArguments}
         setVerifyArguments={setVerifyArguments}
         weights={weights}
@@ -611,6 +634,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           elements={linkableElements(state.elements)}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
+          onAddNewArgument={handleAddNewArgument}
           selected={selected}
           ctrlChain={addBarCtrlChain}
           hideNonEntailsRels={hideNonEntailsRels}

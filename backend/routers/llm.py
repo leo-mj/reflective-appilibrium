@@ -79,9 +79,11 @@ async def test_connection(
             json_mode=False,
         )
     except Exception as exc:  # noqa: BLE001 — this endpoint's job is to report why
-        message = getattr(exc, "message", None) or str(exc)
+        # Safe to log once scrubbed: the prompt above is fixed, so the provider's
+        # reply cannot quote anyone's reasoning, only the key it just rejected.
+        message = scrub_provider_error(getattr(exc, "message", None) or str(exc))
         logger.info(f"Connection test failed for model '{llm.model}': {message}")
-        raise HTTPException(status_code=400, detail=scrub_provider_error(message))
+        raise HTTPException(status_code=400, detail=message)
     return {"status": "ok", "model": llm.model}
 
 
@@ -97,7 +99,7 @@ async def complete(
         temperature=request.temperature,
         json_mode=request.json_mode,
     )
-    logger.info(f"Received response beginning with: {result.text[:20]}")
+    logger.info(f"Received a {len(result.text)}-character response.")
     return CompletionResponse(
         text=result.text,
         model=llm.model,

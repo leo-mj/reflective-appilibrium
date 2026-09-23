@@ -8,7 +8,9 @@ import { C } from "../../constants/colors.js";
 import { useTheme } from "../../hooks/useTheme.js";
 import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
+import { useLLMSettings, useLLMSettingsRequested } from "../../utils/llmKey.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
+import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import {
   ASSIST_TABS,
@@ -48,12 +50,9 @@ export function AppHeaderNarrow({
   ANALYZE_TABS,
   isTabVisible,
   handleImportClick,
+  handleMergeClick,
+  handleMergeSampleClick,
   onDownload,
-  onSave,
-  canSaveToServer,
-  saveLabel,
-  saveColor,
-  saveBusy,
   onHome,
   onUndo,
   canUndo,
@@ -69,6 +68,8 @@ export function AppHeaderNarrow({
   onExpandAll,
   hideNonEntailsRels,
   setHideNonEntailsRels,
+  showProcessTags,
+  setShowProcessTags,
   verifyArguments,
   setVerifyArguments,
   weights,
@@ -80,6 +81,7 @@ export function AppHeaderNarrow({
 }) {
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
   const {
     isDark,
@@ -88,15 +90,16 @@ export function AppHeaderNarrow({
     toggleAccessible,
   } = useTheme();
 
-  const llmSaved = (() => {
-    if (!BYOK_ENABLED) return null;
-    try {
-      const s = JSON.parse(sessionStorage.getItem("llmSettings") ?? "{}");
-      return s?.apiKey ? s : null;
-    } catch {
-      return null;
-    }
-  })();
+  // Both of these are the wide header's, line for line — see the comments there.
+  const settings = useLLMSettings();
+  const llmSaved = BYOK_ENABLED && settings?.apiKey ? settings : null;
+
+  const llmRequests = useLLMSettingsRequested();
+  const [seenLlmRequest, setSeenLlmRequest] = useState(llmRequests);
+  if (seenLlmRequest !== llmRequests) {
+    setSeenLlmRequest(llmRequests);
+    setLlmOpen(true);
+  }
 
   const menuBtn = (active = false) => ({
     ...btn(active),
@@ -161,6 +164,7 @@ export function AppHeaderNarrow({
       </div>
       <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
       <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
+      <PrivacyModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       {menuOpen && (
         <div
           style={{
@@ -309,6 +313,16 @@ export function AppHeaderNarrow({
               onToggle={() => setHideNonEntailsRels((s) => !s)}
               style={menuBtn()}
             />
+            {showProcessTags != null && (
+              <MenuToggle
+                icon="⊕"
+                label={MENU_LABELS.processTags}
+                tooltip={MENU_TOOLTIPS.processTags}
+                on={showProcessTags}
+                onToggle={() => setShowProcessTags((s) => !s)}
+                style={menuBtn()}
+              />
+            )}
             {BACKEND_ENABLED && (
               <MenuToggle
                 icon="⊨"
@@ -333,15 +347,30 @@ export function AppHeaderNarrow({
               <span style={menuIconStyle}>⚙</span>
               {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
             </button>
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setPrivacyOpen(true);
+              }}
+              style={menuBtn()}
+            >
+              <span style={menuIconStyle}>ⓘ</span>
+              {MENU_LABELS.privacy}
+            </button>
             {BACKEND_ENABLED && (
               <>
                 <button
                   onClick={() => setWeightsOpen((o) => !o)}
                   aria-expanded={weightsOpen}
-                  style={{
-                    ...menuBtn(),
-                    color: weightsChanged ? C.principle.accent : undefined,
-                  }}
+                  // Spread in rather than `color: changed ? accent : undefined`
+                  // — see the same row in AppHeaderWide.jsx: that form wipes
+                  // the menu row's own colour and leaves the browser's default
+                  // button ink in its place.
+                  style={
+                    weightsChanged
+                      ? { ...menuBtn(), color: C.principle.accent }
+                      : menuBtn()
+                  }
                 >
                   <span style={menuIconStyle}>⚖</span>
                   {MENU_LABELS.weights}
@@ -442,6 +471,30 @@ export function AppHeaderNarrow({
               <span style={menuIconStyle}>↑</span>
               {MENU_LABELS.import}
             </button>
+            {handleMergeClick && (
+              <button
+                onClick={() => {
+                  handleMergeClick();
+                  setMenuOpen(false);
+                }}
+                style={menuBtn()}
+              >
+                <span style={menuIconStyle}>⊕</span>
+                {MENU_LABELS.merge}
+              </button>
+            )}
+            {handleMergeSampleClick && (
+              <button
+                onClick={() => {
+                  handleMergeSampleClick();
+                  setMenuOpen(false);
+                }}
+                style={menuBtn()}
+              >
+                <span style={menuIconStyle}>⊕</span>
+                {MENU_LABELS.mergeSample}
+              </button>
+            )}
             <button
               onClick={close(onDownload)}
               style={{ ...menuBtn(), color: C.theory.text }}
@@ -449,21 +502,6 @@ export function AppHeaderNarrow({
               <span style={menuIconStyle}>↓</span>
               {MENU_LABELS.export}
             </button>
-            {BACKEND_ENABLED && canSaveToServer && (
-              <button
-                onClick={close(onSave)}
-                disabled={saveBusy}
-                style={{
-                  ...menuBtn(),
-                  ...(saveColor
-                    ? { color: saveColor, borderColor: saveColor }
-                    : {}),
-                }}
-              >
-                <span style={menuIconStyle}>{saveLabel}</span>
-                {MENU_LABELS.save}
-              </button>
-            )}
           </div>
         </div>
       )}

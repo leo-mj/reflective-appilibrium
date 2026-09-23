@@ -1242,6 +1242,43 @@ describe("importStateFromFile — reviews", () => {
   });
 });
 
+// ─── Merged processes ─────────────────────────────────────────────────────────
+
+describe("importStateFromFile — processes", () => {
+  const els = ["J1", "J2"].map((id) => ({
+    id,
+    type: "judgment",
+    status: "active",
+    confidence: 1,
+    text: id,
+    addedRound: 1,
+  }));
+  const importWith = (processes) =>
+    importStateFromFile(
+      makeFile(wrapInMarkdown({ ...MINIMAL_STATE, elements: els, processes })),
+    );
+
+  it("has no processes key on a process never merged", async () => {
+    const state = await importStateFromFile(makeFile(wrapInMarkdown(MINIMAL_STATE)));
+    expect(state).not.toHaveProperty("processes");
+  });
+
+  it("round-trips the processes, dropping members that are not elements", async () => {
+    const state = await importWith([
+      { id: "A", label: "Lying", members: ["J1", "GONE"] },
+      { id: "B", label: "Promises", members: ["J1", "J2"] },
+    ]);
+    expect(state.processes).toEqual([
+      { id: "A", label: "Lying", members: ["J1"] },
+      { id: "B", label: "Promises", members: ["J1", "J2"] },
+    ]);
+  });
+
+  it("refuses a process that is not an object", async () => {
+    await expect(importWith(["A"])).rejects.toThrow(/processes\[0\]/);
+  });
+});
+
 // ─── Groups ───────────────────────────────────────────────────────────────────
 
 describe("importStateFromFile — groups", () => {

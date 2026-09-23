@@ -472,6 +472,28 @@ export function validateState(raw) {
     result.reviews = arr(raw.reviews, "reviews", 100).map(validateReview);
   }
 
+  // The processes a merged one came from (utils/mergeStates.js). Members that
+  // are not elements are dropped rather than refused, as for a group: it is
+  // provenance, and a record that has drifted is still a good process.
+  if (raw.processes !== undefined) {
+    const elementIds = new Set(result.elements.map((e) => e.id));
+    result.processes = arr(raw.processes, "processes", 50).map((p, i) => {
+      const ctx = `processes[${i}]`;
+      if (!p || typeof p !== "object" || Array.isArray(p))
+        throw new Error(`${ctx} must be an object`);
+      const members = arr(p.members ?? [], `${ctx}.members`, 1_000)
+        .map((m, j) => str(m, `${ctx}.members[${j}]`, 10))
+        .filter((m) => elementIds.has(m));
+      const result = {
+        id: str(p.id, `${ctx}.id`, 10),
+        label: str(p.label ?? "", `${ctx}.label`, 200),
+        members: [...new Set(members)],
+      };
+      if (p.round != null) result.round = num(p.round, `${ctx}.round`);
+      return result;
+    });
+  }
+
   if (raw.model !== undefined) {
     if (raw.model !== "questionnaire")
       throw new Error(`"model" must be "questionnaire" if present, got "${raw.model}"`);

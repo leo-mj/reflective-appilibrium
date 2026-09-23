@@ -11,7 +11,9 @@ import {
   makeDiff,
   makeLogEntry,
   ARGUMENT_RELATION_TYPES,
+  argumentRelationType,
   newArgumentId,
+  nextElementId,
   withEvent,
   withUserEdit,
 } from "../utils/stateUtils.js";
@@ -204,6 +206,74 @@ export function useRelationActions({
     }
   };
 
+  /**
+   * An argument written out rather than picked: each premise and the
+   * conclusion is either a new element — added here, together with the
+   * relations joining them — or `{ id }`, an element already on the board.
+   *
+   * One change rather than a run of adds, so it is one round, one log entry and
+   * one undo — and so the ids are worked out against the whole element list,
+   * `possible` ones included, which the add bar's own list leaves out.
+   *
+   * @typedef {{id: string} | {type: string, text: string, confidence: number}} ArgumentSlot
+   * @param {{ premises: ArgumentSlot[], conclusion: ArgumentSlot,
+   *   negated: boolean, explanation: string, origin: string }} formData
+   */
+  const handleAddNewArgument = ({
+    premises,
+    conclusion,
+    negated,
+    explanation,
+    origin,
+  }) => {
+    const newRound = state.round + 1;
+    const argumentId = newArgumentId();
+    const type = argumentRelationType(premises.length, negated);
+    const added = [];
+    const add = (draft) => {
+      if (draft.id) return draft.id;
+      const id = nextElementId([...state.elements, ...added], draft.type);
+      added.push({ id, status: "active", addedRound: newRound, origin, ...draft });
+      return id;
+    };
+    const premiseIds = premises.map(add);
+    const conclusionId = add(conclusion);
+    const rels = premiseIds.map((from) => ({
+      origin: "user",
+      from,
+      to: conclusionId,
+      type,
+      argumentId,
+      explanation,
+      addedRound: newRound,
+    }));
+    const arrow = `${premiseIds.join(", ")} → ${conclusionId}`;
+    mutate((prev) => ({
+      ...prev,
+      round: newRound,
+      elements: [...prev.elements, ...added],
+      relations: [...prev.relations, ...rels],
+      log: [
+        ...prev.log,
+        makeLogEntry(
+          newRound,
+          added.length
+            ? `Argument ${arrow} was added by the user, with ${added.map((e) => e.id).join(", ")}.`
+            : `Argument ${arrow} was added by the user.`,
+          "Added",
+          [
+            ...(added.length ? [`${added.map((e) => e.id).join(", ")} added`] : []),
+            `${arrow} (${type}) added`,
+          ].join("; "),
+        ),
+      ],
+    }));
+    setSelected(null);
+    setSelectedRel(null);
+    setRecentlyAddedRel(rels.at(-1));
+    setRecentlyAdded(null);
+  };
+
   const handleRejectRelations = (formDatas) => {
     mutate((prev) => ({
       ...prev,
@@ -237,6 +307,7 @@ export function useRelationActions({
     handleReinstateRelation,
     handleDeleteRelationsByArgId,
     handleAddRelation,
+    handleAddNewArgument,
     handleRejectRelations,
   };
 }

@@ -30,7 +30,7 @@ describe("fetchProcessReview", () => {
   it("prod: returns the sample review, never calls fetch", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: false }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: false, BACKEND_URL: "http://localhost:8000" }));
     const { fetchProcessReview } = await import("./reviewClient.js");
 
     const result = await fetchProcessReview(aState(), false);
@@ -96,7 +96,7 @@ describe("fetchProcessReview", () => {
           }),
       }),
     );
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: true }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: true, BACKEND_URL: "http://localhost:8000" }));
     openaiStub();
     const { fetchProcessReview } = await import("./reviewClient.js");
 
@@ -124,7 +124,7 @@ describe("fetchProcessReview", () => {
           }),
       }),
     );
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: true }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: true, BACKEND_URL: "http://localhost:8000" }));
     openaiStub();
     const { fetchProcessReview } = await import("./reviewClient.js");
 
@@ -141,7 +141,7 @@ describe("fetchProcessReview", () => {
   it("useDummy checked: returns the sample, never calls fetch", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: true }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: true, BACKEND_URL: "http://localhost:8000" }));
     openaiStub();
     const { fetchProcessReview } = await import("./reviewClient.js");
 

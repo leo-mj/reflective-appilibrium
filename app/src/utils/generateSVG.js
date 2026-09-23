@@ -160,7 +160,25 @@ function groupNodeSVG(el, positions, ox, oy) {
   );
 }
 
-function nodeSVG(el, positions, ox, oy, palette) {
+/**
+ * The merged-process pill the canvas pins to a node (`ProcessTag`), in the
+ * colours an export can carry: `C.bg` and `C.dim` are restated in THEME_STYLE,
+ * and `C.withdrawn` is a literal — the canvas's `C.panel` and `C.text` are
+ * variables nothing outside the app defines.
+ */
+function processTagSVG(tag, r) {
+  const h = 13;
+  const w = 7 + tag.length * 6;
+  return (
+    `<g transform="translate(${f(r * 0.7)},${f(-r * 0.95)})">` +
+    `<rect x="${f(-w / 2)}" y="${f(-h / 2)}" width="${w}" height="${h}" rx="${h / 2}"` +
+    ` fill="${C.bg}" stroke="${C.withdrawn}" stroke-width="1"/>` +
+    `<text dy="0.35em" text-anchor="middle" font-size="9" font-weight="bold"` +
+    ` fill="${C.dim}" font-family="system-ui,sans-serif">${esc(tag)}</text></g>`
+  );
+}
+
+function nodeSVG(el, positions, ox, oy, palette, processTag) {
   const pos = positions[el.id];
   if (!pos) return "";
   // No confidence fade: `getColors` already carries confidence in the fill, and
@@ -189,7 +207,8 @@ function nodeSVG(el, positions, ox, oy, palette) {
     `<text dy="${r + 14}" text-anchor="middle"` +
     ` fill="${C.dim}" font-size="11" font-family="system-ui,sans-serif">${el.id}</text>`;
 
-  return `<g transform="translate(${cx},${cy})">${shape}${label}</g>`;
+  const tag = processTag ? processTagSVG(processTag, r) : "";
+  return `<g transform="translate(${cx},${cy})">${shape}${label}${tag}</g>`;
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -209,13 +228,20 @@ function nodeSVG(el, positions, ox, oy, palette) {
  * @param {import('../constants/palettes.js').Palette} [opts.palette] - Defaults
  *   to the standard palette. An export is read in a document rather than in the
  *   app, so it does not follow a reader's high-contrast setting unless asked to.
+ * @param {Map<string, string>} [opts.processTags] - Element id → merged-process
+ *   letters (`processTagMap`), drawn on each node as the canvas draws them.
  * @returns {string|null}
  */
 export function generateGraphSVG(
   elements,
   relations,
   positions,
-  { showWithdrawn = false, palette = PALETTES.default, groups = [] } = {},
+  {
+    showWithdrawn = false,
+    palette = PALETTES.default,
+    groups = [],
+    processTags = new Map(),
+  } = {},
 ) {
   const shownEls = showWithdrawn
     ? elements
@@ -267,7 +293,7 @@ export function generateGraphSVG(
       .map((el) =>
         el.type === "group"
           ? groupNodeSVG(el, visPositions, ox, oy)
-          : nodeSVG(el, visPositions, ox, oy, palette),
+          : nodeSVG(el, visPositions, ox, oy, palette, processTags.get(el.id)),
       )
       .filter(Boolean),
     `</svg>`,

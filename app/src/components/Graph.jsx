@@ -28,6 +28,7 @@ import {
   groupJointArguments,
 } from "../utils/graphHelpers.js";
 import { groupsOf, projectGroups, selectionIds } from "../utils/groupUtils.js";
+import { processesOf, processTagMap } from "../utils/mergeStates.js";
 import {
   elementsAtRound,
   argumentRelationType,
@@ -84,63 +85,65 @@ function AddButtonsOverlay({
         ["principle", "P"],
         ["theory", "T"],
       ].map(([type, label]) => (
-        <button
-          key={type}
-          onClick={() => onAddEl(type)}
-          aria-label={`Add ${type}`}
-          title={`Add ${type}`}
-          style={{
-            // Fill matches the nodes it adds, in whichever mode is on. The ink
-            // does not: this is an HTML control, where AA is enforced and the
-            // node palette's black lands at 3.7:1 on the saturated violet. The
-            // nodes themselves are a deliberate exception to that; a button is
-            // not.
-            background: typeTokens(type, palette).high,
-            border: "none",
-            color: inkOn(typeTokens(type, palette).high),
-            borderRadius: 6,
-            padding: "8px 12px",
-            fontSize: 13,
-            cursor: "pointer",
-          }}
-        >
-          + {label}
-        </button>
+        <Tooltip key={type} text={`Add ${type}`}>
+          <button
+            onClick={() => onAddEl(type)}
+            aria-label={`Add ${type}`}
+            style={{
+              // Fill matches the nodes it adds, in whichever mode is on. The ink
+              // does not: this is an HTML control, where AA is enforced and the
+              // node palette's black lands at 3.7:1 on the saturated violet. The
+              // nodes themselves are a deliberate exception to that; a button is
+              // not.
+              background: typeTokens(type, palette).high,
+              border: "none",
+              color: inkOn(typeTokens(type, palette).high),
+              borderRadius: 6,
+              padding: "8px 12px",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            + {label}
+          </button>
+        </Tooltip>
       ))}
       {!hideNonEntailsRels && (
+        <Tooltip text="Add relation">
+          <button
+            onClick={onAddRel}
+            aria-label="Add relation"
+            style={{
+              background: C.border,
+              border: "none",
+              color: C.text,
+              borderRadius: 6,
+              padding: "8px 12px",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            + Rel
+          </button>
+        </Tooltip>
+      )}
+      <Tooltip text="Add argument">
         <button
-          onClick={onAddRel}
-          aria-label="Add relation"
-          title="Add relation"
+          onClick={onAddArg}
+          aria-label="Add argument"
           style={{
-            background: C.border,
-            border: "none",
-            color: C.text,
+            background: C.jointly_entails + "33",
+            border: `1px solid ${C.jointly_entails}`,
+            color: C.jointly_entails,
             borderRadius: 6,
             padding: "8px 12px",
             fontSize: 13,
             cursor: "pointer",
           }}
         >
-          + Rel
+          + Arg
         </button>
-      )}
-      <button
-        onClick={onAddArg}
-        aria-label="Add argument"
-        title="Add argument"
-        style={{
-          background: C.jointly_entails + "33",
-          border: `1px solid ${C.jointly_entails}`,
-          color: C.jointly_entails,
-          borderRadius: 6,
-          padding: "8px 12px",
-          fontSize: 13,
-          cursor: "pointer",
-        }}
-      >
-        + Arg
-      </button>
+      </Tooltip>
       {/* The one affordance that says grouping exists at all. Ctrl-clicking
           nodes and choosing Group is the quicker way and the tooltip says so,
           but nobody discovers a modifier key by looking at a canvas. Chrome
@@ -476,6 +479,8 @@ export function Graph({
 
   const { active, withdrawn } = elementsAtRound(state.elements, state.round);
   const wIds = new Set(withdrawn.map((e) => e.id));
+  // After a merge, which process each node came from. Empty otherwise.
+  const processTags = useMemo(() => processTagMap(processesOf(state)), [state]);
   const rejectedEls = state.elements.filter((e) => e.status === "rejected");
   const isElVisible = (el) => {
     if (el.status === "possible") return false;
@@ -844,15 +849,18 @@ export function Graph({
           renderNode(
             el,
             displayPositions,
-            graphNodeVisuals(
-              el,
-              wIds,
-              dimNode,
-              selected,
-              undefined,
-              recentlyAdded,
-              equilibriumPreviewWithdrawnIds,
-            ),
+            {
+              ...graphNodeVisuals(
+                el,
+                wIds,
+                dimNode,
+                selected,
+                undefined,
+                recentlyAdded,
+                equilibriumPreviewWithdrawnIds,
+              ),
+              processTag: processTags.get(el.id),
+            },
             isDragging,
             setTooltip,
           ),

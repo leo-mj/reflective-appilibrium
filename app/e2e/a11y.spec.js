@@ -16,7 +16,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { gotoHome, loadSample, axeViolations, openMenu, park } from "./helpers.js";
+import { gotoHome, loadSample, axeViolations, openMenu, park, themeToggle } from "./helpers.js";
 
 /**
  * Impacts that fail the build.
@@ -148,7 +148,7 @@ test.describe("Accessibility", () => {
     // The palette is theme-dependent, and several colours that pass on one
     // ground fail on the other — the edge teal reads 6.03:1 on the dark panel
     // and 2.22:1 on the light one. Auditing one theme only would miss that.
-    await page.click('button[title*="Switch to"]');
+    await themeToggle(page).click();
     await park(page);
     await audit(page, "home/light");
   });

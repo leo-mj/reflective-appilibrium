@@ -98,10 +98,13 @@ describe("the graph's full-screen toggle", () => {
   it("also folds the assist panel away from the graph beside it", async () => {
     open();
     // Assist mode opens with the graph as its side panel, at half width. The
-    // workflow panel it shares the row with is lazily imported.
+    // workflow panel it shares the row with is lazily imported — and a chunk
+    // that has to be transformed before it can load takes longer than the
+    // default one-second wait whenever the whole suite is running at once,
+    // which is what made this the flakiest test in the file.
     fireEvent.click(screen.getByText("Assist"));
     expect(onAssistTab()).toBe(true);
-    await screen.findByText(/Elicit Judgments/);
+    await screen.findByText(/Elicit Judgments/, {}, { timeout: 5_000 });
 
     fireEvent.click(screen.getByLabelText("Full screen"));
     expect(screen.queryByText(/Elicit Judgments/)).toBeNull();
@@ -111,7 +114,7 @@ describe("the graph's full-screen toggle", () => {
     expect(screen.getByText("Graph").style.background).not.toBe("transparent");
 
     fireEvent.click(screen.getByLabelText("Exit full screen"));
-    await screen.findByText(/Elicit Judgments/);
+    await screen.findByText(/Elicit Judgments/, {}, { timeout: 5_000 });
   });
 });
 
@@ -325,7 +328,8 @@ describe("questionnaire mode", () => {
 describe("the central divider", () => {
   afterEach(() => localStorage.removeItem("workspaceSplit"));
 
-  const divider = () => screen.queryByRole("separator", { name: "Resize panels" });
+  const divider = () =>
+    screen.queryByRole("separator", { name: "Resize panels" });
   const textPanel = (container) =>
     container.querySelector('[data-tutorial="text-panel"]');
 
@@ -364,5 +368,45 @@ describe("the central divider", () => {
     const { container } = open();
     fireEvent.keyDown(divider(), { key: "ArrowRight" });
     expect(textPanel(container).style.width).toBe("51%");
+  });
+});
+
+describe("merged-process tags", () => {
+  const merged = {
+    ...SAMPLE_STATE,
+    processes: [
+      {
+        id: "A",
+        label: "First",
+        members: SAMPLE_STATE.elements.map((e) => e.id),
+        round: 1,
+      },
+    ],
+  };
+  // The text cards' process fields — "Process A", captioned by the letter, with
+  // the process's own name as the value. Found by the stat's name rather than by
+  // a `title`, which is now the app's own Tooltip and so opens only on hover.
+  const chips = () =>
+    document.querySelectorAll('[data-stat^="Process "]');
+  const key = () => screen.queryAllByTestId("legend-process");
+
+  it("has no toggle before a merge", () => {
+    open();
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    expect(screen.queryByText("Process tags")).toBeNull();
+  });
+
+  it("shows the tags after a merge, and the toggle hides them everywhere", () => {
+    open(merged);
+    expect(chips().length).toBeGreaterThan(0);
+    expect(key()).toHaveLength(1);
+
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    fireEvent.click(screen.getByText("Process tags"));
+    expect(chips()).toHaveLength(0);
+    expect(key()).toHaveLength(0);
+
+    fireEvent.click(screen.getByText("Process tags"));
+    expect(chips().length).toBeGreaterThan(0);
   });
 });

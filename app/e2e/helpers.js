@@ -31,7 +31,9 @@ export async function park(page) {
  */
 export async function gotoHome(page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: "Reflective APPilibrium" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Reflective APPilibrium" }),
+  ).toBeVisible();
 }
 
 /**
@@ -45,7 +47,10 @@ export async function startFresh(page, topic) {
   // across the page: questionnaire cards label their own buttons, and one of
   // them being called "Start" would otherwise break every test that starts a
   // process — a failure a long way from its cause.
-  const card = page.locator("div").filter({ has: page.locator('input[aria-label*="Topic"]') }).last();
+  const card = page
+    .locator("div")
+    .filter({ has: page.locator('input[aria-label*="Topic"]') })
+    .last();
   await card.locator('input[aria-label*="Topic"]').fill(topic);
   await card.getByRole("button", { name: /^Start/ }).click();
   await expect(page.locator("h1")).toContainText(/Round \d+/);
@@ -94,8 +99,26 @@ export async function loadSample(page) {
   // the one surface both layouts share — the narrow layout drops the element
   // list and its filter chips entirely — and waiting on a node label also
   // covers the force simulation having run.
-  await expect(page.locator("svg text").filter({ hasText: /^J\d+$/ }).first()).toBeVisible();
+  await expect(
+    page
+      .locator("svg text")
+      .filter({ hasText: /^J\d+$/ })
+      .first(),
+  ).toBeVisible();
   await waitForReady(page);
+}
+
+/**
+ * The landing page's light/dark switch.
+ *
+ * Found by its accessible name. The app sets no DOM `title` anywhere any more
+ * (components/Tooltip.jsx), and the button is an icon, so the name is what
+ * Tooltip gives it — "Switch to light mode" or "Switch to dark mode".
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+export function themeToggle(page) {
+  return page.getByRole("button", { name: /^Switch to (light|dark) mode$/ });
 }
 
 /**
@@ -130,7 +153,10 @@ export function modalTextarea(page) {
  * @param {"Element"|"Argument"} tab
  */
 export async function ensureAddTab(page, tab) {
-  const wanted = tab === "Element" ? /Enter statement/ : /premises/;
+  // The Argument tab has two modes, and opens on Write, whose first field is
+  // "Premise 1…"; Pick's is the explanation, "Why do these premises…". Either
+  // one means the bar is on the Argument tab — which mode is the caller's call.
+  const wanted = tab === "Element" ? /Enter statement/ : /premises|^Premise \d/;
   const current = (await addBar(page).getAttribute("placeholder")) ?? "";
   if (!wanted.test(current)) {
     await page.locator(`button:text-is("${tab}")`).click();
@@ -211,7 +237,9 @@ export async function expectCounts(page, expected) {
   await expect
     .poll(async () => {
       const counts = await chipCounts(page);
-      return Object.fromEntries(Object.keys(expected).map((k) => [k, counts[k]]));
+      return Object.fromEntries(
+        Object.keys(expected).map((k) => [k, counts[k]]),
+      );
     })
     .toEqual(expected);
 }
@@ -219,28 +247,21 @@ export async function expectCounts(page, expected) {
 /**
  * Text of every element card currently listed.
  *
- * Cards carry no test id, so they are found structurally: start at a "Revise"
- * control and climb while the parent still describes exactly one element. Every
- * card shows one "Confidence:" line, so the first ancestor holding two is the
- * list — which makes the level below it the whole card, statement included.
- * Counting rather than pattern-matching the statement keeps this working for
- * short statements, which a "longest text line" heuristic gets wrong.
+ * `data-card="element"` on the card root. It used to be found structurally —
+ * climb from a "Revise" control while the ancestor still held one "Confidence:"
+ * label — and that marker is no longer dependable: the labels moved into a
+ * details section each card can fold away, so a collapsed card carried none and
+ * the climb ran to the whole list.
  *
  * @param {import('@playwright/test').Page} page
  * @returns {Promise<string[]>}
  */
 export async function elementCardTexts(page) {
-  return page.evaluate(() => {
-    const cardsOf = (el) => (el.textContent.match(/Confidence:/g) ?? []).length;
-    return [...document.querySelectorAll("button")]
-      .filter((b) => b.textContent.trim() === "Revise")
-      .map((b) => {
-        let card = b;
-        while (card.parentElement && cardsOf(card.parentElement) <= 1) card = card.parentElement;
-        return card.innerText.replace(/\s+/g, " ").trim();
-      })
-      .filter(Boolean);
-  });
+  return page.evaluate(() =>
+    [...document.querySelectorAll('[data-card="element"]')]
+      .map((card) => card.innerText.replace(/\s+/g, " ").trim())
+      .filter(Boolean),
+  );
 }
 
 /**
@@ -273,7 +294,9 @@ export async function analyzeCounts(page) {
  */
 export async function withdrawFirst(page, reason = "") {
   await page.locator('button:text-is("Withdraw")').first().click();
-  const reasonBox = page.locator('textarea[placeholder*="Reason for withdrawal"]');
+  const reasonBox = page.locator(
+    'textarea[placeholder*="Reason for withdrawal"]',
+  );
   await expect(reasonBox).toBeVisible();
   if (reason) await reasonBox.fill(reason);
   // The modal renders last in the DOM, so its confirm is the last match.
@@ -360,7 +383,9 @@ export async function switchMode(page, label, attribute, value) {
   await openMenu(page);
   await page.locator(`button:has-text("${label}")`).first().click();
   await expect
-    .poll(() => page.evaluate((a) => document.documentElement.getAttribute(a), attribute))
+    .poll(() =>
+      page.evaluate((a) => document.documentElement.getAttribute(a), attribute),
+    )
     .toBe(value);
   await park(page);
 }
@@ -413,69 +438,77 @@ export async function axeViolations(
   { ignoreDimmed = false, ignoreGraphAccents = false } = {},
 ) {
   await page.addScriptTag({
-    path: new URL("../node_modules/axe-core/axe.min.js", import.meta.url).pathname,
+    path: new URL("../node_modules/axe-core/axe.min.js", import.meta.url)
+      .pathname,
   });
-  return page.evaluate(async ({ ignoreDimmed, ignoreGraphAccents }) => {
-    const r = await window.axe.run(document, { resultTypes: ["violations"] });
+  return page.evaluate(
+    async ({ ignoreDimmed, ignoreGraphAccents }) => {
+      const r = await window.axe.run(document, { resultTypes: ["violations"] });
 
-    const elementFor = (node) => {
-      const selector = Array.isArray(node.target[0])
-        ? node.target[0][0]
-        : node.target[0];
-      try {
-        return document.querySelector(selector);
-      } catch {
-        return null;
-      }
-    };
+      const elementFor = (node) => {
+        const selector = Array.isArray(node.target[0])
+          ? node.target[0][0]
+          : node.target[0];
+        try {
+          return document.querySelector(selector);
+        } catch {
+          return null;
+        }
+      };
 
-    const isGraphAccent = (node) =>
-      Boolean(elementFor(node)?.closest('[data-accent="graph"]'));
+      const isGraphAccent = (node) =>
+        Boolean(elementFor(node)?.closest('[data-accent="graph"]'));
 
-    const isFaded = (node) => {
-      const selector = Array.isArray(node.target[0])
-        ? node.target[0][0]
-        : node.target[0];
-      let el;
-      try {
-        el = document.querySelector(selector);
-      } catch {
+      const isFaded = (node) => {
+        const selector = Array.isArray(node.target[0])
+          ? node.target[0][0]
+          : node.target[0];
+        let el;
+        try {
+          el = document.querySelector(selector);
+        } catch {
+          return false;
+        }
+        for (let n = el; n && n !== document.body; n = n.parentElement) {
+          if (Number(getComputedStyle(n).opacity) < 1) return true;
+        }
         return false;
-      }
-      for (let n = el; n && n !== document.body; n = n.parentElement) {
-        if (Number(getComputedStyle(n).opacity) < 1) return true;
-      }
-      return false;
-    };
+      };
 
-    return r.violations
-      .map((v) => ({
-        ...v,
-        nodes:
-          v.id === "color-contrast"
-            ? v.nodes.filter(
-                (n) =>
-                  !(ignoreDimmed && isFaded(n)) &&
-                  !(ignoreGraphAccents && isGraphAccent(n)),
-              )
-            : v.nodes,
-      }))
-      // A rule whose every node was excluded is no longer a finding; leaving it
-      // in would report "color-contrast×0" and fail on an empty list.
-      .filter((v) => v.nodes.length > 0)
-      .map((v) => ({
-        id: v.id,
-        impact: v.impact,
-        nodes: v.nodes.length,
-        help: v.help,
-        // The offending markup and axe's own explanation. Without these a failure
-        // says only that something is wrong, and the run that produced it is gone.
-        sample: v.nodes.slice(0, 3).map((n) => ({
-          html: n.html.replace(/\s+/g, " ").slice(0, 120),
-          why: (n.any?.[0]?.message ?? n.all?.[0]?.message ?? "").replace(/\s+/g, " ").slice(0, 160),
-        })),
-      }));
-  }, { ignoreDimmed, ignoreGraphAccents });
+      return (
+        r.violations
+          .map((v) => ({
+            ...v,
+            nodes:
+              v.id === "color-contrast"
+                ? v.nodes.filter(
+                    (n) =>
+                      !(ignoreDimmed && isFaded(n)) &&
+                      !(ignoreGraphAccents && isGraphAccent(n)),
+                  )
+                : v.nodes,
+          }))
+          // A rule whose every node was excluded is no longer a finding; leaving it
+          // in would report "color-contrast×0" and fail on an empty list.
+          .filter((v) => v.nodes.length > 0)
+          .map((v) => ({
+            id: v.id,
+            impact: v.impact,
+            nodes: v.nodes.length,
+            help: v.help,
+            // The offending markup and axe's own explanation. Without these a failure
+            // says only that something is wrong, and the run that produced it is gone.
+            sample: v.nodes.slice(0, 3).map((n) => ({
+              html: n.html.replace(/\s+/g, " ").slice(0, 120),
+              why: (n.any?.[0]?.message ?? n.all?.[0]?.message ?? "")
+                .replace(/\s+/g, " ")
+                .slice(0, 160),
+            })),
+          }))
+      );
+    },
+    { ignoreDimmed, ignoreGraphAccents },
+  );
 }
 
 /**
@@ -504,7 +537,8 @@ export async function axeViolations(
  */
 export async function fadedCardContrast(page, opacity) {
   await page.addScriptTag({
-    path: new URL("../node_modules/axe-core/axe.min.js", import.meta.url).pathname,
+    path: new URL("../node_modules/axe-core/axe.min.js", import.meta.url)
+      .pathname,
   });
   return page.evaluate(async (target) => {
     const card = [...document.querySelectorAll("div")].find(
@@ -517,7 +551,9 @@ export async function fadedCardContrast(page, opacity) {
     card.scrollIntoView({ block: "center" });
     // Two frames: one for the scroll to apply, one for it to have been painted
     // before axe starts hit-testing against it.
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(r)),
+    );
 
     const r = await window.axe.run(card, { runOnly: ["color-contrast"] });
     const count = (list) => list[0]?.nodes.length ?? 0;

@@ -1,6 +1,8 @@
 /**
  * @fileoverview Inline Q&A panel for discussing a specific suggestion with the LLM.
- * Manages its own session; conversation is scoped to the card's lifetime.
+ * The conversation lives here, for the card's lifetime, and nowhere else: the
+ * server keeps nothing, so each question is sent with the whole conversation
+ * and the state as it is at that moment.
  * @module components/workflows/ConversationPanel
  */
 
@@ -10,8 +12,8 @@ import { LLM_ENABLED } from "../../config.js";
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import {
-  startConversation,
-  sendConversationMessage,
+  askInConversation,
+  MAX_EXCHANGES,
 } from "../../utils/conversationsClient.js";
 import { ErrorBanner, AiTag } from "../SuggestionActions.jsx";
 import { Tooltip } from "../Tooltip.jsx";
@@ -23,11 +25,13 @@ import { sendsToLlmText } from "../../utils/openaiClient.js";
  * @param {Object}   props.suggestion  The suggestion object (any shape — serialised as-is).
  */
 export function ConversationPanel({ state, suggestion }) {
-  const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Said before the question is typed, rather than as the server's 422 after.
+  const full = messages.length >= 2 * MAX_EXCHANGES;
 
   const send = async () => {
     if (!LLM_ENABLED) {
@@ -35,23 +39,18 @@ export function ConversationPanel({ state, suggestion }) {
       return;
     }
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text || loading || full) return;
+    const conversation = [...messages, { role: "user", content: text }];
     setInput("");
     setError(null);
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setMessages(conversation);
     setLoading(true);
     try {
-      let reply, sid, model;
-      if (sessionId) {
-        ({ reply, model } = await sendConversationMessage(sessionId, text));
-      } else {
-        ({
-          reply,
-          session_id: sid,
-          model,
-        } = await startConversation(state, suggestion, text));
-        setSessionId(sid);
-      }
+      const { reply, model } = await askInConversation(
+        state,
+        suggestion,
+        conversation,
+      );
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: reply, model },
@@ -91,6 +90,12 @@ export function ConversationPanel({ state, suggestion }) {
         </div>
       ))}
       {error && <ErrorBanner message={error} />}
+      {full && (
+        <div style={{ fontSize: 11, color: C.dim, margin: "6px 8px 0" }}>
+          This discussion has reached its {MAX_EXCHANGES}-question limit. Close
+          it and open it again to start a new one.
+        </div>
+      )}
       <div
         style={{ display: "flex", gap: 6, marginTop: messages.length ? 6 : 0 }}
       >
@@ -103,7 +108,7 @@ export function ConversationPanel({ state, suggestion }) {
               send();
             }
           }}
-          disabled={loading}
+          disabled={loading || full}
           placeholder="Ask about this suggestion…"
           style={{
             flex: 1,
@@ -120,16 +125,16 @@ export function ConversationPanel({ state, suggestion }) {
         <Tooltip text={sendsToLlmText("your current RE state")}>
           <button
             onClick={send}
-            disabled={loading || !input.trim()}
+            disabled={loading || full || !input.trim()}
             style={{
-              background: loading || !input.trim() ? C.border : C.supports,
+              background: loading || full || !input.trim() ? C.border : C.supports,
               border: "none",
               borderRadius: 4,
               padding: "4px 10px",
               margin: "4px 8px 4px 0",
               fontSize: 11,
               color: C.onFill,
-              cursor: loading || !input.trim() ? "not-allowed" : "pointer",
+              cursor: loading || full || !input.trim() ? "not-allowed" : "pointer",
               flexShrink: 0,
             }}
           >

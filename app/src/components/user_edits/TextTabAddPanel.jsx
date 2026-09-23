@@ -22,6 +22,7 @@
 import { useState } from "react";
 
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { ARGUMENT_GLOSS } from "../../constants/glosses.js";
 import { inkWeight } from "../../constants/palettes.js";
 import { useAddBarSize } from "../../hooks/useAddBarSize.js";
@@ -49,12 +50,15 @@ import {
   fieldStyle,
   ghostBtn,
   idOptionChars,
+  checkWrittenArgument,
   makeArgumentDefaults,
   makeRelationDefaults,
   pickerWidth,
   selectStyle,
+  WRITTEN_ARGUMENT_DEFAULTS,
 } from "./addPanelShared.js";
 import { Field, PremisePickers } from "./addPanelPrimitives.jsx";
+import { WrittenArgumentFields } from "./WrittenArgumentFields.jsx";
 
 // Origin is deliberately not among them: it is who is adding rather than part
 // of the element being written, and so is kept across a clear, an add and a tab
@@ -79,6 +83,9 @@ const ARGUMENT_ROWS = [
  * @param {REElement[]} props.elements   - Elements that may be referenced; see linkableElements.
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
+ * @param {function}    [props.onAddNewArgument] - Adds an argument whose
+ *   premises and conclusion are written out here, elements and relations as
+ *   one change. Without it the argument tab offers picking only.
  * @param {string|null} [props.selected] - The node selected in the graph, which
  *   fills the first end of a link.
  * @param {string[]|null} [props.ctrlChain] - A ctrl+click chain in the graph,
@@ -100,6 +107,7 @@ export function AddBar({
   elements,
   onAddElement,
   onAddRelation,
+  onAddNewArgument,
   selected,
   ctrlChain,
   hideNonEntailsRels,
@@ -163,6 +171,13 @@ export function AddBar({
   const [argumentForm, setArgumentForm] = useState(() =>
     makeArgumentDefaults(elements),
   );
+  // An argument's premises and conclusion are either picked from the board in
+  // one compact row, or stacked a line each, where every line is written out
+  // new or taken from the board. The stack opens by default, since it covers
+  // both; picking is where a ctrl+click chain lands.
+  const [argumentMode, setArgumentMode] = useState("write");
+  const [writtenForm, setWrittenForm] = useState(WRITTEN_ARGUMENT_DEFAULTS);
+  const writing = !!onAddNewArgument && argumentMode === "write";
 
   // The relation tab can be taken away underneath a reader standing on it, by
   // the setting flipping while the bar is open. Derived rather than corrected
@@ -238,6 +253,9 @@ export function AddBar({
         premises: ctrlChain.slice(0, -1),
         conclusion,
       }));
+      // A chain is a deliberate pick of existing elements, so it is shown as
+      // one. A plain selection is not, and leaves a half-written argument be.
+      setArgumentMode("pick");
     }
   }
 
@@ -290,12 +308,15 @@ export function AddBar({
     conclusion &&
     !duplicatePremises &&
     !conclusionIsPremise;
+  const written = checkWrittenArgument(writtenForm, new Set(ids));
   const canSubmit =
     tab === "element"
       ? isElementValid
       : tab === "relation"
         ? isRelationValid
-        : isArgumentValid;
+        : writing
+          ? written.valid
+          : isArgumentValid;
 
   /**
    * Puts the tab on show back to how it started — one premise again, in the
@@ -307,7 +328,10 @@ export function AddBar({
     if (tab === "element") setElementForm(ELEMENT_DEFAULTS);
     else if (tab === "relation")
       setRelationForm(makeRelationDefaults(elements));
-    else setArgumentForm(makeArgumentDefaults(elements));
+    else {
+      setArgumentForm(makeArgumentDefaults(elements));
+      setWrittenForm(WRITTEN_ARGUMENT_DEFAULTS);
+    }
   };
 
   /**
@@ -325,6 +349,25 @@ export function AddBar({
       onAddElement({ ...elementForm, origin: originOrDefault(origin) });
     } else if (tab === "relation") {
       onAddRelation(relationForm);
+    } else if (writing) {
+      // A line taken from the board goes by its id. A written one is a new
+      // element: added at the element tab's default confidence and under the
+      // same origin, since it is the same reader adding it.
+      const draft = ({ id, type, text }) =>
+        id
+          ? { id }
+          : {
+              type,
+              text: text.trim(),
+              confidence: ELEMENT_DEFAULTS.confidence,
+            };
+      onAddNewArgument({
+        premises: writtenForm.premises.map(draft),
+        conclusion: draft(writtenForm.conclusion),
+        negated,
+        explanation: argumentForm.explanation,
+        origin: originOrDefault(origin),
+      });
     } else {
       // One relation per premise, sharing an argumentId — that grouping is what
       // makes the graph draw them converging on a single arrow, and what lets
@@ -345,6 +388,16 @@ export function AddBar({
       );
     }
     resetTab();
+  };
+
+  /** Every field in the bar submits on ctrl-enter. */
+  const submitOnCtrlEnter = (e) => {
+    // metaKey too: on a Mac the shortcut people reach for is cmd-enter, and the
+    // app's own undo already answers to both.
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && canSubmit) {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   /**
@@ -400,21 +453,22 @@ export function AddBar({
   );
 
   const clearButton = (
-    <button
-      onClick={handleClear}
-      // Named for what it clears, as the submit button is: which tab is lit is
-      // the only thing saying what either of them acts on.
-      aria-label={`Clear ${tab}`}
-      title="Start this tab over"
-      style={{
-        ...ghostBtn(size),
-        marginLeft: "auto",
-        flexShrink: 0,
-        ...(roomy ? { minHeight: 44 } : null),
-      }}
-    >
-      Clear
-    </button>
+    <Tooltip text="Start this tab over">
+      <button
+        onClick={handleClear}
+        // Named for what it clears, as the submit button is: which tab is lit is
+        // the only thing saying what either of them acts on.
+        aria-label={`Clear ${tab}`}
+        style={{
+          ...ghostBtn(size),
+          marginLeft: "auto",
+          flexShrink: 0,
+          ...(roomy ? { minHeight: 44 } : null),
+        }}
+      >
+        Clear
+      </button>
+    </Tooltip>
   );
 
   /**
@@ -426,20 +480,21 @@ export function AddBar({
    * worse way of closing it.
    */
   const minimiseButton = (
-    <button
-      onClick={toggleCollapsed}
-      aria-expanded
-      aria-label="Minimise the add bar"
-      title="Fold the add bar away — whatever is above it takes the room"
-      style={{
-        ...ghostBtn(size),
-        flexShrink: 0,
-        // Squared off: picker padding around a single glyph leaves a sliver.
-        padding: "3px 8px",
-      }}
-    >
-      ▾
-    </button>
+    <Tooltip text="Fold the add bar away — whatever is above it takes the room">
+      <button
+        onClick={toggleCollapsed}
+        aria-expanded
+        aria-label="Minimise the add bar"
+        style={{
+          ...ghostBtn(size),
+          flexShrink: 0,
+          // Squared off: picker padding around a single glyph leaves a sliver.
+          padding: "3px 8px",
+        }}
+      >
+        ▾
+      </button>
+    </Tooltip>
   );
 
   // Folded away: the bar gives its height back to whatever is above it and
@@ -471,49 +526,50 @@ export function AddBar({
           display: "flex",
         }}
       >
-        <button
-          onClick={toggleCollapsed}
-          aria-expanded={false}
-          title="Bring the add bar back"
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            // The strip's own row, padded to the bar's own left and right edges
-            // so the chevron lands where the minimise button stood.
-            padding: "4px 16px",
-            minHeight: 32,
-            background: "transparent",
-            border: "none",
-            color: C.dim,
-            font: "inherit",
-            fontSize: 12,
-            textAlign: "left",
-            cursor: "pointer",
-          }}
-        >
-          Show the add bar
-          {/* Which tab it is folded on: the one thing worth knowing before
-              deciding to open it, and part of the name for the same reason. */}
-          <span style={{ opacity: 0.75 }}>· {tab}</span>
-          <span
-            aria-hidden="true"
+        <Tooltip text="Bring the add bar back">
+          <button
+            onClick={toggleCollapsed}
+            aria-expanded={false}
             style={{
-              ...ghostBtn(size),
-              padding: "3px 8px",
-              // Out to the corner the ▾ was in. Decoration inside the button
-              // rather than a button of its own: the whole line already answers
-              // a click, and a second target inside the first would only be a
-              // smaller way of doing the same thing.
-              marginLeft: "auto",
-              flexShrink: 0,
-              cursor: "inherit",
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              // The strip's own row, padded to the bar's own left and right edges
+              // so the chevron lands where the minimise button stood.
+              padding: "4px 16px",
+              minHeight: 32,
+              background: "transparent",
+              border: "none",
+              color: C.dim,
+              font: "inherit",
+              fontSize: 12,
+              textAlign: "left",
+              cursor: "pointer",
             }}
           >
-            ▴
-          </span>
-        </button>
+            Show add bar
+            {/* Which tab it is folded on: the one thing worth knowing before
+              deciding to open it, and part of the name for the same reason. */}
+            <span style={{ opacity: 0.75 }}>· {tab}</span>
+            <span
+              aria-hidden="true"
+              style={{
+                ...ghostBtn(size),
+                padding: "3px 8px",
+                // Out to the corner the ▾ was in. Decoration inside the button
+                // rather than a button of its own: the whole line already answers
+                // a click, and a second target inside the first would only be a
+                // smaller way of doing the same thing.
+                marginLeft: "auto",
+                flexShrink: 0,
+                cursor: "inherit",
+              }}
+            >
+              ▴
+            </span>
+          </button>
+        </Tooltip>
       </div>
     );
   }
@@ -593,36 +649,37 @@ export function AddBar({
             ...(roomy ? { flexBasis: "100%" } : { flexShrink: 0 }),
           }}
         >
-          <button
-            disabled={!canSubmit}
-            onClick={handleSubmit}
-            // Named in full for anyone who cannot see which tab is lit. The
-            // visible "Add" is inside it, as WCAG 2.5.3 asks of any control
-            // whose label is shorter than its accessible name.
-            aria-label={`Add ${tab}`}
-            title={`Add ${tab} — ⌘/Ctrl + Enter`}
-            {...ACCENT_MARKER}
-            style={{
-              // The auto margin is what holds it to the right of the strip. It
-              // leads the row here, so it starts at the left edge everything
-              // below it lines up against.
-              marginLeft: roomy ? 0 : "auto",
-              padding: roomy ? "11px 18px" : "3px 14px",
-              minHeight: roomy ? 44 : undefined,
-              borderRadius: 4,
-              fontSize: roomy ? 15 : 12,
-              fontWeight: fillWeight,
-              cursor: canSubmit ? "pointer" : "default",
-              border: "none",
-              background: C.supports,
-              color: fillInk,
-              opacity: canSubmit ? 1 : 0.4,
-            }}
-          >
-            {/* Just "Add": the lit tab is what says what is being added, so
+          <Tooltip text={`Add ${tab} — ⌘/Ctrl + Enter`}>
+            <button
+              disabled={!canSubmit}
+              onClick={handleSubmit}
+              // Named in full for anyone who cannot see which tab is lit. The
+              // visible "Add" is inside it, as WCAG 2.5.3 asks of any control
+              // whose label is shorter than its accessible name.
+              aria-label={`Add ${tab}`}
+              {...ACCENT_MARKER}
+              style={{
+                // The auto margin is what holds it to the right of the strip. It
+                // leads the row here, so it starts at the left edge everything
+                // below it lines up against.
+                marginLeft: roomy ? 0 : "auto",
+                padding: roomy ? "11px 18px" : "3px 14px",
+                minHeight: roomy ? 44 : undefined,
+                borderRadius: 4,
+                fontSize: roomy ? 15 : 12,
+                fontWeight: fillWeight,
+                cursor: canSubmit ? "pointer" : "default",
+                border: "none",
+                background: C.supports,
+                color: fillInk,
+                opacity: canSubmit ? 1 : 0.4,
+              }}
+            >
+              {/* Just "Add": the lit tab is what says what is being added, so
                 repeating it here only costs the tabs room on the line. */}
-            Add
-          </button>
+              Add
+            </button>
+          </Tooltip>
           {/* On the phone it shares this line, at the far end of it — a row of
               its own for one button was a waste of a screen that has none to
               spare, and opposite ends of a row is distance enough. On a wide
@@ -763,54 +820,55 @@ export function AddBar({
                         { l: "M", v: 0.67, name: "Moderate" },
                         { l: "H", v: 1.0, name: "High" },
                       ].map(({ l, v, name }) => (
-                        <button
-                          key={l}
-                          type="button"
-                          onClick={() => setEl("confidence", v)}
-                          aria-label={`${name} confidence`}
-                          title={`${name} confidence`}
-                          aria-pressed={
-                            Math.abs(elementForm.confidence - v) < 0.01
-                          }
-                          style={{
-                            ...box,
-                            // Single letters, so they are squared off rather
-                            // than left as the slivers picker padding makes.
-                            padding: roomy ? 0 : "3px 7px",
-                            minWidth: roomy ? 38 : undefined,
-                            background:
+                        <Tooltip key={l} text={`${name} confidence`}>
+                          <button
+                            type="button"
+                            onClick={() => setEl("confidence", v)}
+                            aria-label={`${name} confidence`}
+                            aria-pressed={
                               Math.abs(elementForm.confidence - v) < 0.01
-                                ? C.border
-                                : "transparent",
-                            fontWeight:
-                              Math.abs(elementForm.confidence - v) < 0.01
-                                ? "bold"
-                                : "normal",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {l}
-                        </button>
+                            }
+                            style={{
+                              ...box,
+                              // Single letters, so they are squared off rather
+                              // than left as the slivers picker padding makes.
+                              padding: roomy ? 0 : "3px 7px",
+                              minWidth: roomy ? 38 : undefined,
+                              background:
+                                Math.abs(elementForm.confidence - v) < 0.01
+                                  ? C.border
+                                  : "transparent",
+                              fontWeight:
+                                Math.abs(elementForm.confidence - v) < 0.01
+                                  ? "bold"
+                                  : "normal",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {l}
+                          </button>
+                        </Tooltip>
                       ))}
-                      <input
-                        type="number"
-                        aria-label="Confidence, 0 to 1"
-                        title="Or any value between 0 and 1"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={elementForm.confidence}
-                        onChange={(e) => {
-                          const v = parseFloat(e.target.value);
-                          if (!Number.isNaN(v))
-                            setEl("confidence", Math.max(0, Math.min(1, v)));
-                        }}
-                        // The spinner is worth its width on a mouse and nothing
-                        // at all under a thumb, where it was crowding the value
-                        // it steps out of the field altogether.
-                        className={roomy ? "no-spinner" : undefined}
-                        style={{ ...box, width: roomy ? 72 : 55 }}
-                      />
+                      <Tooltip text="Or any value between 0 and 1">
+                        <input
+                          type="number"
+                          aria-label="Confidence, 0 to 1"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={elementForm.confidence}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            if (!Number.isNaN(v))
+                              setEl("confidence", Math.max(0, Math.min(1, v)));
+                          }}
+                          // The spinner is worth its width on a mouse and nothing
+                          // at all under a thumb, where it was crowding the value
+                          // it steps out of the field altogether.
+                          className={roomy ? "no-spinner" : undefined}
+                          style={{ ...box, width: roomy ? 72 : 55 }}
+                        />
+                      </Tooltip>
                     </span>
                   </Field>
                 </span>
@@ -857,22 +915,71 @@ export function AddBar({
             </>
           ) : (
             <>
+              {/* Where the premises and conclusion come from: the board, or
+                  the fields below. A pair of pressed buttons rather than a
+                  picker, since both choices are worth seeing at once. */}
+              {onAddNewArgument && (
+                <span
+                  role="group"
+                  aria-label="Argument from"
+                  style={{ display: "flex", gap: 0, flexShrink: 0 }}
+                >
+                  {[
+                    {
+                      mode: "write",
+                      label: "Write",
+                      title:
+                        "Write premises and conclusion out as new statements, mixed with elements from the board as you like",
+                    },
+                    {
+                      mode: "pick",
+                      label: "Pick",
+                      title: "Build it from elements already on the board",
+                    },
+                  ].map(({ mode, label, title }, i) => {
+                    const on = argumentMode === mode;
+                    return (
+                      <Tooltip key={mode} text={title}>
+                        <button
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setArgumentMode(mode)}
+                          style={{
+                            ...ghost,
+                            borderRadius:
+                              i === 0 ? "4px 0 0 4px" : "0 4px 4px 0",
+                            marginLeft: i === 0 ? 0 : -1,
+                            background: on ? C.border : "transparent",
+                            color: on ? C.text : C.dim,
+                            fontWeight: on ? "bold" : "normal",
+                          }}
+                        >
+                          {label}
+                        </button>
+                      </Tooltip>
+                    );
+                  })}
+                </span>
+              )}
               {/* Premises, joined by +. One argument can rest on several, and
                   they are added a row at a time rather than by a count field.
                   The assist tabs' panel draws the same run from the same
-                  component — see {@link PremisePickers}. */}
-              <PremisePickers
-                premises={premises}
-                options={elementRows}
-                layout={idLayout}
-                selectStyle={linkSel}
-                ghostStyle={ghost}
-                arrowStyle={arrow}
-                onChange={setPremise}
-                onRemove={removePremise}
-                onAdd={addPremise}
-                canAdd={ids.length > premises.length + 1}
-              />
+                  component — see {@link PremisePickers}. Written out, they
+                  are in the stack under this row instead. */}
+              {!writing && (
+                <PremisePickers
+                  premises={premises}
+                  options={elementRows}
+                  layout={idLayout}
+                  selectStyle={linkSel}
+                  ghostStyle={ghost}
+                  arrowStyle={arrow}
+                  onChange={setPremise}
+                  onRemove={removePremise}
+                  onAdd={addPremise}
+                  canAdd={ids.length > premises.length + 1}
+                />
+              )}
               <Dropdown
                 label="Argument type"
                 value={negated ? "precludes" : "entails"}
@@ -887,16 +994,26 @@ export function AddBar({
                 // 9 for "precludes".
                 layout={pickerWidth(9)}
               />
-              <span style={arrow}>→</span>
-              <Dropdown
-                label="Conclusion"
-                value={conclusion}
-                onChange={(v) => setArg("conclusion", v)}
-                options={elementRows}
-                style={linkSel}
-                layout={idLayout}
-              />
-              {tooFewElements ? (
+              {!writing && (
+                <>
+                  <span style={arrow}>→</span>
+                  <Dropdown
+                    label="Conclusion"
+                    value={conclusion}
+                    onChange={(v) => setArg("conclusion", v)}
+                    options={elementRows}
+                    style={linkSel}
+                    layout={idLayout}
+                  />
+                </>
+              )}
+              {writing ? (
+                written.complaint && (
+                  <span role="status" style={complaintStyle(linkSize)}>
+                    {written.complaint}
+                  </span>
+                )
+              ) : tooFewElements ? (
                 needsTwo
               ) : duplicatePremises || conclusionIsPremise ? (
                 <span role="status" style={complaintStyle(linkSize)}>
@@ -920,6 +1037,21 @@ export function AddBar({
         {!roomy && minimiseButton}
       </div>
 
+      {/* ── Written argument: premises over conclusion ── */}
+      {tab === "argument" && writing && (
+        <WrittenArgumentFields
+          form={writtenForm}
+          onChange={setWrittenForm}
+          elements={elements}
+          onKeyDown={submitOnCtrlEnter}
+          selectStyle={sel}
+          ghostStyle={ghostBtn(size)}
+          arrowStyle={arrow}
+          roomy={roomy}
+          generation={generation}
+        />
+      )}
+
       {/* ── Text / explanation ── */}
       <textarea
         // Keyed on the tab as well as the generation: each tab's placeholder is
@@ -941,14 +1073,7 @@ export function AddBar({
               ? setRel("explanation", e.target.value)
               : setArg("explanation", e.target.value)
         }
-        onKeyDown={(e) => {
-          // metaKey too: on a Mac the shortcut people reach for is cmd-enter,
-          // and the app's own undo already answers to both.
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && canSubmit) {
-            e.preventDefault();
-            handleSubmit();
-          }
-        }}
+        onKeyDown={submitOnCtrlEnter}
         placeholder={
           tab === "element"
             ? "Enter statement…"

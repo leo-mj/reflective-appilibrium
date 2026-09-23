@@ -21,6 +21,8 @@ import {
   SIMULATE_TABS,
 } from "../constants/tabConstants.jsx";
 import { linkableElements } from "../utils/stateUtils.js";
+import { processesOf } from "../utils/mergeStates.js";
+import { useHasLLMKey } from "../utils/llmKey.js";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 
 /**
@@ -104,6 +106,11 @@ const ProcessReviewTab = lazy(() =>
     default: m.ProcessReviewTab,
   })),
 );
+const ElementMergeTab = lazy(() =>
+  import("./workflows/ElementMergeTab.jsx").then((m) => ({
+    default: m.ElementMergeTab,
+  })),
+);
 
 const SimulateRethonTab = lazy(() =>
   import("./workflows/SimulateRethonTab.jsx").then((m) => ({
@@ -120,6 +127,8 @@ const QuestionnaireTab = lazy(() =>
 export function GraphPanel({
   tab,
   state,
+  processes = [],
+  onMergeElements,
   positions,
   hiddenLegendKeys,
   setHiddenLegendKeys,
@@ -130,6 +139,7 @@ export function GraphPanel({
   onAddElement,
   onReviseElementText,
   onAddRelation,
+  onAddNewArgument,
   onDeleteRelationsByArgId,
   onQuestionnaireSelectAnswer,
   onScrollToRelations,
@@ -167,12 +177,25 @@ export function GraphPanel({
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
   const suggestionsDisabled = !LLM_ENABLED && !isSample;
+  // The public site's ordinary first state: the build has the LLM features, the
+  // visitor has not supplied a key yet. Folded into the sample gate below rather
+  // than made a gate of its own — a keyless visitor and a visitor who ticked
+  // "Use sample data" need exactly the same thing from every tab, and a second
+  // parallel condition is how the two would drift.
+  const hasKey = useHasLLMKey();
+  const keyMissing = LLM_ENABLED && !hasKey;
   // True whenever the suggestions on screen came from the sample fixtures
   // rather than a live model — the same condition makeLLMClient branches on.
   // Note this covers demo builds, where LLM_ENABLED is false and the "Use
   // sample data" toggle is never rendered: everything is sample data there,
   // so anything that would need a live call must stay hidden.
-  const suggestionsAreSample = !LLM_ENABLED || useDummyAssist;
+  //
+  // This is also what goes down as `useDummy`, which is what keeps the claim
+  // above true. The tabs used to be handed `useDummyAssist` for fetching and
+  // this flag for display, and the two agreed only by coincidence: a keyless
+  // visitor would have been shown "these are samples" while the tab fired a
+  // real request that could only 400. One value, so they cannot disagree.
+  const suggestionsAreSample = !LLM_ENABLED || useDummyAssist || keyMissing;
   const autoFetch = !!workflowPhase;
   const isAssistPanel =
     ASSIST_TABS.includes(tab) || SIMULATE_TABS.includes(tab);
@@ -195,6 +218,7 @@ export function GraphPanel({
               hiddenLegendKeys={hiddenLegendKeys}
               setHiddenLegendKeys={setHiddenLegendKeys}
               hideNonEntailsRels={hideNonEntailsRels}
+              processes={processesOf(state)}
             />
           </div>
           {onToggleFullscreen && (
@@ -222,12 +246,21 @@ export function GraphPanel({
               cursor: "pointer",
             }}
           >
-            <input
-              type="checkbox"
-              checked={useDummyAssist}
-              onChange={(e) => setUseDummyAssist(e.target.checked)}
-              style={{ accentColor: C.supports, cursor: "pointer" }}
-            />
+            {/* Forced on and inert without a key: unticking it would promise
+                live suggestions the tab cannot fetch, leaving the checkbox
+                saying one thing and the panel below it doing another. */}
+            <Tooltip text={keyMissing ? "No API key configured." : ""} wrap>
+              <input
+                type="checkbox"
+                checked={useDummyAssist || keyMissing}
+                disabled={keyMissing}
+                onChange={(e) => setUseDummyAssist(e.target.checked)}
+                style={{
+                  accentColor: C.supports,
+                  cursor: keyMissing ? "not-allowed" : "pointer",
+                }}
+              />
+            </Tooltip>
             Use sample data
           </label>
         )}
@@ -253,6 +286,7 @@ export function GraphPanel({
             elements={linkableElements(state.elements)}
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
+            onAddNewArgument={onAddNewArgument}
             hideNonEntailsRels={hideNonEntailsRels}
             preset={ADD_BAR_PRESETS[tab] ?? null}
           />
@@ -311,7 +345,7 @@ export function GraphPanel({
               workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={useDummyAssist}
+              useDummy={suggestionsAreSample}
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
             />
@@ -328,7 +362,7 @@ export function GraphPanel({
               workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={useDummyAssist}
+              useDummy={suggestionsAreSample}
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
@@ -346,7 +380,7 @@ export function GraphPanel({
               workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={useDummyAssist}
+              useDummy={suggestionsAreSample}
               suggestionsAreSample={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
               weights={weights}
@@ -364,7 +398,7 @@ export function GraphPanel({
               workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={useDummyAssist}
+              useDummy={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
@@ -385,8 +419,21 @@ export function GraphPanel({
               workflowNextPhase={workflowNextPhase}
               onAdvanceWorkflow={onAdvanceWorkflow}
               nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={useDummyAssist}
+              useDummy={suggestionsAreSample}
               suggestionsAreSample={suggestionsAreSample}
+              suggestionsDisabled={suggestionsDisabled}
+            />
+          </Suspense>
+        )}
+        {tab === "mergeElements" && (
+          <Suspense fallback={null}>
+            {/* Not a phase, and never fetched on arrival: it is asked for once
+                a merge has happened, not every iteration. */}
+            <ElementMergeTab
+              state={state}
+              processes={processes}
+              onMergeElements={onMergeElements}
+              useDummy={suggestionsAreSample}
               suggestionsDisabled={suggestionsDisabled}
             />
           </Suspense>
@@ -405,7 +452,8 @@ export function GraphPanel({
           <Suspense fallback={null}>
             <DetectArgumentsTab
               state={state}
-              useDummy={useDummyAssist}
+              useDummy={suggestionsAreSample}
+              suggestionsDisabled={suggestionsDisabled}
               verifyArguments={verifyArguments}
               onAddElement={onAddElement}
               onReviseElementText={onReviseElementText}
