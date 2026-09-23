@@ -166,6 +166,88 @@ writes, so anyone can pick a fresh allowance per request. The backend logs a
 warning at startup when neither tokens nor `TRUSTED_PROXY_HOPS` are set, and a
 second, once per process, when a request shows a proxy it is ignoring.
 
+### Deploying to Cloud Run
+
+The `deploy-backend` job in `.github/workflows/ci.yml` publishes the backend
+image to Google Cloud Run. It runs **only from the Actions tab** ("Run
+workflow"), never on a push, and only after the backend tests and the image
+check have passed.
+
+Why Cloud Run: its free tier — 180,000 vCPU-seconds, 360,000 GiB-seconds and
+2M requests a month, counted only while a request is being served — covers a
+research tool with room to spare, and there is no server to maintain. The price
+is a few seconds' cold start after an idle spell, since the service scales to
+zero: the container starts, imports rethon, and the first simulation also starts
+its worker process.
+
+The one-off setup, once per Google Cloud project:
+
+```bash
+PROJECT=your-project-id          # gcloud projects create … or the console
+REGION=europe-west3              # Frankfurt; any region works
+REPO=appilibrium
+GITHUB_REPO=leo-mj/assistive-equilibrium
+
+gcloud config set project "$PROJECT"
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
+    iamcredentials.googleapis.com
+
+# Where the image lives. The cleanup policy is what keeps storage inside the
+# free half-gigabyte: without it every deploy leaves an image behind for good.
+gcloud artifacts repositories create "$REPO" --repository-format=docker --location="$REGION"
+cat > /tmp/cleanup.json <<'JSON'
+[{"name": "keep-3", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 3}},
+ {"name": "drop-the-rest", "action": {"type": "Delete"}, "condition": {"olderThan": "7d"}}]
+JSON
+gcloud artifacts repositories set-cleanup-policies "$REPO" --location="$REGION" \
+    --policy=/tmp/cleanup.json
+
+# The identity the workflow acts as.
+gcloud iam service-accounts create github-deploy
+SA="github-deploy@$PROJECT.iam.gserviceaccount.com"
+for role in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="$role"
+done
+
+# Workload Identity Federation: GitHub proves which repository is asking, and
+# Google trusts that. No service-account key is stored in the repository, so
+# there is no long-lived credential to leak. The attribute condition is what
+# stops any other repository using this.
+gcloud iam workload-identity-pools create github --location=global
+gcloud iam workload-identity-pools providers create-oidc github \
+    --location=global --workload-identity-pool=github \
+    --issuer-uri="https://token.actions.githubusercontent.com" \
+    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+    --attribute-condition="assertion.repository=='$GITHUB_REPO'"
+NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
+gcloud iam service-accounts add-iam-policy-binding "$SA" \
+    --role=roles/iam.workloadIdentityUser \
+    --member="principalSet://iam.googleapis.com/projects/$NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/$GITHUB_REPO"
+
+echo "GCP_WORKLOAD_IDENTITY_PROVIDER=projects/$NUMBER/locations/global/workloadIdentityPools/github/providers/github"
+```
+
+Then set these **repository variables** (Settings → Secrets and variables →
+Actions → Variables). None is secret: the workflow holds no credential.
+
+| Variable | Value |
+| --- | --- |
+| `GCP_PROJECT_ID` | the project id |
+| `GCP_REGION` | e.g. `europe-west3` |
+| `GCP_ARTIFACT_REPO` | `appilibrium` |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | printed by the last command above |
+| `GCP_DEPLOY_SERVICE_ACCOUNT` | `github-deploy@<project>.iam.gserviceaccount.com` |
+| `BACKEND_CORS_ORIGINS` | the frontend's origin, e.g. `https://reflective-appilibrium.pages.dev` |
+
+Finally, **set a budget alert** (Billing → Budgets & alerts) at an amount you
+would notice, say €1. The free tier covers normal use, but a budget alert is
+what tells you if that ever stops being true.
+
+The deploy sets `DEPLOYMENT=hosted`, `TRUSTED_PROXY_HOPS=1` (Cloud Run appends
+the caller's address to `X-Forwarded-For`) and `--max-instances=1`, which the
+rate limiter requires. The run's summary prints the service URL — that is the
+`VITE_BACKEND_URL` the frontend build needs.
+
 ### Where your work lives
 
 The working state is written to the browser's `localStorage` as you go, and the

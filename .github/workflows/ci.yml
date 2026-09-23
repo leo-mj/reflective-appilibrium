@@ -6,6 +6,9 @@ on:
     branches: [main, visualisation, deploy]
   pull_request:
     branches: [main]
+  # Deploying the backend is a deliberate act, never a side effect of a push:
+  # it replaces the server people are using. See the deploy-backend job.
+  workflow_dispatch:
 
 jobs:
   test-backend:
@@ -281,3 +284,108 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  # The backend, to Cloud Run. Manual only: this replaces the server people are
+  # using, and a push should never do that on its own. Run it from the Actions
+  # tab ("Run workflow") on the branch you want deployed.
+  #
+  # Authentication is Workload Identity Federation — GitHub proves which repo
+  # and workflow is asking, and Google trusts that directly. No service-account
+  # key is stored in the repository; there is no long-lived credential to leak.
+  # README "Deploying to Cloud Run" has the one-off setup.
+  deploy-backend:
+    name: Deploy backend to Cloud Run
+    if: github.event_name == 'workflow_dispatch'
+    # The same gates as any other change, plus the image actually starting.
+    needs: [test-backend, backend-image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Lets the job mint the OIDC token Google checks. Without it the auth
+      # step fails with "unable to get ACTIONS_ID_TOKEN_REQUEST_URL".
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Said before anything is built, naming what is missing: the alternative
+      # is gcloud failing several minutes later on an empty flag.
+      - name: Check the deployment is configured
+        env:
+          PROJECT: ${{ vars.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION }}
+          REPO: ${{ vars.GCP_ARTIFACT_REPO }}
+          PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          ORIGINS: ${{ vars.BACKEND_CORS_ORIGINS }}
+        run: |
+          missing=
+          for name in PROJECT REGION REPO PROVIDER ACCOUNT ORIGINS; do
+            eval "value=\${$name}"
+            [ -n "$value" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Set these repository variables (Settings → Secrets and variables → Actions → Variables), see README 'Deploying to Cloud Run':$missing"
+            exit 1
+          fi
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Built here rather than by Cloud Build: the runner already has Docker,
+      # and this way nothing but the finished image reaches Google.
+      - name: Build and push the image
+        env:
+          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend
+        run: |
+          gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+          # Tagged with the commit as well as `latest`, so a rollback names the
+          # commit it goes back to.
+          docker build -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:latest"
+
+      - name: Deploy
+        env:
+          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/backend
+        run: |
+          # --max-instances=1 is required, not tuning: the rate limiter counts
+          #   in one process's memory, so a second instance doubles every
+          #   allowance (README "Deploying the backend version").
+          # --min-instances=0 is what keeps this inside the free tier; the
+          #   price is a few seconds' cold start after an idle spell.
+          # TRUSTED_PROXY_HOPS=1: Cloud Run's front end appends the caller's
+          #   address to x-forwarded-for, and that entry is the one to believe.
+          # The ^##^ prefix makes ## the separator, so CORS_ORIGINS may list
+          #   several comma-separated origins.
+          gcloud run deploy appilibrium-backend \
+            --image "$IMAGE:$GITHUB_SHA" \
+            --region "${{ vars.GCP_REGION }}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --memory 1Gi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 1 \
+            --concurrency 40 \
+            --timeout 300 \
+            --set-env-vars "^##^DEPLOYMENT=hosted##TRUSTED_PROXY_HOPS=1##CORS_ORIGINS=${{ vars.BACKEND_CORS_ORIGINS }}"
+
+      - name: Check it answers
+        run: |
+          url=$(gcloud run services describe appilibrium-backend \
+            --region "${{ vars.GCP_REGION }}" --format 'value(status.url)')
+          echo "Deployed to $url" >> "$GITHUB_STEP_SUMMARY"
+          # The first request wakes the container and imports rethon, so allow
+          # for a slow one rather than failing a deploy that is merely starting.
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 5 --max-time 60 "$url/api/health" -o health.json
+          cat health.json
+          grep -q '"deployment":"hosted"' health.json
+          echo "VITE_BACKEND_URL for the frontend build: $url" >> "$GITHUB_STEP_SUMMARY"
