@@ -25,6 +25,9 @@ Thumbs.db
 # Questionnaire data files
 app/src/questionnaires/*
 
+# Release checklist — kept local, not part of what ships
+RELEASING.md
+
 # Logs
 *.log
 npm-debug.log*
