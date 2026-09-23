@@ -7,8 +7,10 @@ It is part of a research project exploring in how far LLMs can assist in RE proc
 
 The app ships in two configurations. Both are the same React SPA — the demo is not a reduced build, it is the full interface with the AI and simulation features switched off and replaced by pre-set examples.
 
-- **Demo version** — a static site. No server, no API key, nothing leaves the browser. Live at <https://leo-mj.github.io/reflective-appilibrium/>.
-- **Backend version** — the SPA plus a FastAPI server that provides LLM access and the rethon RE simulation. The server keeps nothing: your work stays in the browser and leaves it as a Markdown export. Run it locally or deploy the backend yourself.
+- **Demo version** — a static site. No server, no API key, nothing leaves the browser. Published at <https://leo-mj.github.io/reflective-appilibrium/>.
+- **Backend version** — the SPA plus a FastAPI server that provides LLM access and the rethon RE simulation. The server keeps nothing: your work stays in the browser and leaves it as a Markdown export. Run it locally, or deploy it — the two halves are published separately from the demo, at whatever addresses their deployment gives them.
+
+The two are published as **separate sites, deliberately**. The demo holds no key and makes no requests, so it is safe on a shared host; the backend version holds a visitor's API key in the browser tab, so it belongs on an address of its own rather than one shared with unrelated pages. Which host each uses is a deployment decision, not a property of the code: both builds come from this repository and are pointed at their destination by `VITE_BASE_PATH`, `VITE_BACKEND_URL` and the backend's `CORS_ORIGINS`.
 
 | Capability                                                                                  | Demo                   | Backend  |
 | ------------------------------------------------------------------------------------------- | ---------------------- | -------- |
@@ -30,7 +32,7 @@ Neither version stores anything on a server. Both autosave the working state to 
 
 ## Demo version
 
-Nothing to install — open <https://leo-mj.github.io/reflective-appilibrium/>.
+Nothing to install — open <https://leo-mj.github.io/reflective-appilibrium/>. That address serves the demo only; the version with the AI features is deployed separately, and its address depends on where it is hosted.
 
 To build it yourself:
 
@@ -166,10 +168,12 @@ writes, so anyone can pick a fresh allowance per request. The backend logs a
 warning at startup when neither tokens nor `TRUSTED_PROXY_HOPS` are set, and a
 second, once per process, when a request shows a proxy it is ignoring.
 
-### Deploying to Cloud Run
+### Deploying the backend to a container host — a worked example
 
-The `deploy-backend` job in `.github/workflows/ci.yml` publishes the backend
-image to Google Cloud Run. It runs **only from the Actions tab** ("Run
+Any host that runs a container works, and the image needs nothing from a
+particular one. What follows is one example end to end, Google Cloud Run,
+because a deployment is easier to adapt than to invent. The `deploy-backend` job
+in `.github/workflows/ci.yml` runs it **only from the Actions tab** ("Run
 workflow"), never on a push, and only after the backend tests and the image
 check have passed.
 
@@ -237,7 +241,7 @@ Actions → Variables). None is secret: the workflow holds no credential.
 | `GCP_ARTIFACT_REPO` | `appilibrium` |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | printed by the last command above |
 | `GCP_DEPLOY_SERVICE_ACCOUNT` | `github-deploy@<project>.iam.gserviceaccount.com` |
-| `BACKEND_CORS_ORIGINS` | the frontend's origin, e.g. `https://reflective-appilibrium.pages.dev` |
+| `BACKEND_CORS_ORIGINS` | the frontend site's origin, `scheme://host` with no path; empty if one host serves both |
 
 Finally, **set a budget alert** (Billing → Budgets & alerts) at an amount you
 would notice, say €1. The free tier covers normal use, but a budget alert is
@@ -273,6 +277,22 @@ VITE_BACKEND_URL=https://<your-deployed-backend> npm run build:backend
 
 A build that falls back to the placeholder logs an error at load, and every
 backend request from it fails.
+
+Two shapes of deployment, and the build says which by what it is given
+(see [app/src/backendUrl.js](app/src/backendUrl.js)):
+
+- **Backend on its own host** — `VITE_BACKEND_URL=https://…`, and the backend's
+  `CORS_ORIGINS` names the site's origin. The site and the server can then be
+  hosted independently of each other.
+- **Both behind one host**, one proxy routing `/api` to the backend —
+  `VITE_BACKEND_URL=/`, and `CORS_ORIGINS` empty, since no request crosses an
+  origin. `docker-compose.yml` runs that pair; the frontend image serves the
+  site and forwards `/api` itself, so a host routes one name to one container.
+
+Nothing in the code names a hosting provider. `.github/workflows/ci.yml` carries
+one worked example for each half — the demo to GitHub Pages, the backend to a
+container host — and both read their destination from repository variables, so
+moving either is a change of setting rather than of code.
 
 See [app/README.md](app/README.md) for the full build-target and feature-flag tables.
 

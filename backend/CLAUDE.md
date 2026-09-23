@@ -12,6 +12,15 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
 - `models/re_state.py` — Pydantic state schema
 
 ## Notes
+- **Host-agnostic by design.** The server is the image `Dockerfile` builds plus
+  environment variables; nothing in the code knows which platform runs it.
+  `DEPLOYMENT=hosted` picks the safe posture, `CORS_ORIGINS` names the site
+  allowed to call it (empty when one host serves both and routes `/api` here),
+  and `TRUSTED_PROXY_HOPS` says how many proxies append to `X-Forwarded-For` —
+  without it every visitor behind a proxy shares one rate-limit allowance.
+  `docker-compose.yml` runs the pair behind one host; the CI workflows hold a
+  worked example of a container host, read from repository variables. Keep new
+  platform specifics in those files rather than in `backend/`.
 - **The server writes nothing to disk, and that is a property to keep.** There
   was a `/api/sessions` router storing RE states as Markdown files under a
   configured directory, gated on `SESSIONS_ENABLED`; it was removed rather than

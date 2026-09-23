@@ -39,6 +39,8 @@ Includes all LLM features. Users enter their own API key (BYOK) in the LLM setti
 
 ```bash
 VITE_BACKEND_URL=https://<your-deployed-backend> npm run build:backend
+# …or, when one host serves the site and routes /api to the backend:
+VITE_BACKEND_URL=/ VITE_BASE_PATH=/ npm run build:backend
 ```
 
 ## Feature flags

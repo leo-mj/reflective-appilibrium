@@ -2,7 +2,17 @@
 
 React SPA (Vite). `src/config.js` derives every feature flag from one build-time
 `VITE_APP_ENV` (`dev` | `demo` | `backend`) — `LLM_ENABLED` and `BYOK_ENABLED` both
-follow `BACKEND_ENABLED`. Mock data is a *runtime* choice, not a flag: the assist
+follow `BACKEND_ENABLED`.
+
+Two more build-time values decide where a build is *served* and where it *calls*,
+and both have one home each: `VITE_BASE_PATH` through `vite-plugins/basePath.js`
+(unset, a Pages-bound build keeps the repo prefix), and `VITE_BACKEND_URL` through
+`src/backendUrl.js`, exported as `BACKEND_URL` from `config.js` — every client
+imports that rather than reading the variable, which is what keeps the clients and
+`vite-plugins/contentSecurityPolicy.js` agreeing on one address. `/` there means
+the backend is behind the page's own host, so `connect-src` stays `'self'` and no
+CORS is involved. **No hosting provider is named anywhere in `src/`**; a deployment
+is those three values and the server's `CORS_ORIGINS`. Mock data is a *runtime* choice, not a flag: the assist
 panel's "use sample suggestions" checkbox passes `useDummy` down to
 `llmClientFactory`, which also falls back to samples whenever `LLM_ENABLED` is false.
 

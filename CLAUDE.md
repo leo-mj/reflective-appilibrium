@@ -17,6 +17,16 @@ One codebase ships two ways, selected by `VITE_APP_ENV` (`app/src/config.js`):
 turn on the backend, the LLM features and the BYOK settings modal. State files are
 interchangeable between them — export/import is the handoff.
 
+**The two are published as separate sites**, and which host serves each is a
+deployment decision the code does not know about. The demo carries no key and
+makes no requests; the `backend` build holds a visitor's API key in the tab, so
+it gets an address of its own rather than sharing one with unrelated pages. A
+build is aimed by three values — `VITE_APP_ENV`, `VITE_BACKEND_URL` and
+`VITE_BASE_PATH` — plus `CORS_ORIGINS` on the server; `app/src/backendUrl.js`
+defines what the backend URL may say, including `/` for the case where one host
+serves the page and routes `/api` to the backend. Don't write a host's name into
+the app: the workflows hold the examples, and they read repository variables.
+
 **Nothing is stored on a server, in either build.** The working state is
 autosaved to the browser (`localStorage`, offered back as "Continue where you
 left off") and Markdown export is the only way out of it. There was a
