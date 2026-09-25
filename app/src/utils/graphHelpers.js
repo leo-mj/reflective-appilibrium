@@ -485,3 +485,89 @@ export function distToSegment(px, py, ax, ay, bx, by) {
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
+
+// ─── Edge hit-testing ─────────────────────────────────────────────────────────
+
+/**
+ * The relation under a point, if any — with the relations it is drawn with
+ * (a joint argument's, or itself alone) and where along the drawing to
+ * anchor anything said about it: the edge's midpoint, or the junction dot.
+ * Uses the geometry the edges are drawn with, threshold 8px.
+ *
+ * Shared by every canvas that answers a pointer on its edges: `useGraphClick`
+ * for the Graph tab's click, hover and tap, and the History tab's hover and tap.
+ *
+ * @param {{ relations: RERelation[], jointGroups: RERelation[][],
+ *   positions: PositionMap, elementById: Map<string, REElement>,
+ *   edgeOffsets: Map<RERelation, number> }} graph - As drawn.
+ * @param {number} sx
+ * @param {number} sy
+ * @returns {{ rel: object, rels: object[], x: number, y: number }|null} `rel`
+ *   is what a click selects: the edge itself, a premise's own line, or an
+ *   argument's first relation for its junction and conclusion arrow.
+ */
+export function relationAt({ relations, jointGroups, positions, elementById, edgeOffsets }, sx, sy) {
+  for (const r of relations) {
+    const sp = positions[r.from], tp = positions[r.to];
+    if (!sp || !tp) continue;
+    const srcEl = elementById.get(r.from);
+    const tgtEl = elementById.get(r.to);
+    const ddx = tp.x - sp.x, ddy = tp.y - sp.y;
+    const { x1, y1, tipX, tipY, perpX, perpY } = arrowGeometry(
+      sp, tp,
+      boundaryDistance(srcEl, ddx, ddy),
+      boundaryDistance(tgtEl, -ddx, -ddy),
+    );
+    const offset = edgeOffsets.get(r) ?? 0;
+    const cx = (x1 + tipX) / 2 + perpX * offset;
+    const cy = (y1 + tipY) / 2 + perpY * offset;
+    const tdx = tipX - cx, tdy = tipY - cy;
+    const tlen = Math.hypot(tdx, tdy) || 1;
+    const bx = tipX - (tdx / tlen) * 10, by = tipY - (tdy / tlen) * 10;
+    if (distToQuadBezier(sx, sy, x1, y1, cx, cy, bx, by) < 8) {
+      // The curve at its middle: ¼, ½, ¼ of its three points.
+      return {
+        rel: r,
+        rels: [r],
+        x: 0.25 * x1 + 0.5 * cx + 0.25 * bx,
+        y: 0.25 * y1 + 0.5 * cy + 0.25 * by,
+      };
+    }
+  }
+
+  // Joint argument hit-test: premise lines, junction dot, conclusion arrow.
+  for (const rels of jointGroups) {
+    const conclusionEl = elementById.get(rels[0].to);
+    const conclusionPos = positions[rels[0].to];
+    if (!conclusionPos || !conclusionEl) continue;
+    const premises = rels
+      .map((r) => ({ r, el: elementById.get(r.from), pos: positions[r.from] }))
+      .filter((d) => d.el && d.pos);
+    if (!premises.length) continue;
+    const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
+    const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
+    const { jx, jy } = computeJunction(
+      centX, centY, conclusionPos,
+      boundaryDistance(conclusionEl, centX - conclusionPos.x, centY - conclusionPos.y),
+    );
+    const tr = boundaryDistance(conclusionEl, jx - conclusionPos.x, jy - conclusionPos.y);
+    const at = (rel) => ({ rel, rels, x: jx, y: jy });
+    // Junction circle
+    if (Math.hypot(sx - jx, sy - jy) < 10) return at(rels[0]);
+    // Premise lines
+    for (const { r, el, pos } of premises) {
+      const dx = jx - pos.x, dy = jy - pos.y;
+      const sr = boundaryDistance(el, dx, dy);
+      const dist = Math.hypot(dx, dy) || 1;
+      const x1 = pos.x + (dx / dist) * sr, y1 = pos.y + (dy / dist) * sr;
+      if (distToSegment(sx, sy, x1, y1, jx, jy) < 8) return at(r);
+    }
+    // Conclusion arrow
+    const adx = conclusionPos.x - jx, ady = conclusionPos.y - jy;
+    const adist = Math.hypot(adx, ady) || 1;
+    const tipX = conclusionPos.x - (adx / adist) * tr;
+    const tipY = conclusionPos.y - (ady / adist) * tr;
+    if (distToSegment(sx, sy, jx, jy, tipX, tipY) < 8) return at(rels[0]);
+  }
+  return null;
+}

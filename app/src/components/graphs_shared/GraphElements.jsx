@@ -542,6 +542,35 @@ export function CardBackground({ card, position, opacity, transition }) {
 }
 
 /**
+ * Every card's fill, for a canvas's worth of elements — the layer the edges are
+ * drawn over. Shared by the Graph and History tabs, which differ only in how a
+ * card fades (`visualsOf`: the selection's dimming on one, the playback's on
+ * the other).
+ *
+ * A grown card is left out: it fills itself, lying over its neighbours as
+ * well as over the edges.
+ *
+ * @param {{ elements: REElement[], positions: Object,
+ *   visualsOf: function(REElement): { opacity: number, transition?: string } }} props
+ */
+export function CardBackgrounds({ elements, positions, visualsOf }) {
+  return elements.map((el) => {
+    const position = positions[el.id];
+    if (!el.card || el.card.expanded || !position) return null;
+    const { opacity, transition } = visualsOf(el);
+    return (
+      <CardBackground
+        key={el.id}
+        card={el.card}
+        position={position}
+        opacity={opacity}
+        transition={transition}
+      />
+    );
+  });
+}
+
+/**
  * The letter of the merged process an element came from, pinned to the node's
  * upper right. Letters rather than a colour per process: the node's colour
  * already carries type and confidence, and a letter reads the same in every mode

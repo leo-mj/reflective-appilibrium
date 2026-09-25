@@ -18,15 +18,22 @@ import {
   ARGUMENT_RELATION_TYPES,
 } from "../utils/stateUtils.js";
 import {
-  CardBackground,
+  CardBackgrounds,
   GraphCanvas,
+  RelationLabel,
   OffscreenIndicators,
   StatementToggle,
 } from "./graphs_shared/GraphElements.jsx";
 import { useStatementView } from "../hooks/useStatementView.js";
 import { cardAt, useCardGrowth } from "../hooks/useCardGrowth.js";
+import { useShownRelation } from "../hooks/useShownRelation.js";
 import { widestCard } from "../utils/statementCards.js";
-import { parallelEdgeOffsets, groupJointArguments } from "../utils/graphHelpers.js";
+import {
+  parallelEdgeOffsets,
+  groupJointArguments,
+  relationAt,
+} from "../utils/graphHelpers.js";
+import { pageFontFamily } from "../utils/textWidth.js";
 import {
   renderEdge,
   renderJointArgument,
@@ -161,6 +168,50 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
     refitKey: state.elements.length,
   });
 
+  const { solo, jointGroups } = groupJointArguments(visRels);
+  const offsets = parallelEdgeOffsets(solo);
+
+  // What an edge says, shown under a mouse or a tap as on the Graph tab — by
+  // the same hit test (`relationAt`), in the wording the round being played
+  // gave it. Not for a relation not yet added, drawn invisible.
+  const relInPlay = (r) => (r.addedRound || 1) <= snappedRound;
+  /** `{ sx, sy }` in simulation coordinates, from a pointer event. */
+  const simAt = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      sx: (e.clientX - rect.left - pan.x) / zoom,
+      sy: (e.clientY - rect.top - pan.y) / zoom,
+    };
+  };
+  /** The node or card at a point, and failing one, the edge. */
+  const pointedAt = ({ sx, sy }) => {
+    const el = cardAt(displayEls.filter(inPlay), displayPositions, overlay, sx, sy);
+    return {
+      el,
+      rel: el
+        ? null
+        : relationAt(
+            {
+              relations: solo.filter(relInPlay),
+              jointGroups: jointGroups.filter((g) => relInPlay(g[0])),
+              positions: displayPositions,
+              elementById,
+              edgeOffsets: offsets,
+            },
+            sx,
+            sy,
+          ),
+    };
+  };
+  const [shownRel, showRel] = useShownRelation();
+  const shown =
+    shownRel && visRels.includes(shownRel.rel) && relInPlay(shownRel.rel)
+      ? {
+          ...shownRel,
+          rels: shownRel.rels.map((r) => asOfRound(r, snappedRound)),
+        }
+      : null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <PlaybackControls playback={playback} maxRound={state.round} />
@@ -179,23 +230,24 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
         onPointerMove={(e) => {
           growth.notePointer(e);
           onPointerMove(e);
+          if (e.pointerType !== "mouse") return;
+          if (isDragging) return showRel(null);
+          showRel(pointedAt(simAt(e)).rel);
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") showRel(null);
         }}
         onPointerUp={(e) => {
           onPointerUp(e);
           const from = tapFrom.current;
           tapFrom.current = null;
-          if (!statements || from?.type !== "touch") return;
+          if (from?.type !== "touch") return;
           if (Math.hypot(e.clientX - from.x, e.clientY - from.y) > 10) return;
-          const rect = e.currentTarget.getBoundingClientRect();
-          growth.tap(
-            cardAt(
-              displayEls.filter(inPlay),
-              displayPositions,
-              overlay,
-              (e.clientX - rect.left - pan.x) / zoom,
-              (e.clientY - rect.top - pan.y) / zoom,
-            ),
-          );
+          const { el, rel } = pointedAt(simAt(e));
+          // A tap grows a card, or shows what an edge says, and a tap on open
+          // canvas lets either go.
+          if (statements) growth.tap(el);
+          showRel(rel);
         }}
         onPointerCancel={onPointerCancel}
         applyWheel={applyWheel}
@@ -228,28 +280,12 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
         }
       >
         {/* Card fills under the edges, as on the Graph tab. */}
-        {displayEls.map((el) => {
-          const position = displayPositions[el.id];
-          if (!el.card || el.card.expanded || !position) return null;
-          const { opacity, transition } = historyNodeVisuals(
-            el,
-            wIds,
-            newIds,
-            snappedRound,
-          );
-          return (
-            <CardBackground
-              key={el.id}
-              card={el.card}
-              position={position}
-              opacity={opacity}
-              transition={transition}
-            />
-          );
-        })}
+        <CardBackgrounds
+          elements={displayEls}
+          positions={displayPositions}
+          visualsOf={(el) => historyNodeVisuals(el, wIds, newIds, snappedRound)}
+        />
         {(() => {
-          const { solo, jointGroups } = groupJointArguments(visRels);
-          const offsets = parallelEdgeOffsets(solo);
           return (
             <>
               {solo.map((r) =>
@@ -289,6 +325,20 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
             // — and one not yet added, drawn invisible, answers nothing.
             el.card ? (inPlay(el) ? growth.hoverFor(el) : {}) : undefined,
           ),
+        )}
+
+        {/* What the edge under the pointer says, over everything. */}
+        {shown && (
+          <RelationLabel
+            hit={shown}
+            zoom={zoom}
+            color={
+              historyEdgeVisuals(shown.rel, wIds, snappedRound, shown.rels).isWithdrawn
+                ? C.withdrawn
+                : palette.edges[shown.rel.type]
+            }
+            fontFamily={pageFontFamily()}
+          />
         )}
       </GraphCanvas>
     </div>

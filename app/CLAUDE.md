@@ -23,10 +23,24 @@ a test that needs it says so itself. Unpinned, whole-app renders fired real
 requests at no server, and a failure landing after its file had finished broke
 the run with "Closing rpc while onUserConsoleLog was pending".
 
+The exception is Playwright's `live-backend` project, which starts the real
+FastAPI server and runs the SPA against it — see `e2e/README.md`. **History's
+"Calculate Z-scores per round" scores the whole process** (`wholeProcess`, from
+`REState`), not the text panel's `state`, which on the History tab is the
+projection at the round being played: on arrival that is round 0 with nothing in
+it, which the server refuses, and later it held only the rounds played so far.
+The chart marks the played round and dims those after it itself. That live
+project is what found it.
+
 ## Key files
 
 - `src/App.jsx` — root component
 - `src/components/REState.jsx` — main state management and layout
+- `src/components/Graph.jsx` — the Graph tab's canvas: hooks, click and tap
+  wiring, and its drawing layers. What it draws and how it fades is
+  `utils/graphView.js` (`drawnOnGraph`, `graphHighlights`), plain functions with
+  their own tests; its add buttons, ctrl+click bar and add dialogs are in
+  `src/components/graph/`.
 - `src/components/workflows/` — JudgmentElicitTab, PrincipleSuggestTab, RelationSuggestTab, ProcessReviewTab, QuestionnaireTab, ElementMergeTab (after a merge only; see the root CLAUDE.md)
 - `src/utils/` — LLM client, workflow utilities, state utilities
 - `src/state.js`, `types.js`, `config.js` — app state and config
@@ -447,6 +461,37 @@ reheating the simulation. It used to restart at full heat on any size change
 seconds on the move for a layout whose shape nothing had asked to change. Only
 elements, relations or groups changing re-run it.
 
+### The keyboard
+
+**The canvas is pointer-only, and the text panel is the keyboard's way in.**
+Growing a card and showing what an edge says answer a pointer or a finger, and
+nothing on the canvas takes the focus. Everything they offer is in the text
+panel — every statement whole, every relation with its explanation — so that
+panel has to work without a mouse, and `e2e/a11y.spec.js` ("the text panel can
+be worked by keyboard alone") walks it: search, fold a section, select a
+relation and an element, open Revise, Tab, Escape.
+
+What that walk found, and what fixed it:
+
+- **A section folds by a button** (`SectionHeader`, `aria-expanded`), beside
+  its "+" rather than around it. It was the header's click, on a div.
+- **A relation row is selected by a button** (`RowSelect`, the type between its
+  ends, `aria-pressed`, named "Select relation: J1 supports P1"). The row was a
+  clickable div; its end badges were buttons that said "Select J1" and, their
+  click bubbling, selected the relation — so they are `inert` in a row now.
+  **A row never selected anything, mouse or keyboard**: its handler called
+  `onSelect(() => null)` after `onSelectRel`, and the two are coupled
+  (`useREActions`), so the second cleared what the first had set. Unit tests
+  missed it because their harness setters were independent.
+- **Every dialog is a dialog** (`ModalShell`, which all add, edit and withdraw
+  forms are): announced, focused on opening, Tab kept inside, Escape to close,
+  focus handed back to what opened it. It had none of that.
+- **The search box is named and shows its focus**; it had `outline: none`.
+
+The spec's catch-all — nothing showing a pointer that neither takes the focus
+nor holds something that does — would not have found the first two: both held
+*a* button, just not one that did their job. The walk's explicit steps did.
+
 ### Search, on the graph
 
 The text panel's search also lights up the graph: what it does not find fades
@@ -463,21 +508,22 @@ wider).
 - **Only while the panel is on screen.** Full screen hides the search box, and
   a graph still filtered by a query nobody can see or clear would look broken.
 - **The panel's own tests** (`matchesSearch`, `matchesSearchRel`), so the two
-  cannot disagree about what matches; a collapsed group is found through its
-  members.
+  cannot disagree about what matches; `searchFinds`, beside them in
+  `utils/textTabHelpers.js`, applies the first to what the canvas draws, a
+  collapsed group being found through its members.
 
 ### An edge's explanation
 
 Relations carry an `explanation` the graph used to draw nowhere. On the Graph
-tab, **a mouse over an edge — or a tap on one — shows a box** (`RelationLabel`)
+and History tabs, **a mouse over an edge — or a tap on one — shows a box** (`RelationLabel`)
 with the relation's type and its explanation, anchored at the edge's midpoint or
 at a joint argument's junction, which gathers its premises' distinct
 explanations. In both views, not only the statement view: an explanation is
 worth reading whether or not the statements are shown. Nothing over a node,
 which answers for itself, and nothing mid-pan.
 
-- **One hit test for click, hover and tap**: `relationAt` in `useGraphClick`,
-  lifted out of the click handler. Joint arguments have no hover area of their
+- **One hit test for click, hover and tap**: `relationAt` in `graphHelpers.js`,
+  lifted out of `useGraphClick`'s click handler. Joint arguments have no hover area of their
   own, so a hover on the drawn edges could not have found them; asking the
   geometry does, and the three cannot disagree about which edge is under the
   pointer.
@@ -485,10 +531,14 @@ which answers for itself, and nothing mid-pan.
   with the graph would be illegible exactly when the graph is too small to
   follow without it. Outlined in the edge's colour, written in the text
   colours — the relation colours are not all legible as type.
-- **The state changes only when the edge does** (`showRel`), so a pointer moving
+- **The state changes only when the edge does** (`useShownRelation`, which
+  both tabs use), so a pointer moving
   along one re-renders nothing; the box is drawn only while its relation still
   is. Type names come from `RELATION_LABELS`, which the legend reads too.
-- Not on the History tab, whose canvas does no edge hit-testing.
+- **The History tab too**, by the same test — `relationAt` is a plain function
+  in `graphHelpers.js`, which `useGraphClick` and `HistoryTab` both ask. There
+  the box carries the wording the round being played gave the relation
+  (`asOfRound`), and a relation not yet added, drawn invisible, says nothing.
 
 ### Statement view
 
@@ -554,7 +604,8 @@ lands on the border.
   estimate at monospace widths came first and put the last characters on the
   border, the canvas's monospace running wider than assumed. The estimate
   survives only where nothing can measure: jsdom, so the tests.
-- **Switching glides** (`useStatementView`, ~320ms, eased): every element from
+- **Switching glides** (`hooks/useViewGlide.js`, ~320ms, eased — the statement
+  view marks its departure with `depart()` at the press): every element from
   where it stood to where it is going, and pan and zoom to the new framing with
   them, so the reader follows each node to its card and back. The shapes swap
   at once; the places move. The departure is taken **at the press**, since by
@@ -575,6 +626,17 @@ lands on the border.
   1.5× about their centroid, then only overlapping cards are pushed apart,
   connected ones to a wider gap so the edge between them has length. The
   arrangement the reader knows survives the switch both ways.
+- **Cards are remembered** (`statementCard`), by type, confidence, wording,
+  line limit and measurer, and frozen — the canvases ask for every element's on
+  every render, which while the layout settles is every tick. A variant is a
+  copy (`{ ...card, hovered: true }`), never an edit.
+- **The pass parts a pair by 1.5× the overlap** (`PUSH`, ¾ each), not exactly:
+  parted exactly, a chain of cards nudged its neighbours back into contact and
+  the pass crept — 30 cards at the canvas's density still overlapping after its
+  200 passes. From 60 cards it compares only neighbours on a grid rebuilt each
+  pass (`nearPairs`); below, every pair, so small graphs lay out as they did.
+  It clears anything the force layout hands it; a true pile of wide cards in a
+  small patch it does not, and does not need to.
 - **That pass must stay continuous** (`nextStatementLayout`). Run afresh on every
   simulation tick, it turned a sub-pixel settle into a minute of jiggling, since
   a tiny shift can flip which way a pair is pushed. So moves under 2px are not

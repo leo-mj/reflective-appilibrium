@@ -326,6 +326,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const textPanelProps = {
     search,
     onSearch: setSearch,
+    // What History's round-by-round scores are worked out over: every round,
+    // whichever one the panel is showing.
+    wholeProcess: viewState,
     isWide,
     clusterSectionRef,
     scrollToRelationsKey,

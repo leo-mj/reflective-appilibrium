@@ -80,7 +80,21 @@ const STATE = {
     },
   ],
   relations: [
-    { from: "J1", to: "P1", type: "supports", explanation: "", addedRound: 1 },
+    {
+      from: "J1",
+      to: "P1",
+      type: "supports",
+      explanation: "Keeping promises is what keeps trust.",
+      addedRound: 1,
+      history: [{ round: 3, type: "revised", previousText: "Trust." }],
+    },
+    {
+      from: "J2",
+      to: "P1",
+      type: "supports",
+      explanation: "Late, but it counts.",
+      addedRound: 4,
+    },
   ],
   coherence: { tensions: [], orphans: [], clusters: [] },
   log: [],
@@ -177,3 +191,61 @@ describe("the History tab's statement view", () => {
     expect(lines.at(-1)).toMatch(/made it\.$/);
   });
 });
+
+describe("the History tab's edges", () => {
+  /** A point in simulation coordinates, as the canvas's pan and zoom put it on screen. */
+  const onScreen = (container, x, y) => {
+    const [, px, py, z] = container
+      .querySelector("svg > g")
+      .getAttribute("transform")
+      .match(/translate\(([^,]+),([^)]+)\) scale\(([^)]+)\)/);
+    return { clientX: x * z + +px, clientY: y * z + +py };
+  };
+  const label = (container) =>
+    container.querySelector('[data-testid="relation-label"]');
+  const lines = (container) =>
+    [...label(container).querySelectorAll("tspan")].map((t) => t.textContent);
+  // J1 (100, 100) to P1 (400, 100): the edge passes through (250, 100).
+  const hover = (container, x, y) =>
+    fireEvent.pointerMove(container.querySelector("svg"), {
+      ...onScreen(container, x, y),
+      pointerId: 1,
+      pointerType: "mouse",
+    });
+
+  it("says what an edge says, as the round being played had it", () => {
+    const { container, toRound } = setup();
+    toRound(2);
+    hover(container, 250, 100);
+    expect(lines(container)).toEqual(["Supports", "Trust."]);
+    toRound(4);
+    hover(container, 250, 101);
+    expect(lines(container).slice(1).join(" ")).toBe(
+      "Keeping promises is what keeps trust.",
+    );
+  });
+
+  it("says nothing of a relation not yet added", () => {
+    const { container, toRound } = setup();
+    toRound(2);
+    // On J2 → P1, which arrives in round 4: drawn, invisible, and silent.
+    hover(container, 325, 200);
+    expect(label(container)).toBeNull();
+  });
+
+  it("shows on a tap, and goes on a tap elsewhere", () => {
+    const { container, toRound } = setup();
+    toRound(4);
+    const svg = container.querySelector("svg");
+    const tap = (x, y) => {
+      const at = { ...onScreen(container, x, y), pointerId: 2, pointerType: "touch" };
+      fireEvent.pointerDown(svg, at);
+      fireEvent.pointerUp(svg, at);
+    };
+    tap(250, 100);
+    expect(label(container)).not.toBeNull();
+    tap(250, 600);
+    expect(label(container)).toBeNull();
+  });
+});
+

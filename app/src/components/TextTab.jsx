@@ -114,6 +114,7 @@ export function TextTab({
   historyView = null,
   search: searchProp,
   onSearch,
+  wholeProcess = null,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   /** Whether the list is far enough down for "↑ Top" to be worth showing. */
@@ -201,7 +202,11 @@ export function TextTab({
   const loadRoundScores = () => {
     if (!BACKEND_ENABLED || roundScoresLoading) return;
     setRoundScoresLoading(true);
-    scorePerRound(state)
+    // The whole process, not the round being played: `state` is History's
+    // projection, which on arrival is round 0 with nothing in it — a request
+    // the server refuses — and later holds only the rounds up to the one on
+    // screen. The chart marks that round itself, and dims the ones after it.
+    scorePerRound(wholeProcess ?? state)
       .then((data) => setRoundScores(data.round_scores))
       .catch(() => {})
       .finally(() => setRoundScoresLoading(false));

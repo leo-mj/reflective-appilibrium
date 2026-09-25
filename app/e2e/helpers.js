@@ -419,7 +419,9 @@ export async function exportDownload(page) {
   await openMenu(page);
   await page.getByRole("button", { name: /Export/ }).click();
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download" }).click();
+  // Exact: the dialog also offers "Download .argdown", which a bare
+  // "Download" matches too — and in strict mode, two matches is a failure.
+  await page.getByRole("button", { name: "Download", exact: true }).click();
   return downloadPromise;
 }
 

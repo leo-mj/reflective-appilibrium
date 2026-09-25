@@ -106,9 +106,31 @@ export function MetaChip({ color = C.dim, title, children }) {
  * @param {function} [props.onToggle]
  */
 export function SectionHeader({ title, onAdd, addLabel, collapsed, onToggle }) {
+  // The fold is a button, filling the header beside the "+": it was the whole
+  // header's click, on a div, which no keyboard could reach — a reader without
+  // a mouse could open no section the panel had closed. Not the header itself
+  // as the button, since the "+" is a button inside it, and a button may not
+  // hold another.
+  const label = (
+    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {onToggle && (
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: 10,
+            transition: "transform 0.15s",
+            display: "inline-block",
+            transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+          }}
+        >
+          ▼
+        </span>
+      )}
+      {title}
+    </span>
+  );
   return (
     <div
-      onClick={onToggle}
       style={{
         position: "sticky",
         top: 0,
@@ -125,25 +147,27 @@ export function SectionHeader({ title, onAdd, addLabel, collapsed, onToggle }) {
         padding: "14px 0 6px",
         borderBottom: `1px solid ${C.border}`,
         marginBottom: collapsed ? 0 : 10,
-        cursor: onToggle ? "pointer" : "default",
         userSelect: "none",
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {onToggle && (
-          <span
-            style={{
-              fontSize: 10,
-              transition: "transform 0.15s",
-              display: "inline-block",
-              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
-            }}
-          >
-            ▼
-          </span>
-        )}
-        {title}
-      </span>
+      {onToggle ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          style={{
+            all: "unset",
+            flex: 1,
+            cursor: "pointer",
+            // `all: unset` takes the focus ring with it; this puts it back.
+            outline: "revert",
+          }}
+        >
+          {label}
+        </button>
+      ) : (
+        label
+      )}
       {onAdd && (
         <Tooltip text={addLabel ?? `Add to ${title}`}>
           <button
@@ -190,13 +214,39 @@ export function SectionHeader({ title, onAdd, addLabel, collapsed, onToggle }) {
  * Selection is a ring outside the border rather than a stronger tint, which a
  * solid fill leaves no room for.
  */
-export function Badge({ id }) {
+export function Badge({ id, inert = false }) {
   const { badgeColor, badgeFill, badgeTextColor, selected, onSelect } =
     useContext(Ctx);
   const stroke = badgeColor(id);
   const fill = badgeFill(id);
   const ink = badgeTextColor(id);
   const isSelected = selected === id;
+  // `inert`: drawn as a badge, doing nothing, for a row about a relation — its
+  // ends are named, not offered. As buttons there they announced "Select J1"
+  // and, by their click bubbling to the row, selected the relation instead.
+  if (inert)
+    return (
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: "bold",
+          padding: "1px 7px",
+          marginRight: "5px",
+          borderRadius: 4,
+          background: fill,
+          color: ink,
+          border: `1px solid ${stroke}`,
+          flexShrink: 0,
+          lineHeight: 1.8,
+          width: "3em",
+          textAlign: "center",
+          display: "inline-block",
+          boxSizing: "border-box",
+        }}
+      >
+        {id}
+      </span>
+    );
   return (
     <button
       type="button"

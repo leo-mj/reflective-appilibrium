@@ -21,7 +21,6 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { fitView } from "../utils/graphHelpers.js";
 import {
   STATEMENT_CARD,
   STATEMENT_SPREAD,
@@ -36,6 +35,7 @@ import {
   subscribeStatementView,
 } from "../utils/statementViewSetting.js";
 import { pageFontFamily, textMeasurer } from "../utils/textWidth.js";
+import { useViewGlide } from "./useViewGlide.js";
 
 /**
  * The page font, kept current. The font setting writes a custom property onto
@@ -56,14 +56,6 @@ function usePageFont() {
   return font;
 }
 
-/** How long the switch between views takes to glide, in ms. */
-const MOTION_MS = 320;
-
-/** Ease in and out, so the glide neither starts nor lands with a jolt. */
-const ease = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
-
-const lerp = (a, b, t) => a + (b - a) * t;
-
 /**
  * Zoomed out past this, a card shows its badge and one line; zoomed back in
  * past the second, all of them again. At 30% a card's 14px text is about 4px
@@ -77,30 +69,6 @@ const lerp = (a, b, t) => a + (b - a) * t;
  */
 const COMPACT_BELOW = 0.3;
 const COMPACT_ABOVE = 0.36;
-
-/** Whether the reader has asked their system for less motion. */
-const reducedMotion = () =>
-  typeof window !== "undefined" &&
-  typeof window.matchMedia === "function" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-/**
- * Positions part of the way from `from` to `to`. Anything `from` did not hold
- * — an element added mid-glide — is simply at its destination.
- *
- * @param {PositionMap} from
- * @param {PositionMap} to
- * @param {number} t - 0 is `from`, 1 is `to`.
- * @returns {PositionMap}
- */
-function between(from, to, t) {
-  const out = {};
-  for (const [id, p] of Object.entries(to)) {
-    const q = from[id];
-    out[id] = q ? { ...p, x: lerp(q.x, p.x, t), y: lerp(q.y, p.y, t) } : p;
-  }
-  return out;
-}
 
 /**
  * @param {Object}       args
@@ -137,15 +105,6 @@ export function useStatementView({
     statementViewOn,
     statementViewOn,
   );
-  // What the canvas last drew, and where the view stood: a switch glides from
-  // here. Kept at the moment of the press rather than in the effect that runs
-  // after it, by which time the new view's positions are already the answer.
-  const shown = useRef(null);
-  const departure = useRef(null);
-  const toggleStatements = () => {
-    departure.current = { positions: shown.current, pan, zoom };
-    setStatementViewOn(!statementViewOn());
-  };
 
   // Cards are sized in the font their text will be drawn in, so a change of
   // font is a change of every card.
@@ -220,54 +179,20 @@ export function useStatementView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statements, layoutPositions, cardKey]);
 
-  // Switching views re-frames the whole graph, once the positions for the new
-  // view exist: the spread one runs well off a canvas fitted to the compact one.
-  //
-  // It glides there rather than jumping — every element from where it stood to
-  // where it is going, and the view with them — so the reader can follow each
-  // node to its card and back instead of finding them all again. The shapes
-  // change at once; it is the places that move. Not for a reader whose system
-  // asks for less motion, nor for a switch not made from the button, which
-  // leaves nothing to glide from.
-  const [glide, setGlide] = useState(null);
-  const framed = useRef(statements);
-  useEffect(() => {
-    if (framed.current === statements) return;
-    framed.current = statements;
-    const view = fitView(positions, null, dims, { padding: 96, maxZoom: 1 });
-    const from = departure.current;
-    departure.current = null;
-    if (!view) return;
-    if (!from?.positions || reducedMotion()) {
-      setGlide(null);
-      resetView(view.pan, view.zoom);
-      return;
-    }
-    let frame;
-    const start = performance.now();
-    const step = (now) => {
-      // Clamped below too: a frame's timestamp is when the frame began, which
-      // can fall just before `start`, and eased backwards is a twitch.
-      const t = Math.min(1, Math.max(0, (now - start) / MOTION_MS));
-      const e = ease(t);
-      resetView(
-        { x: lerp(from.pan.x, view.pan.x, e), y: lerp(from.pan.y, view.pan.y, e) },
-        lerp(from.zoom, view.zoom, e),
-      );
-      setGlide(t < 1 ? { from: from.positions, t: e } : null);
-      if (t < 1) frame = requestAnimationFrame(step);
-    };
-    setGlide({ from: from.positions, t: 0 });
-    frame = requestAnimationFrame(step);
-    // Switched again mid-glide: that one starts from wherever this one got to.
-    return () => cancelAnimationFrame(frame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statements]);
-
-  const drawn = glide ? between(glide.from, positions, glide.t) : positions;
-  useEffect(() => {
-    shown.current = drawn;
+  // Switching views re-frames the whole graph, gliding there: see
+  // `hooks/useViewGlide.js`. The departure is marked at the press.
+  const { drawn, depart } = useViewGlide({
+    trigger: statements,
+    positions,
+    dims,
+    resetView,
+    pan,
+    zoom,
   });
+  const toggleStatements = () => {
+    depart();
+    setStatementViewOn(!statementViewOn());
+  };
 
   return { statements, toggleStatements, drawnEls, positions: drawn, measure };
 }

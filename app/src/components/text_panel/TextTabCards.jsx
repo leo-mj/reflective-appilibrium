@@ -18,7 +18,7 @@ import {
   cardDivider,
   cardActions,
 } from "../../constants/textTabStyles.js";
-import { statusTag } from "../../utils/stateUtils.js";
+import { sortElementIds, statusTag } from "../../utils/stateUtils.js";
 import { groupOfElement } from "../../utils/groupUtils.js";
 import { processesOf, processesOfElement } from "../../utils/mergeStates.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
@@ -286,6 +286,43 @@ export function ElementCard({ e, dim }) {
   );
 }
 
+// ─── Selecting a relation row ─────────────────────────────────────────────────
+
+/**
+ * The button a relation row is selected by — its type, written between its
+ * ends. The row takes a click anywhere, for a mouse; this is what a keyboard
+ * reaches, and what a screen reader hears. It has no handler of its own: its
+ * click bubbles to the row's, so the two cannot come apart.
+ *
+ * The row was a clickable div, which no keyboard reached. What a keyboard did
+ * reach were the badges of its ends, whose click bubbled to the row and
+ * selected the relation while they announced "Select J1" — so they are inert
+ * in a row now, and this does the selecting it names.
+ *
+ * @param {{ pressed: boolean, label: string, color: string,
+ *   children: React.ReactNode }} props
+ */
+function RowSelect({ pressed, label, color, children }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      aria-label={label}
+      style={{
+        all: "unset",
+        color,
+        fontSize: 11,
+        fontWeight: "bold",
+        cursor: "pointer",
+        // `all: unset` takes the focus ring with it; this puts it back.
+        outline: "revert",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 // ─── Argument card (grouped jointly_entails) ──────────────────────────────────
 
 export function ArgumentCard({ rels, dim }) {
@@ -293,7 +330,6 @@ export function ArgumentCard({ rels, dim }) {
     state,
     selectedRel,
     onSelectRel,
-    onSelect,
     onEditRelRequest,
     onWithdrawRelRequest,
     onReinstateRel,
@@ -310,14 +346,15 @@ export function ArgumentCard({ rels, dim }) {
       {rels.map((r) => (
         <div
           key={r.from}
-          // Deliberately swallows the badges inside it: the click bubbles up
-          // here and clears the element selection they just made, so pressing
-          // one in a relation row does nothing. The row is about the relation,
-          // and selecting one of its ends from here would say the wrong thing.
-          onClick={() => {
-            onSelectRel((prev) => (rels.includes(prev) ? null : r));
-            onSelect(() => null);
-          }}
+          // Selecting the relation clears any element selection itself:
+          // `onSelectRel` and `onSelect` are coupled (see useREActions). It
+          // used to call `onSelect(() => null)` after, to undo the selection a
+          // badge in the row had just made — and being coupled, that cleared
+          // the relation it had just selected, so no row ever selected
+          // anything. The badges are inert here now (`RowSelect`).
+          onClick={() =>
+            onSelectRel((prev) => (rels.includes(prev) ? null : r))
+          }
           style={{
             ...cardHeader,
             gap: 5,
@@ -329,13 +366,17 @@ export function ArgumentCard({ rels, dim }) {
           }}
         >
           <div style={cardIdentity}>
-            <Badge id={r.from} />
-            <span
-              style={{
-                color: C[rels[0].type] ?? C.jointly_entails,
-                fontSize: 11,
-                fontWeight: "bold",
-              }}
+            <Badge id={r.from} inert />
+            <RowSelect
+              pressed={isSel}
+              // Premises sorted: the same argument is drawn with them in
+              // another order where it is shown selected, and a name should
+              // not change with where its button happens to be.
+              label={`Select argument: ${rels
+                .map((x) => x.from)
+                .sort(sortElementIds)
+                .join(", ")} ${rels[0].type.replace("_", " ")} ${conclusionId}`}
+              color={C[rels[0].type] ?? C.jointly_entails}
             >
               {rels[0].type === "precludes"
                 ? "⇒ precludes ⇒"
@@ -344,8 +385,8 @@ export function ArgumentCard({ rels, dim }) {
                   : rels[0].type === "entails"
                     ? "→ entails →"
                     : "→ jointly entails →"}
-            </span>
-            <Badge id={r.to} />
+            </RowSelect>
+            <Badge id={r.to} inert />
           </div>
           <div style={cardChips(isWide)}>
             <StatusLabel tag={statusTag(r, state.round)} />
@@ -454,7 +495,6 @@ export function RelationCard({ r, dim }) {
     state,
     selectedRel,
     onSelectRel,
-    onSelect,
     onEditRelRequest,
     onWithdrawRelRequest,
     onReinstateRel,
@@ -468,11 +508,8 @@ export function RelationCard({ r, dim }) {
   return (
     <div style={{ ...CARD_STYLE, opacity: dim ? 0.4 : 1 }}>
       <div
-        // As in ArgumentCard above: the badges inside are inert here on purpose.
-        onClick={() => {
-          onSelectRel((prev) => (prev === r ? null : r));
-          onSelect(() => null);
-        }}
+        // As in ArgumentCard above.
+        onClick={() => onSelectRel((prev) => (prev === r ? null : r))}
         style={{
           ...cardHeader,
           gap: 5,
@@ -484,11 +521,15 @@ export function RelationCard({ r, dim }) {
         }}
       >
         <div style={cardIdentity}>
-          <Badge id={r.from} />
-          <span style={{ color: C[r.type], fontSize: 11, fontWeight: "bold" }}>
+          <Badge id={r.from} inert />
+          <RowSelect
+            pressed={isSel}
+            label={`Select relation: ${r.from} ${r.type} ${r.to}`}
+            color={C[r.type]}
+          >
             → {r.type} →
-          </span>
-          <Badge id={r.to} />
+          </RowSelect>
+          <Badge id={r.to} inert />
         </div>
         <div onClick={(e) => e.stopPropagation()} style={cardActions}>
           <ActionButtons

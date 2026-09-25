@@ -139,8 +139,28 @@ export function spreadPositions(positions, factor) {
  */
 
 /**
+ * Cards already worked out, by measurer and then by what a card depends on.
+ *
+ * A card is a function of the element's type, confidence and wording, the line
+ * limit and the measurer — and the canvases ask for every element's on every
+ * render, which while the layout settles is every tick of it. Measurers are
+ * held weakly: one per font, and a new one per export, none of which should
+ * outlive being used. Bounded all the same, since wordings come and go.
+ *
+ * @type {WeakMap<Function, Map<string, StatementCard>>}
+ */
+const cardsByMeasure = new WeakMap();
+/** @type {Map<string, StatementCard>} For the estimate, with no measurer. */
+const estimatedCards = new Map();
+const CARD_CACHE_LIMIT = 5000;
+
+/**
  * The card an element is drawn as in the statement view: its node at its usual
  * size as a badge on the left, the wording beside it.
+ *
+ * The same object for the same inputs, and frozen: it is shared by every
+ * render and every caller that asks, so nothing may change it in place — a
+ * variant is a copy (`{ ...card, hovered: true }`).
  *
  * @param {REElement} el
  * @param {{ maxLines?: number, measure?: (function(string): number)|null }} [opts]
@@ -148,6 +168,31 @@ export function spreadPositions(positions, factor) {
  * @returns {StatementCard}
  */
 export function statementCard(el, { maxLines, measure } = {}) {
+  let cache = estimatedCards;
+  if (measure) {
+    cache = cardsByMeasure.get(measure);
+    if (!cache) cardsByMeasure.set(measure, (cache = new Map()));
+  }
+  const key = `${el.type}\u0000${el.confidence}\u0000${maxLines ?? ""}\u0000${el.text}`;
+  let card = cache.get(key);
+  if (!card) {
+    if (cache.size >= CARD_CACHE_LIMIT) cache.clear();
+    card = buildCard(el, { maxLines, measure });
+    Object.freeze(card.lines);
+    Object.freeze(card.widths);
+    cache.set(key, Object.freeze(card));
+  }
+  return card;
+}
+
+/**
+ * Works a card out: see {@link statementCard}, which remembers them.
+ *
+ * @param {REElement} el
+ * @param {{ maxLines?: number, measure?: (function(string): number)|null }} opts
+ * @returns {StatementCard}
+ */
+function buildCard(el, { maxLines, measure }) {
   const { fontSize, lineHeight, gap, padX, padY } = STATEMENT_CARD;
   const r = elementRadius(el);
   // `NodeShape`'s principle is 2.2r wide and 1.5r tall; the rest fit in 2r.
@@ -252,8 +297,8 @@ export function cardFootprint(card) {
 /**
  * Positions moved just far enough that no two footprints overlap.
  *
- * Only boxes that collide move, each by half the overlap, along whichever axis
- * needs less — which is what keeps the arrangement the reader knows. Two boxes
+ * Only boxes that collide move, each by a share of the overlap (`PUSH`), along
+ * whichever axis needs less — which is what keeps the arrangement the reader knows. Two boxes
  * an edge runs between are held further apart than the rest (`linkedMargin`):
  * edges stop at a card's border, so the gap between two connected cards is all
  * the edge there is, and at the ordinary margin it was mostly arrowhead.
@@ -280,38 +325,47 @@ export function separateFootprints(
       return { id, f, x: from.x, y: from.y };
     });
 
+  /** Pushes a pair apart if their boxes overlap; says whether it did. */
+  const resolve = (i, j) => {
+    const a = nodes[i];
+    const b = nodes[j];
+    const m = linked?.has(`${a.id}|${b.id}`) ? linkedMargin : margin;
+    const ox =
+      Math.min(a.x + a.f.hw, b.x + b.f.hw) -
+      Math.max(a.x - a.f.hw, b.x - b.f.hw) +
+      m;
+    if (ox <= 0) return false;
+    const oy =
+      Math.min(a.y + a.f.bottom, b.y + b.f.bottom) -
+      Math.max(a.y + a.f.top, b.y + b.f.top) +
+      m;
+    if (oy <= 0) return false;
+    if (ox < oy) {
+      // Ties go by order, so two nodes on one spot still come apart.
+      const s = a.x < b.x || (a.x === b.x && i < j) ? -1 : 1;
+      a.x += s * ox * PUSH;
+      b.x -= s * ox * PUSH;
+    } else {
+      const ay = a.y + (a.f.top + a.f.bottom) / 2;
+      const by = b.y + (b.f.top + b.f.bottom) / 2;
+      const s = ay < by || (ay === by && i < j) ? -1 : 1;
+      a.y += s * oy * PUSH;
+      b.y -= s * oy * PUSH;
+    }
+    return true;
+  };
+
+  // Every pair, for a graph small enough that that is nothing. Past it, only
+  // the pairs a grid says could touch: the pass is otherwise a square in the
+  // number of cards, run on every visible move of a settling layout.
+  const pairsOf =
+    nodes.length < GRID_FROM ? everyPair(nodes.length) : nearPairs(nodes, {
+      margin: Math.max(margin, linked ? linkedMargin : 0),
+    });
+
   for (let it = 0; it < iterations; it++) {
     let moved = false;
-    for (let i = 0; i < nodes.length; i++) {
-      const a = nodes[i];
-      for (let j = i + 1; j < nodes.length; j++) {
-        const b = nodes[j];
-        const m = linked?.has(`${a.id}|${b.id}`) ? linkedMargin : margin;
-        const ox =
-          Math.min(a.x + a.f.hw, b.x + b.f.hw) -
-          Math.max(a.x - a.f.hw, b.x - b.f.hw) +
-          m;
-        if (ox <= 0) continue;
-        const oy =
-          Math.min(a.y + a.f.bottom, b.y + b.f.bottom) -
-          Math.max(a.y + a.f.top, b.y + b.f.top) +
-          m;
-        if (oy <= 0) continue;
-        moved = true;
-        if (ox < oy) {
-          // Ties go by order, so two nodes on one spot still come apart.
-          const s = a.x < b.x || (a.x === b.x && i < j) ? -1 : 1;
-          a.x += (s * ox) / 2;
-          b.x -= (s * ox) / 2;
-        } else {
-          const ay = a.y + (a.f.top + a.f.bottom) / 2;
-          const by = b.y + (b.f.top + b.f.bottom) / 2;
-          const s = ay < by || (ay === by && i < j) ? -1 : 1;
-          a.y += (s * oy) / 2;
-          b.y -= (s * oy) / 2;
-        }
-      }
-    }
+    for (const [i, j] of pairsOf()) if (resolve(i, j)) moved = true;
     if (!moved) break;
   }
 
@@ -370,6 +424,78 @@ export function statementGraph(elements, relations, positions, groups, measure) 
       footprints,
       { linked },
     ),
+  };
+}
+
+/**
+ * How far each of an overlapping pair is pushed, as a share of the overlap.
+ *
+ * Not ½, which parts them exactly: in a chain, parting one pair exactly nudges
+ * its neighbours back into contact, and the pass crept rather than settled —
+ * 30 cards at the canvas's density still overlapping after its 200 passes,
+ * with 1,000 needed to clear them. Parting by half as much again settles the
+ * same cards in a few passes and moves them less far overall, at the price of
+ * gaps up to half an overlap wider than the margin.
+ */
+const PUSH = 0.75;
+
+/**
+ * From how many cards {@link separateFootprints} compares only neighbours.
+ * Below it every pair is compared, as it always was — so a process of the
+ * size anyone has yet lays out exactly as before.
+ */
+const GRID_FROM = 60;
+
+/**
+ * Every pair `[i, j]`, `i < j`, of `n` — the same each pass.
+ *
+ * @param {number} n
+ * @returns {function(): Iterable<[number, number]>}
+ */
+function everyPair(n) {
+  return function* () {
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) yield [i, j];
+  };
+}
+
+/**
+ * The pairs `[i, j]`, `i < j`, whose boxes could overlap, by a grid built
+ * afresh from where the nodes stand at the start of each pass.
+ *
+ * A cell is as wide and as tall as the most two boxes can overlap by, so any
+ * pair that does sits in the same cell or neighbouring ones. Nodes moved
+ * during a pass may come to overlap where the grid did not look; the next
+ * pass's grid does, and the loop ends only after a pass that found nothing.
+ * Within a node's candidates the order is ascending, as {@link everyPair}'s.
+ *
+ * @param {{ x: number, y: number, f: { hw: number, top: number, bottom: number } }[]} nodes
+ * @param {{ margin: number }} opts - The largest margin any pair is held to.
+ * @returns {function(): Iterable<[number, number]>}
+ */
+function nearPairs(nodes, { margin }) {
+  const cellW = 2 * Math.max(...nodes.map((n) => n.f.hw)) + margin;
+  const cellH =
+    Math.max(...nodes.map((n) => n.f.bottom)) -
+    Math.min(...nodes.map((n) => n.f.top)) +
+    margin;
+  return function* () {
+    const cells = new Map();
+    const at = (n) => [Math.floor(n.x / cellW), Math.floor(n.y / cellH)];
+    nodes.forEach((n, i) => {
+      const key = at(n).join(",");
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push(i);
+    });
+    for (let i = 0; i < nodes.length; i++) {
+      const [cx, cy] = at(nodes[i]);
+      const near = [];
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++)
+          for (const j of cells.get(`${cx + dx},${cy + dy}`) ?? [])
+            if (j > i) near.push(j);
+      near.sort((a, b) => a - b);
+      for (const j of near) yield [i, j];
+    }
   };
 }
 

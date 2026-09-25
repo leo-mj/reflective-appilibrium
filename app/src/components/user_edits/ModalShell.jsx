@@ -7,6 +7,7 @@
  * @module components/ModalShell
  */
 
+import { useEffect, useId, useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { FIELD_STYLE, LABEL_STYLE } from "../../constants/modalConstants.js";
@@ -25,11 +26,26 @@ export function FormField({ label, children }) {
 
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
+/** What Tab can land on inside the dialog. */
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /**
  * Centred modal overlay with a standard two-button footer.
  *
  * Clicking the backdrop calls `onCancel`.  The inner box stops propagation so
  * clicks inside do not reach the backdrop.
+ *
+ * **A dialog to a keyboard, too.** It is announced as one (`role="dialog"`,
+ * modal, named by its title), takes the focus when it opens — its first
+ * field, unless a field has focused itself — keeps Tab inside it, closes on
+ * Escape, and hands the focus back to whatever opened it. It did none of
+ * this: a reader revising an element from the text panel by keyboard was left
+ * on the Revise button behind the backdrop, with Tab walking the page under
+ * it and no key to close it. Every add, edit and withdraw form is this shell,
+ * so they all had the same gap. A dropdown inside keeps Escape for itself
+ * while its list is open (`Dropdown` stops it), so Escape there closes the
+ * list and not the dialog.
  *
  * @param {Object}           props
  * @param {string}           props.title        - Bold heading shown at the top of the modal.
@@ -54,6 +70,52 @@ export function ModalShell({
   saveLabel = "Save",
   saveDisabled = false,
 }) {
+  const titleId = useId();
+  const subtitleId = useId();
+  const boxRef = useRef(null);
+  // Whatever had the focus when the dialog opened: read on the first render,
+  // before a field inside can take the focus with `autoFocus`.
+  const [opener] = useState(() =>
+    typeof document === "undefined" ? null : document.activeElement,
+  );
+
+  useEffect(() => {
+    const box = boxRef.current;
+    if (box && !box.contains(document.activeElement))
+      (box.querySelector(FOCUSABLE) ?? box).focus();
+    return () => {
+      if (opener && document.contains(opener)) opener.focus?.();
+    };
+  }, [opener]);
+
+  const onKeyDown = (e) => {
+    if (e.key === "Enter" && e.ctrlKey && !saveDisabled) {
+      e.preventDefault();
+      onSave();
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const stops = [...boxRef.current.querySelectorAll(FOCUSABLE)].filter(
+      (el) => el.offsetParent !== null || el === document.activeElement,
+    );
+    if (!stops.length) return;
+    const first = stops[0];
+    const last = stops.at(-1);
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div
       onClick={onCancel}
@@ -68,13 +130,14 @@ export function ModalShell({
       }}
     >
       <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={subtitle ? subtitleId : undefined}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && e.ctrlKey && !saveDisabled) {
-            e.preventDefault();
-            onSave();
-          }
-        }}
+        onKeyDown={onKeyDown}
         style={{
           background: C.panel,
           border: `1px solid ${C.border}`,
@@ -88,6 +151,7 @@ export function ModalShell({
         }}
       >
         <div
+          id={titleId}
           style={{
             fontSize: 15,
             fontWeight: "bold",
@@ -97,7 +161,7 @@ export function ModalShell({
         >
           {title}
         </div>
-        <div style={{ fontSize: 11, color: C.dim, marginBottom: 24 }}>
+        <div id={subtitleId} style={{ fontSize: 11, color: C.dim, marginBottom: 24 }}>
           {subtitle}
         </div>
 

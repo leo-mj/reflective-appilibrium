@@ -19,13 +19,52 @@ import { defineConfig, devices } from "@playwright/test";
  * second dev server built as "backend", pointed at a backend origin that does
  * not exist — every call to it is answered by `page.route` in the spec, so a
  * real server on localhost:8000 is never reached, and neither is any provider.
+ *
+ * And the `live-backend` project, the one place the SPA meets the FastAPI server
+ * for real: everything else fakes one side of that line — Vitest the network,
+ * the `backend` project the server, pytest the browser — so a request or a
+ * response changed on one side would pass every test. It starts the server
+ * itself (uvicorn, from the repo root) and a dev server built as "backend"
+ * pointed at it, and exercises only what needs no key and calls no third
+ * party: the rethon scoring and simulation routes. Every setting that decides
+ * the server's behaviour is pinned here, so a developer's backend/.env — keys,
+ * tokens, a hosted posture — cannot change what it tests.
  */
 const PORT = 5173;
 const BACKEND_BUILD_PORT = 5174;
+const LIVE_APP_PORT = 5176;
+const LIVE_API_PORT = 8766;
 export const FAKE_BACKEND = "http://backend.e2e.invalid";
 
 /** Specs that need the backend build rather than the demo. */
 const BACKEND_SPECS = /discuss\.spec\.js/;
+/** Specs that need the real server behind that build. */
+const LIVE_SPECS = /live-backend\.spec\.js/;
+
+/**
+ * The projects named with `--project`, or `null` when none are — a full run.
+ *
+ * Read so that a run starts only the servers its projects use: every server
+ * starts for every run otherwise, and since the live-backend project's include
+ * a Python server, one desktop spec was paying for it. Only `--project` is
+ * read. A run narrowed any other way — a spec file, `-g`, `--ui` — starts them
+ * all, as before; and so does a project given by wildcard, rather than guess.
+ *
+ * @param {string[]} argv
+ * @returns {string[]|null}
+ */
+function projectsNamed(argv) {
+  const names = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i].startsWith("--project=")) names.push(argv[i].slice(10));
+    else if (argv[i] === "--project" && argv[i + 1]) names.push(argv[++i]);
+  }
+  return names.length && !names.some((n) => /[*?]/.test(n)) ? names : null;
+}
+const named = projectsNamed(process.argv);
+/** Whether any of these projects is in this run. */
+const running = (...projects) =>
+  !named || projects.some((p) => named.includes(p));
 
 export default defineConfig({
   testDir: "./e2e",
@@ -59,7 +98,7 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
       // responsive.spec.js asserts the narrow layout; running it at 1440px
       // would fail on assertions that are only meaningful on a phone.
-      testIgnore: [/responsive\.spec\.js/, BACKEND_SPECS],
+      testIgnore: [/responsive\.spec\.js/, BACKEND_SPECS, LIVE_SPECS],
     },
     {
       name: "backend",
@@ -69,6 +108,15 @@ export default defineConfig({
         baseURL: `http://localhost:${BACKEND_BUILD_PORT}/`,
       },
       testMatch: BACKEND_SPECS,
+    },
+    {
+      name: "live-backend",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+        baseURL: `http://localhost:${LIVE_APP_PORT}/`,
+      },
+      testMatch: LIVE_SPECS,
     },
     {
       // The narrow layout is a different component tree (AppHeaderNarrow), not
@@ -86,15 +134,16 @@ export default defineConfig({
     },
   ],
 
+  // Each server only for the runs whose projects use it: see `projectsNamed`.
   webServer: [
-    {
+    running("chromium", "mobile") && {
       command: "npm run dev -- --port " + PORT + " --strictPort",
       url: `http://localhost:${PORT}/`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       env: { VITE_APP_ENV: "demo" },
     },
-    {
+    running("backend") && {
       // Not reused locally the way the demo server is: a dev server you already
       // have on this port would carry your own .env, and with it a real backend.
       command: "npm run dev -- --port " + BACKEND_BUILD_PORT + " --strictPort",
@@ -103,5 +152,31 @@ export default defineConfig({
       timeout: 120_000,
       env: { VITE_APP_ENV: "backend", VITE_BACKEND_URL: FAKE_BACKEND },
     },
-  ],
+    running("live-backend") && {
+      // The real FastAPI server, for the live-backend project. `python3`, as
+      // the README's setup has it; CI's e2e job installs backend/requirements.
+      command: `python3 -m uvicorn backend.main:app --port ${LIVE_API_PORT}`,
+      cwd: "..",
+      url: `http://localhost:${LIVE_API_PORT}/api/health`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: {
+        DEPLOYMENT: "local",
+        CORS_ORIGINS: `http://localhost:${LIVE_APP_PORT}`,
+        APP_ACCESS_TOKENS: "",
+        LLM_API_KEYS: "{}",
+        CROSSREF_ENABLED: "false",
+      },
+    },
+    running("live-backend") && {
+      command: "npm run dev -- --port " + LIVE_APP_PORT + " --strictPort",
+      url: `http://localhost:${LIVE_APP_PORT}/`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: {
+        VITE_APP_ENV: "backend",
+        VITE_BACKEND_URL: `http://localhost:${LIVE_API_PORT}`,
+      },
+    },
+  ].filter(Boolean),
 });

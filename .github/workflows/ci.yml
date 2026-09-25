@@ -169,6 +169,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # For the live-backend project, which starts the real FastAPI server and
+      # runs the SPA against it — the one test where the two meet rather than
+      # each meeting a fake of the other. See playwright.config.js.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ../backend/requirements.txt
+
       # Keyed on the lockfile, so a Playwright bump re-downloads and every other
       # run reuses the binary.
       - name: Cache Playwright browser

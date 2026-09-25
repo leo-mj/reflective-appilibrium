@@ -266,6 +266,97 @@ test.describe("Accessibility", () => {
     }
   });
 
+  // The text panel is where a keyboard reads what the graph offers a pointer —
+  // a statement cut short on a card, what an edge says — so everything in it
+  // has to work without one. Two things did not: a section could be folded only
+  // by a click on its header, and a relation selected only by a click on its
+  // row. The native-controls check below could see neither: both were divs.
+  test("the text panel can be worked by keyboard alone", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    await park(page);
+    const panel = page.locator('[data-tutorial="text-panel"]');
+
+    // The search box: named, and visibly focused once reached.
+    const search = panel.getByRole("searchbox", {
+      name: "Search elements and relations",
+    });
+    await search.focus();
+    expect(
+      await search.evaluate((el) => getComputedStyle(el).outlineStyle),
+    ).not.toBe("none");
+    await page.keyboard.type("J1");
+    await expect(search).toHaveValue("J1");
+    // Cleared again: while a search is on, the panel holds every section open.
+    // ControlOrMeta — on a Mac, Control+A only goes to the start of the line.
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.press("Backspace");
+    await expect(search).toHaveValue("");
+
+    // A section folds and unfolds from the keyboard.
+    // Whichever way it starts — the app opens with every section expanded —
+    // Enter folds it and Enter unfolds it again.
+    const args = panel.getByRole("button", { name: /^▼?\s*Arguments/ });
+    const initially = await args.getAttribute("aria-expanded");
+    const flipped = initially === "true" ? "false" : "true";
+    await args.focus();
+    await page.keyboard.press("Enter");
+    await expect(args).toHaveAttribute("aria-expanded", flipped);
+    await page.keyboard.press("Enter");
+    await expect(args).toHaveAttribute("aria-expanded", initially);
+    if (initially === "false") await page.keyboard.press("Enter");
+    await expect(args).toHaveAttribute("aria-expanded", "true");
+
+    // An argument is selected from the keyboard, by the button that says so.
+    // Held by its own name: selecting reorders the panel, and "the first such
+    // button" is then another row.
+    const rowName = await panel
+      .getByRole("button", { name: /^Select (argument|relation):/ })
+      .first()
+      .getAttribute("aria-label");
+    const row = panel.getByRole("button", { name: rowName, exact: true }).first();
+    await row.focus();
+    await page.keyboard.press("Space");
+    await expect(
+      panel.getByRole("button", { name: rowName, exact: true, pressed: true }),
+    ).not.toHaveCount(0);
+
+    // So is an element, by its badge.
+    const badge = panel.getByRole("button", { name: "Select J1" }).first();
+    await badge.focus();
+    await page.keyboard.press("Enter");
+    await expect(badge).toHaveAttribute("aria-pressed", "true");
+
+    // And its card's actions open from the keyboard, and Escape shuts them.
+    // The dialog takes the focus, keeps Tab inside it, and on Escape hands the
+    // focus back to the button that opened it.
+    const revise = panel.getByRole("button", { name: /^Revise/ }).first();
+    await revise.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
+    for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
+    expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(revise).toBeFocused();
+
+    // Nothing in the panel answers a click that a keyboard cannot reach: what
+    // shows a pointer is focusable, or holds something that is. Asked where the
+    // pointer starts — an element showing it whose parent does not — since
+    // everything inside a clickable row inherits the row's cursor.
+    const clickOnly = await panel.evaluate((root) =>
+      [...root.querySelectorAll("*")]
+        .filter((el) => el.offsetWidth > 0 && getComputedStyle(el).cursor === "pointer")
+        .filter((el) => getComputedStyle(el.parentElement).cursor !== "pointer")
+        .filter((el) => el.tabIndex < 0 && !el.closest("button, a[href], input, select, textarea, [tabindex]"))
+        .filter((el) => !el.querySelector("button, a[href], input, select, textarea, [tabindex]"))
+        .map((el) => `${el.tagName}: ${(el.textContent || "").trim().slice(0, 40)}`),
+    );
+    expect(clickOnly, `pointer, no keyboard: ${clickOnly.join(" | ")}`).toEqual([]);
+  });
+
   test("every interactive control is reachable by keyboard", async ({ page }) => {
     await gotoHome(page);
     await loadSample(page);

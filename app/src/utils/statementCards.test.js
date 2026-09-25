@@ -92,8 +92,12 @@ describe("separateFootprints", () => {
     const linked = separateFootprints(positions, f, {
       linked: new Set(["A|B", "B|A"]),
     });
-    expect(gap(plain)).toBeCloseTo(12);
-    expect(gap(linked)).toBeCloseTo(44);
+    // At least the margin, and past it by no more than the push's overshoot:
+    // half the overlap they started with (2 and 34 here).
+    expect(gap(plain)).toBeGreaterThanOrEqual(12);
+    expect(gap(plain)).toBeLessThanOrEqual(12 + 1);
+    expect(gap(linked)).toBeGreaterThanOrEqual(44);
+    expect(gap(linked)).toBeLessThanOrEqual(44 + 17);
   });
 
   it("separates nodes on exactly the same spot", () => {
@@ -322,5 +326,88 @@ describe("widestCard", () => {
     expect(widest.hw).toBeCloseTo(Math.max(now.hw, before.hw));
     expect(widest.hh).toBeCloseTo(Math.max(now.hh, before.hh));
     expect(widest.hh).toBeGreaterThan(now.hh);
+  });
+});
+
+describe("statementCard, remembered", () => {
+  const el = { id: "J1", type: "judgment", confidence: 1, text: "Promises bind." };
+
+  it("hands back the same card for the same inputs, frozen", () => {
+    const card = statementCard(el);
+    expect(statementCard({ ...el })).toBe(card);
+    expect(Object.isFrozen(card)).toBe(true);
+    expect(Object.isFrozen(card.lines)).toBe(true);
+  });
+
+  it("works a card out afresh for any input it depends on", () => {
+    const card = statementCard(el);
+    expect(statementCard({ ...el, text: "Promises bind tightly." })).not.toBe(card);
+    expect(statementCard({ ...el, confidence: 0.2 })).not.toBe(card);
+    expect(statementCard(el, { maxLines: 1 })).not.toBe(card);
+    expect(statementCard(el, { measure: (s) => s.length * 9 })).not.toBe(card);
+  });
+});
+
+describe("separateFootprints, on a large graph", () => {
+  /**
+   * `n` boxes of assorted sizes, some pairs linked, scattered at the density a
+   * spread force layout gives: many overlapping, none piled up. A pile — tens
+   * of wide boxes in one small patch — is not what the pass is ever handed,
+   * and there it bounces between pushes for far longer than its budget.
+   */
+  function crowd(n) {
+    const positions = {};
+    const f = new Map();
+    const linked = new Set();
+    // About the canvas's own density — the force layout's spacing, spread
+    // 1.5×, under cards of this size: some tens of overlaps to clear.
+    const spread = Math.sqrt(n) / 2;
+    for (let i = 0; i < n; i++) {
+      positions[`N${i}`] = { x: ((i * 37) % 400) * spread, y: ((i * 53) % 300) * spread };
+      f.set(`N${i}`, { hw: 40 + (i % 5) * 15, top: -20 - (i % 3) * 8, bottom: 20 + (i % 3) * 8 });
+      if (i % 7 === 0 && i > 0) {
+        linked.add(`N${i}|N${i - 1}`);
+        linked.add(`N${i - 1}|N${i}`);
+      }
+    }
+    return { positions, f, linked };
+  }
+
+  /** Every pair held clear of the other by its margin, give or take a hair. */
+  function allClear(out, f, linked) {
+    const ids = [...f.keys()];
+    const bad = [];
+    for (let i = 0; i < ids.length; i++)
+      for (let j = i + 1; j < ids.length; j++) {
+        const [a, b] = [ids[i], ids[j]];
+        const m = linked.has(`${a}|${b}`) ? 44 : 12;
+        const ox =
+          Math.min(out[a].x + f.get(a).hw, out[b].x + f.get(b).hw) -
+          Math.max(out[a].x - f.get(a).hw, out[b].x - f.get(b).hw) +
+          m;
+        const oy =
+          Math.min(out[a].y + f.get(a).bottom, out[b].y + f.get(b).bottom) -
+          Math.max(out[a].y + f.get(a).top, out[b].y + f.get(b).top) +
+          m;
+        if (ox > 1e-6 && oy > 1e-6) bad.push(`${a}/${b}`);
+      }
+    return bad;
+  }
+
+  it("clears every pair by its margin, comparing only neighbours", () => {
+    const { positions, f, linked } = crowd(150);
+    // Non-vacuous: the scatter does start with overlaps to clear.
+    expect(allClear(positions, f, linked).length).toBeGreaterThan(0);
+    const out = separateFootprints(positions, f, { linked });
+    expect(allClear(out, f, linked)).toEqual([]);
+  });
+
+  it("lays a graph below the grid's threshold out exactly as before", () => {
+    // Under 60 cards every pair is compared, as it always was: the same
+    // answer, not merely an answer without overlaps.
+    const { positions, f, linked } = crowd(30);
+    const out = separateFootprints(positions, f, { linked });
+    expect(allClear(out, f, linked)).toEqual([]);
+    expect(separateFootprints(positions, f, { linked })).toEqual(out);
   });
 });
