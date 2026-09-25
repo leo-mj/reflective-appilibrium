@@ -17,6 +17,11 @@ panel's "use sample suggestions" checkbox passes `useDummy` down to
 `llmClientFactory`, which also falls back to samples whenever `LLM_ENABLED` is false.
 
 Tests: `npm test` (Vitest, jsdom) and `npm run test:e2e` (Playwright — see `e2e/README.md`).
+Both pin `VITE_APP_ENV=demo` (`test.env` in `vite.config.js`, `webServer.env` in
+`playwright.config.js`), so a local `.env` cannot turn the backend on under them:
+a test that needs it says so itself. Unpinned, whole-app renders fired real
+requests at no server, and a failure landing after its file had finished broke
+the run with "Closing rpc while onUserConsoleLog was pending".
 
 ## Key files
 
@@ -434,6 +439,182 @@ taken on an element (revising, withdrawing) deliberately leave it alone, since
 selection dims the rest of the graph.
 
 Tabs: Graph (D3 force-directed), Text, History (slider, 3.2s/round). Node positions stable via shared force simulation on all elements including withdrawn.
+
+**A resize moves the layout; it does not redo it.** `useStablePositions` shifts
+every node by the move of the centre and re-aims the centring forces, without
+reheating the simulation. It used to restart at full heat on any size change
+`useCoarseDims` let through — going full screen is one — and every node spent
+seconds on the move for a layout whose shape nothing had asked to change. Only
+elements, relations or groups changing re-run it.
+
+### Search, on the graph
+
+The text panel's search also lights up the graph: what it does not find fades
+by the selection's own fade, so a search reads as a selection made by typing.
+**The graph lights exactly what the panel lists** — an edge by the panel's test
+for a relation, asked of the relation held in state, and not merely for having
+a found element at one end, which lit edges the panel did not list. In the card
+view the words it found are marked on the card (`SearchMarks` — underlined in
+the panel mark's teal, not bolded: a card is sized to its text, and bold runs
+wider).
+
+- **`REState` holds the query**, passing it to the panel (`search`/`onSearch`;
+  `TextTab` keeps its own when given none) and to the graph.
+- **Only while the panel is on screen.** Full screen hides the search box, and
+  a graph still filtered by a query nobody can see or clear would look broken.
+- **The panel's own tests** (`matchesSearch`, `matchesSearchRel`), so the two
+  cannot disagree about what matches; a collapsed group is found through its
+  members.
+
+### An edge's explanation
+
+Relations carry an `explanation` the graph used to draw nowhere. On the Graph
+tab, **a mouse over an edge — or a tap on one — shows a box** (`RelationLabel`)
+with the relation's type and its explanation, anchored at the edge's midpoint or
+at a joint argument's junction, which gathers its premises' distinct
+explanations. In both views, not only the statement view: an explanation is
+worth reading whether or not the statements are shown. Nothing over a node,
+which answers for itself, and nothing mid-pan.
+
+- **One hit test for click, hover and tap**: `relationAt` in `useGraphClick`,
+  lifted out of the click handler. Joint arguments have no hover area of their
+  own, so a hover on the drawn edges could not have found them; asking the
+  geometry does, and the three cannot disagree about which edge is under the
+  pointer.
+- **Held at one size on screen** by scaling against the zoom: a box zoomed out
+  with the graph would be illegible exactly when the graph is too small to
+  follow without it. Outlined in the edge's colour, written in the text
+  colours — the relation colours are not all legible as type.
+- **The state changes only when the edge does** (`showRel`), so a pointer moving
+  along one re-renders nothing; the box is drawn only while its relation still
+  is. Type names come from `RELATION_LABELS`, which the legend reads too.
+- Not on the History tab, whose canvas does no edge hit-testing.
+
+### Statement view
+
+The card-icon switch above the zoom buttons (`StatementToggle`,
+`StatementCardIcon` — not "Aa", which is the font setting's) draws each element
+as a **card**: the
+node at its usual size as a badge on the left, the wording beside it.
+`hooks/useStatementView.js` is the state and wiring, `utils/statementCards.js`
+the geometry. The Graph and History tabs, by the one switch; the Cluster tab and
+the text panel do not follow it.
+
+**In the History tab** the cards carry the wording each element had in the
+round being played (`asOfRound`), so playback shows statements being revised.
+They are laid out at each card's **largest wording over the whole process**
+(`widestCard`, passed as `layoutCardOf`), so the layout holds still through
+playback: laid out by the round's own wording, every revision would push the
+cards about afresh. That is also why the overlap pass is keyed on the boxes it
+lays out rather than on the wording. Growing on hover and tap is the Graph
+tab's, from the same hook (`hooks/useCardGrowth.js`, `cardAt` for this canvas's
+taps, having no `useGraphClick`); a card not yet added, drawn invisible, answers
+neither.
+
+**The switch is a module store** (`utils/statementViewSetting.js`, remembered
+per browser), because **the Markdown export's graph follows it** — the one view
+setting it does follow. "The graph as you left it" drawn as nodes when the
+reader left it as cards would not be that; the palette, by contrast, is how a
+reader sees the graph, not what it says, and the export keeps ignoring it.
+`REState` reads the switch when Export is pressed and passes `{ statements }` to
+`buildMarkdown`, whose graph section lays the cards out afresh with
+`statementGraph` — the canvas's own spread and push, without the warm start,
+there being no earlier frame. The cluster diagrams stay nodes, as the Clusters
+tab does. A separate "download this view" button came first and was dropped:
+two exports of one graph that disagreed was the problem, not the solution.
+
+`generateGraphSVG` draws a card for any element carrying `card`, fills under
+the edges as on the canvas, and names the page font the cards were measured in.
+**Each line is held to its measured width** (`textLength` from the card's
+`widths`, `lengthAdjust="spacingAndGlyphs"`), so the text fits its box in
+whatever font the file is opened with — naming the font alone left it to
+overflow on a machine without it. Glyphs as well as spacing, so a wider font is
+squeezed a little rather than overlapping its own letters. The canvas needs
+none of this: it draws in the font it measured in. Attribute values go
+through `escAttr`, since a font list read off the page quotes its multi-word
+names. **Every relation type has an arrowhead** — hollow for `entails` and
+`precludes`, filled for the rest, as on the canvas; the four inferential types
+used to have none. Heads are in user space (10 × 10px whatever the line width)
+and anchored at their base, where `arrowGeometry` ends the line, so the tip
+lands on the border.
+
+- **A card, not a node with a label under it.** The first version hung the text
+  under an enlarged node, and two objects per element was the mess. The badge
+  keeps shape for type and size and fill for confidence, so nothing the node
+  said is lost. Text does not fit *inside* a node at any readable size.
+- **Everything reads the card off a display copy** (`card` on the element, never
+  on state). Edges meet it at its border through `boundaryDistance`, clicks
+  land on it through `hitsElement` — ask those rather than `elementRadius`
+  wherever an edge or a pointer meets a node. The rings (`NodeRing`,
+  `PulseRing`) and the off-screen arrows take the box too.
+- **Measured before it is drawn**, because edges need the border before
+  anything is laid out: `utils/textWidth.js` measures on an `OffscreenCanvas`
+  in the font the SVG text inherits (the reader's, from ☰ → Font — the hook
+  watches `<html>`'s style for a change), and lines wrap by that width. An
+  estimate at monospace widths came first and put the last characters on the
+  border, the canvas's monospace running wider than assumed. The estimate
+  survives only where nothing can measure: jsdom, so the tests.
+- **Switching glides** (`useStatementView`, ~320ms, eased): every element from
+  where it stood to where it is going, and pan and zoom to the new framing with
+  them, so the reader follows each node to its card and back. The shapes swap
+  at once; the places move. The departure is taken **at the press**, since by
+  the effect that runs after it the new view's positions are already the
+  answer. `prefers-reduced-motion` gets the jump instead, and so do the tests
+  that look at where things land — they stub `matchMedia`; "gliding between
+  views" drives frames by hand. Progress is clamped at 0, a frame's timestamp
+  being able to precede the glide's start.
+- **Zoomed far out, cards go one line deep** (`compactMaxLines`), below 30%
+  and back above 36% — the gap is so a zoom resting near the line does not
+  flicker. At 30% the 14px text is about 4px on screen, and four lines of it
+  only cover the canvas. It started at 45%, which is about where the fitted
+  view of a few dozen elements opens — so the graph's first view was one line
+  a card, at a size still read. **Laid out full size regardless**: `useStatementView`
+  keeps `cardedEls` for the layout and draws `drawnEls`, so zooming never
+  rearranges the graph — compact cards simply stand further apart.
+- **Room comes from the settled layout, not a new one.** Positions are spread
+  1.5× about their centroid, then only overlapping cards are pushed apart,
+  connected ones to a wider gap so the edge between them has length. The
+  arrangement the reader knows survives the switch both ways.
+- **That pass must stay continuous** (`nextStatementLayout`). Run afresh on every
+  simulation tick, it turned a sub-pixel settle into a minute of jiggling, since
+  a tiny shift can flip which way a pair is pushed. So moves under 2px are not
+  passed on, and a run starts from the last result shifted by how far each node
+  moved. It starts afresh only when the cards or links change.
+- **A withdrawn or rejected card stays readable.** Nodes fade whole for their
+  state; a card faded whole left its wording all but illegible, and reading it
+  is the view's point. So `graphNodeVisuals` hands a card its state as `fade`
+  and keeps `opacity` for a selection's dimming: badge and outline fade (grey or
+  rose, id struck through), the wording turns `C.dim` at full strength, the
+  background stays opaque. The export draws them the same way.
+- **The fill is drawn under the edges** (`CardBackground`), the outline, badge
+  and text over them, with a halo on the text. An opaque card over the edges hid
+  every edge behind it; a translucent one only half-hid them.
+- **A hovered card grows to its whole statement** (`expandedCard`), when four
+  lines cut it short. **The card itself grows** — `Graph` swaps the grown copy
+  in for it and moves it last so it is drawn over its neighbours. A first
+  version laid a second card over the selected one, which doubled every border
+  and tied reading a statement to selecting it, which dims the rest of the
+  graph. It grows from its own top-left corner with the badge and first lines
+  left in place, fills itself, and stays **out of the layout** — a card that
+  pushed its neighbours aside whenever the pointer crossed it would reshuffle
+  the graph under the reader. `useGraphClick` asks it first (`overlay`), so a
+  click on its grown part is a click on it and not on what it covers. Hovering
+  a card opens no hover card; the details that one carried are on the card a
+  click pins. **On a phone a tap grows it** (`onTap` in `useGraphClick`; a tap
+  elsewhere lets it go), and the card's own mouse handlers stand down while the
+  last real pointer was a finger (`lastPointer` in `hooks/useCardGrowth.js`,
+  shared with the History tab, from pointer events, which the
+  mouse a browser emulates after a tap does not raise). That emulation is
+  unreliable enough to shrink a grown card at once — in Chromium it replays a
+  move to wherever the mouse last was. A leave is also ignored while the pointer
+  is still over the card's outline: growing moves the card to the end of the
+  drawing, and moving a node under the pointer is reported as leaving it.
+  `e2e/statement-cards.spec.js` covers both under the `mobile` project. The
+  pinned details card **leaves out the statement** (`NodeTooltip`, on `el.card`),
+  the card beside it already showing it; status, earlier wording, reason,
+  confidence, origin and the actions stay. **Every hovered card answers with a heavier border** (`hovered`
+  on the card, 2.5px against 1.5), grown or not: one whose statement already
+  fits used to do nothing at all under the pointer.
 
 ## Panels the reader sizes
 

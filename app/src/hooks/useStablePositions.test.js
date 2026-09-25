@@ -74,6 +74,26 @@ describe("useStablePositions", () => {
     expect(Math.hypot(after.x - before.x, after.y - before.y)).toBeLessThan(300);
   });
 
+  it("moves the layout to a new centre on a resize rather than redoing it", async () => {
+    // Going full screen used to restart the simulation at full heat, and every
+    // node spent seconds on the move for a layout nothing had asked to change.
+    const state = stateWith(["J1", "J2", "P1"]);
+    const { result, rerender } = renderHook(
+      ({ dims }) => useStablePositions(state, dims),
+      { initialProps: { dims: DIMS } },
+    );
+    await settle();
+    const before = structuredClone(result.current.positions);
+
+    rerender({ dims: { w: 1400, h: 600 } });
+    const after = result.current.positions;
+    // Shifted by the move of the centre, with the shape untouched.
+    for (const id of ["J1", "J2", "P1"]) {
+      expect(after[id].x - before[id].x).toBeCloseTo(300);
+      expect(after[id].y - before[id].y).toBeCloseTo(0);
+    }
+  });
+
   it("stays unready until the fallback timeout fires", () => {
     vi.useFakeTimers();
     const { result } = renderHook(() =>

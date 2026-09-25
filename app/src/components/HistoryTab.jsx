@@ -18,9 +18,14 @@ import {
   ARGUMENT_RELATION_TYPES,
 } from "../utils/stateUtils.js";
 import {
+  CardBackground,
   GraphCanvas,
   OffscreenIndicators,
+  StatementToggle,
 } from "./graphs_shared/GraphElements.jsx";
+import { useStatementView } from "../hooks/useStatementView.js";
+import { cardAt, useCardGrowth } from "../hooks/useCardGrowth.js";
+import { widestCard } from "../utils/statementCards.js";
 import { parallelEdgeOffsets, groupJointArguments } from "../utils/graphHelpers.js";
 import {
   renderEdge,
@@ -67,7 +72,6 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
     zoomOut,
     resetView,
   } = usePan();
-  useAutoFit({ positions, dims, resetView, refitKey: state.elements.length });
   const playback = usePlayback(state.round);
   const { snappedRound } = playback;
 
@@ -88,10 +92,51 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
     [state.elements, snappedRound],
   );
 
-  const elementById = useMemo(
-    () => new Map(elementsNow.map((e) => [e.id, e])),
-    [elementsNow],
+  const visRels = hideNonEntailsRels
+    ? state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type))
+    : state.relations;
+
+  // The statement view, as on the Graph tab and by the same switch: each
+  // element a card, carrying the wording it had in the round being played, so
+  // playback shows statements being revised. Laid out at each card's largest
+  // wording over the whole process (`widestCard`), so the layout holds still
+  // through playback rather than being pushed about at every revision.
+  const stateById = useMemo(
+    () => new Map(state.elements.map((e) => [e.id, e])),
+    [state.elements],
   );
+  const {
+    statements,
+    toggleStatements,
+    drawnEls,
+    positions: viewPositions,
+    measure,
+  } = useStatementView({
+    layoutPositions: positions,
+    visibleEls: elementsNow,
+    visRels,
+    groups: [],
+    dims,
+    resetView,
+    pan,
+    zoom,
+    layoutCardOf: (e, m) => widestCard(stateById.get(e.id) ?? e, m),
+  });
+  const growth = useCardGrowth({ measure, isDragging });
+  const {
+    elements: displayEls,
+    positions: displayPositions,
+    overlay,
+  } = growth.grow(drawnEls, viewPositions);
+  // Not yet added at this round: drawn, faded to nothing, so that it fades in
+  // when its round comes — and so not something a pointer can grow.
+  const inPlay = (e) => (e.addedRound || 1) <= snappedRound;
+
+  // A tap, on a phone: grows the card tapped, as it does on the Graph tab.
+  // This canvas has no click handling of its own, so it spots taps here.
+  const tapFrom = useRef(null);
+
+  const elementById = new Map(displayEls.map((e) => [e.id, e]));
 
   const { withdrawn } = elementsAtRound(state.elements, snappedRound);
   const wIds = new Set(withdrawn.map((e) => e.id));
@@ -109,6 +154,12 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
       : [],
   );
   const sortedLog = [...state.log].sort((a, b) => a.round - b.round);
+  useAutoFit({
+    positions: viewPositions,
+    dims,
+    resetView,
+    refitKey: state.elements.length,
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -120,13 +171,39 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
         pan={pan}
         zoom={zoom}
         isDragging={isDragging}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        onPointerDown={(e) => {
+          growth.notePointer(e);
+          tapFrom.current = { x: e.clientX, y: e.clientY, type: e.pointerType };
+          onPointerDown(e);
+        }}
+        onPointerMove={(e) => {
+          growth.notePointer(e);
+          onPointerMove(e);
+        }}
+        onPointerUp={(e) => {
+          onPointerUp(e);
+          const from = tapFrom.current;
+          tapFrom.current = null;
+          if (!statements || from?.type !== "touch") return;
+          if (Math.hypot(e.clientX - from.x, e.clientY - from.y) > 10) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          growth.tap(
+            cardAt(
+              displayEls.filter(inPlay),
+              displayPositions,
+              overlay,
+              (e.clientX - rect.left - pan.x) / zoom,
+              (e.clientY - rect.top - pan.y) / zoom,
+            ),
+          );
+        }}
         onPointerCancel={onPointerCancel}
         applyWheel={applyWheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}
+        viewControls={
+          <StatementToggle on={statements} onToggle={toggleStatements} />
+        }
         tooltip={tooltip}
         containerStyle={{ flex: 1, minHeight: 0 }}
         overlay={
@@ -140,8 +217,8 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
               />
             )}
             <OffscreenIndicators
-              els={state.elements}
-              positions={positions}
+              els={displayEls.filter(inPlay)}
+              positions={displayPositions}
               pan={pan}
               zoom={zoom}
               dims={dims}
@@ -150,10 +227,27 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
           </>
         }
       >
+        {/* Card fills under the edges, as on the Graph tab. */}
+        {displayEls.map((el) => {
+          const position = displayPositions[el.id];
+          if (!el.card || el.card.expanded || !position) return null;
+          const { opacity, transition } = historyNodeVisuals(
+            el,
+            wIds,
+            newIds,
+            snappedRound,
+          );
+          return (
+            <CardBackground
+              key={el.id}
+              card={el.card}
+              position={position}
+              opacity={opacity}
+              transition={transition}
+            />
+          );
+        })}
         {(() => {
-          const visRels = hideNonEntailsRels
-            ? state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type))
-            : state.relations;
           const { solo, jointGroups } = groupJointArguments(visRels);
           const offsets = parallelEdgeOffsets(solo);
           return (
@@ -161,7 +255,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
               {solo.map((r) =>
                 renderEdge(
                   r,
-                  positions,
+                  displayPositions,
                   elementById,
                   historyEdgeVisuals(r, wIds, snappedRound),
                   offsets.get(r) ?? 0,
@@ -171,7 +265,7 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
                 <React.Fragment key={rels[0].argumentId}>
                   {renderJointArgument(
                     rels,
-                    positions,
+                    displayPositions,
                     elementById,
                     historyEdgeVisuals(rels[0], wIds, snappedRound, rels),
                     palette,
@@ -181,16 +275,19 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
             </>
           );
         })()}
-        {elementsNow.map((el) =>
+        {displayEls.map((el) =>
           renderNode(
             el,
-            positions,
+            displayPositions,
             {
               ...historyNodeVisuals(el, wIds, newIds, snappedRound),
               processTag: processTags.get(el.id),
             },
             isDragging,
             setTooltip,
+            // A card grows under the pointer instead of opening the hover card
+            // — and one not yet added, drawn invisible, answers nothing.
+            el.card ? (inPlay(el) ? growth.hoverFor(el) : {}) : undefined,
           ),
         )}
       </GraphCanvas>

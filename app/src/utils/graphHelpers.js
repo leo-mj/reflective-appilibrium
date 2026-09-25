@@ -44,6 +44,32 @@ export function nodeRadius(type, confidence = 1) {
   return base * (RADIUS_MIN + RADIUS_SPAN * t);
 }
 
+/**
+ * Type size for a node's id.
+ *
+ * Capped by the *smallest* node of that type, not the average one: the id sits
+ * inside the shape, and the shape shrinks to `RADIUS_MIN` (65%) of its base at
+ * zero confidence. The binding case is a three-character id on a judgment
+ * circle, where the room at the glyph's own height is
+ * `2·√(r² − halfHeight²) = 22px` against a width of ~1.65× the font size — which
+ * puts the ceiling at 13. Principles are drawn on a 40px-wide rect and have room
+ * to spare; theories are diamonds, tighter per pixel of radius but never more
+ * than two characters.
+ *
+ * Raising these further means raising {@link RADIUS_MIN},
+ * which costs confidence range. `e2e/palette.spec.js` measures the real glyph
+ * boxes and fails if a label outgrows its shape.
+ *
+ * Shared by the canvas and the SVG export, which draws a statement card's
+ * badge the way the canvas does.
+ *
+ * @param {string} type
+ * @returns {number}
+ */
+export function nodeLabelSize(type) {
+  return type === "principle" ? 16 : 13;
+}
+
 /** How far past its outline a node stays clickable. */
 const HIT_PADDING = 8;
 /** Floor on a touch target, whatever the node's own size. */
@@ -86,6 +112,51 @@ export function elementRadius(el) {
 }
 
 /**
+ * How far from a node's centre its border lies, heading towards `(dx, dy)` —
+ * where an edge leaving that way starts, or one arriving from there ends.
+ *
+ * The node's radius in any direction, except for the statement view's cards
+ * (`card` on a display copy, from `statementCard`), which are wide boxes: an
+ * edge drawn to a radius would stop short of one on its sides and run into it
+ * at top and bottom. Ask this rather than {@link elementRadius} wherever an
+ * edge meets a node.
+ *
+ * @param {REElement & { card?: { hw: number, hh: number } }} el
+ * @param {number} dx
+ * @param {number} dy
+ * @returns {number}
+ */
+export function boundaryDistance(el, dx, dy) {
+  if (!el?.card) return elementRadius(el);
+  const { hw, hh } = el.card;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = Math.abs(dx / len);
+  const uy = Math.abs(dy / len);
+  // No direction at all (two nodes on one spot): any border point will do.
+  if (!ux && !uy) return hh;
+  return Math.min(ux ? hw / ux : Infinity, uy ? hh / uy : Infinity);
+}
+
+/**
+ * Whether a point in simulation coordinates lands on a node drawn at `pos`:
+ * within its hit radius, or on a statement card with the same padding.
+ *
+ * @param {REElement & { card?: { hw: number, hh: number } }} el
+ * @param {Position} pos
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean}
+ */
+export function hitsElement(el, pos, x, y) {
+  if (el?.card)
+    return (
+      Math.abs(x - pos.x) <= el.card.hw + HIT_PADDING / 2 &&
+      Math.abs(y - pos.y) <= el.card.hh + HIT_PADDING / 2
+    );
+  return (pos.x - x) ** 2 + (pos.y - y) ** 2 < elementHitRadius(el) ** 2;
+}
+
+/**
  * Hit-test radius for whatever the graph is drawing at that spot.
  * {@link hitRadius} is to {@link nodeRadius} as this is to {@link elementRadius}.
  *
@@ -97,6 +168,21 @@ export function elementHitRadius(el) {
 }
 
 // ─── Edge styling ─────────────────────────────────────────────────────────────
+
+/**
+ * What each relation type is called on screen — the legend's labels, and the
+ * heading of the box an edge's explanation shows in. One map, so the two
+ * cannot name a type differently.
+ */
+export const RELATION_LABELS = {
+  supports: "Supports",
+  conflicts: "Conflicts",
+  undermines: "Undermines",
+  entails: "Entails",
+  jointly_entails: "Jointly Entails",
+  precludes: "Precludes",
+  jointly_precludes: "Jointly Precludes",
+};
 
 /**
  * SVG stroke-dasharray value for a relation type.
@@ -270,7 +356,8 @@ export function focusFraming(dims) {
  * @param {number}   centX        - Premise centroid x.
  * @param {number}   centY        - Premise centroid y.
  * @param {Position} conclusionPos - Conclusion node centre.
- * @param {number}   tr           - Conclusion node radius.
+ * @param {number}   tr           - Conclusion node radius, or its
+ *   {@link boundaryDistance} towards the premises' centroid.
  * @returns {{ jx: number, jy: number }}
  */
 export function computeJunction(centX, centY, conclusionPos, tr) {

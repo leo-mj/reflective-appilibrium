@@ -399,3 +399,54 @@ describe("buildMarkdown merged processes", () => {
     expect(elementsBlock(md)).not.toContain("process");
   });
 });
+
+describe("buildMarkdown graph, and the statement view", () => {
+  const state = makeState({
+    elements: [
+      makeState().elements[0],
+      {
+        id: "P1",
+        type: "principle",
+        status: "active",
+        confidence: 1,
+        origin: "user",
+        text: "A principle",
+        addedRound: 1,
+      },
+    ],
+    relations: [
+      { from: "J1", to: "P1", type: "entails", explanation: "", addedRound: 1 },
+    ],
+  });
+  const positions = { J1: { x: 0, y: 0 }, P1: { x: 300, y: 0 } };
+
+  /** The SVG embedded in the Graph section. */
+  function graphSvg(md) {
+    const [, b64] = md.match(/## Graph\n\n<img src="data:image\/svg\+xml;base64,([^"]+)"/);
+    return decodeURIComponent(escape(atob(b64)));
+  }
+
+  it("draws nodes when the graph is not showing statements", () => {
+    const svg = graphSvg(buildMarkdown(state, positions, new Set(["graph"])));
+    expect(svg).not.toContain('fill="var(--c-panel)"');
+    expect(svg).not.toContain("Current wording");
+  });
+
+  it("draws cards, wording and all, when it is", () => {
+    const svg = graphSvg(
+      buildMarkdown(state, positions, new Set(["graph"]), { statements: true }),
+    );
+    expect(svg).toContain('fill="var(--c-panel)"');
+    expect(svg).toContain(">Current wording</tspan>");
+    expect(svg).toContain(">A principle</tspan>");
+  });
+
+  it("follows the view for the graph only, not the cluster diagrams", () => {
+    const md = buildMarkdown(state, positions, new Set(["clusters"]), {
+      statements: true,
+    });
+    expect(md).not.toContain("## Graph");
+    const [, b64] = md.match(/data:image\/svg\+xml;base64,([^"]+)"/);
+    expect(decodeURIComponent(escape(atob(b64)))).not.toContain("tspan");
+  });
+});

@@ -4,7 +4,7 @@
 // whose controls are gated on a backend — so in a demo build every visitor
 // landed on a screen of dead buttons with no explanation.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 
 import REState from "./REState.jsx";
 import { SAMPLE_STATE, makeQuestionnaireState } from "../state.js";
@@ -82,6 +82,32 @@ describe("the graph's full-screen toggle", () => {
     // The way out has to be on the graph too, or full screen is a trap.
     fireEvent.click(screen.getByLabelText("Exit full screen"));
     expect(textPanelShown(container)).toBe(true);
+  });
+
+  it("lets the graph show what the panel's search finds, while the panel is there", async () => {
+    // Frames that run: the layout simulation ticks on them, and without it no
+    // node has a position to be drawn at.
+    vi.stubGlobal("requestAnimationFrame", (cb) =>
+      setTimeout(() => cb(performance.now()), 0),
+    );
+    const { container } = open();
+    const nodeOpacity = (id) =>
+      [...container.querySelectorAll('svg > g[transform*="scale"] g[transform^="translate("]')]
+        .find((g) => g.querySelector(":scope > text")?.textContent === id)
+        ?.style.opacity;
+    await waitFor(() => expect(nodeOpacity("P1")).toBeDefined());
+    fireEvent.change(container.querySelector('input[type="search"]'), {
+      target: { value: "J1" },
+    });
+    expect(nodeOpacity("J1")).toBe("1");
+    expect(nodeOpacity("P1")).toBe("0.12");
+
+    // Full screen hides the search box, and with it the search: a graph still
+    // filtered by a query nobody can see or clear would look broken.
+    fireEvent.click(screen.getByLabelText("Full screen"));
+    expect(nodeOpacity("P1")).toBe("1");
+    fireEvent.click(screen.getByLabelText("Exit full screen"));
+    expect(nodeOpacity("P1")).toBe("0.12");
   });
 
   it("stays away when narrow, where the text is a tab of its own", () => {

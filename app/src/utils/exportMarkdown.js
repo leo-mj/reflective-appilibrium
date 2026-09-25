@@ -19,6 +19,8 @@ import { citationMarkdown } from "./citation.js";
 import { sortElementIds, historyOf, reviewsOf } from "./stateUtils.js";
 import { groupsOf } from "./groupUtils.js";
 import { generateGraphSVG, svgToDataUrl } from "./generateSVG.js";
+import { STATEMENT_CARD, statementGraph } from "./statementCards.js";
+import { pageFontFamily, textMeasurer } from "./textWidth.js";
 import { processesOf, processTagMap } from "./mergeStates.js";
 import { buildArgdown } from "./exportArgdown.js";
 
@@ -158,11 +160,40 @@ function processesSection(processes) {
   );
 }
 
-function graphSection(elements, relations, positions, groups, processTags) {
-  const svg = generateGraphSVG(elements, relations, positions, {
-    groups,
-    processTags,
-  });
+/**
+ * The graph as the reader left it — as cards when the Graph tab is showing
+ * statements. That one view setting is followed and no other: a picture drawn
+ * some other way than the reader chose to look at the graph is not the graph
+ * as they left it, while the palette and the like are how *they* read it, not
+ * what it says.
+ *
+ * Laid out afresh (`statementGraph`), so it agrees with the canvas in all but
+ * the few pixels the canvas's warm-started pass may have left a card off.
+ */
+function graphSection(elements, relations, positions, groups, processTags, statements) {
+  // As `generateGraphSVG` would show them — the cards are laid out among the
+  // elements actually drawn, not among withdrawn ones it will drop.
+  const shown = elements.filter((e) => e.status !== "withdrawn");
+  const shownIds = new Set(shown.map((e) => e.id));
+  const shownRels = relations.filter(
+    (r) => shownIds.has(r.from) && shownIds.has(r.to),
+  );
+  const fontFamily = pageFontFamily();
+  const view = statements
+    ? statementGraph(
+        shown,
+        shownRels,
+        positions,
+        groups,
+        textMeasurer(`${STATEMENT_CARD.fontSize}px ${fontFamily}`),
+      )
+    : null;
+  const svg = generateGraphSVG(
+    view?.elements ?? shown,
+    shownRels,
+    view?.positions ?? positions,
+    { groups, processTags, ...(fontFamily && { fontFamily }) },
+  );
   if (!svg) return "";
   return (
     '## Graph\n\n<img src="' + svgToDataUrl(svg) + '" style="max-width:100%"/>'
@@ -332,7 +363,7 @@ export const EXPORT_SECTIONS = [
   {
     key: "graph",
     label: "Graph",
-    detail: "An image of the graph as you left it.",
+    detail: "An image of the graph as you left it — as cards, if it is showing statements.",
     on: true,
   },
   {
@@ -392,12 +423,15 @@ export const DEFAULT_EXPORT_SECTIONS = new Set(
  * @param {REState}    state
  * @param {PositionMap} positions
  * @param {Set<string>} [sections] - Keys of {@link EXPORT_SECTIONS} to write.
+ * @param {{ statements?: boolean }} [view] - Whether the Graph tab is showing
+ *   statements, which the graph section follows.
  * @returns {string}
  */
 export function buildMarkdown(
   state,
   positions,
   sections = DEFAULT_EXPORT_SECTIONS,
+  { statements = false } = {},
 ) {
   const want = (key) => sections.has(key);
   const date = new Date().toISOString().slice(0, 10);
@@ -441,6 +475,7 @@ export function buildMarkdown(
         positions,
         groupsOf(state),
         processTags,
+        statements,
       ),
     want("clusters") && clustersSection(state, positions, processTags),
     want("coherence") && coherenceSection(state.coherence),
@@ -460,9 +495,10 @@ export function buildMarkdown(
  * @param {REState}    state
  * @param {PositionMap} positions
  * @param {Set<string>} [sections] - As for {@link buildMarkdown}.
+ * @param {{ statements?: boolean }} [view] - As for {@link buildMarkdown}.
  */
-export function downloadMarkdown(state, positions, sections) {
-  const markdown = buildMarkdown(state, positions, sections);
+export function downloadMarkdown(state, positions, sections, view) {
+  const markdown = buildMarkdown(state, positions, sections, view);
   const slug = state.topic.slice(0, 30).replace(/\s+/g, "-").toLowerCase();
   const filename = `re-${slug}-round${state.round}.md`;
 

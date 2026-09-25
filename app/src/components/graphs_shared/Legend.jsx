@@ -6,6 +6,7 @@
 import { C } from "../../constants/colors.js";
 import { usePalette } from "../../hooks/useTheme.js";
 import { Tooltip } from "../Tooltip.jsx";
+import { RELATION_LABELS } from "../../utils/graphHelpers.js";
 
 /** The HTML twin of the graph's `ProcessTag`: same pill, same chrome colours. */
 const PROCESS_PILL = {
@@ -47,14 +48,14 @@ export function Legend({
   const e = palette.edges;
   const lines = [
     ...(!hideNonEntailsRels ? [
-      { label: "Supports", color: e.supports, dash: "", key: "supports" },
-      { label: "Conflicts", color: e.conflicts, dash: "8,4", key: "conflicts" },
-      { label: "Undermines", color: e.undermines, dash: "4,4", key: "undermines" },
+      { label: RELATION_LABELS.supports, color: e.supports, dash: "", key: "supports" },
+      { label: RELATION_LABELS.conflicts, color: e.conflicts, dash: "8,4", key: "conflicts" },
+      { label: RELATION_LABELS.undermines, color: e.undermines, dash: "4,4", key: "undermines" },
     ] : []),
-    { label: "Entails", color: e.entails, dash: "", key: "entails" },
-    { label: "Jointly Entails", color: e.jointly_entails, dash: "", key: "jointly_entails" },
-    { label: "Precludes", color: e.precludes, dash: "", key: "precludes" },
-    { label: "Jointly Precludes", color: e.jointly_precludes, dash: "", key: "jointly_precludes" },
+    { label: RELATION_LABELS.entails, color: e.entails, dash: "", key: "entails" },
+    { label: RELATION_LABELS.jointly_entails, color: e.jointly_entails, dash: "", key: "jointly_entails" },
+    { label: RELATION_LABELS.precludes, color: e.precludes, dash: "", key: "precludes" },
+    { label: RELATION_LABELS.jointly_precludes, color: e.jointly_precludes, dash: "", key: "jointly_precludes" },
   ];
 
   const hidden = (key) => hiddenLegendKeys?.has(key) ?? false;

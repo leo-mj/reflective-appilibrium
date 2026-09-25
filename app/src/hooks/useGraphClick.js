@@ -5,8 +5,8 @@
 
 import { useRef } from "react";
 import {
-  elementHitRadius,
-  elementRadius,
+  boundaryDistance,
+  hitsElement,
   arrowGeometry,
   distToSegment,
   distToQuadBezier,
@@ -36,8 +36,115 @@ export function useGraphClick({
   onHullClick,
   hulls = [],
   toSourceRel = (r) => r,
+  overlay = null,
+  onTap,
 }) {
   const clickOrigin = useRef(null);
+
+  /**
+   * The node under a point, if any. `overlay` — the statement view's expanded
+   * card, `{ el, pos }` — is asked first: it is drawn over everything, so a
+   * click on it is a click on it, not on whatever it happens to cover.
+   */
+  const nodeAt = (sx, sy) => {
+    if (overlay && hitsElement(overlay.el, overlay.pos, sx, sy))
+      return overlay.el;
+    return visibleEls.find((el) => {
+      const pos = positions[el.id];
+      return pos && hitsElement(el, pos, sx, sy);
+    });
+  };
+
+  /**
+   * The relation under a point, if any — with the relations it is drawn with
+   * (a joint argument's, or itself alone) and where along the drawing to
+   * anchor anything said about it: the edge's midpoint, or the junction dot.
+   * Uses the geometry the edges are drawn with, threshold 8px.
+   *
+   * @param {number} sx
+   * @param {number} sy
+   * @returns {{ rel: object, rels: object[], x: number, y: number }|null} `rel`
+   *   is what a click selects: the edge itself, a premise's own line, or an
+   *   argument's first relation for its junction and conclusion arrow.
+   */
+  const relationAt = (sx, sy) => {
+    for (const r of visRels) {
+      const sp = positions[r.from], tp = positions[r.to];
+      if (!sp || !tp) continue;
+      const srcEl = elementById.get(r.from);
+      const tgtEl = elementById.get(r.to);
+      const ddx = tp.x - sp.x, ddy = tp.y - sp.y;
+      const { x1, y1, tipX, tipY, perpX, perpY } = arrowGeometry(
+        sp, tp,
+        boundaryDistance(srcEl, ddx, ddy),
+        boundaryDistance(tgtEl, -ddx, -ddy),
+      );
+      const offset = edgeOffsets.get(r) ?? 0;
+      const cx = (x1 + tipX) / 2 + perpX * offset;
+      const cy = (y1 + tipY) / 2 + perpY * offset;
+      const tdx = tipX - cx, tdy = tipY - cy;
+      const tlen = Math.hypot(tdx, tdy) || 1;
+      const bx = tipX - (tdx / tlen) * 10, by = tipY - (tdy / tlen) * 10;
+      if (distToQuadBezier(sx, sy, x1, y1, cx, cy, bx, by) < 8) {
+        // The curve at its middle: ¼, ½, ¼ of its three points.
+        return {
+          rel: r,
+          rels: [r],
+          x: 0.25 * x1 + 0.5 * cx + 0.25 * bx,
+          y: 0.25 * y1 + 0.5 * cy + 0.25 * by,
+        };
+      }
+    }
+
+    // Joint argument hit-test: premise lines, junction dot, conclusion arrow.
+    for (const rels of jointGroups) {
+      const conclusionEl = elementById.get(rels[0].to);
+      const conclusionPos = positions[rels[0].to];
+      if (!conclusionPos || !conclusionEl) continue;
+      const premises = rels
+        .map((r) => ({ r, el: elementById.get(r.from), pos: positions[r.from] }))
+        .filter((d) => d.el && d.pos);
+      if (!premises.length) continue;
+      const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
+      const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
+      const { jx, jy } = computeJunction(
+        centX, centY, conclusionPos,
+        boundaryDistance(conclusionEl, centX - conclusionPos.x, centY - conclusionPos.y),
+      );
+      const tr = boundaryDistance(conclusionEl, jx - conclusionPos.x, jy - conclusionPos.y);
+      const at = (rel) => ({ rel, rels, x: jx, y: jy });
+      // Junction circle
+      if (Math.hypot(sx - jx, sy - jy) < 10) return at(rels[0]);
+      // Premise lines
+      for (const { r, el, pos } of premises) {
+        const dx = jx - pos.x, dy = jy - pos.y;
+        const sr = boundaryDistance(el, dx, dy);
+        const dist = Math.hypot(dx, dy) || 1;
+        const x1 = pos.x + (dx / dist) * sr, y1 = pos.y + (dy / dist) * sr;
+        if (distToSegment(sx, sy, x1, y1, jx, jy) < 8) return at(r);
+      }
+      // Conclusion arrow
+      const adx = conclusionPos.x - jx, ady = conclusionPos.y - jy;
+      const adist = Math.hypot(adx, ady) || 1;
+      const tipX = conclusionPos.x - (adx / adist) * tr;
+      const tipY = conclusionPos.y - (ady / adist) * tr;
+      if (distToSegment(sx, sy, jx, jy, tipX, tipY) < 8) return at(rels[0]);
+    }
+    return null;
+  };
+
+  /**
+   * Screen → simulation coordinates, accounting for pan and zoom.
+   *
+   * @param {React.PointerEvent} e
+   */
+  const toSim = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      sx: (e.clientX - rect.left - pan.x) / zoom,
+      sy: (e.clientY - rect.top - pan.y) / zoom,
+    };
+  };
 
   /**
    * Selects the relation an edge stands for.
@@ -77,24 +184,23 @@ export function useGraphClick({
     )
       return; // drag
 
-    // Convert screen → simulation coordinates (accounting for pan and zoom).
-    const rect = e.currentTarget.getBoundingClientRect();
-    const sx = (e.clientX - rect.left - pan.x) / zoom;
-    const sy = (e.clientY - rect.top - pan.y) / zoom;
+    const { sx, sy } = toSim(e);
 
     if (pointerType === "touch") {
       // Touch: tap shows/dismisses tooltip only — no focus/selection.
-      for (const el of visibleEls) {
-        const pos = positions[el.id];
-        if (!pos) continue;
-        if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < elementHitRadius(el) ** 2) {
-          setTooltip((prev) =>
-            prev?.el?.id === el.id
-              ? null
-              : { x: e.clientX, y: e.clientY - 10, el },
-          );
-          return;
-        }
+      const el = nodeAt(sx, sy);
+      // What a finger has in place of hover: the statement view grows a card
+      // under the pointer, and an edge's explanation shows under it, and a
+      // phone has none. Told of every tap, the background's included, which
+      // is how either is let go of.
+      onTap?.(el ?? null, el ? null : relationAt(sx, sy));
+      if (el) {
+        setTooltip((prev) =>
+          prev?.el?.id === el.id
+            ? null
+            : { x: e.clientX, y: e.clientY - 10, el },
+        );
+        return;
       }
       // Tapped background — clear tooltip.
       setTooltip(null);
@@ -102,91 +208,26 @@ export function useGraphClick({
     }
 
     // Mouse: node hit-test → focus/selection.
-    for (const el of visibleEls) {
-      const pos = positions[el.id];
-      if (!pos) continue;
-      if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < elementHitRadius(el) ** 2) {
-        if (e.ctrlKey || e.metaKey) {
-          onCtrlNodeClick(el.id);
-          onNodeClick?.(null);
-        } else {
-          onSelectRel(() => null);
-          onSelect((prev) => (prev === el.id ? null : el.id));
-          onNodeClick?.(el, e.clientX, e.clientY);
-        }
-        return;
+    const el = nodeAt(sx, sy);
+    if (el) {
+      if (e.ctrlKey || e.metaKey) {
+        onCtrlNodeClick(el.id);
+        onNodeClick?.(null);
+      } else {
+        onSelectRel(() => null);
+        onSelect((prev) => (prev === el.id ? null : el.id));
+        onNodeClick?.(el, e.clientX, e.clientY);
       }
+      return;
     }
 
-    // Edge hit-test (threshold 8 px) — uses the same bezier geometry as rendering.
-    for (const r of visRels) {
-      const sp = positions[r.from], tp = positions[r.to];
-      if (!sp || !tp) continue;
-      const srcEl = elementById.get(r.from);
-      const tgtEl = elementById.get(r.to);
-      const { x1, y1, tipX, tipY, perpX, perpY } = arrowGeometry(
-        sp, tp,
-        elementRadius(srcEl),
-        elementRadius(tgtEl),
-      );
-      const offset = edgeOffsets.get(r) ?? 0;
-      const cx = (x1 + tipX) / 2 + perpX * offset;
-      const cy = (y1 + tipY) / 2 + perpY * offset;
-      const tdx = tipX - cx, tdy = tipY - cy;
-      const tlen = Math.hypot(tdx, tdy) || 1;
-      const bx = tipX - (tdx / tlen) * 10, by = tipY - (tdy / tlen) * 10;
-      if (distToQuadBezier(sx, sy, x1, y1, cx, cy, bx, by) < 8) {
-        onNodeClick?.(null);
-        onSelect(() => null);
-        selectRel(r);
-        return;
-      }
-    }
-
-    // Joint argument hit-test: premise lines, junction dot, conclusion arrow.
-    for (const rels of jointGroups) {
-      const conclusionEl = elementById.get(rels[0].to);
-      const conclusionPos = positions[rels[0].to];
-      if (!conclusionPos || !conclusionEl) continue;
-      const premises = rels
-        .map((r) => ({ r, el: elementById.get(r.from), pos: positions[r.from] }))
-        .filter((d) => d.el && d.pos);
-      if (!premises.length) continue;
-      const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
-      const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
-      const tr = elementRadius(conclusionEl);
-      const { jx, jy } = computeJunction(centX, centY, conclusionPos, tr);
-      // Junction circle
-      if (Math.hypot(sx - jx, sy - jy) < 10) {
-        onNodeClick?.(null);
-        onSelect(() => null);
-        selectRel(rels[0]);
-        return;
-      }
-      // Premise lines
-      for (const { r, el, pos } of premises) {
-        const sr = elementRadius(el);
-        const dx = jx - pos.x, dy = jy - pos.y;
-        const dist = Math.hypot(dx, dy) || 1;
-        const x1 = pos.x + (dx / dist) * sr, y1 = pos.y + (dy / dist) * sr;
-        if (distToSegment(sx, sy, x1, y1, jx, jy) < 8) {
-          onNodeClick?.(null);
-          onSelect(() => null);
-          selectRel(r);
-          return;
-        }
-      }
-      // Conclusion arrow
-      const adx = conclusionPos.x - jx, ady = conclusionPos.y - jy;
-      const adist = Math.hypot(adx, ady) || 1;
-      const tipX = conclusionPos.x - (adx / adist) * tr;
-      const tipY = conclusionPos.y - (ady / adist) * tr;
-      if (distToSegment(sx, sy, jx, jy, tipX, tipY) < 8) {
-        onNodeClick?.(null);
-        onSelect(() => null);
-        selectRel(rels[0]);
-        return;
-      }
+    // Edges, then an expanded group's box.
+    const hit = relationAt(sx, sy);
+    if (hit) {
+      onNodeClick?.(null);
+      onSelect(() => null);
+      selectRel(hit.rel);
+      return;
     }
 
     // Inside an expanded group's box, but on none of its contents. Last of the
@@ -214,5 +255,5 @@ export function useGraphClick({
     onSelectRel(() => null);
   };
 
-  return { onPointerDown, onPointerUp };
+  return { onPointerDown, onPointerUp, nodeAt, relationAt, toSim };
 }

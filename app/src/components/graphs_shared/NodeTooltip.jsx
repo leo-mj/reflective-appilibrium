@@ -26,7 +26,8 @@ import { confidenceDetail } from "../../utils/confidenceLabel.js";
  *
  * Also serves the pseudo-element a collapsed group is drawn as, which has a
  * member list where an element has a statement, and no confidence, origin or
- * round of its own.
+ * round of its own. And a statement card, pinned by a click, which leaves its
+ * statement out: the card beside it already shows it.
  *
  * @param {Object}            props
  * @param {TooltipState|null} props.tooltip - Current tooltip data, or `null` to hide.
@@ -86,7 +87,12 @@ export function NodeTooltip({ tooltip, actions = null }) {
             </div>
           ))}
         </div>
-      ) : (
+      ) : el.card ? null : (
+        // Not for a statement card (`card`, the statement view's display copy):
+        // its wording is the card, one hover away from whole, and this box
+        // repeating it beside the card was the clutter. What is left here —
+        // status, earlier wording, reason, confidence, origin, the actions —
+        // is what the card does not show.
         <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.4 }}>
           {el.text}
         </div>

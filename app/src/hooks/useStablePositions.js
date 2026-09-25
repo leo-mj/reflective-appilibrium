@@ -90,10 +90,17 @@ function groupingForce(groups) {
  * a guaranteed minimum so the UI doesn't stay invisible indefinitely.
  *
  * ### When does the simulation restart?
- * The `useEffect` dependency array is `[elements.length, relations.length, groupSignature,
- * dims.w, dims.h]`. The simulation restarts only when the number of elements/relations
- * changes, a group is created, collapsed or dissolved, or the panel dimensions change —
- * **not** on every re-render — so performance is not a concern.
+ * Only when the number of elements/relations changes, or a group is created,
+ * collapsed or dissolved — **not** on every re-render, so performance is not a
+ * concern.
+ *
+ * ### A resize moves the layout; it does not redo it
+ * A new panel size changes only where the centre is. The nodes are shifted by
+ * however far it moved and the forces re-aimed at it, without reheating the
+ * simulation — which used to restart at full heat and spend seconds with every
+ * node on the move, for a layout whose shape nothing had asked to change. Going
+ * full screen is the case that shows it; the statement view, whose cards are
+ * pushed apart afresh whenever the layout moves, showed it worst.
  *
  * @param {REState} state - Full RE state; all elements and relations are used for layout.
  * @param {Dims}    dims  - Pixel dimensions of the graph panel. The simulation centre is
@@ -115,6 +122,8 @@ export function useStablePositions(state, dims) {
   const posRef = useRef({});
   /** @type {React.RefObject<d3.Simulation|null>} Reference to the running simulation so we can stop it before starting a new one. */
   const simRef = useRef(null);
+  /** @type {React.RefObject<{x: number, y: number}|null>} Where the layout is centred. */
+  const centerRef = useRef(null);
   const [positions, setPositions] = useState({});
   const [ready, setReady] = useState(false);
   const halfWidth = dims.w / 2;
@@ -126,8 +135,45 @@ export function useStablePositions(state, dims) {
     .map((g) => `${g.id}:${g.collapsed ? 1 : 0}:${g.members.join(",")}`)
     .join("|");
 
+  const hasDims = dims.w > 0 && dims.h > 0;
+
+  /** Snapshots node positions into the ref (stable) and state (re-renders). */
+  function publish(nodes) {
+    const p = {};
+    nodes.forEach((n) => {
+      p[n.id] = { x: n.x, y: n.y };
+    });
+    posRef.current = p;
+    setPositions({ ...p });
+  }
+
+  // Declared before the simulation's effect, so that on the render that first
+  // has a size the centre is recorded before the simulation reads it.
   useEffect(() => {
-    if (!dims.w || !dims.h) return;
+    const prev = centerRef.current;
+    centerRef.current = { x: halfWidth, y: halfHeight };
+    const sim = simRef.current;
+    if (!prev || !sim) return;
+    const dx = halfWidth - prev.x;
+    const dy = halfHeight - prev.y;
+    if (!dx && !dy) return;
+    const nodes = sim.nodes();
+    for (const n of nodes) {
+      n.x += dx;
+      n.y += dy;
+    }
+    // Re-aimed without touching alpha: a simulation already at rest stays at
+    // rest, and one still settling carries on from where it was.
+    sim
+      .force("center", d3.forceCenter(halfWidth, halfHeight))
+      .force("x", d3.forceX(halfWidth).strength(0.04))
+      .force("y", d3.forceY(halfHeight).strength(0.04));
+    publish(nodes);
+  }, [halfWidth, halfHeight]);
+
+  useEffect(() => {
+    if (!hasDims) return;
+    const { x: cx, y: cy } = centerRef.current;
     const allEls = state.elements;
     const allRels = state.relations;
     const groups = groupsOf(state);
@@ -154,8 +200,8 @@ export function useStablePositions(state, dims) {
         // process rather than about how the user has filed it, so a pile of
         // exactly coincident nodes there would be unreadable.
         collapsed: collapsedIds.has(e.id),
-        x: prev?.x ?? halfWidth + ((Math.random() - 0.5) * halfWidth) / 10,
-        y: prev?.y ?? halfHeight + ((Math.random() - 0.5) * halfHeight) / 10,
+        x: prev?.x ?? cx + ((Math.random() - 0.5) * cx) / 10,
+        y: prev?.y ?? cy + ((Math.random() - 0.5) * cy) / 10,
         vx: 0,
         vy: 0,
       };
@@ -177,26 +223,18 @@ export function useStablePositions(state, dims) {
           .strength(0.4),
       )
       .force("charge", d3.forceManyBody().strength(-320))
-      .force("center", d3.forceCenter(halfWidth, halfHeight))
+      .force("center", d3.forceCenter(cx, cy))
       .force(
         "collision",
         d3.forceCollide().radius((d) => (d.collapsed ? d.r * 0.4 : d.r + 12)),
       )
       .force("group", groupingForce(groups))
       // Weak restoring forces keep isolated nodes from drifting off-screen.
-      .force("x", d3.forceX(halfWidth).strength(0.04))
-      .force("y", d3.forceY(halfHeight).strength(0.04))
+      .force("x", d3.forceX(cx).strength(0.04))
+      .force("y", d3.forceY(cy).strength(0.04))
       .alphaDecay(0.01);
 
-    // On every tick, snapshot positions into both the ref (stable) and state (triggers re-render).
-    sim.on("tick", () => {
-      const p = {};
-      nodes.forEach((n) => {
-        p[n.id] = { x: n.x, y: n.y };
-      });
-      posRef.current = p;
-      setPositions({ ...p });
-    });
+    sim.on("tick", () => publish(nodes));
 
     // Mark ready when the simulation finishes — or after a guaranteed timeout so
     // the UI never stays invisible indefinitely on slow machines or large graphs.
@@ -213,17 +251,10 @@ export function useStablePositions(state, dims) {
     // Those arrays are rebuilt by every mutation, so depending on them would
     // restart the layout whenever an element's text, confidence, or status
     // changed — scrambling the positions the user is currently reading. Only a
-    // node or edge appearing or disappearing should re-run the simulation.
+    // node or edge appearing or disappearing should re-run the simulation; a
+    // new size is the effect above's business.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    state.elements.length,
-    state.relations.length,
-    groupSignature,
-    dims.w,
-    dims.h,
-    halfWidth,
-    halfHeight,
-  ]);
+  }, [state.elements.length, state.relations.length, groupSignature, hasDims]);
 
   return { positions, ready };
 }

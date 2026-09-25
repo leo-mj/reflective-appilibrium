@@ -80,7 +80,9 @@ export default defineConfig({
       // viewport-and-touch difference the layout code does not distinguish.
       name: "mobile",
       use: { ...devices["iPhone 13"], browserName: "chromium" },
-      testMatch: /responsive\.spec\.js/,
+      // statement-cards.spec.js too, for what a finger does to a card: there
+      // is no hover on a phone, and the card view grows a card on hover.
+      testMatch: /(responsive|statement-cards)\.spec\.js/,
     },
   ],
 

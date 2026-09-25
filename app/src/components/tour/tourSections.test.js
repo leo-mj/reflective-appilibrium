@@ -104,6 +104,21 @@ describe("the tour's shape", () => {
     });
   });
 
+  it("points out the statement view, on any process, as part of the Graph tab", () => {
+    for (const isSample of [true, false]) {
+      const sections = build({ isSample });
+      const order = ids(sections);
+      const statements = sections.find((s) => s.id === "statements");
+      expect(statements, `isSample: ${isSample}`).toBeDefined();
+      expect(statements.target).toBe("statement-toggle");
+      expect(statements.tab).toBe("graph");
+      // Once the Graph tab has been named, and before History, which it says
+      // the switch also holds for.
+      expect(order.indexOf("statements")).toBeGreaterThan(order.indexOf("analyze"));
+      expect(order.indexOf("statements")).toBeLessThan(order.indexOf("history"));
+    }
+  });
+
   it("drops the demo-graph chapter on someone's own process", () => {
     // Those sections name the demo's elements by ID. On another state the IDs
     // mean something else, or nothing.
@@ -167,7 +182,15 @@ describe("the same tour at either width", () => {
   it("only rings what is on screen at that width", () => {
     // There is no tab bar here, so everything the tour points at is either
     // always drawn or inside the ☰ menu — and the menu ones have to open it.
-    const ALWAYS_DRAWN = ["topic", "btn-menu", "graph-add", "text-panel"];
+    // The statement toggle is the graph's own, above its zoom buttons, as the
+    // add buttons are — drawn wherever the graph is.
+    const ALWAYS_DRAWN = [
+      "topic",
+      "btn-menu",
+      "graph-add",
+      "text-panel",
+      "statement-toggle",
+    ];
     narrow()
       .filter((s) => s.target && !ALWAYS_DRAWN.includes(s.target))
       .forEach((s) => {

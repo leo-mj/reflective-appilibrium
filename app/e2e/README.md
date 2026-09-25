@@ -38,6 +38,7 @@ and waits for the port, and `reuseExistingServer` is on outside CI, so a
 | `discuss.spec.js` | the Discuss panel, against a faked backend — runs only under the `backend` project |
 | `questionnaire.spec.js` | questionnaire mode end to end (skips if no spec present) |
 | `responsive.spec.js` | narrow layout — runs only under the `mobile` project |
+| `statement-cards.spec.js` | the Graph tab's card view where only a browser can tell: cards not overlapping, measured text fitting its card, the pointer landing on one, a grown card taking clicks — and, under `mobile`, a tap growing one |
 | `a11y.spec.js` | axe-core audit of the composed pages, keyboard reachability |
 | `known-issues.spec.js` | fixed defects, and open ones asserted to be still open |
 

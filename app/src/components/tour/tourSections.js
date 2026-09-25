@@ -368,6 +368,24 @@ function chromeSections() {
       narrow: { target: "menu-analyze", menu: true },
     },
     {
+      // Here rather than in the chapter on reading the demo graph, which is
+      // dropped on someone's own process: the view is for any process.
+      id: "statements",
+      title: "Reading statements on the graph",
+      body: [
+        "The card button above the zoom controls writes every element's statement onto the graph: each node becomes a card, its shape and fill kept as a badge beside the wording, and the graph is laid out with room for the words.",
+        byLayout(
+          "Hover a card to read a statement too long for it, and hover an arrow to read what its relation says. Zoomed far out, the cards shrink to a line each.",
+          "Tap a card to read a statement too long for it, and tap an arrow to read what its relation says. Zoomed far out, the cards shrink to a line each.",
+        ),
+        "The switch holds for History too, where each card shows the wording of the round being played — and for the graph in an export.",
+      ],
+      target: "statement-toggle",
+      tab: "graph",
+      chrome: true,
+      focus: [],
+    },
+    {
       id: "history",
       title: "History",
       body: [

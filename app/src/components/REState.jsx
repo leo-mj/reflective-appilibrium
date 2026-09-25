@@ -18,6 +18,7 @@ import {
   exportSectionsFor,
 } from "../utils/exportMarkdown.js";
 import { downloadArgdown } from "../utils/exportArgdown.js";
+import { statementViewOn } from "../utils/statementViewSetting.js";
 import {
   completesIteration,
   nextPhaseEnabled,
@@ -307,6 +308,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
 
   const textState =
     tab === "history" ? stateAtRound(viewState, historyRound) : viewState;
+  // The text panel's search, held here so the graph can show what it finds.
+  const [search, setSearch] = useState("");
 
   // Props shared by both the assist-side and analyze-mode TextPanel instances.
   // While the tour is running it says whether the text panel belongs on screen.
@@ -321,6 +324,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         : showText
     : tab === "text";
   const textPanelProps = {
+    search,
+    onSearch: setSearch,
     isWide,
     clusterSectionRef,
     scrollToRelationsKey,
@@ -360,6 +365,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   };
 
   const graphPanelCommonProps = {
+    // What the text panel's search finds lights up on the graph — only while
+    // the panel is there to show the query and clear it. Full screen, a graph
+    // still filtered by a search nobody can see is a graph that looks broken.
+    search: showingTextPanel ? search : "",
     state: viewState,
     // From the state itself: the Merge tab needs the process record whether or
     // not the tags drawn from it are showing.
@@ -519,7 +528,12 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         setTab={handleSetTab}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
-        onDownload={(sections) => downloadMarkdown(state, positions, sections)}
+        onDownload={(sections) =>
+          downloadMarkdown(state, positions, sections, {
+            // The graph section follows the Graph tab's statement view.
+            statements: statementViewOn(),
+          })
+        }
         exportSections={exportSectionsFor(state)}
         onDownloadArgdown={() => downloadArgdown(state)}
         onImportFile={handleImportFile}

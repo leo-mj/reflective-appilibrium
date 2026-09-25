@@ -112,6 +112,8 @@ export function TextTab({
   weights,
   showZScores = false,
   historyView = null,
+  search: searchProp,
+  onSearch,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   /** Whether the list is far enough down for "↑ Top" to be worth showing. */
@@ -126,7 +128,11 @@ export function TextTab({
   const refLog = useRef(null);
 
   // ── State ───────────────────────────────────────────────────────────────
-  const [search, setSearch] = useState("");
+  // Held by `REState` when it gives one, so the graph beside the panel can
+  // light up what the search finds; held here otherwise.
+  const [ownSearch, setOwnSearch] = useState("");
+  const search = searchProp ?? ownSearch;
+  const setSearch = onSearch ?? setOwnSearch;
   const [collapsed, setCollapsed] = useState(DEFAULT_COLLAPSED_SECTIONS);
   /**
    * @type {[Record<string,{delta_account:number,delta_systematicity:number}|null>|null, Function]}

@@ -190,6 +190,40 @@ export function SuggestIcon({ size = "2em" }) {
   );
 }
 
+/**
+ * A statement card: a box, the node as a dot at its left, lines of wording
+ * beside it — what the graph's statement view draws each element as. A picture
+ * of the thing rather than a letter, "Aa" being the font setting's.
+ */
+export function StatementCardIcon({ size = "2em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+      aria-hidden="true"
+    >
+      <rect
+        x="40"
+        y="116"
+        width="432"
+        height="280"
+        rx="48"
+        stroke="currentColor"
+        strokeWidth="32"
+        fill="none"
+      />
+      <circle cx="140" cy="256" r="48" fill="currentColor" />
+      <g stroke="currentColor" strokeWidth="32" strokeLinecap="round">
+        <line x1="232" y1="196" x2="410" y2="196" />
+        <line x1="232" y1="256" x2="410" y2="256" />
+        <line x1="232" y1="316" x2="340" y2="316" />
+      </g>
+    </svg>
+  );
+}
+
 export function JudgmentIcon({ size = "2em" }) {
   return (
     <svg

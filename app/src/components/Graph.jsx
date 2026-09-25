@@ -19,6 +19,10 @@ import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import { useGraphClick } from "../hooks/useGraphClick.js";
+import { useStatementView } from "../hooks/useStatementView.js";
+import { useCardGrowth } from "../hooks/useCardGrowth.js";
+import { pageFontFamily } from "../utils/textWidth.js";
+import { matchesSearch, matchesSearchRel } from "../utils/textTabHelpers.js";
 import {
   elementRadius,
   fitView,
@@ -38,7 +42,10 @@ import {
 import {
   GraphCanvas,
   GroupHull,
+  CardBackground,
+  RelationLabel,
   OffscreenIndicators,
+  StatementToggle,
 } from "./graphs_shared/GraphElements.jsx";
 import { GroupChips } from "./graphs_shared/GroupChips.jsx";
 import {
@@ -435,7 +442,7 @@ function GraphModals({
 export function Graph({
   state,
   hiddenLegendKeys,
-  positions,
+  positions: layoutPositions,
   selected,
   onSelect,
   selectedRel,
@@ -455,6 +462,7 @@ export function Graph({
   hideNonEntailsRels,
   equilibriumPreviewWithdrawnIds,
   focus,
+  search = "",
 }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
@@ -465,6 +473,12 @@ export function Graph({
   // Clicking a node pins its tooltip open with the same actions the text tab
   // offers. It takes precedence over the hover tooltip until dismissed.
   const [pinned, setPinned] = useState(null);
+  // The edge under the pointer, or last tapped, whose explanation shows:
+  // `{ rel, rels, x, y }` from `relationAt`.
+  const [shownRel, setShownRel] = useState(null);
+  /** Changes only when the edge does, so moving along one re-renders nothing. */
+  const showRel = (hit) =>
+    setShownRel((prev) => (prev?.rel === hit?.rel ? prev : hit));
   const [addingElType, setAddingElType] = useState(null);
   const [addingRel, setAddingRel] = useState(false);
   const [addingArg, setAddingArg] = useState(false);
@@ -517,6 +531,36 @@ export function Graph({
       ),
   );
 
+  // ── Pan, and the statement view ───────────────────────────────────────────
+  // Ahead of the groups, since the statement view decides what they are drawn
+  // from: display copies carrying a card each, at positions made room for.
+
+  const {
+    pan,
+    zoom,
+    isDragging,
+    onPointerDown: panDown,
+    onPointerMove,
+    onPointerUp: panUp,
+    onPointerCancel,
+    applyWheel,
+    zoomIn,
+    zoomOut,
+    resetView,
+  } = usePan();
+  const { statements, toggleStatements, drawnEls, positions, measure } =
+    useStatementView({
+      layoutPositions,
+      visibleEls,
+      visRels,
+      groups: groupsOf(state),
+      dims,
+      resetView,
+      pan,
+      zoom,
+    });
+  const growth = useCardGrowth({ measure, isDragging });
+
   // ── Groups ────────────────────────────────────────────────────────────────
   // Everything below this point works on the *projected* graph: a collapsed
   // group is one node, its internal edges are gone, and every edge that crossed
@@ -524,19 +568,29 @@ export function Graph({
   // rather than before it is what keeps the two consistent — a group whose
   // members the legend has hidden has nothing left to stand for.
   const {
-    elements: displayEls,
+    elements: projectedEls,
     relations: displayRels,
     relSource,
-    positions: displayPositions,
+    positions: projectedPositions,
     hulls,
     groupNodes,
   } = projectGroups({
-    elements: visibleEls,
+    elements: drawnEls,
     relations: visRels,
     groups: groupsOf(state),
     positions,
-    radiusOf: elementRadius,
+    // A hull pads by one number on both axes; a card's half-width covers it
+    // sideways and leaves some room over and under.
+    radiusOf: (e) => e?.card?.hw ?? elementRadius(e),
   });
+  // The hovered — or, on a phone, tapped — card grown to its whole statement;
+  // see `hooks/useCardGrowth.js`. Everything below draws and hit-tests these.
+  const {
+    elements: displayEls,
+    positions: displayPositions,
+    overlay,
+  } = growth.grow(projectedEls, projectedPositions);
+
   /** The relation as held in state — see `relSource` in utils/groupUtils. */
   const toSourceRel = (r) => relSource.get(r) ?? r;
   const groupIds = new Set(groupNodes.map((g) => g.id));
@@ -568,40 +622,55 @@ export function Graph({
           ? new Set(selectedArgRels.flatMap((r) => [r.from, r.to]))
           : null;
 
-  const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
-  const dimEdge = (r) => {
-    if (selectedRel) return !selectedArgRelSet.has(r);
-    if (highlightedIds) return !focusSet.has(r.from) && !focusSet.has(r.to);
-    return false;
-  };
-
   const stateElementById = useMemo(
     () => new Map(state.elements.map((e) => [e.id, e])),
     [state.elements],
   );
-  // Group nodes belong here too: edge geometry and hit-testing look their
-  // endpoints up in this map, and a collapsed group is now one of them.
+
+  // What the text panel's search finds, by the panel's own test, so the two
+  // agree on what matches. A collapsed group stands for its members.
+  const query = search.trim();
+  const found = query
+    ? new Set(
+        displayEls
+          .filter((e) =>
+            e.type === "group"
+              ? e.memberIds?.some((id) => {
+                  const m = stateElementById.get(id);
+                  return m && matchesSearch(m, query);
+                })
+              : matchesSearch(e, query),
+          )
+          .map((e) => e.id),
+      )
+    : null;
+
+  // Faded by a selection elsewhere, and by a search that did not find it —
+  // the same fade, so a search reads as a selection made by typing.
+  const dimNode = (id) =>
+    (highlightedIds && !highlightedIds.has(id)) || (found && !found.has(id));
+  const dimEdge = (r) => {
+    if (selectedRel) return !selectedArgRelSet.has(r);
+    if (highlightedIds) return !focusSet.has(r.from) && !focusSet.has(r.to);
+    // Lit exactly when the panel lists it: by the panel's own test for a
+    // relation, and not merely for having a found element at one end — the
+    // graph and the panel show the same relations. Asked of the relation held
+    // in state, which is what the panel lists: an edge into a collapsed group
+    // is drawn from a copy pointed at the group instead.
+    if (found) return !matchesSearchRel(toSourceRel(r), query);
+    return false;
+  };
+
+  // What is drawn goes over what is held: edge geometry and hit-testing look
+  // their endpoints up in this map, so a collapsed group has to be in it, and
+  // so do the statement view's enlarged copies.
   const elementById = new Map(stateElementById);
-  for (const g of groupNodes) elementById.set(g.id, g);
+  for (const e of displayEls) elementById.set(e.id, e);
 
   const { solo: soloRels, jointGroups } = groupJointArguments(displayRels);
   const edgeOffsets = parallelEdgeOffsets(soloRels);
 
-  // ── Pan + click ───────────────────────────────────────────────────────────
-
-  const {
-    pan,
-    zoom,
-    isDragging,
-    onPointerDown: panDown,
-    onPointerMove,
-    onPointerUp: panUp,
-    onPointerCancel,
-    applyWheel,
-    zoomIn,
-    zoomOut,
-    resetView,
-  } = usePan();
+  // ── Click ─────────────────────────────────────────────────────────────────
 
   // The raw positions, not the projected ones: a collapsed group's members keep
   // theirs, so framing still covers the ground the group is standing on — and
@@ -628,7 +697,7 @@ export function Graph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey, dims.w, dims.h, ready]);
 
-  const { onPointerDown, onPointerUp } = useGraphClick({
+  const { onPointerDown, onPointerUp, nodeAt, relationAt, toSim } = useGraphClick({
     panDown,
     panUp,
     visibleEls: displayEls,
@@ -643,6 +712,12 @@ export function Graph({
     onSelect,
     onSelectRel,
     toSourceRel,
+    overlay,
+    // A tap grows a card as hover does; see `useCardGrowth`.
+    onTap: (el, rel) => {
+      growth.tap(el);
+      showRel(rel);
+    },
     setTooltip,
     onNodeClick: (el, clientX, clientY) => {
       // A group is a lid, not a claim. Clicking one opens it — and re-asserts
@@ -702,6 +777,23 @@ export function Graph({
   // A pinned card outlives the click that opened it, so it has to let go when
   // the node underneath stops being drawn — expanding a group from its chip
   // dissolves exactly the node whose members the card is listing.
+  // Once per node: a statement card's background, drawn under the edges, has
+  // to fade exactly as the rest of the card does.
+  const nodeVisuals = new Map(
+    displayEls.map((el) => [
+      el.id,
+      graphNodeVisuals(
+        el,
+        wIds,
+        dimNode,
+        selected,
+        undefined,
+        recentlyAdded,
+        equilibriumPreviewWithdrawnIds,
+      ),
+    ]),
+  );
+
   const pinnedNode =
     pinned && displayEls.some((e) => e.id === pinned.el.id) ? pinned : null;
 
@@ -713,13 +805,31 @@ export function Graph({
         pan={pan}
         zoom={zoom}
         isDragging={isDragging}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
+        onPointerDown={(e) => {
+          growth.notePointer(e);
+          onPointerDown(e);
+        }}
+        onPointerMove={(e) => {
+          growth.notePointer(e);
+          onPointerMove(e);
+          // A mouse over an edge shows what it says; over a node, or panning,
+          // nothing. A finger has `onTap` instead.
+          if (e.pointerType !== "mouse") return;
+          if (isDragging) return showRel(null);
+          const { sx, sy } = toSim(e);
+          showRel(nodeAt(sx, sy) ? null : relationAt(sx, sy));
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") showRel(null);
+        }}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
         applyWheel={applyWheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}
+        viewControls={
+          <StatementToggle on={statements} onToggle={toggleStatements} />
+        }
         tooltip={pinnedNode ?? tooltip}
         tooltipActions={
           // Nothing for a group: revising and withdrawing are things you do to
@@ -822,6 +932,26 @@ export function Graph({
           />
         ))}
 
+        {/* ── Card backgrounds ── */}
+        {/* Under the edges, so that one running behind a statement card is
+            still drawn; the card's outline and text go on top with the nodes. */}
+        {displayEls.map((el) => {
+          const position = displayPositions[el.id];
+          // A grown card fills itself: it lies over its neighbours as well as
+          // over the edges.
+          if (!el.card || el.card.expanded || !position) return null;
+          const { opacity, transition } = nodeVisuals.get(el.id);
+          return (
+            <CardBackground
+              key={el.id}
+              card={el.card}
+              position={position}
+              opacity={opacity}
+              transition={transition}
+            />
+          );
+        })}
+
         {/* ── Edges ── */}
         {soloRels.map((r) =>
           renderEdge(
@@ -850,20 +980,34 @@ export function Graph({
             el,
             displayPositions,
             {
-              ...graphNodeVisuals(
-                el,
-                wIds,
-                dimNode,
-                selected,
-                undefined,
-                recentlyAdded,
-                equilibriumPreviewWithdrawnIds,
-              ),
+              ...nodeVisuals.get(el.id),
               processTag: processTags.get(el.id),
+              // For the card to mark what the search found in its wording.
+              search: query,
             },
             isDragging,
             setTooltip,
+            // A card's hover grows it rather than opening the hover card over
+            // it: the wording is the card, and a second box repeating it was
+            // the clutter. The details the hover card also carried are on the
+            // one a click pins, beside Revise and Withdraw.
+            growth.hoverFor(el),
           ),
+        )}
+        {/* ── What the edge under the pointer says, over everything ── */}
+        {/* Only while the edge is still drawn: one deleted, or hidden by the
+            legend, under a pointer that has not moved since, says nothing. */}
+        {shownRel && displayRels.includes(shownRel.rel) && (
+          <RelationLabel
+            hit={shownRel}
+            zoom={zoom}
+            color={
+              shownRel.rel.status === "withdrawn"
+                ? C.withdrawn
+                : palette.edges[shownRel.rel.type]
+            }
+            fontFamily={pageFontFamily()}
+          />
         )}
       </GraphCanvas>
 
