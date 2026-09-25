@@ -42,9 +42,8 @@ Relation types (all are directional — check both A→B and B→A):
 - supports: A provides positive reason for B (evidential, explanatory, or logical)
 - conflicts: A and B are incompatible; holding both generates contradiction or incoherence
 - undermines: A weakens B without flatly contradicting it; reduces plausibility or confidence
-- depends: A presupposes B; A cannot hold (or loses its grounding) if B is withdrawn
 
-Use ONLY these four types. Formal-inference types such as "entails" or "precludes" \
+Use ONLY these three types. If A presupposes B, record that B supports A. Formal-inference types such as "entails" or "precludes" \
 are recorded elsewhere, by the argument-reconstruction step, and must never appear here.
 
 A single pair can have multiple relations (e.g. P supports J in one respect but undermines it in another). Record each separately.

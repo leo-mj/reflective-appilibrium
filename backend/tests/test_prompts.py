@@ -137,7 +137,7 @@ def test_principles_prompt_separates_judgments_from_principles():
 def test_relation_rules_exclude_argument_relation_types():
     # "entails" validates against RelationType but carries no argument_id, so it
     # would enter the state invisible to argument deduplication.
-    assert "Use ONLY these four types" in RELATION_RULES
+    assert "Use ONLY these three types" in RELATION_RULES
     for banned in ("entails", "precludes"):
         assert banned in RELATION_RULES  # named, as excluded
 

@@ -893,7 +893,7 @@ export function AddBar({
                 // The colour goes on the trigger, so the chevron and the list's
                 // own labels take it too.
                 style={{ ...linkSel, color: C[relationForm.type] }}
-                // 10 for "undermines" and "depends on", the longest offered.
+                // 10 for "undermines", the longest offered.
                 layout={pickerWidth(10)}
               />
               <span style={arrow}>→</span>

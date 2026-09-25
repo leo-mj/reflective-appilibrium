@@ -30,12 +30,13 @@ const RELATION_TYPES = new Set([
   "supports",
   "conflicts",
   "undermines",
-  "depends",
   "entails",
   "precludes",
   "jointly_entails",
   "jointly_precludes",
 ]);
+/** Retired relation types still accepted from older files, and read as another. */
+const LEGACY_RELATION_TYPES = new Set(["depends"]);
 
 // ─── Field validators ─────────────────────────────────────────────────────────
 
@@ -312,19 +313,47 @@ function validateElement(e, i) {
   return result;
 }
 
+/**
+ * `A depends on B` — A presupposes B — as the relation it now is: `B supports
+ * A`. `depends` joined two readings pointing opposite ways (B grounds A; A
+ * entails B), and this is the weaker one and the one in the same family, so
+ * it commits nobody to an entailment they never drew. Silent by design: the
+ * relation reads as though it had always been a support.
+ */
+function migrateDepends(result) {
+  return { ...result, from: result.to, to: result.from, type: "supports" };
+}
+
+/**
+ * Drops a migrated `depends` that lands on a support the state already held
+ * between the same two elements, which is kept as it was.
+ */
+function dropMigratedDuplicates(raw, relations) {
+  const migrated = (i) => raw[i].type === "depends";
+  const key = (r) => `${r.from} ${r.type} ${r.to} ${r.argumentId ?? ""}`;
+  const held = new Set(relations.filter((_, i) => !migrated(i)).map(key));
+  return relations.filter((r, i) => {
+    if (!migrated(i)) return true;
+    if (held.has(key(r))) return false;
+    held.add(key(r));
+    return true;
+  });
+}
+
 function validateRelation(r, i) {
   const ctx = `relations[${i}]`;
   const type = str(r.type, `${ctx}.type`, 20);
-  if (!RELATION_TYPES.has(type))
+  if (!RELATION_TYPES.has(type) && !LEGACY_RELATION_TYPES.has(type))
     throw new Error(`${ctx}.type "${type}" is not valid`);
 
-  const result = {
+  let result = {
     from: str(r.from, `${ctx}.from`, 10),
     to: str(r.to, `${ctx}.to`, 10),
     type,
     explanation: str(r.explanation ?? "", `${ctx}.explanation`, 2_000),
     addedRound: num(r.addedRound, `${ctx}.addedRound`),
   };
+  if (type === "depends") result = migrateDepends(result);
 
   if (r.status != null) {
     const s = str(r.status, `${ctx}.status`, 20);
@@ -432,7 +461,10 @@ export function validateState(raw) {
     phase: typeof raw.phase === "number" ? num(raw.phase, "phase") : 2,
     round: num(raw.round, "round"),
     elements: arr(raw.elements, "elements", 1_000).map(validateElement),
-    relations: arr(raw.relations, "relations", 5_000).map(validateRelation),
+    relations: dropMigratedDuplicates(
+      raw.relations,
+      arr(raw.relations, "relations", 5_000).map(validateRelation),
+    ),
     coherence: {
       tensions: arr(coherenceRaw.tensions ?? [], "coherence.tensions", 200).map(
         (s, i) => str(s, `coherence.tensions[${i}]`, 500),
@@ -529,7 +561,7 @@ export async function importStateFromFile(file) {
   const openIdx = text.indexOf(OPEN);
   if (openIdx === -1)
     throw new Error(
-      "No re-state block found. Make sure the file was exported from this app.",
+      "This file has no full history, so the process cannot be read from it. Export it again with “Full history” ticked.",
     );
   const lineEnd = text.indexOf("\n", openIdx + OPEN.length);
   if (lineEnd === -1)

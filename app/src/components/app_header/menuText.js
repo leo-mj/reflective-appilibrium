@@ -38,7 +38,7 @@ export const MENU_TOOLTIPS = {
   llm: "Your provider, model and API key.",
   privacy: "What leaves your browser, and what is kept.",
   weights: "What the rethon simulation optimises for.",
-  relations: "Adds supports, conflicts, undermines and depends.",
+  relations: "Adds supports, conflicts and undermines.",
   checker: "Detected arguments are tested for validity first.",
   processTags: "Letters marking which merged process each element came from.",
   font: "Includes a face drawn for dyslexic readers.",
@@ -46,10 +46,10 @@ export const MENU_TOOLTIPS = {
   contrast: "Stronger node colours, AAA throughout.",
   navBar: "Section links and search, in the text panel.",
   cards: "Every card in the text panel, open or closed.",
-  import: "Read a state back from a file.",
-  merge: "Add another exported process to this one, as one round.",
+  import: "Read a state back from a file, or an Argdown argument map.",
+  merge: "Add another exported process or Argdown map to this one, as one round.",
   mergeSample: "Merge a second sample process into this one, to try the feature.",
-  export: "Write the whole process out to a file.",
+  export: "Write the process out to a file, choosing what goes in.",
 };
 
 /** Headings over the menu's blocks, in the order they appear. */

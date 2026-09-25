@@ -149,7 +149,7 @@ describe("importStateFromFile — block extraction errors", () => {
   it("rejects a file with no re-state block", async () => {
     const file = makeFile("# Just markdown\n\nNo state block here.");
     await expect(importStateFromFile(file)).rejects.toThrow(
-      "No re-state block found",
+      "This file has no full history",
     );
   });
 
@@ -420,7 +420,7 @@ describe("importStateFromFile — block extraction edge cases", () => {
   it("rejects a file whose only code block is a different language", async () => {
     const file = makeFile("```json\n{}\n```\n");
     await expect(importStateFromFile(file)).rejects.toThrow(
-      "No re-state block found",
+      "This file has no full history",
     );
   });
 });
@@ -623,6 +623,52 @@ describe("importStateFromFile — relation: argumentId", () => {
     await expect(
       importStateFromFile(makeFile(wrapInMarkdown(state))),
     ).rejects.toThrow(/argumentId/);
+  });
+});
+
+describe("importStateFromFile — relation: retired depends", () => {
+  const importRels = (relations) =>
+    importStateFromFile(makeFile(wrapInMarkdown({ ...MINIMAL_STATE, relations })));
+  const depends = {
+    from: "J1",
+    to: "P1",
+    type: "depends",
+    explanation: "The verdict presupposes the principle.",
+    addedRound: 2,
+  };
+
+  it("reads A depends on B as B supports A, and says nothing of it", async () => {
+    const state = await importRels([depends]);
+    expect(state.relations).toEqual([
+      {
+        from: "P1",
+        to: "J1",
+        type: "supports",
+        explanation: "The verdict presupposes the principle.",
+        addedRound: 2,
+      },
+    ]);
+    expect(state.log).toEqual([]);
+  });
+
+  it("keeps status and history through the reversal", async () => {
+    const history = [{ round: 3, type: "withdrawn" }];
+    const [rel] = (
+      await importRels([{ ...depends, status: "withdrawn", history }])
+    ).relations;
+    expect(rel).toMatchObject({ type: "supports", status: "withdrawn", history });
+  });
+
+  it("drops one that lands on a support the state already holds", async () => {
+    const held = {
+      from: "P1",
+      to: "J1",
+      type: "supports",
+      explanation: "Held.",
+      addedRound: 1,
+    };
+    const { relations } = await importRels([depends, held]);
+    expect(relations).toEqual([held]);
   });
 });
 

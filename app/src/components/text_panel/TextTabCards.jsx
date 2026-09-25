@@ -18,7 +18,7 @@ import {
   cardDivider,
   cardActions,
 } from "../../constants/textTabStyles.js";
-import { relationTypeLabel, statusTag } from "../../utils/stateUtils.js";
+import { statusTag } from "../../utils/stateUtils.js";
 import { groupOfElement } from "../../utils/groupUtils.js";
 import { processesOf, processesOfElement } from "../../utils/mergeStates.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
@@ -486,7 +486,7 @@ export function RelationCard({ r, dim }) {
         <div style={cardIdentity}>
           <Badge id={r.from} />
           <span style={{ color: C[r.type], fontSize: 11, fontWeight: "bold" }}>
-            → {relationTypeLabel(r.type)} →
+            → {r.type} →
           </span>
           <Badge id={r.to} />
         </div>

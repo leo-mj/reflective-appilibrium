@@ -42,6 +42,32 @@ describe("buildArgdown", () => {
     expect(ad).toMatch(/^===\ntitle: "Lying"\n/);
   });
 
+  it("writes groups under their own heading, apart from the type headings", () => {
+    const ad = buildArgdown(
+      makeState({
+        relations: [{ from: "P1", to: "J2", type: "supports", explanation: "" }],
+        groups: [
+          { id: "G1", label: "Deception", members: ["P1", "J2"], collapsed: true },
+          { id: "G2", label: "Harm", members: ["P2", "T1"], collapsed: false },
+        ],
+      }),
+    );
+    // Members in type order, each still carrying its own relations.
+    expect(ad).toContain(
+      "# Groups {isGroup: false}\n\n## Deception {isClosed: true}\n\n[J2]: Lying for profit is wrong.",
+    );
+    expect(ad).toContain("## Harm\n\n[P2]:");
+    expect(ad).toContain("[P1]: Never lie. #principle");
+    expect(ad).toContain("  +> [J2] // supports");
+    expect(ad.indexOf("# Groups")).toBeLessThan(ad.indexOf("# Judgments"));
+    // The rest stay under type headings Argdown's maps are told not to box.
+    expect(ad).toContain("# Judgments {isGroup: false}\n\n[J1]:");
+    // Both principles and the theory are grouped, so their type headings go.
+    expect(ad).not.toContain("# Principles");
+    expect(ad).not.toContain("# Background theories");
+    expect(ad.match(/\[P1\]:/g)).toHaveLength(1);
+  });
+
   it("tags a non-active status and leaves possible elements out", () => {
     const ad = buildArgdown(
       makeState({
@@ -63,14 +89,12 @@ describe("buildArgdown", () => {
           { from: "P1", to: "J2", type: "supports", explanation: "direct" },
           { from: "P1", to: "J1", type: "conflicts" },
           { from: "T1", to: "P2", type: "undermines" },
-          { from: "P2", to: "T1", type: "depends" },
         ],
       }),
     );
     expect(ad).toContain("  +> [J2] // supports: direct");
     expect(ad).toContain("  -> [J1] // conflicts");
     expect(ad).toContain("  -> [P2] // undermines");
-    expect(ad).toContain("  +> [T1] // depends");
   });
 
   it("keeps withdrawn relations as comments only", () => {

@@ -5,7 +5,9 @@ import { renderHook, act } from "@testing-library/react";
 import { useREActions } from "./useREActions.js";
 import { textAtRound, isWithdrawnNow } from "../utils/stateUtils.js";
 
-vi.mock("../utils/importMarkdown.js", () => ({
+// The real validator stays: the Argdown reader validates what it builds with it.
+vi.mock("../utils/importMarkdown.js", async (importOriginal) => ({
+  ...(await importOriginal()),
   importStateFromFile: vi.fn(),
 }));
 import { importStateFromFile } from "../utils/importMarkdown.js";
@@ -350,7 +352,7 @@ describe("handleAddRelation", () => {
     // Adding with select=false should leave recentlyAddedRel unchanged
     act(() => {
       result.current.handleAddRelation(
-        { from: "J1", to: "P1", type: "depends", explanation: "" },
+        { from: "J1", to: "P1", type: "undermines", explanation: "" },
         { select: false },
       );
     });
@@ -934,7 +936,7 @@ describe("handleWithdrawRelRequest", () => {
 
   it("does not clear selectedRel when a different relation is selected", () => {
     const rel1 = makeRel({ from: "J1", to: "P1" });
-    const rel2 = makeRel({ from: "P1", to: "J1", type: "depends" });
+    const rel2 = makeRel({ from: "P1", to: "J1", type: "undermines" });
     const state = baseState({ relations: [rel1, rel2] });
     const { result } = renderHook(() => useREActions(state));
     act(() => result.current.handleSelectRel(result.current.state.relations[1]));
@@ -1040,7 +1042,7 @@ describe("handleRejectRelations", () => {
     act(() => {
       result.current.handleRejectRelations([
         { from: "J1", to: "P1", type: "conflicts", explanation: "x" },
-        { from: "P1", to: "J1", type: "depends", explanation: "y" },
+        { from: "P1", to: "J1", type: "undermines", explanation: "y" },
       ]);
     });
     expect(result.current.state.log[0].findings).toContain("2 relation suggestions rejected");
@@ -1450,6 +1452,36 @@ describe("handleImportFile", () => {
     expect(result.current.canUndo).toBe(false);
     expect(result.current.selected).toBeNull();
     expect(result.current.selectedRel).toBeNull();
+  });
+
+  it("reads an .argdown file as an argument map, not as an exported state", async () => {
+    importStateFromFile.mockClear();
+    const { result } = renderHook(() => useREActions(baseState()));
+    const map =
+      "[a]: Lying is wrong. #principle\n  -> [b]\n\n[b]: This lie is fine.\n";
+    await act(async () => {
+      await result.current.handleImportFile(new File([map], "paper.argdown"));
+    });
+    expect(importStateFromFile).not.toHaveBeenCalled();
+    expect(result.current.state.topic).toBe("paper");
+    expect(result.current.state.elements.map((e) => e.id)).toEqual([
+      "P1",
+      "J1",
+    ]);
+    expect(result.current.state.relations).toMatchObject([
+      { from: "P1", to: "J1", type: "conflicts" },
+    ]);
+  });
+  it("prepares an Argdown map for merging, labelled without its extension", async () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    let prepared;
+    await act(async () => {
+      prepared = await result.current.handlePrepareMerge(
+        new File(["[a]: A claim from my paper."], "my-paper.argdown"),
+      );
+    });
+    expect(prepared.label).toBe("my-paper");
+    expect(prepared.incoming.elements).toHaveLength(1);
   });
 });
 

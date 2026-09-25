@@ -7,6 +7,7 @@
 
 import { useState, useReducer } from "react";
 import { importStateFromFile } from "../utils/importMarkdown.js";
+import { importArgdownFromFile, isArgdownFile } from "../utils/importArgdown.js";
 import {
   assertMergeable,
   mergeStates,
@@ -171,8 +172,12 @@ export function useREActions(initialState) {
     setRecentlyAdded,
   });
 
+  /** An exported process, or an Argdown map read into a fresh one. */
+  const readStateFile = (file) =>
+    isArgdownFile(file) ? importArgdownFromFile(file) : importStateFromFile(file);
+
   const handleImportFile = async (file) => {
-    const newState = await importStateFromFile(file);
+    const newState = await readStateFile(file);
     dispatch({ type: "replace", state: newState });
     setSelected(null);
     setSelectedRel(null);
@@ -186,9 +191,9 @@ export function useREActions(initialState) {
    * @returns {Promise<{ incoming: Object, label: string, preview: ReturnType<typeof previewMerge> }>}
    */
   const handlePrepareMerge = async (file) => {
-    const incoming = await importStateFromFile(file);
+    const incoming = await readStateFile(file);
     assertMergeable(state, incoming);
-    const label = file.name.replace(/\.md$/i, "");
+    const label = file.name.replace(/\.(md|argdown|ad)$/i, "");
     return { incoming, label, preview: previewMerge(state, incoming, { label }) };
   };
 

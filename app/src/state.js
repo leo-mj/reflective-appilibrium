@@ -49,7 +49,7 @@ const _inlineState = {
   ],
   relations: [
     // { from: "J1", to: "P1", type: "supports", explanation: "...", addedRound: 1 },
-    // types: "supports", "conflicts", "undermines", "depends",
+    // types: "supports", "conflicts", "undermines",
     //        "entails", "precludes", "jointly_entails", "jointly_precludes"
     // Argument relations share an argumentId; relations take `history` too.
   ],

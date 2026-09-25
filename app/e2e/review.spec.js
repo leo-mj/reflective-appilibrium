@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoHome, loadSample, showView, park, openMenu } from "./helpers.js";
+import { gotoHome, loadSample, showView, park, exportDownload } from "./helpers.js";
 
 /**
  * Demo mode, so the Review tab serves the pre-set example reading rather than
@@ -127,11 +127,7 @@ test.describe("Process review", () => {
   test("the export carries the reviews", async ({ page }) => {
     await acceptTwo(page);
 
-    await openMenu(page);
-    const [download] = await Promise.all([
-      page.waitForEvent("download"),
-      page.locator('button:text-is("Export")').click(),
-    ]);
+    const download = await exportDownload(page);
     const stream = await download.createReadStream();
     const markdown = (await stream.toArray()).join("");
 

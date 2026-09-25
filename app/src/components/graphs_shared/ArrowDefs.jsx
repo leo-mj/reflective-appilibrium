@@ -36,7 +36,7 @@ export function ArrowDefs({ prefix }) {
   const palette = usePalette();
   return (
     <defs>
-      {["supports", "conflicts", "undermines", "depends", "entails", "precludes", "jointly_entails", "jointly_precludes"].map((t) =>
+      {["supports", "conflicts", "undermines", "entails", "precludes", "jointly_entails", "jointly_precludes"].map((t) =>
         [false, true].map((w) => (
           <marker
             key={`${prefix}-${t}-${w}`}

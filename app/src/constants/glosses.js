@@ -18,7 +18,7 @@
  * words the reader has met on the tabs, in the legend and on the nodes, and a
  * sentence apiece under a picker offering three of them is noise where the
  * words are doing the work. Relation types are the opposite case: "undermines"
- * and "depends on" are not guessable from the label.
+ * is not guessable from the label.
  *
  * The wording follows the domain model in the root CLAUDE.md. Keep each to a
  * single clause: it is a line in a row, not the documentation.
@@ -29,7 +29,7 @@
 /** @import { REElement } from '../types.js' */
 
 /**
- * The six types a two-endpoint picker offers: the dialectical four, then the
+ * The five types a two-endpoint picker offers: the dialectical three, then the
  * single-premise inferential pair. The joint forms are absent for the reason
  * they are absent from the picker — they need more than one premise, so they
  * are made in the argument panels, where {@link ARGUMENT_GLOSS} covers them.
@@ -40,7 +40,6 @@ export const RELATION_GLOSS = {
   supports: "From provides a positive reason for To",
   conflicts: "From and To are incompatible",
   undermines: "From weakens To without flatly contradicting it",
-  depends: "From presupposes To",
   entails: "From entails To",
   precludes: "From entails the negation of To",
 };

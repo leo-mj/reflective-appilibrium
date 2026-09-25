@@ -20,7 +20,7 @@ const RELATION_ROWS = relationTypeOptions({ capitalized: true });
  * @typedef {Object} AddRelationFormData
  * @property {string} from
  * @property {string} to
- * @property {'supports'|'conflicts'|'undermines'|'depends'|'entails'|'precludes'} type
+ * @property {'supports'|'conflicts'|'undermines'|'entails'|'precludes'} type
  * @property {string} explanation
  */
 

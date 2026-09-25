@@ -256,7 +256,7 @@ function graphSections() {
       id: "menu-files",
       title: "Saving your progress",
       body: [
-        "Nothing you do here is stored on a server, so closing the tab is the end of the process. Export writes it out as a Markdown file instead — every element and relation, the round-by-round log, and the graph's layout — and Import reads one back, yours or one someone sent you.",
+        "Nothing you do here is stored on a server, so closing the tab is the end of the process. Export writes it out as a Markdown file instead, with the sections you pick — elements and relations, the round-by-round log, the graph, an Argdown map — and Import reads one back, yours or one someone sent you, as long as it carries the full history.",
         "Both are in the ☰ menu, open beside this card, along with the settings. Hover any entry to find out what it does.",
       ],
       target: "menu-files",

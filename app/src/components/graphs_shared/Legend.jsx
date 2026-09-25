@@ -50,7 +50,6 @@ export function Legend({
       { label: "Supports", color: e.supports, dash: "", key: "supports" },
       { label: "Conflicts", color: e.conflicts, dash: "8,4", key: "conflicts" },
       { label: "Undermines", color: e.undermines, dash: "4,4", key: "undermines" },
-      { label: "Depends on", color: e.depends, dash: "", key: "depends" },
     ] : []),
     { label: "Entails", color: e.entails, dash: "", key: "entails" },
     { label: "Jointly Entails", color: e.jointly_entails, dash: "", key: "jointly_entails" },

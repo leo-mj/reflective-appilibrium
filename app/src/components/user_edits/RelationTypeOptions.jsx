@@ -11,7 +11,6 @@ const DIALECTICAL = [
   ["supports", "supports"],
   ["conflicts", "conflicts"],
   ["undermines", "undermines"],
-  ["depends", "depends on"],
 ];
 
 const ARGUMENT = [
@@ -24,12 +23,12 @@ const capitalize = (s) => s[0].toUpperCase() + s.slice(1);
 /**
  * The relation types a two-endpoint form can express, grouped so the
  * formal-inference pair reads as a different kind of thing from the dialectical
- * four. `jointly_entails`/`jointly_precludes` are absent by design: they need
+ * three. `jointly_entails`/`jointly_precludes` are absent by design: they need
  * more than one premise, so they come from the argument panels instead.
  *
- * Each carries its one-line gloss as the row's `detail` — six terms of art
- * offered as bare words, of which "undermines" and "depends on" are the pair no
- * one guesses from the label. See {@link module:constants/glosses}.
+ * Each carries its one-line gloss as the row's `detail` — five terms of art
+ * offered as bare words, of which "undermines" is the one no one guesses from
+ * the label. See {@link module:constants/glosses}.
  *
  * @param {Object}  [options]
  * @param {boolean} [options.capitalized] - Title-case labels, to match modal styling.

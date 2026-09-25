@@ -21,6 +21,7 @@ vi.mock("../config.js", async (importOriginal) => ({
 import { AppHeader } from "./AppHeader.jsx";
 import { TAB_LABELS } from "../constants/tabConstants.jsx";
 import { TOUR_Z } from "./tour/tourZ.js";
+import { EXPORT_SECTIONS } from "../utils/exportMarkdown.js";
 
 afterEach(() => {
   cleanup();
@@ -139,6 +140,58 @@ describe("model weights", () => {
       const row = (name) => screen.getByRole("button", { name });
       expect(row(/Model weights/).style.color).toBe(row(/Privacy/).style.color);
       expect(row(/Model weights/).style.color).not.toBe("");
+    });
+  }
+});
+
+describe("export", () => {
+  // Export asks what to write before writing anything.
+  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+  const sections = EXPORT_SECTIONS.filter((s) => !s.has);
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+
+    it(`opens the section picker from the ${layout} menu, and downloads on its button`, () => {
+      localStorage.clear();
+      const onDownload = vi.fn();
+      render(
+        <AppHeader
+          {...PROPS}
+          onDownload={onDownload}
+          exportSections={sections}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      fireEvent.click(screen.getByRole("button", { name: /Export/ }));
+      expect(onDownload).not.toHaveBeenCalled();
+      expect(screen.getByRole("group", { name: "Sections to export" })).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Download" }));
+      expect(onDownload).toHaveBeenCalledTimes(1);
+      expect([...onDownload.mock.calls[0][0]]).toContain("history");
+      expect(screen.queryByRole("group", { name: "Sections to export" })).toBeNull();
+    });
+
+    it(`downloads the .argdown file from the same dialog (${layout})`, () => {
+      const onDownload = vi.fn();
+      const onDownloadArgdown = vi.fn();
+      render(
+        <AppHeader
+          {...PROPS}
+          onDownload={onDownload}
+          onDownloadArgdown={onDownloadArgdown}
+          exportSections={sections}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      fireEvent.click(screen.getByRole("button", { name: /Export/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Download .argdown" }));
+      expect(onDownloadArgdown).toHaveBeenCalledTimes(1);
+      expect(onDownload).not.toHaveBeenCalled();
+      expect(screen.queryByRole("group", { name: "Sections to export" })).toBeNull();
     });
   }
 });

@@ -19,7 +19,7 @@ import {
 
 const PADDING = 70; // px of whitespace around the bounding box
 const M = "x"; // marker-id prefix — avoids collisions if multiple SVGs land in one doc
-const REL_TYPES = ["supports", "conflicts", "undermines", "depends"];
+const REL_TYPES = ["supports", "conflicts", "undermines"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

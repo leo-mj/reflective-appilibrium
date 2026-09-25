@@ -118,7 +118,7 @@ the judgments being added, not the arrows the argument becomes.
 they double as general UI accents (a primary button's teal, a reject's orange)
 and must not move when the graph's palette does.
 
-The accessible set is the same six hues moved into the luminance band that is
+The accessible set is the same five hues moved into the luminance band that is
 legible on both canvases *and* as type on the header chip: roughly 0.175–0.265,
 which is narrow. They are deliberately not all at one luminance, since that is
 the channel red-green deficiency leaves intact. What the set fixes is contrast,
@@ -276,7 +276,7 @@ Colorblind-safe palette. Two modules, and the split matters:
   states, surfaces, and the per-type *foreground* tones (`C.judgment.text`, …).
 - `src/constants/palettes.js` — the node **fills** and the label ink, which do.
 
-Edges: teal (supports), orange (conflicts), amber (undermines), grey (depends);
+Edges: teal (supports), orange (conflicts), amber (undermines);
 green (entails) and rose (precludes), hollow arrowhead for the single-premise
 forms and filled for the joint ones. Withdrawn: grey at 25% opacity; rejected:
 rose at 35%.

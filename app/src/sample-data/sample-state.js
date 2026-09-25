@@ -515,17 +515,6 @@ export default {
       origin: "user",
     },
 
-    // Depends
-    {
-      from: "P5",
-      to: "T1",
-      type: "depends",
-      explanation:
-        "Extending justice to all who will be affected presupposes that future people qualify as moral patients.",
-      addedRound: 5,
-      origin: "user",
-    },
-
     // Arguments (entails for single-premise; jointly_entails for multi-premise)
     // arg-sample-3: P2 + P3 → J5  (detected round 4: P3 arrives round 4)
     {

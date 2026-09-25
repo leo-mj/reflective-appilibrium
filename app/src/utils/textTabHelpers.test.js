@@ -65,7 +65,7 @@ describe("buildPrincipleCovers", () => {
 
   it("ignores relation types other than supports", () => {
     const elements = [el("P1", "principle"), el("J1", "judgment")];
-    for (const type of ["conflicts", "undermines", "depends", "entails"]) {
+    for (const type of ["conflicts", "undermines", "entails"]) {
       expect(coversFor(elements, [rel("P1", "J1", type)])).toEqual({ P1: [] });
     }
   });

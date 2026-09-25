@@ -11,7 +11,7 @@ import { ModalShell, FormField } from "./ModalShell.jsx";
 
 /**
  * @typedef {Object} EditRelationFormData
- * @property {'supports'|'conflicts'|'undermines'|'depends'|'entails'} type
+ * @property {'supports'|'conflicts'|'undermines'|'entails'} type
  * @property {string} explanation
  */
 
@@ -56,7 +56,6 @@ export function EditRelationModal({
           <option value="supports">Supports</option>
           <option value="conflicts">Conflicts</option>
           <option value="undermines">Undermines</option>
-          <option value="depends">Depends on</option>
           <option value="entails">Entails</option>
           <option value="precludes">Precludes</option>
           <option value="jointly_entails">Jointly Entails</option>

@@ -57,7 +57,7 @@ The component provides three tabs:
    - **Judgments (J)**: small circular nodes. Blue shades encode confidence (high = saturated, moderate = medium, low = faint). Withdrawn judgments are greyed out. Full text on hover.
    - **Principles (P)**: larger rounded-rectangle nodes in purple, with edges to the judgments they cover. Orphan judgments have no principle edges. Full text on hover.
    - **Background Theories (T)** (from Round 5 onward): amber diamond-shaped nodes connected to the principles they ground.
-   - **Edges**: teal = supports, orange dashed = conflicts, yellow dotted = undermines, grey with arrow = depends.
+   - **Edges**: teal = supports, orange dashed = conflicts, yellow dotted = undermines.
    - A "Show withdrawn" toggle reveals withdrawn elements and their edges at reduced opacity.
    - Active elements are fully opaque. Withdrawn elements are greyed out.
 
@@ -131,7 +131,7 @@ const state = {
       explanation: "...",
       addedRound: 2,
     },
-    // types: "supports", "conflicts", "undermines", "depends"
+    // types: "supports", "conflicts", "undermines"
   ],
   coherence: {
     tensions: ["J1 conflicts with P2: ..."],
@@ -316,7 +316,7 @@ A complete table of all elements that were part of the process, with their final
 
 ### 3. Relation Map
 
-All active relations (supports, conflicts, depends, undermines) among the final active elements.
+All active relations (supports, conflicts, undermines) among the final active elements.
 
 ### 4. Adjustment Log
 

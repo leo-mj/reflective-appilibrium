@@ -29,7 +29,18 @@ the app: the workflows hold the examples, and they read repository variables.
 
 **Nothing is stored on a server, in either build.** The working state is
 autosaved to the browser (`localStorage`, offered back as "Continue where you
-left off") and Markdown export is the only way out of it. There was a
+left off") and Markdown export is the only way out of it.
+
+**Export asks what to write.** ☰ → Export opens `ExportModal`, which offers the
+sections of `EXPORT_SECTIONS` in `utils/exportMarkdown.js` — elements,
+relations, graph, clusters, the log, an Argdown rendering and so on — leaving
+out any with nothing to say, and remembers the choice in the browser. **Full
+history** is the `re-state` block, the only part Import and Merge read: a file
+without it is a report, not a way back in, and the dialog says so when it is
+unticked. The defaults are the export as it was before the choice existed,
+Argdown off. The same dialog's **Download .argdown** writes the Argdown map
+alone (`downloadArgdown`), ignoring the ticks: Argdown's tools open that file
+and not a Markdown one, and Import reads it back as an argument map. There was a
 `/api/sessions` router writing RE states to a directory on disk; it was removed
 rather than switched off, since a gate is one setting away from holding
 strangers' moral reasoning on a shared machine. See `backend/CLAUDE.md` for what
@@ -62,7 +73,18 @@ Two families, both directional, and a pair of elements may carry several at once
 - **Supports** — A provides positive reason for B
 - **Conflicts** — A and B are incompatible
 - **Undermines** — A weakens B without flat contradiction
-- **Depends** — A presupposes B
+
+There was a fourth, **depends** (A presupposes B), and it was retired: it joined
+two relations pointing opposite ways — B grounds A, which is *B supports A*, and
+A cannot be true without B, which is *A entails B* — so an edge carrying it did
+not say which way the reasons ran, and the coherence analysis read it as
+neither. A state written before then still loads: `validateState` in
+`utils/importMarkdown.js`, which every file, merge and autosaved draft passes
+through, rewrites each one as the reversed `supports`, the weaker of the two
+and the one in the same family. One that lands on a `supports` already held is
+dropped. **The migration is silent**: no log entry, no note on the edge, its
+explanation untouched — keep it that way. Nothing offers, suggests or writes
+the type any more, and the backend refuses it.
 
 **Inferential** — formal argument steps, and what the rethon simulation reads.
 
@@ -121,8 +143,9 @@ Two criteria it deliberately is **not**, both of which look plausible:
   orthogonal to plausibility — it would rank a fringe commitment the user's
   principles happen to require above a well-supported theory they do not, and a
   theory chosen that way borrows all its credibility from the position it is
-  meant to support. That is narrow RE with a third node shape. `depends` remains
-  a legal *relation*; it is just never a reason to propose anything.
+  meant to support. That is narrow RE with a third node shape. A theory the
+  position does rest on can still be tied to it by a `supports` edge; that is
+  just never a reason to propose one.
 - **Not balance.** The prompt must not require theories on both sides: a quota
   for opposition platforms fringe positions for opposing rather than for being
   well-supported. The instruction is *non-suppression* — do not filter by whether
@@ -274,6 +297,63 @@ which ids the second process lands on depends on the first — and falling back 
 word overlap (`samplePairs`) for any other process. All three drift apart
 silently, so `sample-merge-pairs.test.js` reads the file as the app does, merges
 it and checks the pairs still resolve.
+
+### Argdown import
+
+☰ → Import and ☰ → Merge also take an [Argdown](https://argdown.org/syntax/) file
+(`.argdown`, `.ad`) — `utils/importArgdown.js`, the inverse of
+`utils/exportArgdown.js`, so an argument map written elsewhere (a paper's
+reconstruction) becomes a graph. Parsing is `@argdown/core`'s own parser, loaded
+on the press as a chunk of its own; `package.json` overrides `lodash-es` because
+the chevrotain it pins fails `npm audit`.
+
+Statements become elements, typed by `#judgment` / `#principle` / `#theory` and
+**a judgment when untagged**; each inference step of a premise-conclusion
+structure becomes one argument (`entails` / `jointly_entails`, premises being
+the statements since the previous conclusion unless `-- {uses: [1, 3]} --` says
+otherwise).
+
+Statement relations follow **Argdown's interpretation mode**: loose (the
+default) is the dialectical family, strict (`model: {mode: strict}` in the front
+matter, which the parser reads itself) the inferential one.
+
+| Argdown         | Loose mode  | Strict mode |
+|-----------------|-------------|-------------|
+| `+>` support    | supports    | entails     |
+| `->` attack     | conflicts   | precludes   |
+| `><` contradict | precludes   | precludes   |
+
+Strict `->` is contrariety, not both true, which is "A entails not-B". `><` is
+logical in both modes and keeps only that half; its "not both false" has no
+counterpart, and the log entry says so whenever one is imported. Each `entails`
+or `precludes` read from a statement relation is a one-premise argument of its
+own, skipped if a premise-conclusion structure already holds it. The exception
+is the exporter's negation: a `[not X]` tied to `[X]` by `><` turns a conclusion
+into `precludes` and is neither an element nor a relation.
+
+Undercuts and relations aimed at a whole reconstructed argument have no
+counterpart and are left out — **counted in the import's log entry**, which also
+names the mode it read and which title became which id, since titles do not
+survive. A title that is already an id of its type is kept, which is what makes
+an exported file round-trip.
+
+**Groups are headings**, which is also how Argdown's own maps draw a group.
+Each element joins the nearest heading above its definition; `{isGroup: false}`
+on a heading opts it out, and `{isClosed: true}` makes the group collapsed.
+Groups here are flat, so a nested heading becomes a group of its own, and a
+heading over one statement is none — both counted in the log. The export keeps
+groups visibly apart from the type sections: every group is a `##` heading over
+its members, of any type, under one `# Groups` heading, and the rest go under
+`# Judgments` and the other type headings. `# Groups` and the type headings
+carry `{isGroup: false}`, so neither Argdown's maps nor the import read them as
+groups.
+
+The export (`utils/exportArgdown.js`) reaches the reader as the Argdown section
+of the Markdown export, a fenced `argdown` block. It writes loose mode: `supports` and
+`conflicts` as `+>` and `->`, arguments as premise-conclusion structures.
+**`undermines` does not survive the round trip**: having no symbol of its own,
+it is written as `->` and comes back as `conflicts`. The trailing comment
+naming the original type is for a human reader; the parser drops comments.
 
 ### State schema
 

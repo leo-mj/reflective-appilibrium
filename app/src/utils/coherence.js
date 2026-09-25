@@ -17,11 +17,7 @@
 
 /** @import { REElement, RERelation } from '../types.js' */
 
-import {
-  ARGUMENT_RELATION_TYPES,
-  isWithdrawnNow,
-  relationTypeLabel,
-} from "./stateUtils.js";
+import { ARGUMENT_RELATION_TYPES, isWithdrawnNow } from "./stateUtils.js";
 
 /**
  * Relations that describe two commitments pulling against each other.
@@ -38,16 +34,11 @@ const TENSION_TYPES = new Set([
   "jointly_precludes",
 ]);
 
-/**
- * Relations in which one side speaks for the other.
- *
- * `depends` is not here: presupposing something is not the same as supporting
- * it, and reinstating on that basis would be a different move.
- */
+/** Relations in which one side speaks for the other. */
 const SUPPORT_TYPES = new Set(["supports", "entails", "jointly_entails"]);
 
 /** "jointly_precludes" → "jointly precludes". */
-const label = (type) => relationTypeLabel(type).replace(/_/g, " ");
+const label = (type) => type.replace(/_/g, " ");
 
 /** Statuses that mean an element is not currently held. */
 const NOT_HELD = new Set(["withdrawn", "rejected", "possible"]);

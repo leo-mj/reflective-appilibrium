@@ -356,7 +356,6 @@ describe("ctrl+click relation building", () => {
       "Supports",
       "Conflicts",
       "Undermines",
-      "Depends on",
       "Entails",
       "Precludes",
     ]);

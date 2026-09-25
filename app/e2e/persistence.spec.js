@@ -2,7 +2,15 @@ import { test, expect } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { gotoHome, startFresh, addElement, expectCounts, openMenu, park } from "./helpers.js";
+import {
+  gotoHome,
+  startFresh,
+  addElement,
+  expectCounts,
+  exportDownload,
+  openMenu,
+  park,
+} from "./helpers.js";
 
 test.describe("Session draft", () => {
   test("a reload offers the work back, and Resume restores it", async ({ page }) => {
@@ -44,10 +52,7 @@ test.describe("Export and import", () => {
     await addElement(page, "judgment", "Judgment one for export.");
     await addElement(page, "principle", "Principle one for export.");
 
-    await openMenu(page);
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Export/ }).click();
-    const download = await downloadPromise;
+    const download = await exportDownload(page);
 
     // Markdown, not JSON: a human-readable report with the machine-readable
     // state in a fenced re-state block at the end.
@@ -78,6 +83,51 @@ test.describe("Export and import", () => {
     await expectCounts(page, { J: 1, P: 1 });
   });
 
+  test("an Argdown map imports as a graph", async ({ page }) => {
+    // The parser is a chunk of its own, loaded on the press, so this is also
+    // the check that the chunk loads in a real browser.
+    const file = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), "re-e2e-")),
+      "paper.argdown",
+    );
+    fs.writeFileSync(
+      file,
+      [
+        "===",
+        "title: My paper",
+        "===",
+        "",
+        "[Harm]: Preventing grave harm can outweigh honesty. #principle",
+        "",
+        "<Door>: The murderer at the door.",
+        "",
+        "(1) [Harm]",
+        "(2) [Grave]: Lying to the murderer prevents grave harm.",
+        "----",
+        "(3) [Permissible]: Lying to the murderer is permissible.",
+        "  -> [Kant]",
+        "",
+        "[Kant]: Never lie. #principle",
+        "",
+      ].join("\n"),
+    );
+
+    await gotoHome(page);
+    await startFresh(page, "Throwaway");
+    await openMenu(page);
+    const chooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /Import/ }).click();
+    // An empty process has nothing to replace, so there is no confirmation.
+    await (await chooserPromise).setFiles(file);
+    await park(page);
+
+    await expect(page.locator("body")).toContainText("My paper");
+    await expect(page.locator("body")).toContainText(
+      "Lying to the murderer is permissible.",
+    );
+    await expectCounts(page, { J: 2, P: 2 });
+  });
+
   test("the exported graph is self-contained", async ({ page }) => {
     // The SVG is embedded as a data URI and read outside the app, where the
     // app's stylesheet is not present. Any custom property it references has to
@@ -86,10 +136,7 @@ test.describe("Export and import", () => {
     await startFresh(page, "Export portability");
     await addElement(page, "judgment", "A judgment to draw in the exported graph.");
 
-    await openMenu(page);
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Export/ }).click();
-    const download = await downloadPromise;
+    const download = await exportDownload(page);
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "re-e2e-")), "export.md");
     await download.saveAs(file);
 

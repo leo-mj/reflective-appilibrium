@@ -8,7 +8,6 @@
  * - supports  → teal  (`#06b6d4`)
  * - conflicts → orange (`#f97316`)
  * - undermines → amber (`#eab308`)
- * - depends   → grey  (`#6b7280`)
  * - entails           → green (`#16a34a`), hollow arrowhead
  * - precludes         → rose  (`#e11d48`), hollow arrowhead
  * - jointly_entails   → green (`#16a34a`), filled arrowhead
@@ -67,7 +66,6 @@ const INK_ON_LIGHT_FILL = "#0f172a";
  *   supportsText: string,
  *   conflicts: string,
  *   undermines: string,
- *   depends: string,
  *   entails: string,
  *   precludes: string,
  *   jointly_entails: string,
@@ -116,7 +114,6 @@ export const C = {
   supportsText: "var(--c-supports-text)",
   conflicts: "#f97316",
   undermines: "#eab308",
-  depends: "#6b7280",
   entails: "#16a34a",
   precludes: "#e11d48",
   jointly_entails: "#16a34a",

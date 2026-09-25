@@ -68,19 +68,18 @@ export {};
 
 /**
  * The directional relation types allowed between elements, in two families: the
- * dialectical four, then the inferential four that make up arguments (the set
+ * dialectical three, then the inferential four that make up arguments (the set
  * `ARGUMENT_RELATION_TYPES` in utils/stateUtils.js).
  * See `skill/re-relations-reference.md` for the full matrix of which pairs are legal.
  * - `supports`  — source provides a positive reason for target (teal arrow)
  * - `conflicts` — source and target are incompatible (orange dashed arrow)
  * - `undermines` — source weakens target without flat contradiction (amber dashed arrow)
- * - `depends`   — source presupposes target (grey arrow)
- * - `entails`          — single premise entails conclusion (green arrow)
+ * - `entails`         — single premise entails conclusion (green arrow)
  * - `precludes`        — single premise entails negation of conclusion (rose arrow)
  * - `jointly_entails`  — multiple premises jointly entail conclusion (green arrow)
  * - `jointly_precludes` — multiple premises jointly preclude conclusion, i.e. entail its negation (rose arrow)
  *
- * @typedef {'supports'|'conflicts'|'undermines'|'depends'|'entails'|'precludes'|'jointly_entails'|'jointly_precludes'} RelationType
+ * @typedef {'supports'|'conflicts'|'undermines'|'entails'|'precludes'|'jointly_entails'|'jointly_precludes'} RelationType
  */
 
 // ─── Domain objects ───────────────────────────────────────────────────────────

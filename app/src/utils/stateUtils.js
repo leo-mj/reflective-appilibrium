@@ -478,19 +478,6 @@ export function argumentPostulateExplanation(postulates) {
   return `Valid given: ${postulates.join(" ")}`;
 }
 
-/**
- * Human-readable label for a relation type. The stored identifier stays
- * `"depends"` (used as a color key, in the backend schema, and in saved
- * state); only the user-facing wording reads "depends on" so edges render as
- * "A depends on B".
- *
- * @param {string} type - Relation type identifier.
- * @returns {string}
- */
-export function relationTypeLabel(type) {
-  return type === "depends" ? "depends on" : type;
-}
-
 // ─── Origin helpers ───────────────────────────────────────────────────────────
 
 /**

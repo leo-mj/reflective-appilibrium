@@ -13,7 +13,11 @@ import {
   ASSIST_TABS,
   SIMULATE_TABS,
 } from "../constants/tabConstants.jsx";
-import { downloadMarkdown } from "../utils/exportMarkdown.js";
+import {
+  downloadMarkdown,
+  exportSectionsFor,
+} from "../utils/exportMarkdown.js";
+import { downloadArgdown } from "../utils/exportArgdown.js";
 import {
   completesIteration,
   nextPhaseEnabled,
@@ -245,7 +249,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     setWorkflowPhase(null);
     setWorkflowLoops(0);
   };
-  const NON_ENTAILS_TYPES = ["supports", "conflicts", "undermines", "depends"];
+  const NON_ENTAILS_TYPES = ["supports", "conflicts", "undermines"];
   const effectiveHiddenKeys = hideNonEntailsRels
     ? new Set([...hiddenLegendKeys, ...NON_ENTAILS_TYPES])
     : hiddenLegendKeys;
@@ -515,7 +519,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         setTab={handleSetTab}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
-        onDownload={() => downloadMarkdown(state, positions)}
+        onDownload={(sections) => downloadMarkdown(state, positions, sections)}
+        exportSections={exportSectionsFor(state)}
+        onDownloadArgdown={() => downloadArgdown(state)}
         onImportFile={handleImportFile}
         onPrepareMerge={handlePrepareMerge}
         onConfirmMerge={handleConfirmMerge}

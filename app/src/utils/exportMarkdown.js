@@ -1,7 +1,9 @@
 /**
- * @fileoverview Generates and triggers a markdown download of the full RE state.
+ * @fileoverview Generates and triggers a markdown download of the RE state.
  * Covers the Text tab (elements, relations, coherence), Graph tab (SVG),
- * and Clusters tab (cluster analysis with per-cluster SVGs).
+ * Clusters tab (cluster analysis with per-cluster SVGs), an Argdown rendering,
+ * and the machine-readable state block Import reads back — each a section the
+ * reader picks in the Export dialog ({@link EXPORT_SECTIONS}).
  * @module utils/exportMarkdown
  */
 
@@ -18,6 +20,7 @@ import { sortElementIds, historyOf, reviewsOf } from "./stateUtils.js";
 import { groupsOf } from "./groupUtils.js";
 import { generateGraphSVG, svgToDataUrl } from "./generateSVG.js";
 import { processesOf, processTagMap } from "./mergeStates.js";
+import { buildArgdown } from "./exportArgdown.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -270,6 +273,116 @@ function logSection(log) {
   return lines.join("\n");
 }
 
+/**
+ * The position as an Argdown document, fenced so a Markdown reader shows it
+ * verbatim. The fence is longer than any run of backticks inside it, which a
+ * statement's text may contain.
+ */
+function argdownSection(state) {
+  const argdown = buildArgdown(state).trimEnd();
+  const longest = Math.max(
+    0,
+    ...[...argdown.matchAll(/`+/g)].map((m) => m[0].length),
+  );
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  return `## Argdown\n\n${fence}argdown\n${argdown}\n${fence}`;
+}
+
+// ─── Sections offered ─────────────────────────────────────────────────────────
+
+/**
+ * What the Export dialog offers, in document order. The title and round head
+ * every file and are not a choice.
+ *
+ * `history` is the machine-readable state block — the whole process, with its
+ * log, reviews and every item's history — and the only part Import reads, so a
+ * file without it is a report and not a way back in. `has` leaves out a
+ * section with nothing to say: offering "Groups" on a process with none is a
+ * box that changes nothing.
+ *
+ * @type {{ key: string, label: string, detail: string, on: boolean, has?: (state: REState) => boolean }[]}
+ */
+export const EXPORT_SECTIONS = [
+  {
+    key: "elements",
+    label: "Elements",
+    detail: "Every judgment, principle and theory, with its wording history.",
+    on: true,
+  },
+  {
+    key: "relations",
+    label: "Relations",
+    detail: "Each relation and argument step, with its explanation.",
+    on: true,
+  },
+  {
+    key: "groups",
+    label: "Groups",
+    detail: "Your groups and their members.",
+    on: true,
+    has: (state) => groupsOf(state).length > 0,
+  },
+  {
+    key: "processes",
+    label: "Merged processes",
+    detail: "Which process each element came from.",
+    on: true,
+    has: (state) => processesOf(state).length > 0,
+  },
+  {
+    key: "graph",
+    label: "Graph",
+    detail: "An image of the graph as you left it.",
+    on: true,
+  },
+  {
+    key: "clusters",
+    label: "Clusters",
+    detail: "The coherent clusters, with an image of each.",
+    on: true,
+  },
+  {
+    key: "coherence",
+    label: "Coherence analysis",
+    detail: "Tensions and orphans.",
+    on: true,
+  },
+  {
+    key: "reviews",
+    label: "Process reviews",
+    detail: "The reviews you accepted, oldest first.",
+    on: true,
+    has: (state) => reviewsOf(state).length > 0,
+  },
+  {
+    key: "log",
+    label: "Round log",
+    detail: "What changed in each round.",
+    on: true,
+  },
+  {
+    key: "argdown",
+    label: "Argdown",
+    detail: "The position as an Argdown map, for the Argdown tools.",
+    on: false,
+  },
+  {
+    key: "history",
+    label: "Full history",
+    detail: "Everything needed to continue this process later: import the file to pick up where you left off.",
+    on: true,
+  },
+];
+
+/** The sections worth offering for `state`. */
+export const exportSectionsFor = (state) =>
+  EXPORT_SECTIONS.filter((s) => !s.has || s.has(state));
+
+/** What the export writes when nobody has chosen. */
+export const DEFAULT_EXPORT_SECTIONS = new Set(
+  EXPORT_SECTIONS.filter((s) => s.on).map((s) => s.key),
+);
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
@@ -278,9 +391,15 @@ function logSection(log) {
  *
  * @param {REState}    state
  * @param {PositionMap} positions
+ * @param {Set<string>} [sections] - Keys of {@link EXPORT_SECTIONS} to write.
  * @returns {string}
  */
-export function buildMarkdown(state, positions) {
+export function buildMarkdown(
+  state,
+  positions,
+  sections = DEFAULT_EXPORT_SECTIONS,
+) {
+  const want = (key) => sections.has(key);
   const date = new Date().toISOString().slice(0, 10);
   const visIds = new Set(state.elements.map((e) => e.id));
   const pCovers = buildPrincipleCovers(
@@ -303,28 +422,32 @@ export function buildMarkdown(state, positions) {
   // Machine-readable state block — used by the import feature to restore this session.
   const stateBlock = "```re-state\n" + JSON.stringify(state, null, 2) + "\n```";
 
+  // Each section is built only when asked for: the graph and the clusters
+  // render SVGs, which is the expensive part of an export.
   const parts = [
     header,
-    elementsBlock,
-    relationsSection(state.relations),
-    groupsSection(groupsOf(state)),
-    processesSection(processes),
+    want("elements") && elementsBlock,
+    want("relations") && relationsSection(state.relations),
+    want("groups") && groupsSection(groupsOf(state)),
+    want("processes") && processesSection(processes),
     // Groups are the user's own filing, so the graph is drawn as they left it.
     // The cluster diagrams below are not: a coherent cluster is computed from
     // the relations, and cuts across the grouping rather than following it.
     // Process letters go on both, being a fact about each element.
-    graphSection(
-      state.elements,
-      state.relations,
-      positions,
-      groupsOf(state),
-      processTags,
-    ),
-    clustersSection(state, positions, processTags),
-    coherenceSection(state.coherence),
-    reviewsSection(reviewsOf(state)),
-    logSection(state.log),
-    stateBlock,
+    want("graph") &&
+      graphSection(
+        state.elements,
+        state.relations,
+        positions,
+        groupsOf(state),
+        processTags,
+      ),
+    want("clusters") && clustersSection(state, positions, processTags),
+    want("coherence") && coherenceSection(state.coherence),
+    want("reviews") && reviewsSection(reviewsOf(state)),
+    want("log") && logSection(state.log),
+    want("argdown") && argdownSection(state),
+    want("history") && stateBlock,
   ].filter(Boolean);
 
   return parts.join("\n\n---\n\n");
@@ -336,9 +459,10 @@ export function buildMarkdown(state, positions) {
  *
  * @param {REState}    state
  * @param {PositionMap} positions
+ * @param {Set<string>} [sections] - As for {@link buildMarkdown}.
  */
-export function downloadMarkdown(state, positions) {
-  const markdown = buildMarkdown(state, positions);
+export function downloadMarkdown(state, positions, sections) {
+  const markdown = buildMarkdown(state, positions, sections);
   const slug = state.topic.slice(0, 30).replace(/\s+/g, "-").toLowerCase();
   const filename = `re-${slug}-round${state.round}.md`;
 

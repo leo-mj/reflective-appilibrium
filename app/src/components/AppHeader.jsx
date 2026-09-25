@@ -7,6 +7,7 @@ import { useState, useRef } from "react";
 import { TutorialOverlay } from "./TutorialOverlay.jsx";
 import { ModalShell } from "./user_edits/ModalShell.jsx";
 import { MergeModal } from "./user_edits/MergeModal.jsx";
+import { ExportModal } from "./user_edits/ExportModal.jsx";
 import {
   ASSIST_TABS,
   SIMULATE_TABS,
@@ -27,7 +28,12 @@ import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
  * @param {function} props.setShowRejected
  * @param {string}   props.assistSidePanel
  * @param {function} props.setAssistSidePanel
- * @param {function} props.onDownload
+ * @param {function(Set<string>): void} props.onDownload - Writes the file, with
+ *   the sections chosen in the Export dialog, which this header opens first.
+ * @param {Object[]} props.exportSections - The sections the dialog offers for
+ *   this process, from `exportSectionsFor`.
+ * @param {function(): void} [props.onDownloadArgdown] - Writes the Argdown map
+ *   alone as an `.argdown` file, from the same dialog.
  * @param {boolean|null} [props.showProcessTags] - Whether the merged-process
  *   letters are drawn; null before any merge, which leaves the row out.
  * @param {function} [props.setShowProcessTags]
@@ -72,6 +78,8 @@ export function AppHeader({
   assistSidePanel,
   setAssistSidePanel,
   onDownload,
+  exportSections = [],
+  onDownloadArgdown,
   onImportFile,
   onPrepareMerge,
   onConfirmMerge,
@@ -123,6 +131,7 @@ export function AppHeader({
   const [tutorialMode] = useState(false);
   const [importConfirmPending, setImportConfirmPending] = useState(null);
   const [importError, setImportError] = useState(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const doImport = async (file) => {
     try {
@@ -211,6 +220,23 @@ export function AppHeader({
           }}
         />
       )}
+      {exportOpen && (
+        <ExportModal
+          sections={exportSections}
+          onCancel={() => setExportOpen(false)}
+          onExport={(sections) => {
+            setExportOpen(false);
+            onDownload(sections);
+          }}
+          onExportArgdown={
+            onDownloadArgdown &&
+            (() => {
+              setExportOpen(false);
+              onDownloadArgdown();
+            })
+          }
+        />
+      )}
       {importError && (
         <ModalShell
           title="Could not read file"
@@ -228,7 +254,7 @@ export function AppHeader({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".md"
+        accept=".md,.argdown,.ad"
         style={{ display: "none" }}
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -246,7 +272,7 @@ export function AppHeader({
       <input
         ref={mergeInputRef}
         type="file"
-        accept=".md"
+        accept=".md,.argdown,.ad"
         data-testid="merge-input"
         style={{ display: "none" }}
         onChange={(e) => {
@@ -270,7 +296,7 @@ export function AppHeader({
     handleImportClick,
     handleMergeClick: canMerge ? handleMergeClick : null,
     handleMergeSampleClick: canMergeSample ? handleMergeSampleClick : null,
-    onDownload,
+    onDownload: () => setExportOpen(true),
     onHome,
     onUndo,
     canUndo,

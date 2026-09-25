@@ -408,6 +408,22 @@ export async function openMenu(page) {
 }
 
 /**
+ * Export through the ☰ menu: Export opens the section picker, and its Download
+ * button writes the file, with whatever sections are ticked — the defaults, in
+ * a fresh browser context.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<import('@playwright/test').Download>}
+ */
+export async function exportDownload(page) {
+  await openMenu(page);
+  await page.getByRole("button", { name: /Export/ }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download" }).click();
+  return downloadPromise;
+}
+
+/**
  * Run axe-core against the current page and return its violations.
  *
  * axe-core is already a devDependency (the jsdom a11y test uses it), so this

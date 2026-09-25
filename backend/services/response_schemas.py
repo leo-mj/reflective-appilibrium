@@ -26,7 +26,7 @@ from typing import get_args
 # Only the four dialectical relation types belong to relation suggestion; the
 # formal-inference types are produced by the argument-reconstruction step, which
 # attaches an argument_id the relations path cannot supply.
-SUGGESTIBLE_RELATION_TYPES = ["supports", "conflicts", "undermines", "depends"]
+SUGGESTIBLE_RELATION_TYPES = ["supports", "conflicts", "undermines"]
 
 assert set(SUGGESTIBLE_RELATION_TYPES) <= set(
     get_args(RelationType)
