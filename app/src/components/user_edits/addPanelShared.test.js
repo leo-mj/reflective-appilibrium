@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { makeRelationDefaults } from "./addPanelShared.js";
+import {
+  checkPickedArgument,
+  checkRelation,
+  makeRelationDefaults,
+} from "./addPanelShared.js";
 
 const el = (id, status = "active") => ({ id, status });
 
@@ -38,6 +42,68 @@ describe("makeRelationDefaults", () => {
     expect(makeRelationDefaults([el("J1")])).toMatchObject({
       from: "J1",
       to: "",
+    });
+  });
+});
+
+describe("checkRelation", () => {
+  it("takes two different ends, and says nothing", () => {
+    expect(checkRelation({ from: "J1", to: "P1" }, 2)).toEqual({
+      valid: true,
+      complaint: null,
+    });
+  });
+
+  it("refuses a loop, and says why", () => {
+    expect(checkRelation({ from: "J1", to: "J1" }, 2)).toEqual({
+      valid: false,
+      complaint: "From ≠ To",
+    });
+  });
+
+  it("asks for two elements before anything else", () => {
+    expect(checkRelation({ from: "J1", to: "" }, 1)).toEqual({
+      valid: false,
+      complaint: "Add two elements first",
+    });
+  });
+});
+
+describe("checkPickedArgument", () => {
+  const form = (premises, conclusion) => ({ premises, conclusion });
+
+  it("takes distinct premises and a conclusion apart from them", () => {
+    expect(checkPickedArgument(form(["J1", "J2"], "P1"), 3)).toEqual({
+      valid: true,
+      complaint: null,
+    });
+  });
+
+  it("refuses a premise named twice", () => {
+    expect(checkPickedArgument(form(["J1", "J1"], "P1"), 3)).toEqual({
+      valid: false,
+      complaint: "Premises must differ",
+    });
+  });
+
+  it("refuses a conclusion that is also a premise", () => {
+    expect(checkPickedArgument(form(["J1"], "J1"), 3)).toEqual({
+      valid: false,
+      complaint: "Premise ≠ conclusion",
+    });
+  });
+
+  it("refuses an empty picker without complaining about it", () => {
+    expect(checkPickedArgument(form(["J1", ""], "P1"), 3)).toEqual({
+      valid: false,
+      complaint: null,
+    });
+  });
+
+  it("asks for two elements before anything else", () => {
+    expect(checkPickedArgument(form([""], ""), 0)).toEqual({
+      valid: false,
+      complaint: "Add two elements first",
     });
   });
 });

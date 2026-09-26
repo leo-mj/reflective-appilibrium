@@ -3,7 +3,11 @@
  * @module utils/confidenceLabel
  */
 
-/** Mirrors the preset buttons in `ConfidenceInput`. */
+/**
+ * The three presets every confidence control offers — the dialogs'
+ * `ConfidenceInput` and the add bar's L, M and H — and the words they read as.
+ * One list, so a value picked in one place is always a preset in the others.
+ */
 export const CONFIDENCE_PRESETS = [
   { label: "Low", value: 0.33 },
   { label: "Moderate", value: 0.67 },

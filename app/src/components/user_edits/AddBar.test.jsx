@@ -30,7 +30,7 @@ import {
   selectedRow,
 } from "./dropdownTestUtils.js";
 import { ADD_BAR_PRESETS } from "../../constants/tabConstants.jsx";
-import { AddBar } from "./TextTabAddPanel.jsx";
+import { AddBar } from "./AddBar.jsx";
 import { ADD_BAR_MIN_HEIGHT } from "./addPanelShared.js";
 import { HEIGHT_CAP } from "../../hooks/useAddBarSize.js";
 

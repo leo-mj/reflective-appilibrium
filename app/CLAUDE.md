@@ -145,7 +145,8 @@ not hue separation — orange, yellow and green stay confusable, and what carrie
 them apart is the redundancy already there: dash pattern and arrowhead.
 
 Five places draw an edge and all five take the palette: `ArrowDefs`,
-`GraphElements`, `graphRender.renderJointArgument` (a plain function, so its two
+`GraphEdge` (in `graphs_shared/`, exported through `GraphElements.jsx` with the
+graph's other drawing components), `graphRender.renderJointArgument` (a plain function, so its two
 callers — `Graph` and `HistoryTab` — pass it in), `Legend`, and `generateSVG`.
 
 ## Process review
@@ -366,7 +367,7 @@ the pair clears AAA. So the bar's filled buttons carry `ACCENT_MARKER`
 (`data-accent="graph"`, in `addPanelShared.js`), the editor and assist audits pass
 `ignoreGraphAccents` — default mode only, as everywhere — and the high-contrast
 e2e test picks them up for free, since it walks exactly that attribute.
-`TextTabAddPanel.test.jsx` pins the fill, the ink and the weight per mode, which
+`AddBar.test.jsx` pins the fill, the ink and the weight per mode, which
 is what stops a hex being written back in; it has been written in by hand once in
 each direction already.
 
@@ -769,6 +770,17 @@ strip's did not, and the same two complaints were worded differently in each. Wh
 those panels knew that the bar did not is which kind of thing their tab was about,
 and that is a preset rather than a component.
 
+`AddBar` (`user_edits/AddBar.jsx`) is the frame: the buttons, the
+layout and the one text field. The three forms live in `useAddBarForms`, which
+hands the frame the form on show as one record — its check, its text field, its
+placeholder, submit and reset — so the frame never asks which tab is lit. The
+checks are pure, beside `checkWrittenArgument` in `addPanelShared.js`, and each
+returns `{ valid, complaint }` for the bar's one complaint slot. Each tab's
+fields are in `AddBarFields.jsx`, and every style they wear comes from one
+`barLook(roomy)`. The forms are in the hook rather than in the fields because they
+outlive them: switching tabs keeps a half-written element, and a graph selection
+fills the relation and argument forms whichever one is on show.
+
 `ADD_BAR_PRESETS` in `constants/tabConstants.jsx` maps a tab to `{tab,
 elementType}`; `REState` hands the bar `ADD_BAR_PRESETS[tab] ?? null`, and the bar
 applies it exactly when the object's *identity* changes — the same
@@ -840,7 +852,7 @@ Two things the store carries besides the number. `setTourResizing` is read by th
 app's eased `padding-left`, which is right for a tour appearing and wrong for one
 being dragged — the column would follow the pointer with the app a third of a
 second behind it. And `width` is in `measureRing`'s dependencies in
-`GuidedTour.jsx` although nothing there reads it: the app is padded by the
+`tour/useTourRing.js` although nothing there reads it: the app is padded by the
 column, so dragging its edge moves everything the spotlight is drawn around.
 
 **Only the column.** The narrow layout's sheet keeps its two heights and its
@@ -863,6 +875,9 @@ it (tab, chrome, graph framing, selection, control to ring). `tour/GuidedTour.js
 applies it and renders it either as a `column` down a wide screen's left edge or
 as a `sheet` along a narrow one's bottom, both scroll-driven, with the app
 padding itself by whichever edge it has given away (`TOUR_W`, `sheetHeight()`).
+What it draws sits beside it — `TourSection`, `TourControls` (progress bar,
+sheet handle, column edge) and `Spotlight`, whose rings `useTourRing` measures —
+and `tourHelpers.js` drops sections the state cannot carry.
 
 **Never fork the script.** A phone used to get a separate nine-card tour that
 walked the ☰ menu and never mentioned reflective equilibrium — the one thing a

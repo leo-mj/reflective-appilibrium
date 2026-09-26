@@ -2,7 +2,7 @@
 //
 // The narrow screen's + hosts the wide layout's AddBar rather than a pair of
 // dialogs of its own, so what the bar offers is AddBar's business and is tested
-// in TextTabAddPanel.test.jsx. What is tested here is the wiring: that opening
+// in AddBar.test.jsx. What is tested here is the wiring: that opening
 // the sheet really produces that bar, that the arguments-only setting reaches
 // it, and that a multi-premise argument survives the trip.
 import { describe, it, expect, afterEach, vi } from "vitest";

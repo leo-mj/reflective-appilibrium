@@ -2,8 +2,8 @@
  * @fileoverview What is left of the add bar's own small parts — a captioned
  * control, and the run of premise pickers both argument forms are built from.
  *
- * Split out of TextTabAddPanel, which had grown to hold three tab modes, three
- * sizes, and these. Its styling lives in addPanelShared.js alongside the rest of
+ * Split out of the add bar (then `TextTabAddPanel.jsx`, now `AddBar.jsx`),
+ * which had grown to hold three tab modes, three sizes, and these. Its styling lives in addPanelShared.js alongside the rest of
  * the bar's sizing.
  *
  * The pickers used to live here too, as a `<select>` with a chevron drawn over

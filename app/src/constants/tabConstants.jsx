@@ -43,7 +43,7 @@ export const SIMULATE_TABS = ["simulateRethon"];
  *
  * Frozen module constants, and looked up by tab rather than built at the call
  * site, because the bar applies a preset when the *identity* of the one it is
- * handed changes — see {@link module:components/TextTabAddPanel.AddBar}. An
+ * handed changes — see {@link module:components/user_edits/AddBar.AddBar}. An
  * object built inline would be a new one every render, and the bar would reset
  * under the reader's hands each time.
  *

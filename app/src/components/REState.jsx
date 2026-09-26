@@ -32,7 +32,7 @@ import { sheetHeight } from "./tour/tourZ.js";
 import { useTourResizing, useTourWidth } from "./tour/tourWidth.js";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { GroupModal } from "./user_edits/GroupModal.jsx";
-import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
+import { AddBar } from "./user_edits/AddBar.jsx";
 export default function REState({ initialState, isSample, onHome, onReady }) {
   // Graph, not the Assist panel: assist controls are gated on a backend, so in
   // a demo build the old default landed every visitor on dead buttons.
