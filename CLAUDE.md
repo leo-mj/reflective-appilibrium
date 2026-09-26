@@ -124,6 +124,26 @@ graph.
 `state.groups` is absent from every state written before the feature existed —
 read it through `groupsOf(state)`, never directly.
 
+### Pinned positions
+
+Dragging a node on the Graph tab (mouse only; a finger pans) pins it where it
+is dropped — `state.pins`, `{ J1: { x, y } }`, `utils/pinUtils.js`, read through
+`pinsOf(state)`. Like a group it is a view device: no round, no log entry, not in
+the coherence analysis. Unlike a group it is **not an undo step** either — the
+`pins` action in `useREActions` changes the present without recording it, and
+undo and redo carry the present's pins across (`carryPins`), so undoing an edit
+does not undo the drags made since. It is on the state so that the export's
+`re-state` block, the autosave and Import carry it.
+
+- **Offsets from the layout's centre**, not canvas coordinates, since the centre
+  follows the reader's window.
+- **Merge keeps only the current process's pins**: the incoming file's were
+  positions on another canvas.
+- **A group that closes drops its members' pins** (`withGroups` in
+  `useGroupActions`), since collapsed members have to gather on the disc;
+  dragging the closed group pins them again, together.
+- Argdown has no place for coordinates, so they stay out of it.
+
 ### Background theories
 
 Suggested by `components/workflows/TheorySuggestTab.jsx`, backed by
@@ -372,6 +392,7 @@ naming the original type is for a human reader; the parser drops comments.
   relations: [{ from, to, type, explanation, addedRound, ?origin, ?status, ?history, ?argumentId, ?revisedRound }],
   coherence: { tensions: [], orphans: [], clusters: [] },
   ?groups: [{ id, label, members: [elementId], collapsed }],
+  ?pins: { [elementId]: { x, y } },  // offsets from the layout's centre
   ?reviews: [{ id, round, headline, arc, surprises, missed, method, model, origin }],
   log: [{ round, findings, options, decision, changes }]
 }

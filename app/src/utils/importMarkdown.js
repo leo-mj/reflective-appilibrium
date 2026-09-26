@@ -526,6 +526,21 @@ export function validateState(raw) {
     });
   }
 
+  // Where the reader dragged nodes (utils/pinUtils.js). A pin for an element
+  // the file does not hold is dropped rather than refused, as a group member is.
+  if (raw.pins !== undefined) {
+    if (!raw.pins || typeof raw.pins !== "object" || Array.isArray(raw.pins))
+      throw new Error("pins must be an object");
+    const elementIds = new Set(result.elements.map((e) => e.id));
+    result.pins = {};
+    for (const [id, p] of Object.entries(raw.pins).slice(0, 1_000)) {
+      if (!elementIds.has(id)) continue;
+      if (!p || typeof p !== "object")
+        throw new Error(`pins.${id} must be an object`);
+      result.pins[id] = { x: num(p.x, `pins.${id}.x`), y: num(p.y, `pins.${id}.y`) };
+    }
+  }
+
   if (raw.model !== undefined) {
     if (raw.model !== "questionnaire")
       throw new Error(`"model" must be "questionnaire" if present, got "${raw.model}"`);

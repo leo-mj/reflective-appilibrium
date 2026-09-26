@@ -31,8 +31,16 @@ export function useGraphClick({
   toSourceRel = (r) => r,
   overlay = null,
   onTap,
+  panMove,
+  onNodeDragStart,
+  onNodeDrag,
+  onNodeDragEnd,
 }) {
   const clickOrigin = useRef(null);
+  // A mouse press on a node: `{ el, x, y, moving }`. It moves the node rather
+  // than panning, once it has travelled past the click threshold — before
+  // that it may still be a click.
+  const nodePress = useRef(null);
 
   /**
    * The node under a point, if any. `overlay` — the statement view's expanded
@@ -84,7 +92,23 @@ export function useGraphClick({
 
   /** @param {React.PointerEvent} e */
   const onPointerDown = (e) => {
-    panDown(e);
+    // A mouse only: on a touch screen a finger on a node pans, since a dense
+    // graph leaves little background to start a pan from. Ctrl+click is
+    // building a selection, and stays a click.
+    const { sx, sy } = toSim(e);
+    const el =
+      onNodeDragStart &&
+      e.pointerType === "mouse" &&
+      e.button === 0 &&
+      !(e.ctrlKey || e.metaKey)
+        ? nodeAt(sx, sy)
+        : null;
+    if (el) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      nodePress.current = { el, x: e.clientX, y: e.clientY, moving: false };
+    } else {
+      panDown(e);
+    }
     clickOrigin.current = {
       x: e.clientX,
       y: e.clientY,
@@ -95,7 +119,37 @@ export function useGraphClick({
   };
 
   /** @param {React.PointerEvent} e */
+  const onPointerMove = (e) => {
+    const press = nodePress.current;
+    if (!press) return panMove?.(e);
+    const dx = e.clientX - press.x;
+    const dy = e.clientY - press.y;
+    if (!press.moving) {
+      if (Math.abs(dx) <= 4 && Math.abs(dy) <= 4) return;
+      press.moving = true;
+      onNodeDragStart(press.el);
+    }
+    // In the canvas's own units: the pan and zoom are the view's, not the node's.
+    onNodeDrag?.(press.el, dx / zoom, dy / zoom);
+  };
+
+  /** Lets go of a node being dragged, if one is. */
+  const endNodePress = () => {
+    const press = nodePress.current;
+    nodePress.current = null;
+    if (press?.moving) onNodeDragEnd?.(press.el);
+  };
+
+  /** @param {React.PointerEvent} e */
+  const onPointerCancel = (e) => {
+    endNodePress();
+    clickOrigin.current = null;
+    panUp(e);
+  };
+
+  /** @param {React.PointerEvent} e */
   const onPointerUp = (e) => {
+    endNodePress();
     panUp(e);
     if (!clickOrigin.current) return;
     const { x: ox, y: oy, pointerType } = clickOrigin.current;
@@ -178,5 +232,13 @@ export function useGraphClick({
     onSelectRel(() => null);
   };
 
-  return { onPointerDown, onPointerUp, nodeAt, relationAt: relationAtPoint, toSim };
+  return {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    nodeAt,
+    relationAt: relationAtPoint,
+    toSim,
+  };
 }

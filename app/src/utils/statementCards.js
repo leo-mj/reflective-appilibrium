@@ -507,6 +507,7 @@ const SETTLE_THRESHOLD = 2;
  * @property {PositionMap} input  - The positions the pass was last run on.
  * @property {PositionMap} output - What it made of them.
  * @property {string}      key    - Identifies the footprints it used.
+ * @property {boolean}     [held] - Made while a card was held, and not pushed.
  */
 
 /**
@@ -535,11 +536,38 @@ const SETTLE_THRESHOLD = 2;
  * @param {Map<string, { hw: number, top: number, bottom: number }>} footprints
  * @param {string} key - Changes whenever `footprints` or `linked` would.
  * @param {Set<string>} [linked] - Connected pairs; see {@link separateFootprints}.
+ * @param {{ hold?: boolean }} [options] - `hold` while the reader drags a card:
+ *   every node moves exactly as far as the layout moved it and nothing is
+ *   pushed, so a card can be carried across the others rather than shoving
+ *   each one it meets aside. The first run after a hold pushes as usual,
+ *   settling wherever it was dropped.
  * @returns {StatementLayout}
  */
-export function nextStatementLayout(prev, input, footprints, key, linked) {
+export function nextStatementLayout(
+  prev,
+  input,
+  footprints,
+  key,
+  linked,
+  { hold = false } = {},
+) {
   const warm = prev && prev.key === key;
-  if (warm) {
+  if (warm && hold) {
+    // Every move passed on, however small: the threshold is for the settle's
+    // sub-pixel creep, and a card under the pointer should not lag it.
+    const output = { ...prev.output };
+    for (const id of footprints.keys()) {
+      const a = input[id];
+      const b = prev.input[id];
+      if (a && b && prev.output[id])
+        output[id] = {
+          x: prev.output[id].x + a.x - b.x,
+          y: prev.output[id].y + a.y - b.y,
+        };
+    }
+    return { input, output, key, held: true };
+  }
+  if (warm && !prev.held) {
     let moved = false;
     for (const id of footprints.keys()) {
       const a = input[id];

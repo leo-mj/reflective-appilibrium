@@ -686,12 +686,20 @@ where they were left (`utils/storedPref.js` — localStorage that cannot throw,
 since private-mode Safari denies it outright).
 
 **The central divider** — `hooks/useSplitRatio.js`. **The ratio is the line's
-position from the left edge of the row, not a panel's share of it.** The two
-modes put the flexible panel on opposite sides — analyze reads text-then-graph,
-an assist tab anchors its own panel left and puts the companion right of it — so
-a ratio meaning "the fixed panel's width" would jump when the reader changed
-tabs. `panelWidth` goes on whichever panel carries an explicit width; the other
-takes what is left with `flex: 1`.
+position from the left edge of the row.** Analyze reads text-then-graph, an
+assist tab anchors its own panel left and puts the companion right of it, and
+**the left panel is the fixed one in both**: `panelWidth` goes on it, the right
+one takes what is left with `flex: 1`, and the line sits on the divider's left
+edge. Fixing the right panel on an assist tab — as it once did — put the line
+at `100% − (1 − r)` there and `r` in analyze mode, and it visibly shifted on
+every change of mode.
+
+**The graph is one element for both modes** (`graphPanel` in `REState`),
+right of the divider in the same slot of the row, so moving between an analyze
+tab and an assist tab keeps the same canvas mounted. As two elements, one per
+mode, every such change remounted it — pan and zoom reset, the view re-fitted,
+and the graph flashed. The text panel, by contrast, takes a slot on each side,
+so the keyboard reaches things in the order they are drawn.
 
 Three things hang together and must stay that way. The divider **is** the
 boundary: neither panel draws a border on the edge they share, or there are two

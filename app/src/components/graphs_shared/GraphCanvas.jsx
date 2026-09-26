@@ -136,7 +136,21 @@ export function GraphCanvas({
             userSelect: "none",
             WebkitUserSelect: "none",
           }}
-          onPointerDown={onPointerDown}
+          onPointerDown={(e) => {
+            // `userSelect` above covers the canvas and nothing else: a drag
+            // that starts here and runs off the edge — a node carried to the
+            // border, a pan overshooting it — went on to select the text panel
+            // and the legend beside it. A press on the canvas starts no
+            // selection at all, as the central divider's does not. Mouse only:
+            // on a touch screen the default is what makes a long press work.
+            if (e.pointerType === "mouse" && e.button === 0) {
+              e.preventDefault();
+              // The default also took the focus away from whatever held it —
+              // the search box, a field in the add bar. That part is kept.
+              document.activeElement?.blur?.();
+            }
+            onPointerDown?.(e);
+          }}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}

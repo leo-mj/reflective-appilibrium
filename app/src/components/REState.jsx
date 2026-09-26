@@ -144,6 +144,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     canUndo,
     handleRedo,
     canRedo,
+    handlePinNodes,
   } = useREActions(initialState);
 
   // Not the sample: it is a fixed demonstration anyone can reload from the home
@@ -209,15 +210,18 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     (usesSidePanel
       ? assistSidePanel !== "none" && assistSidePanel !== "focus"
       : showText);
-  // Where the central divider sits, and how wide that leaves the panel on the
-  // fixed side of it. Which side that is differs by mode, and is the same thing
-  // the section below orders the two panels by.
+  // Where the central divider sits, and how wide that leaves the panel left of
+  // it. The left panel is the fixed one in every mode — the text in analyze
+  // mode, the workflow panel on an assist tab — and whatever is right of the
+  // line takes the rest. Fixing the right one on an assist tab put the line at
+  // `100% − (1 − r)` there and at `r` in analyze mode: the same place on
+  // paper, and a pixel apart once each was rounded and drawn.
   const {
     rowRef,
     ratio: splitRatio,
     panelWidth,
     dividerProps,
-  } = useSplitRatio(usesSidePanel ? "right" : "left");
+  } = useSplitRatio("left");
 
   /** The workspace row, inside the app's own 16px padding. */
   const rowW = dims.w - 32;
@@ -236,7 +240,13 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   // would otherwise restart the simulation and drift the nodes under a view
   // that stays put. Rotations and panel toggles are far bigger and still land.
   const simDims = useCoarseDims({ w: graphW, h: dims.h * 0.8 });
-  const { positions, ready } = useStablePositions(state, simDims);
+  // Where the reader drops a node is kept on the state, so the export carries
+  // it: see utils/pinUtils.js.
+  const { positions, ready, drag: nodeDrag } = useStablePositions(
+    state,
+    simDims,
+    handlePinNodes,
+  );
   useEffect(() => {
     if (ready) onReady?.();
   }, [ready, onReady]);
@@ -378,6 +388,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     processes: state.processes ?? [],
     onMergeElements: handleMergeElements,
     positions,
+    nodeDrag,
     hiddenLegendKeys: effectiveHiddenKeys,
     setHiddenLegendKeys,
     selected,
@@ -420,32 +431,90 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   };
 
   // The panel the tab is about: the graph, history or cluster view in analyze
-  // mode, the workflow panel on an assist or simulate tab. Bound here rather
-  // than written inline because the section below places it on either side of
-  // its companion depending on which of those two it is.
-  const mainPanel = (isWide || tab !== "text") && !sideGraphIsFull && (
-    <GraphPanel
-      {...graphPanelCommonProps}
-      tab={tab}
-      workflowPhase={workflowPhase}
-      workflowNextPhase={workflowNextPhase}
-      onAdvanceWorkflow={advanceWorkflow}
-      nextPhaseIsEnabled={workflowNextPhaseEnabled}
-      isFullscreen={!showingTextPanel}
-      // The assist and simulate tabs hand their own graph the toggle above;
-      // here it is the text panel that folds away. When narrow the text is a
-      // tab of its own, with nothing beside it to reclaim.
-      onToggleFullscreen={
-        isWide && !usesSidePanel ? () => setShowText((s) => !s) : null
-      }
-      fullscreenHides="text panel"
-    />
-  );
+  // mode, the workflow panel on an assist or simulate tab.
+  const mainShown = usesSidePanel ? !sideGraphIsFull : isWide || tab !== "text";
 
   // Only ever between two panels: a boundary with nothing on the far side of it
   // is a line the reader cannot move and should not be looking for.
   const showDivider =
-    isWide && !!mainPanel && (showingSideGraph || showingTextPanel);
+    isWide && mainShown && (showingSideGraph || showingTextPanel);
+
+  // The workflow panel, left of the divider on an assist or simulate tab —
+  // at the divider's width when there is one, the whole row when not.
+  const workflowPanel = usesSidePanel && mainShown && (
+    <div
+      style={{
+        minWidth: 0,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        ...(showDivider ? { width: panelWidth, flexShrink: 0 } : { flex: 1 }),
+      }}
+    >
+      <GraphPanel
+        {...graphPanelCommonProps}
+        tab={tab}
+        workflowPhase={workflowPhase}
+        workflowNextPhase={workflowNextPhase}
+        onAdvanceWorkflow={advanceWorkflow}
+        nextPhaseIsEnabled={workflowNextPhaseEnabled}
+        isFullscreen={!showingTextPanel}
+        onToggleFullscreen={null}
+        fullscreenHides="text panel"
+      />
+    </div>
+  );
+
+  // The graph, right of the divider in both modes: the analyze tab's own view,
+  // or an assist tab's companion. **One element for both**, in one place in
+  // the tree, so that changing between an analyze and an assist tab keeps the
+  // same canvas mounted — pan, zoom, framing and all. Two elements, one per
+  // mode, remounted the graph at every such change, and it flashed as it
+  // re-fitted a view nobody had asked to move. Its box is the same in both,
+  // too — what the divider leaves — so the canvas does not move either.
+  const graphShown = usesSidePanel ? isWide && showingSideGraph : mainShown;
+  const graphPanel = graphShown && (
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {usesSidePanel ? (
+        <GraphPanel
+          {...graphPanelCommonProps}
+          tab="graph"
+          workflowPhase={null}
+          workflowNextPhase={null}
+          onAdvanceWorkflow={null}
+          nextPhaseIsEnabled={false}
+          isFullscreen={sideGraphIsFull}
+          onToggleFullscreen={() =>
+            setAssistSidePanel(sideGraphIsFull ? "graph" : "graphFull")
+          }
+          fullscreenHides={isSimulateTab ? "simulation panel" : "assist panel"}
+        />
+      ) : (
+        <GraphPanel
+          {...graphPanelCommonProps}
+          tab={tab}
+          workflowPhase={workflowPhase}
+          workflowNextPhase={workflowNextPhase}
+          onAdvanceWorkflow={advanceWorkflow}
+          nextPhaseIsEnabled={workflowNextPhaseEnabled}
+          isFullscreen={!showingTextPanel}
+          // Here it is the text panel that folds away. When narrow the text is
+          // a tab of its own, with nothing beside it to reclaim.
+          onToggleFullscreen={isWide ? () => setShowText((s) => !s) : null}
+          fullscreenHides="text panel"
+        />
+      )}
+    </div>
+  );
+
   // It carries the boundary itself, which is why neither panel draws one on the
   // edge they share: two lines twelve pixels apart read as a gutter with
   // something wrong in it. The span inside is the line; the box around it is
@@ -593,55 +662,24 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           gap: showDivider ? 0 : 12,
         }}
       >
-        {/* Order matters, and it is the one thing that differs between the two
-            modes. Analyze reads left to right — the text beside the graph. An
-            assist or simulate tab is the thing being worked in, so it is
-            anchored to the left edge and whatever accompanies it, graph or
+        {/* Order matters. Analyze reads left to right — the text beside the
+            graph. An assist or simulate tab is the thing being worked in, so it
+            is anchored to the left edge and whatever accompanies it, graph or
             text, sits to its right; that keeps the tab still while the header's
-            Graph/Text switch changes what is beside it. `usesSidePanel` is the
-            same flag the companion panel itself is chosen by. */}
-        {usesSidePanel && mainPanel}
-        {usesSidePanel && divider}
-        {isWide && showingSideGraph && (
-          <div
-            style={{
-              width: sideGraphIsFull ? "100%" : panelWidth,
-              flexShrink: 0,
-              // No border on the shared edge: the divider beside it is the
-              // boundary, and draws it.
-              ...(sideGraphIsFull ? {} : { paddingLeft: 12 }),
-              minHeight: 0,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <GraphPanel
-              {...graphPanelCommonProps}
-              tab="graph"
-              workflowPhase={null}
-              workflowNextPhase={null}
-              onAdvanceWorkflow={null}
-              nextPhaseIsEnabled={false}
-              onCtrlChainSelect={setAddBarCtrlChain}
-              isFullscreen={sideGraphIsFull}
-              onToggleFullscreen={() =>
-                setAssistSidePanel(sideGraphIsFull ? "graph" : "graphFull")
-              }
-              fullscreenHides={
-                isSimulateTab ? "simulation panel" : "assist panel"
-              }
-            />
-          </div>
+            Graph/Text switch changes what is beside it. The graph is right of
+            the divider either way, which is what lets it be one slot here that
+            both modes share — see `graphPanel`. The text panel takes a slot on
+            each side instead, so the order a keyboard reaches things in is the
+            order they are drawn in. */}
+        {showingTextPanel && !usesSidePanel && (
+          <TextPanel {...textPanelProps} side="left" width={panelWidth} />
         )}
-        {showingTextPanel && (
-          <TextPanel
-            {...textPanelProps}
-            side={usesSidePanel ? "right" : "left"}
-            width={panelWidth}
-          />
+        {workflowPanel}
+        {divider}
+        {graphPanel}
+        {showingTextPanel && usesSidePanel && (
+          <TextPanel {...textPanelProps} side="right" />
         )}
-        {!usesSidePanel && divider}
-        {!usesSidePanel && mainPanel}
       </section>
 
       {/* Under every tab, not only the analyze ones. The assist tabs used to

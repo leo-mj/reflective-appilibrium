@@ -130,6 +130,7 @@ export function GraphPanel({
   processes = [],
   onMergeElements,
   positions,
+  nodeDrag,
   hiddenLegendKeys,
   setHiddenLegendKeys,
   selected,
@@ -297,6 +298,7 @@ export function GraphPanel({
             state={state}
             hiddenLegendKeys={hiddenLegendKeys}
             positions={positions}
+            nodeDrag={nodeDrag}
             selected={selected}
             onSelect={onSelect}
             selectedRel={selectedRel}

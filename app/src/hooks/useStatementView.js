@@ -84,6 +84,8 @@ const COMPACT_ABOVE = 0.36;
  *   The box to lay each element out at, where that is not the card it is drawn
  *   as — the History tab's, whose cards change with the round played and whose
  *   layout must not (`widestCard`). Defaults to the drawn card.
+ * @param {boolean}      [args.holding] - A card is being dragged: cards are not
+ *   pushed apart until it is let go. See `nextStatementLayout`.
  * @returns {{ statements: boolean, toggleStatements: function(): void,
  *   drawnEls: REElement[], positions: PositionMap,
  *   measure: (function(string): number)|null }} `measure` is what the cards
@@ -99,6 +101,7 @@ export function useStatementView({
   pan,
   zoom,
   layoutCardOf,
+  holding = false,
 }) {
   const statements = useSyncExternalStore(
     subscribeStatementView,
@@ -174,10 +177,11 @@ export function useStatementView({
       footprints,
       cardKey,
       linked,
+      { hold: holding },
     );
     return layout.current.output;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statements, layoutPositions, cardKey]);
+  }, [statements, layoutPositions, cardKey, holding]);
 
   // Switching views re-frames the whole graph, gliding there: see
   // `hooks/useViewGlide.js`. The departure is marked at the press.

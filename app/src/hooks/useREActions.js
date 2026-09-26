@@ -15,6 +15,7 @@ import {
 } from "../utils/mergeStates.js";
 import { mergeElementPair } from "../utils/elementMerge.js";
 import { useElementActions } from "./useElementActions.js";
+import { carryPins, withPins } from "../utils/pinUtils.js";
 import { useGroupActions } from "./useGroupActions.js";
 import { useRelationActions } from "./useRelationActions.js";
 import { useReviewActions } from "./useReviewActions.js";
@@ -42,7 +43,7 @@ const MAX_UNDO = 20;
 
 /**
  * @param {REHistory} hist
- * @param {{type: 'mutate', updater: Function} | {type: 'undo'} | {type: 'redo'} | {type: 'replace', state: Object}} action
+ * @param {{type: 'mutate', updater: Function} | {type: 'undo'} | {type: 'redo'} | {type: 'replace', state: Object} | {type: 'pins', pins: Object}} action
  * @returns {REHistory}
  */
 function historyReducer(hist, action) {
@@ -55,22 +56,32 @@ function historyReducer(hist, action) {
         past: [hist.present, ...hist.past].slice(0, MAX_UNDO),
         future: [],
       };
+    // Both carry the present's pins across: a drag is not an undo step, so
+    // undoing an edit must not also undo the drags made since it.
     case "undo": {
       const [prev, ...rest] = hist.past;
       return prev
-        ? { present: prev, past: rest, future: [hist.present, ...hist.future] }
+        ? {
+            present: carryPins(prev, hist.present),
+            past: rest,
+            future: [hist.present, ...hist.future],
+          }
         : hist;
     }
     case "redo": {
       const [next, ...rest] = hist.future;
       return next
         ? {
-            present: next,
+            present: carryPins(next, hist.present),
             past: [hist.present, ...hist.past].slice(0, MAX_UNDO),
             future: rest,
           }
         : hist;
     }
+    // Pinning a node where it was dropped: a change to the present that leaves
+    // nothing for undo to return to. See utils/pinUtils.js.
+    case "pins":
+      return { ...hist, present: withPins(hist.present, action.pins) };
     // A freshly imported state is a new process, not a step in this one, so
     // neither undo nor redo may reach back across it.
     case "replace":
@@ -100,6 +111,14 @@ export function useREActions(initialState) {
    * The updater must be free of side effects — see {@link REHistory}.
    */
   const mutate = (updater) => dispatch({ type: "mutate", updater });
+
+  /**
+   * Pins elements where the reader dropped them on the graph — offsets from
+   * the layout's centre, keyed by id. Not an undo step; see utils/pinUtils.js.
+   *
+   * @param {Record<string, {x: number, y: number}>} pins
+   */
+  const handlePinNodes = (pins) => dispatch({ type: "pins", pins });
 
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
@@ -291,6 +310,7 @@ export function useREActions(initialState) {
     canUndo,
     handleRedo,
     canRedo,
+    handlePinNodes,
     ...elementActions,
     ...relationActions,
     ...groupActions,

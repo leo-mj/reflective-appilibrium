@@ -23,6 +23,7 @@ import {
   toggleGroup,
   upsertGroup,
 } from "../utils/groupUtils.js";
+import { withoutPins } from "../utils/pinUtils.js";
 
 /**
  * @param {{ state: import('../types.js').REState, mutate: Function,
@@ -37,8 +38,22 @@ export function useGroupActions({ state, mutate, setSelected, setSelectedRel }) 
    */
   const [editingGroup, setEditingGroup] = useState(null);
 
+  // A group that closes lets go of its members' pins: collapsed, they have to
+  // gather on its disc, and members pinned apart would hold open the ground
+  // collapsing was meant to reclaim. Dragging the closed group pins them again,
+  // together.
   const withGroups = (fn) =>
-    mutate((prev) => ({ ...prev, groups: fn(groupsOf(prev)) }));
+    mutate((prev) => {
+      const before = new Set(
+        groupsOf(prev).filter((g) => g.collapsed).flatMap((g) => g.members),
+      );
+      const groups = fn(groupsOf(prev));
+      const closing = groups
+        .filter((g) => g.collapsed)
+        .flatMap((g) => g.members)
+        .filter((id) => !before.has(id));
+      return { ...withoutPins(prev, closing), groups };
+    });
 
   /**
    * Brackets a canvas selection together, or extends the group one of them is

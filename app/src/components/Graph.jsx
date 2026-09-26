@@ -28,6 +28,7 @@ import {
 import { groupsOf, projectGroups } from "../utils/groupUtils.js";
 import { processesOf, processTagMap } from "../utils/mergeStates.js";
 import { linkableElements } from "../utils/stateUtils.js";
+import { STATEMENT_SPREAD } from "../utils/statementCards.js";
 import {
   GraphCanvas,
   GroupHull,
@@ -65,7 +66,10 @@ const isInPlay = (el) => el.status !== "withdrawn" && el.status !== "rejected";
  * The graph itself does not run any simulation.
  *
  * ### Interaction
- * - **Pan** — drag anywhere on the SVG via {@link module:hooks/usePan}.
+ * - **Pan** — drag the background via {@link module:hooks/usePan}.
+ * - **Move a node** — drag it with a mouse (`nodeDrag`, from
+ *   {@link module:hooks/useStablePositions}). It stays where it is dropped,
+ *   for as long as the page is open. A finger on a node still pans.
  * - **Click to highlight** — click a node to highlight it and its immediate
  *   neighbours; all other nodes and edges dim to low opacity.  Click the same
  *   node again, or click the background, to deselect.
@@ -108,6 +112,7 @@ export function Graph({
   state,
   hiddenLegendKeys,
   positions: layoutPositions,
+  nodeDrag,
   selected,
   onSelect,
   selectedRel,
@@ -176,12 +181,15 @@ export function Graph({
     onPointerDown: panDown,
     onPointerMove,
     onPointerUp: panUp,
-    onPointerCancel,
     applyWheel,
     zoomIn,
     zoomOut,
     resetView,
   } = usePan();
+  // A node being moved by hand. Held apart from `isDragging`, which is the
+  // view's pan, but it silences the same hover responses.
+  const [draggingNode, setDraggingNode] = useState(false);
+  const moving = isDragging || draggingNode;
   const { statements, toggleStatements, drawnEls, positions, measure } =
     useStatementView({
       layoutPositions,
@@ -192,8 +200,11 @@ export function Graph({
       resetView,
       pan,
       zoom,
+      // Carried across the others while held, rather than shoving each one it
+      // meets aside; the cards settle once it is let go.
+      holding: draggingNode,
     });
-  const growth = useCardGrowth({ measure, isDragging });
+  const growth = useCardGrowth({ measure, isDragging: moving });
 
   // ── Groups ────────────────────────────────────────────────────────────────
   // Everything below this point works on the *projected* graph: a collapsed
@@ -284,9 +295,41 @@ export function Graph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey, dims.w, dims.h, ready]);
 
-  const { onPointerDown, onPointerUp, nodeAt, relationAt, toSim } = useGraphClick({
+  // What a dragged node moves: a collapsed group's disc stands for its members.
+  const dragIdsOf = (el) =>
+    el.type === "group"
+      ? (groupsOf(state).find((g) => g.id === el.id)?.members ?? [])
+      : [el.id];
+
+  const {
+    onPointerDown,
+    onPointerMove: pointerMove,
+    onPointerUp,
+    onPointerCancel: pointerCancel,
+    nodeAt,
+    relationAt,
+    toSim,
+  } = useGraphClick({
     panDown,
     panUp,
+    panMove: onPointerMove,
+    onNodeDragStart: nodeDrag
+      ? (el) => {
+          setDraggingNode(true);
+          setPinned(null);
+          nodeDrag.grab(dragIdsOf(el));
+        }
+      : undefined,
+    // The statement view draws the layout spread about its centre, so a card
+    // moved some distance on screen is a node moved that much less.
+    onNodeDrag: (_el, dx, dy) => {
+      const k = statements ? STATEMENT_SPREAD : 1;
+      nodeDrag?.moveTo(dx / k, dy / k);
+    },
+    onNodeDragEnd: () => {
+      setDraggingNode(false);
+      nodeDrag?.release();
+    },
     visibleEls: displayEls,
     visRels: displayRels,
     jointGroups,
@@ -391,18 +434,18 @@ export function Graph({
         dims={dims}
         pan={pan}
         zoom={zoom}
-        isDragging={isDragging}
+        isDragging={moving}
         onPointerDown={(e) => {
           growth.notePointer(e);
           onPointerDown(e);
         }}
         onPointerMove={(e) => {
           growth.notePointer(e);
-          onPointerMove(e);
+          pointerMove(e);
           // A mouse over an edge shows what it says; over a node, or panning,
           // nothing. A finger has `onTap` instead.
           if (e.pointerType !== "mouse") return;
-          if (isDragging) return showRel(null);
+          if (moving) return showRel(null);
           const { sx, sy } = toSim(e);
           showRel(nodeAt(sx, sy) ? null : relationAt(sx, sy));
         }}
@@ -410,7 +453,7 @@ export function Graph({
           if (e.pointerType === "mouse") showRel(null);
         }}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
+        onPointerCancel={pointerCancel}
         applyWheel={applyWheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}
@@ -561,7 +604,7 @@ export function Graph({
               // For the card to mark what the search found in its wording.
               search: query,
             },
-            isDragging,
+            moving,
             setTooltip,
             // A card's hover grows it rather than opening the hover card over
             // it: the wording is the card, and a second box repeating it was
