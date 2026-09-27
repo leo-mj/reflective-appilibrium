@@ -316,14 +316,22 @@ export function useStablePositions(state, dims, onPin) {
   const drag = useMemo(
     () => ({
       /**
-       * Holds the named nodes where they stand. The layout is left as it is —
-       * not warmed, as D3's own drag does — so nothing but the dragged nodes
-       * moves: a node is put somewhere, not tugged there with its neighbours
-       * trailing after it. A layout still settling carries on settling.
+       * Holds the named nodes where they stand, and brings the layout to rest
+       * — the opposite of D3's own drag, which warms it — so nothing but the
+       * dragged nodes moves: a node is put somewhere, not tugged there with
+       * its neighbours trailing after it.
+       *
+       * At rest, not merely left alone. A layout looks still long before it
+       * is: two nodes reach the point where their forces balance in a second
+       * or two, while the simulation runs on for ten more, and carrying a node
+       * through it lets its forces shove each neighbour it passes. Stopping it
+       * is also what a reader who has started arranging things by hand wants
+       * of a layout still visibly settling.
        */
       grab(ids) {
         const sim = simRef.current;
         if (!sim) return;
+        sim.stop();
         const wanted = new Set(ids);
         const grabbed = new Map();
         for (const n of sim.nodes()) {

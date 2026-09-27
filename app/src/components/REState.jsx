@@ -6,6 +6,7 @@ import { useIsWide, useWindowSize } from "../hooks/useWindowSize.js";
 import { useCoarseDims } from "../hooks/useCoarseDims.js";
 import { useSplitRatio } from "../hooks/useSplitRatio.js";
 import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
+import { pinsOf } from "../utils/pinUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { useAutosaveDraft } from "../hooks/useAutosaveDraft.js";
 import {
@@ -145,6 +146,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleRedo,
     canRedo,
     handlePinNodes,
+    handleResetLayout,
   } = useREActions(initialState);
 
   // Not the sample: it is a fixed demonstration anyone can reload from the home
@@ -156,6 +158,16 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
       // Never while typing: in a textarea these are the editor's own undo.
       if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")
         return;
+
+      // Escape lets go of the selection — an element, a relation, a group, and
+      // with it any ctrl+click chain, which is only kept for the selection it
+      // started from. Only an Escape nothing else wanted: a dialog or an open
+      // dropdown stops its own, and the tour closes on it.
+      if (e.key === "Escape" && !e.defaultPrevented && !tourActive) {
+        handleSelectNode(() => null);
+        return;
+      }
+
       if (!(e.ctrlKey || e.metaKey)) return;
 
       // Ctrl/Cmd+Shift+Z, and Ctrl+Y for the Windows habit.
@@ -173,7 +185,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, handleSelectNode, tourActive]);
 
   const dims = useWindowSize();
   // Through the hook rather than a comparison written out here: it is the app's
@@ -634,6 +646,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         setHideNonEntailsRels={setHideNonEntailsRels}
         showProcessTags={hasMerged ? showProcessTags : null}
         setShowProcessTags={setShowProcessTags}
+        onResetLayout={
+          Object.keys(pinsOf(state)).length ? handleResetLayout : null
+        }
         hasMerged={hasMerged}
         verifyArguments={verifyArguments}
         setVerifyArguments={setVerifyArguments}

@@ -5,7 +5,13 @@
 
 /** @import { REState, PositionMap } from '../types.js' */
 
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useMemo,
+  useEffect,
+  useCallback,
+} from "react";
 
 import { C } from "../constants/colors.js";
 import { usePalette } from "../hooks/useTheme.js";
@@ -16,6 +22,7 @@ import { useGraphClick } from "../hooks/useGraphClick.js";
 import { useStatementView } from "../hooks/useStatementView.js";
 import { useCardGrowth } from "../hooks/useCardGrowth.js";
 import { useShownRelation } from "../hooks/useShownRelation.js";
+import { usePanGlide } from "../hooks/useViewGlide.js";
 import { pageFontFamily } from "../utils/textWidth.js";
 import { drawnOnGraph, graphHighlights } from "../utils/graphView.js";
 import {
@@ -51,6 +58,34 @@ import { CtrlSelectionBar } from "./graph/CtrlSelectionBar.jsx";
 import { GraphModals } from "./graph/GraphModals.jsx";
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
+
+/**
+ * How far inside the canvas's edge, in screen px, a selected node's centre has
+ * to be to count as on screen. At the very edge it is half cut off.
+ */
+const ON_SCREEN_MARGIN = 24;
+
+/**
+ * How much of the canvas's right edge its controls cover — the add buttons'
+ * column (`AddButtonsOverlay`, about 76px wide at 12px in) with the margin
+ * above beside it. A node under them is not one the reader can see.
+ */
+const RIGHT_CONTROLS_WIDTH = 96 + ON_SCREEN_MARGIN;
+
+/**
+ * The elements a relation joins: its two ends, or for one step of a joint
+ * argument, every premise of that argument and its conclusion.
+ *
+ * @param {import('../types.js').RERelation} rel
+ * @param {import('../types.js').RERelation[]} relations
+ * @returns {string[]}
+ */
+const relationEnds = (rel, relations) => {
+  const rels = rel.argumentId
+    ? relations.filter((r) => r.argumentId === rel.argumentId)
+    : [rel];
+  return [...new Set(rels.flatMap((r) => [r.from, r.to]))];
+};
 
 /** Withdrawn and rejected elements offer Reinstate where others offer Withdraw. */
 const isInPlay = (el) => el.status !== "withdrawn" && el.status !== "rejected";
@@ -143,6 +178,9 @@ export function Graph({
   // Clicking a node pins its tooltip open with the same actions the text tab
   // offers. It takes precedence over the hover tooltip until dismissed.
   const [pinned, setPinned] = useState(null);
+  // It is opened by a click that selects, and goes when the selection does —
+  // Escape included, which clears the selection from outside the canvas.
+  if (pinned && !selected) setPinned(null);
   // The edge under the pointer, or last tapped, whose explanation shows.
   const [shownRel, showRel] = useShownRelation();
   const [addingElType, setAddingElType] = useState(null);
@@ -275,14 +313,93 @@ export function Graph({
   // the tour, below, can frame an element that is currently inside one.
   useAutoFit({ positions, dims, resetView, enabled: ready });
 
+  const focusKey = focus?.key;
+
+  // What is selected is brought into view, at the zoom the reader has: an
+  // element, or a relation's ends — every premise and the conclusion, for a
+  // joint argument, since the whole argument is what lights up. Picked in the
+  // text panel, most often; a click on the canvas selects what is already on
+  // it, and moves the view only when that is cut off at the edge.
+  const { glideTo, stop: stopGlide } = usePanGlide({ resetView, pan, zoom });
+  const seenFocus = useRef(focusKey);
+  const seenSelection = useRef({ selected, selectedRel });
+  useEffect(() => {
+    // A change of selection only: on arrival — back from History with
+    // something selected — the opening fit has the view, and this effect
+    // would be reading it from before that fit landed.
+    const seen = seenSelection.current;
+    if (seen.selected === selected && seen.selectedRel === selectedRel) return;
+    seenSelection.current = { selected, selectedRel };
+    // The tour selects and frames together, and its framing is the one that
+    // counts: a selection arriving in the same render as one does not glide.
+    if (focusKey !== seenFocus.current || !dims.w) return;
+    const ids = selected
+      ? [selected]
+      : selectedRel
+        ? relationEnds(selectedRel, state.relations)
+        : [];
+
+    // Every end's whole box on screen, not its centre: a statement card is
+    // wide, and one standing half off the edge had its centre well inside.
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const id of ids) {
+      const pos = displayPositions[id] ?? positions[id];
+      if (!pos) continue;
+      const el = displayEls.find((e) => e.id === id);
+      const rx = (el?.card?.hw ?? (el ? elementRadius(el) : 0)) * zoom;
+      const ry = (el?.card?.hh ?? (el ? elementRadius(el) : 0)) * zoom;
+      const sx = pos.x * zoom + pan.x;
+      const sy = pos.y * zoom + pan.y;
+      minX = Math.min(minX, sx - rx);
+      maxX = Math.max(maxX, sx + rx);
+      minY = Math.min(minY, sy - ry);
+      maxY = Math.max(maxY, sy + ry);
+    }
+    if (minX === Infinity) return;
+
+    // What is clear of the canvas's own controls: the add buttons and the
+    // zoom column run down the right edge, and a node under them is hidden.
+    const left = ON_SCREEN_MARGIN;
+    const top = ON_SCREEN_MARGIN;
+    const right = dims.w - RIGHT_CONTROLS_WIDTH;
+    const bottom = dims.h - ON_SCREEN_MARGIN;
+    const lost = maxX < 0 || minX > dims.w || maxY < 0 || minY > dims.h;
+    const fits = maxX - minX <= right - left && maxY - minY <= bottom - top;
+    let dx;
+    let dy;
+    if (lost || !fits) {
+      // Nowhere to be seen, or too big to show whole: centred on the clear area.
+      dx = (left + right) / 2 - (minX + maxX) / 2;
+      dy = (top + bottom) / 2 - (minY + maxY) / 2;
+    } else {
+      // Only cut off: moved just far enough to be whole, so the rest of the
+      // view — which the reader was looking at — shifts as little as it can.
+      dx = minX < left ? left - minX : maxX > right ? right - maxX : 0;
+      dy = minY < top ? top - minY : maxY > bottom ? bottom - maxY : 0;
+    }
+    if (!dx && !dy) return;
+    // The card a click pins is placed in page coordinates, where the click
+    // was; it moves with the view, or it would be left behind by the node it
+    // is about.
+    glideTo({ x: pan.x + dx, y: pan.y + dy }, (mx, my) =>
+      setPinned((p) => p && { ...p, x: p.x + mx, y: p.y + my }),
+    );
+    // Keyed on the selection alone: the view moving is not a reason to move it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, selectedRel]);
+
   // The tour re-frames the graph on the elements the section being read names.
   // Keyed on `focus.key` rather than on the ids, so the same section framed
   // again — scrolled back to, or reached after the panel resized — still fits.
   // `positions` is deliberately not a dependency: this fires when the tour
   // moves on, not on every tick of the simulation.
-  const focusKey = focus?.key;
   useEffect(() => {
+    seenFocus.current = focusKey;
     if (!focusKey) return;
+    stopGlide();
     const view = fitView(
       positions,
       focus.ids ?? null,
@@ -295,11 +412,16 @@ export function Graph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey, dims.w, dims.h, ready]);
 
-  // What a dragged node moves: a collapsed group's disc stands for its members.
-  const dragIdsOf = (el) =>
-    el.type === "group"
-      ? (groupsOf(state).find((g) => g.id === el.id)?.members ?? [])
-      : [el.id];
+  // What a dragged node moves: a collapsed group's disc stands for its members,
+  // and a node in a ctrl+click selection brings the rest of the selection with
+  // it — the selection holds together and keeps its shape. The chain holds no
+  // groups (`onCtrlNodeClick` refuses them), so it needs no expanding.
+  const dragIdsOf = (el) => {
+    if (el.type === "group")
+      return groupsOf(state).find((g) => g.id === el.id)?.members ?? [];
+    const chain = ctrlArgNodes.length ? [selected, ...ctrlArgNodes] : [];
+    return chain.includes(el.id) ? chain : [el.id];
+  };
 
   const {
     onPointerDown,
@@ -397,6 +519,26 @@ export function Graph({
     },
   });
 
+  /**
+   * Frames the whole graph, as the view opened — the way back after panning
+   * away, or after dragging nodes out to the edges. The raw positions, as for
+   * the opening fit, so a collapsed group's ground is framed too.
+   */
+  const fitGraph = () => {
+    stopGlide();
+    const view = fitView(positions, null, dims, { padding: 96, maxZoom: 1 });
+    if (view) resetView(view.pan, view.zoom);
+  };
+
+  // A wheel taking the view over mid-glide keeps it, as a pointer does.
+  const wheel = useCallback(
+    (deltaY, mx, my) => {
+      stopGlide();
+      applyWheel(deltaY, mx, my);
+    },
+    [applyWheel, stopGlide],
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   // A relation is binary, so it is only on offer for a two-node selection, and
@@ -436,6 +578,8 @@ export function Graph({
         zoom={zoom}
         isDragging={moving}
         onPointerDown={(e) => {
+          // A pointer taking the view over mid-glide keeps it.
+          stopGlide();
           growth.notePointer(e);
           onPointerDown(e);
         }}
@@ -454,9 +598,30 @@ export function Graph({
         }}
         onPointerUp={onPointerUp}
         onPointerCancel={pointerCancel}
-        applyWheel={applyWheel}
+        applyWheel={wheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}
+        onFit={fitGraph}
+        // On a node, Revise; on the background, fit. An edge takes neither: its
+        // two clicks select it and let it go, which is what they were for.
+        onDoubleClick={(e) => {
+          if (e.button !== 0 || e.ctrlKey || e.metaKey) return;
+          const { sx, sy } = toSim(e);
+          const el = nodeAt(sx, sy);
+          if (el) {
+            // Not a group: its first click has already opened it.
+            if (el.type === "group") return;
+            // The two clicks before this selected the node and let it go
+            // again; it is what the dialog is about, so it is held once more,
+            // and stays held when the dialog closes. The card they pinned is
+            // shut — the dialog stands in for it.
+            setPinned(null);
+            onSelect(() => el.id);
+            onEditRequest?.(el.id);
+            return;
+          }
+          if (!relationAt(sx, sy)) fitGraph();
+        }}
         viewControls={
           <StatementToggle on={statements} onToggle={toggleStatements} />
         }

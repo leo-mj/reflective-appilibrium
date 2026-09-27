@@ -29,6 +29,7 @@ import { cardAt, useCardGrowth } from "../hooks/useCardGrowth.js";
 import { useShownRelation } from "../hooks/useShownRelation.js";
 import { widestCard } from "../utils/statementCards.js";
 import {
+  fitView,
   parallelEdgeOffsets,
   groupJointArguments,
   relationAt,
@@ -168,6 +169,12 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
     refitKey: state.elements.length,
   });
 
+  /** Frames the whole graph again, as it opened — the Graph tab's fit button. */
+  const fitHistory = () => {
+    const view = fitView(viewPositions, null, dims, { padding: 96, maxZoom: 1 });
+    if (view) resetView(view.pan, view.zoom);
+  };
+
   const { solo, jointGroups } = groupJointArguments(visRels);
   const offsets = parallelEdgeOffsets(solo);
 
@@ -253,6 +260,13 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
         applyWheel={applyWheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}
+        onFit={fitHistory}
+        // The background only, as on the Graph tab.
+        onDoubleClick={(e) => {
+          if (e.button !== 0) return;
+          const { el, rel } = pointedAt(simAt(e));
+          if (!el && !rel) fitHistory();
+        }}
         viewControls={
           <StatementToggle on={statements} onToggle={toggleStatements} />
         }

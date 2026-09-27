@@ -1814,3 +1814,113 @@ describe("group actions", () => {
     expect(result.current.selected).toBeNull();
   });
 });
+
+// ─── Pins ─────────────────────────────────────────────────────────────────────
+
+describe("pin actions", () => {
+  const threeElements = () =>
+    baseState({
+      elements: [makeEl(), makeEl({ id: "J2" }), makeEl({ id: "J3" })],
+      relations: [],
+    });
+
+  it("pins where a node was dropped, without a round, a log entry or an undo step", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() => result.current.handlePinNodes({ J1: { x: 10, y: -20 } }));
+
+    expect(result.current.state.pins).toEqual({ J1: { x: 10, y: -20 } });
+    expect(result.current.state.round).toBe(1);
+    expect(result.current.state.log).toEqual([]);
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("keeps a drag through the undo of an edit made before it", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() =>
+      result.current.handleAddElement({
+        type: "judgment",
+        text: "New",
+        confidence: 1,
+        origin: "user",
+      }),
+    );
+    act(() => result.current.handlePinNodes({ J1: { x: 5, y: 5 } }));
+    act(() => result.current.handleUndo());
+
+    expect(result.current.state.elements).toHaveLength(3);
+    expect(result.current.state.pins).toEqual({ J1: { x: 5, y: 5 } });
+  });
+
+  it("keeps a drag through a redo too", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() =>
+      result.current.handleAddElement({
+        type: "judgment",
+        text: "New",
+        confidence: 1,
+        origin: "user",
+      }),
+    );
+    act(() => result.current.handleUndo());
+    act(() => result.current.handlePinNodes({ J2: { x: 1, y: 1 } }));
+    act(() => result.current.handleRedo());
+
+    expect(result.current.state.elements).toHaveLength(4);
+    expect(result.current.state.pins).toEqual({ J2: { x: 1, y: 1 } });
+  });
+
+  it("resets the layout as one undo step, which undo takes back", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() =>
+      result.current.handlePinNodes({ J1: { x: 1, y: 1 }, J2: { x: 2, y: 2 } }),
+    );
+    act(() => result.current.handleResetLayout());
+    expect(result.current.state.pins).toEqual({});
+    expect(result.current.canUndo).toBe(true);
+
+    act(() => result.current.handleUndo());
+    expect(result.current.state.pins).toEqual({
+      J1: { x: 1, y: 1 },
+      J2: { x: 2, y: 2 },
+    });
+
+    act(() => result.current.handleRedo());
+    expect(result.current.state.pins).toEqual({});
+  });
+
+  it("lets go of a group's members' pins as the group closes", () => {
+    // Collapsed, they have to gather on the group's disc; pins would hold open
+    // the ground collapsing is there to reclaim.
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() =>
+      result.current.handlePinNodes({
+        J1: { x: 1, y: 1 },
+        J2: { x: 2, y: 2 },
+        J3: { x: 3, y: 3 },
+      }),
+    );
+    // A new group arrives collapsed.
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    expect(result.current.state.pins).toEqual({ J3: { x: 3, y: 3 } });
+  });
+
+  it("does not touch pins when an already-closed group changes", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    // Dragging the closed group pins its members, together.
+    act(() =>
+      result.current.handlePinNodes({ J1: { x: 1, y: 1 }, J2: { x: 1, y: 2 } }),
+    );
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Renamed",
+        members: ["J1", "J2"],
+      }),
+    );
+    expect(result.current.state.pins).toEqual({
+      J1: { x: 1, y: 1 },
+      J2: { x: 1, y: 2 },
+    });
+  });
+});

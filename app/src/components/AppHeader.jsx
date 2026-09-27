@@ -37,6 +37,8 @@ import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
  * @param {boolean|null} [props.showProcessTags] - Whether the merged-process
  *   letters are drawn; null before any merge, which leaves the row out.
  * @param {function} [props.setShowProcessTags]
+ * @param {function|null} [props.onResetLayout] - Releases every pinned node;
+ *   null while none is pinned, which leaves the row out.
  * @param {boolean} [props.hasMerged] - Offers the Merge assist tab.
  * @param {function} props.onImportFile
  * @param {function} [props.onPrepareMerge] - Reads a second exported process and
@@ -103,6 +105,7 @@ export function AppHeader({
   setHideNonEntailsRels,
   showProcessTags = null,
   setShowProcessTags,
+  onResetLayout = null,
   hasMerged = false,
   verifyArguments,
   setVerifyArguments,
@@ -313,6 +316,7 @@ export function AppHeader({
     setHideNonEntailsRels,
     showProcessTags,
     setShowProcessTags,
+    onResetLayout,
     verifyArguments,
     setVerifyArguments,
     weights,

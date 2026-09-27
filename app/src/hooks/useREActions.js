@@ -15,7 +15,7 @@ import {
 } from "../utils/mergeStates.js";
 import { mergeElementPair } from "../utils/elementMerge.js";
 import { useElementActions } from "./useElementActions.js";
-import { carryPins, withPins } from "../utils/pinUtils.js";
+import { carryPins, pinsOf, withPins, withoutPins } from "../utils/pinUtils.js";
 import { useGroupActions } from "./useGroupActions.js";
 import { useRelationActions } from "./useRelationActions.js";
 import { useReviewActions } from "./useReviewActions.js";
@@ -119,6 +119,14 @@ export function useREActions(initialState) {
    * @param {Record<string, {x: number, y: number}>} pins
    */
   const handlePinNodes = (pins) => dispatch({ type: "pins", pins });
+
+  /**
+   * Lets go of every pin, handing the whole graph back to the layout. Unlike
+   * a drag this *is* an undo step: it throws away every placement at once,
+   * and undo is how that is taken back. See `carryPins`.
+   */
+  const handleResetLayout = () =>
+    mutate((prev) => withoutPins(prev, Object.keys(pinsOf(prev))));
 
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
@@ -311,6 +319,7 @@ export function useREActions(initialState) {
     handleRedo,
     canRedo,
     handlePinNodes,
+    handleResetLayout,
     ...elementActions,
     ...relationActions,
     ...groupActions,

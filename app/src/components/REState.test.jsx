@@ -436,3 +436,74 @@ describe("merged-process tags", () => {
     expect(chips().length).toBeGreaterThan(0);
   });
 });
+
+describe("changing between analyze and assist", () => {
+  it("keeps the one graph canvas, rather than drawing it afresh", async () => {
+    // Two canvases, one per mode, remounted the graph on every such change:
+    // pan and zoom reset and the view re-fitted, which flashed.
+    const { container } = open();
+    // The canvas, not the first icon: it is the svg the view is drawn under.
+    const canvas = container
+      .querySelector('svg > g[transform*="scale"]')
+      .closest("svg");
+    fireEvent.click(screen.getByText("Assist"));
+    await screen.findByText(/Elicit Judgments/, {}, { timeout: 5_000 });
+    expect(canvas.isConnected).toBe(true);
+    fireEvent.click(screen.getByText("Analyze"));
+    expect(canvas.isConnected).toBe(true);
+  });
+
+  it("draws the divider line at the same place in both", async () => {
+    // The left panel carries the split's width in both modes, and the line
+    // sits on the divider's left edge — the split itself. Fixing the right
+    // panel on an assist tab put the line a few pixels off.
+    localStorage.setItem("workspaceSplit", "0.4");
+    try {
+      open();
+      const check = () => {
+        const divider = screen.getByRole("separator", { name: "Resize panels" });
+        expect(divider.previousElementSibling.style.width).toBe("40%");
+        expect(divider.style.justifyContent).toBe("flex-start");
+      };
+      check();
+      fireEvent.click(screen.getByText("Assist"));
+      await screen.findByText(/Elicit Judgments/, {}, { timeout: 5_000 });
+      check();
+    } finally {
+      localStorage.removeItem("workspaceSplit");
+    }
+  });
+});
+
+describe("Escape", () => {
+  // J1's id badge, which is how the text panel selects it.
+  const j1Badge = () => screen.getAllByRole("button", { name: "Select J1" })[0];
+
+  it("lets go of the selection", () => {
+    open();
+    fireEvent.click(j1Badge());
+    expect(j1Badge().getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(j1Badge().getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("leaves it alone while a field is being typed in", () => {
+    const { container } = open();
+    fireEvent.click(j1Badge());
+    fireEvent.keyDown(container.querySelector('input[type="search"]'), {
+      key: "Escape",
+    });
+    expect(j1Badge().getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("leaves it alone when a dialog takes the Escape for itself", () => {
+    open();
+    fireEvent.click(j1Badge());
+    fireEvent.click(screen.getAllByRole("button", { name: "Revise" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(j1Badge().getAttribute("aria-pressed")).toBe("true");
+  });
+});

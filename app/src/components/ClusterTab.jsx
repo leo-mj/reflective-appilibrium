@@ -23,6 +23,7 @@ import {
 import { findCoherentClusters } from "../utils/clusterUtils.js";
 import { ARGUMENT_RELATION_TYPES } from "../utils/stateUtils.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
+import { fitView } from "../utils/graphHelpers.js";
 import { processesOf, processTagMap } from "../utils/mergeStates.js";
 
 // ─── ClusterGraph ─────────────────────────────────────────────────────────────
@@ -74,6 +75,11 @@ function ClusterGraph({
     maxZoom: 0.8,
     refitKey: memberKey,
   });
+  /** Frames the cluster again, as it opened — the Graph tab's fit button. */
+  const fitCluster = () => {
+    const view = fitView(positions, ids, dims, { padding: 96, maxZoom: 0.8 });
+    if (view) resetView(view.pan, view.zoom);
+  };
 
   const elementById = useMemo(
     () => new Map(state.elements.map((e) => [e.id, e])),
@@ -107,6 +113,9 @@ function ClusterGraph({
       applyWheel={applyWheel}
       zoomIn={zoomIn}
       zoomOut={zoomOut}
+      onFit={fitCluster}
+      // Anywhere, not only the background: nothing here answers a click.
+      onDoubleClick={(e) => e.button === 0 && fitCluster()}
       tooltip={tooltip}
       containerStyle={{ width: "100%", height: "100%" }}
       overlay={

@@ -70,6 +70,7 @@ export function AppHeaderNarrow({
   setHideNonEntailsRels,
   showProcessTags,
   setShowProcessTags,
+  onResetLayout,
   verifyArguments,
   setVerifyArguments,
   weights,
@@ -322,6 +323,12 @@ export function AppHeaderNarrow({
                 onToggle={() => setShowProcessTags((s) => !s)}
                 style={menuBtn()}
               />
+            )}
+            {onResetLayout && (
+              <button onClick={close(onResetLayout)} style={menuBtn()}>
+                <span style={menuIconStyle}>⟲</span>
+                {MENU_LABELS.resetLayout}
+              </button>
             )}
             {BACKEND_ENABLED && (
               <MenuToggle

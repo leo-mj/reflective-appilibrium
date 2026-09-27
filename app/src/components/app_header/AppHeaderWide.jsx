@@ -72,6 +72,7 @@ export function AppHeaderWide({
   setHideNonEntailsRels,
   showProcessTags,
   setShowProcessTags,
+  onResetLayout,
   verifyArguments,
   setVerifyArguments,
   weights,
@@ -366,6 +367,16 @@ export function AppHeaderWide({
                         onToggle={() => setShowProcessTags((s) => !s)}
                         style={menuItem}
                       />
+                    )}
+                    {/* Only once something is pinned: before that there is
+                        no placement of the reader's to let go of. */}
+                    {onResetLayout && (
+                      <Tooltip text={MENU_TOOLTIPS.resetLayout}>
+                        <button onClick={close(onResetLayout)} style={menuItem}>
+                          <span style={menuIconStyle}>⟲</span>
+                          {MENU_LABELS.resetLayout}
+                        </button>
+                      </Tooltip>
                     )}
                     {BACKEND_ENABLED && (
                       <MenuToggle

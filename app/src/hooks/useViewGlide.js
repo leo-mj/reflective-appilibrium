@@ -12,7 +12,7 @@
 
 /** @import { PositionMap, Dims } from '../types.js' */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fitView } from "../utils/graphHelpers.js";
 
@@ -116,4 +116,54 @@ export function useViewGlide({ trigger, positions, dims, resetView, pan, zoom })
   });
 
   return { drawn, depart };
+}
+
+/**
+ * The view gliding to a new pan, at the zoom it has: the same motion as
+ * {@link useViewGlide}, with nothing on the canvas moving but the view.
+ *
+ * @param {{ resetView: function, pan: { x: number, y: number }, zoom: number }} args
+ *   From `usePan`.
+ * @returns {{ glideTo: function({ x: number, y: number }): void, stop: function(): void }}
+ *   `stop` leaves the view wherever the glide has got to — for a pointer or
+ *   a wheel taking the view over mid-glide, which the next frame would
+ *   otherwise wrest back.
+ */
+export function usePanGlide({ resetView, pan, zoom }) {
+  const frame = useRef(null);
+  // Stable, so a handler built on it — the canvas's wheel listener — is not
+  // re-attached on every render.
+  const stop = useCallback(() => {
+    if (frame.current != null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+  }, []);
+  useEffect(() => stop, [stop]);
+
+  /**
+   * @param {{ x: number, y: number }} to
+   * @param {function(number, number): void} [onMove] - Told how far the view
+   *   moved on each frame, for anything placed in page coordinates that has to
+   *   move with it.
+   */
+  const glideTo = (to, onMove) => {
+    stop();
+    let at = pan;
+    const moveTo = (next) => {
+      resetView(next, zoom);
+      onMove?.(next.x - at.x, next.y - at.y);
+      at = next;
+    };
+    if (reducedMotion()) return moveTo(to);
+    const from = pan;
+    const start = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, Math.max(0, (now - start) / MOTION_MS));
+      const e = ease(t);
+      moveTo({ x: lerp(from.x, to.x, e), y: lerp(from.y, to.y, e) });
+      frame.current = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    frame.current = requestAnimationFrame(step);
+  };
+
+  return { glideTo, stop };
 }

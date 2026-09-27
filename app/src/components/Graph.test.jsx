@@ -10,6 +10,7 @@ import { render, fireEvent, cleanup, act } from "@testing-library/react";
 
 import { Graph } from "./Graph.jsx";
 import { expandedCard, statementCard } from "../utils/statementCards.js";
+import { elementRadius, fitView } from "../utils/graphHelpers.js";
 import { setStatementViewOn } from "../utils/statementViewSetting.js";
 import { C } from "../constants/colors.js";
 import {
@@ -1406,3 +1407,171 @@ describe("the text panel's search, on the graph", () => {
   });
 });
 
+
+// ─── The view: following the selection, fit, double-click ────────────────────
+
+describe("the view follows the selection", () => {
+  // Where things land, not how they get there: the glide jumps under this.
+  beforeEach(() =>
+    vi.stubGlobal("matchMedia", (query) => ({
+      matches: query.includes("prefers-reduced-motion: reduce"),
+    })),
+  );
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setStatementViewOn(false);
+  });
+
+  const el = (id, type = "judgment") => ({
+    id,
+    type,
+    status: "active",
+    confidence: 1,
+    text: `${id}.`,
+    addedRound: 1,
+  });
+  // X1 is far off the right of a 700 × 400 canvas; E1 half off its left edge.
+  const FAR = { J1: { x: 100, y: 100 }, X1: { x: 2000, y: 100 }, E1: { x: 10, y: 200 } };
+  const REL = {
+    from: "J1",
+    to: "X1",
+    type: "entails",
+    explanation: "",
+    addedRound: 1,
+    argumentId: "a1",
+  };
+  const FAR_STATE = {
+    ...STATE,
+    elements: [el("J1"), el("X1"), el("E1")],
+    relations: [REL],
+  };
+
+  /**
+   * The graph with a way to select from outside the canvas, which is what the
+   * text panel does.
+   */
+  function Follow({ onEditRequest = () => {} }) {
+    const [selected, setSelected] = useState(null);
+    const [selectedRel, setSelectedRel] = useState(null);
+    const selectNode = (u) => {
+      setSelectedRel(null);
+      setSelected(u);
+    };
+    const selectRel = (u) => {
+      setSelected(null);
+      setSelectedRel(u);
+    };
+    return (
+      <>
+        <button onClick={() => selectNode(() => "X1")}>pick X1</button>
+        <button onClick={() => selectNode(() => "E1")}>pick E1</button>
+        <button onClick={() => selectRel(() => REL)}>pick relation</button>
+        <Graph
+          state={FAR_STATE}
+          hiddenLegendKeys={new Set()}
+          positions={FAR}
+          selected={selected}
+          onSelect={selectNode}
+          selectedRel={selectedRel}
+          onSelectRel={selectRel}
+          onAddElement={() => {}}
+          onAddRelation={() => {}}
+          onEditRequest={onEditRequest}
+          ready={false}
+          recentlyAdded={null}
+          hideNonEntailsRels={false}
+        />
+      </>
+    );
+  }
+
+  /** The view's pan and zoom, off the transform the canvas draws under. */
+  const view = (container) => {
+    const t = container
+      .querySelector("svg g[transform*='scale']")
+      .getAttribute("transform");
+    const [x, y, z] = t.match(/-?[\d.]+/g).map(Number);
+    return { x, y, zoom: z };
+  };
+  const press = (container, label) =>
+    fireEvent.click(
+      [...container.querySelectorAll("button")].find((b) => b.textContent === label),
+    );
+  const nodeOpacity = (svg, id) =>
+    [...svg.querySelectorAll("g[transform^='translate(']")]
+      .find((g) => g.querySelector(":scope > text")?.textContent === id)
+      .style.opacity;
+
+  // The clear area of a 700 × 400 canvas: 24px in from each edge, and 120px
+  // from the right, where the add and zoom buttons stand.
+  const CLEAR = { left: 24, right: 700 - 120, top: 24, bottom: 400 - 24 };
+  const clearCentre = {
+    x: (CLEAR.left + CLEAR.right) / 2,
+    y: (CLEAR.top + CLEAR.bottom) / 2,
+  };
+
+  it("centres an element selected while nowhere on screen", () => {
+    const { container } = render(<Follow />);
+    press(container, "pick X1");
+    expect(view(container)).toEqual({
+      x: clearCentre.x - 2000,
+      y: clearCentre.y - 100,
+      zoom: 1,
+    });
+  });
+
+  it("moves one only cut off at the edge just far enough to show it whole", () => {
+    const { container } = render(<Follow />);
+    press(container, "pick E1");
+    const r = elementRadius(el("E1"));
+    // Its left edge lands on the margin, and nothing moves up or down.
+    expect(view(container).x + 10 - r).toBeCloseTo(CLEAR.left);
+    expect(view(container).y).toBe(0);
+  });
+
+  it("leaves the view alone for an element already in it", () => {
+    const { container } = render(<Follow />);
+    const svg = container.querySelector("svg");
+    fireEvent.pointerDown(svg, { clientX: 100, clientY: 100, pointerId: 1, pointerType: "mouse" });
+    fireEvent.pointerUp(svg, { clientX: 100, clientY: 100, pointerId: 1, pointerType: "mouse" });
+    expect(view(container)).toEqual({ x: 0, y: 0, zoom: 1 });
+  });
+
+  it("brings in a relation's ends — here too far apart to fit, so its middle", () => {
+    const { container } = render(<Follow />);
+    press(container, "pick relation");
+    expect(view(container).x).toBeCloseTo(clearCentre.x - (100 + 2000) / 2);
+  });
+
+  it("revises a node on a double-click, and keeps it selected", () => {
+    const onEditRequest = vi.fn();
+    const { container } = render(<Follow onEditRequest={onEditRequest} />);
+    const svg = container.querySelector("svg");
+    fireEvent.doubleClick(svg, { clientX: 100, clientY: 100, button: 0 });
+    expect(onEditRequest).toHaveBeenCalledWith("J1");
+    // Selected, so it lights and the rest fades.
+    expect(nodeOpacity(svg, "J1")).toBe("1");
+    expect(Number(nodeOpacity(svg, "E1"))).toBeLessThan(1);
+  });
+
+  it("fits the whole graph from the button, or a double-click on the background", () => {
+    const expected = fitView(FAR, null, { w: 700, h: 400 }, { padding: 96, maxZoom: 1 });
+    for (const act of [
+      (c) => fireEvent.click(c.querySelector('[aria-label="Fit graph to view"]')),
+      (c) =>
+        fireEvent.doubleClick(c.querySelector("svg"), {
+          clientX: 400,
+          clientY: 350,
+          button: 0,
+        }),
+    ]) {
+      const { container, unmount } = render(<Follow />);
+      act(container);
+      const v = view(container);
+      expect(v.zoom).toBeCloseTo(expected.zoom);
+      expect(v.x).toBeCloseTo(expected.pan.x);
+      expect(v.y).toBeCloseTo(expected.pan.y);
+      unmount();
+    }
+  });
+});

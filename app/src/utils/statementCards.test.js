@@ -179,6 +179,43 @@ describe("nextStatementLayout", () => {
     expect(next).not.toBe(first);
     expect(next.output).toEqual(separateFootprints(stacked, f));
   });
+
+  describe("while a card is held", () => {
+    const apart = { A: { x: 0, y: 0 }, B: { x: 400, y: 0 } };
+    // B carried across to sit on top of A.
+    const onTop = { A: { x: 0, y: 0 }, B: { x: 0, y: 0 } };
+
+    it("lets the held card overlap the others rather than pushing them", () => {
+      const first = nextStatementLayout(null, apart, f, "k");
+      const held = nextStatementLayout(first, onTop, f, "k", undefined, {
+        hold: true,
+      });
+      expect(overlaps(held.output, f, "A", "B")).toBe(true);
+      // And A, which nobody moved, stays exactly where it was.
+      expect(held.output.A).toEqual(first.output.A);
+    });
+
+    it("passes on every move, however small, so the card keeps up with the pointer", () => {
+      const first = nextStatementLayout(null, apart, f, "k");
+      const held = nextStatementLayout(first, shift(apart, 0.5, 0), f, "k", undefined, {
+        hold: true,
+      });
+      expect(held).not.toBe(first);
+      expect(held.output.B.x).toBeCloseTo(first.output.B.x + 0.5);
+    });
+
+    it("pushes apart on the first run after it is let go, where it landed", () => {
+      const first = nextStatementLayout(null, apart, f, "k");
+      const held = nextStatementLayout(first, onTop, f, "k", undefined, {
+        hold: true,
+      });
+      // Nothing has moved since — which would normally hand the layout back
+      // untouched — but the drop still settles.
+      const dropped = nextStatementLayout(held, onTop, f, "k");
+      expect(overlaps(dropped.output, f, "A", "B")).toBe(false);
+      expect(dropped.held).toBeFalsy();
+    });
+  });
 });
 
 describe("statementCard", () => {

@@ -509,6 +509,36 @@ export function ExpandIcon({ size = "1em" }) {
   );
 }
 
+/**
+ * Viewfinder corners around three nodes: frame the whole graph. Corners
+ * rather than arrows, so it does not read as the full-screen button's
+ * {@link ExpandIcon}, which sits on the same canvas.
+ */
+export function FitIcon({ size = "1em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block" }}
+      aria-hidden="true"
+    >
+      <polyline points="3 8 3 3 8 3" />
+      <polyline points="16 3 21 3 21 8" />
+      <polyline points="21 16 21 21 16 21" />
+      <polyline points="8 21 3 21 3 16" />
+      <circle cx="9" cy="10" r="1.6" fill="currentColor" />
+      <circle cx="15.5" cy="9" r="1.6" fill="currentColor" />
+      <circle cx="12" cy="15.5" r="1.6" fill="currentColor" />
+    </svg>
+  );
+}
+
 /** The same arrows pulled back in: leave the expanded view. */
 export function CollapseIcon({ size = "1em" }) {
   return (

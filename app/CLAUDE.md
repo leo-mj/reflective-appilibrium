@@ -513,6 +513,33 @@ wider).
   `utils/textTabHelpers.js`, applies the first to what the canvas draws, a
   collapsed group being found through its members.
 
+### Following the selection
+
+An element or relation selected while not wholly on the Graph tab's canvas —
+picked in the text panel, most often — is **glided to** (`usePanGlide` in
+`hooks/useViewGlide.js`), at the zoom the reader has; `prefers-reduced-motion`
+jumps. A relation is its ends, and a joint argument's step is the whole
+argument, every premise and the conclusion (`relationEnds` in `Graph.jsx`),
+since that is what lights up. **The whole node counts**, card and all, and the strip down the right
+edge under the add and zoom buttons does not count as visible: testing the
+centre left a statement card standing half off the edge. One that is lost, or
+too big to show whole, is centred; one that is only cut off moves just far
+enough to be whole, which also applies to a click on a half-hidden node. The
+card a click pins moves with the view (`glideTo`'s `onMove`), being placed in
+page coordinates. A pointer, the wheel or the fit button takes the
+view over mid-glide and keeps it. Two guards: it acts on a *change* of
+selection only, not on the graph mounting with one (the opening fit has the
+view then), and a selection arriving in the same render as the tour's `focus`
+does not glide — the tour selects and frames together, and its framing wins.
+
+**Double-click** is Revise on a node and fit on the background (the fit
+button's other way in, on the History and Cluster canvases too). A double-click
+is two clicks first, which select the node and let it go; the handler selects it
+again and shuts the card they pinned, so the dialog opens over a held node that
+stays held. **Escape** clears the selection — and with it a ctrl+click chain and
+the pinned card — from the handler beside undo in `REState`; a dialog or an open
+dropdown stops its own Escape, and the tour's closes the tour instead.
+
 ### An edge's explanation
 
 Relations carry an `explanation` the graph used to draw nowhere. On the Graph

@@ -14,7 +14,7 @@ import { C } from "../../constants/colors.js";
 import { elementRadius } from "../../utils/graphHelpers.js";
 import { NodeTooltip } from "./NodeTooltip.jsx";
 import { Tooltip } from "../Tooltip.jsx";
-import { StatementCardIcon } from "../Icons.jsx";
+import { FitIcon, StatementCardIcon } from "../Icons.jsx";
 
 const ZOOM_BTN = {
   width: 44,
@@ -77,6 +77,9 @@ export function StatementToggle({ on, onToggle }) {
  * @param {Function}            [props.applyWheel]   - Non-passive wheel handler for zoom.
  * @param {Function}            [props.zoomIn]
  * @param {Function}            [props.zoomOut]
+ * @param {Function}            [props.onFit] - Frames the whole graph; offered as a
+ *   button above the zoom buttons when given.
+ * @param {Function}            [props.onDoubleClick] - On the SVG itself.
  * @param {React.ReactNode}     [props.viewControls] - Drawn above the zoom buttons.
  * @param {Object|null}         props.tooltip
  * @param {React.CSSProperties} [props.containerStyle]
@@ -97,6 +100,8 @@ export function GraphCanvas({
   applyWheel,
   zoomIn,
   zoomOut,
+  onFit,
+  onDoubleClick,
   viewControls,
   tooltip,
   tooltipActions,
@@ -155,6 +160,7 @@ export function GraphCanvas({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
           onPointerLeave={onPointerLeave}
+          onDoubleClick={onDoubleClick}
         >
           <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
             {children}
@@ -173,6 +179,13 @@ export function GraphCanvas({
           }}
         >
           {viewControls}
+          {onFit && (
+            <Tooltip text="Fit the whole graph (or double-click the background)">
+              <button style={ZOOM_BTN} onClick={onFit} aria-label="Fit graph to view">
+                <FitIcon size={20} />
+              </button>
+            </Tooltip>
+          )}
           <Tooltip text="Zoom in">
             <button style={ZOOM_BTN} onClick={zoomIn} aria-label="Zoom in">
               +

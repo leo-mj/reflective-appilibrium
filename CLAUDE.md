@@ -143,6 +143,19 @@ does not undo the drags made since. It is on the state so that the export's
   `useGroupActions`), since collapsed members have to gather on the disc;
   dragging the closed group pins them again, together.
 - Argdown has no place for coordinates, so they stay out of it.
+- **A drag moves only what is held**: grabbing a node brings the layout to rest
+  (`sim.stop()` in `grab`) rather than warming it as D3's own drag does. Left
+  alone is not enough — a layout looks still seconds before it stops, and
+  carrying a node through one still running shoves every neighbour it passes,
+  which is what `e2e/dragging.spec.js` first caught. In the statement view
+  cards are not pushed apart until the
+  card is let go (`hold` in `nextStatementLayout`). What is held is the node, a
+  collapsed group's members, or the whole ctrl+click selection when the node
+  pressed is in it.
+- **☰ → Content → Reset layout** clears every pin, offered only while one
+  exists. It is the one pin change that *is* an undo step — `carryPins` leaves a
+  step alone when the pins are all it changed — since it discards every
+  placement at once.
 
 ### Background theories
 

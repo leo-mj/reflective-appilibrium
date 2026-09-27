@@ -1325,6 +1325,53 @@ describe("importStateFromFile — processes", () => {
   });
 });
 
+// ─── Pins ─────────────────────────────────────────────────────────────────────
+
+describe("importStateFromFile — pins", () => {
+  const els = ["J1", "J2"].map((id) => ({
+    id,
+    type: "judgment",
+    status: "active",
+    confidence: 1,
+    text: id,
+    addedRound: 1,
+  }));
+  const importWith = (pins) =>
+    importStateFromFile(
+      makeFile(wrapInMarkdown({ ...MINIMAL_STATE, elements: els, pins })),
+    );
+
+  it("has no pins key on a state nothing was dragged in", async () => {
+    const state = await importStateFromFile(makeFile(wrapInMarkdown(MINIMAL_STATE)));
+    expect(state).not.toHaveProperty("pins");
+  });
+
+  it("round-trips the pins, negative offsets included", async () => {
+    const state = await importWith({ J1: { x: -12.5, y: 40 } });
+    expect(state.pins).toEqual({ J1: { x: -12.5, y: 40 } });
+  });
+
+  it("drops a pin for an element the file does not hold", async () => {
+    const state = await importWith({ J1: { x: 1, y: 2 }, GONE: { x: 3, y: 4 } });
+    expect(state.pins).toEqual({ J1: { x: 1, y: 2 } });
+  });
+
+  it("keeps only the coordinates, whatever else a pin carries", async () => {
+    const state = await importWith({ J1: { x: 1, y: 2, extra: "no" } });
+    expect(state.pins.J1).toEqual({ x: 1, y: 2 });
+  });
+
+  it("refuses pins that are not an object", async () => {
+    await expect(importWith([1, 2])).rejects.toThrow(/pins/);
+  });
+
+  it("refuses a coordinate that is not a finite number", async () => {
+    await expect(importWith({ J1: { x: "1", y: 2 } })).rejects.toThrow(
+      /pins\.J1\.x/,
+    );
+  });
+});
+
 // ─── Groups ───────────────────────────────────────────────────────────────────
 
 describe("importStateFromFile — groups", () => {

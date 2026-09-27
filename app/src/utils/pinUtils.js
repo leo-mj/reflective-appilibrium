@@ -65,16 +65,32 @@ export function withoutPins(state, ids) {
 }
 
 /**
+ * True when the two states differ in their pins and nothing else — which is
+ * what the one undoable pin change, Reset layout, leaves between its before
+ * and after. Compared by identity, as every edit replaces what it touches.
+ *
+ * @param {REState} a
+ * @param {REState} b
+ */
+function onlyPinsDiffer(a, b) {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  keys.delete("pins");
+  return [...keys].every((k) => a[k] === b[k]);
+}
+
+/**
  * `target` carrying `source`'s pins. Undo and redo move between whole states,
- * and pins are not undo steps: undoing an edit must not also undo the drags
- * made since.
+ * and a drag is not an undo step: undoing an edit must not also undo the drags
+ * made since. The exception is a step that changed nothing but the pins —
+ * Reset layout — which undo is there to take back.
  *
  * @param {REState} target
  * @param {REState} source
  * @returns {REState}
  */
 export function carryPins(target, source) {
-  if (target.pins === source.pins) return target;
+  if (target.pins === source.pins || onlyPinsDiffer(target, source))
+    return target;
   const { pins: _dropped, ...rest } = target;
   return source.pins === undefined ? rest : { ...rest, pins: source.pins };
 }
