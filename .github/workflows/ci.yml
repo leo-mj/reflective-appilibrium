@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     # `deploy` is the release branch: every push to it publishes the demo to
-    # GitHub Pages and the version with the AI features to Cloudflare Pages.
+    # GitHub Pages and the version with the AI features to Cloudflare.
     branches: [main, visualisation, deploy]
   pull_request:
     branches: [main]
@@ -285,8 +285,9 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-  # The version with the AI features, to Cloudflare Pages. Same trigger, gates
-  # and main-ancestry check as the demo: both sites are released from one commit.
+  # The version with the AI features, to Cloudflare as a Worker serving static
+  # assets. Same trigger, gates and main-ancestry check as the demo: both sites
+  # are released from one commit.
   #
   # Cloudflare rather than GitHub Pages because this build holds a visitor's API
   # key in the tab. Its own address keeps that key off a shared github.io origin,
@@ -294,13 +295,18 @@ jobs:
   # frame-ancestors and the rest of the policy arrive as real response headers —
   # a <meta> tag cannot carry them.
   #
+  # A Worker rather than a Cloudflare Pages project: Cloudflare labels Pages
+  # "legacy" and puts new features into Workers only, so a new site on Pages is
+  # a migration scheduled for later. An assets-only Worker has no code and no
+  # wrangler config file; everything it needs is on the command line below.
+  #
   # Built here and uploaded with wrangler, rather than by Cloudflare's own Git
   # integration, which would build every push whether or not the tests passed.
   #
   # The backend is deployed separately (deploy-backend, manually). This reads
   # its address from VITE_BACKEND_URL, which is stable across backend deploys.
   deploy-cloudflare:
-    name: Deploy to Cloudflare Pages
+    name: Deploy to Cloudflare
     needs: [test, test-backend, backend-image, e2e]
     if: github.ref == 'refs/heads/deploy' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -333,17 +339,17 @@ jobs:
       - name: Check the deployment is configured
         env:
           VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
-          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          WORKER: ${{ vars.CLOUDFLARE_WORKER_NAME }}
           HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
           HAS_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
         run: |
           missing=
           case "$VITE_BACKEND_URL" in https://*) ;; *) missing="$missing VITE_BACKEND_URL(https://)" ;; esac
-          [ -n "$PROJECT" ] || missing="$missing CLOUDFLARE_PAGES_PROJECT"
+          [ -n "$WORKER" ] || missing="$missing CLOUDFLARE_WORKER_NAME"
           [ "$HAS_TOKEN" = true ] || missing="$missing CLOUDFLARE_API_TOKEN(secret)"
           [ "$HAS_ACCOUNT" = true ] || missing="$missing CLOUDFLARE_ACCOUNT_ID(secret)"
           if [ -n "$missing" ]; then
-            echo "::error::Set these in Settings → Secrets and variables → Actions, see README 'Deploying the frontend to Cloudflare Pages':$missing"
+            echo "::error::Set these in Settings → Secrets and variables → Actions, see README 'Deploying the frontend to Cloudflare':$missing"
             exit 1
           fi
 
@@ -366,20 +372,23 @@ jobs:
           npm run build:backend
           test -f dist/_headers
 
-      # --branch=main publishes to the project's production branch — the one
-      # it was created with (README). Any other name would be a preview
-      # deployment on a URL of its own, which CORS_ORIGINS does not name.
-      - name: Deploy to Cloudflare Pages
+      # The first run creates the Worker; later runs replace what it serves.
+      # Wrangler 4 is what _headers was checked with (`wrangler dev --assets`
+      # serves the CSP as a header), rather than whatever the action defaults to.
+      # The compatibility date is pinned so a deploy never changes the runtime's
+      # behaviour by itself; with no Worker code of its own, it barely matters.
+      - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4"
           workingDirectory: app
           command: >-
-            pages deploy dist
-            --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }}
-            --branch=main
-            --commit-hash=${{ github.sha }}
+            deploy
+            --assets=dist
+            --name=${{ vars.CLOUDFLARE_WORKER_NAME }}
+            --compatibility-date=2026-06-01
 
   # The backend, to Cloud Run. Manual only: this replaces the server people are
   # using, and a push should never do that on its own. Run it from the Actions

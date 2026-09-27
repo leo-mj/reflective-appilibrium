@@ -1,6 +1,6 @@
 # GitLab pipeline — the same checks as .github/workflows/ci.yml, for whoever
 # reviews or hosts the project from GitLab without opening the GitHub repo.
-# The deploys — the demo to GitHub Pages, the AI version to Cloudflare Pages,
+# The deploys — the demo to GitHub Pages, the AI version to Cloudflare,
 # the backend to Cloud Run — have no counterpart here; the images job instead
 # pushes the two containers to this project's registry, which is what a host pulls.
 #

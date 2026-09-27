@@ -154,7 +154,8 @@ instances are reclaimed, and the June change arrived with no notice.
 ### The frontend stays where it is
 
 *Superseded by "Decision — 2026-09-22" below: the demo stays on GitHub Pages and
-the version with the AI features moves to Cloudflare Pages. The argument against
+the version with the AI features moves to Cloudflare (revised below from Pages
+to a Worker serving static assets). The argument against
 serving the frontend from Cloud Run still stands.*
 
 The backend serves no static files — `main.py` has no `StaticFiles` mount, and
@@ -287,6 +288,24 @@ URL is the demo" true.
   the Actions tab, never on a push. The two static sites deploy on every push
   to `deploy` (`deploy` and `deploy-cloudflare`), the Cloudflare one reading the
   backend's address from `VITE_BACKEND_URL`.
+
+**Revision — 2026-09-27: a Worker, not a Pages project.** The dashboard now
+labels Pages "legacy", and new Cloudflare features land in Workers only. No
+end-of-life date has been announced, but a new site on Pages would be a
+migration scheduled for later, so the AI version is deployed as an assets-only
+Worker instead: `wrangler deploy --assets=dist --name=… --compatibility-date=…`,
+the name from `CLOUDFLARE_WORKER_NAME`. It needs no configuration file in the
+repository and no project created in the dashboard — the first deploy creates
+the Worker — and the token needs *Workers Scripts: Edit* rather than *Pages:
+Edit*. The address is `https://<name>.<subdomain>.workers.dev`. The app has no
+client-side routes, so there is no single-page fallback to configure.
+
+What mattered was that `_headers` still arrives as headers. Checked locally with
+Cloudflare's own runtime (`wrangler dev --assets=dist`, wrangler 4.142): `/`
+carries the Content-Security-Policy as a response header, `frame-ancestors
+'none'` included, with `referrer-policy` and `x-content-type-options`, and
+`/_headers` itself answers 404. Worth one `curl -I` against the live address
+after the first deploy all the same.
 
 **Both defects are fixed on `backend-server`.** The image no longer passes
 `--forwarded-allow-ips="*"`. A new setting, `TRUSTED_PROXY_HOPS`, makes

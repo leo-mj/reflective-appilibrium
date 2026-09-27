@@ -17,7 +17,7 @@
 // Listed by destination rather than tested as `mode === "production"`. Only the
 // demo goes to GitHub Pages. `build:backend` used to as well, which is why this
 // list once named `backend` too; that build now goes to a host serving from its
-// root (Cloudflare Pages, the nginx image), so it takes "/" like the dev server
+// root (Cloudflare, the nginx image), so it takes "/" like the dev server
 // and `build:local`. A backend build bound for a sub-path sets VITE_BASE_PATH.
 const PAGES_MODES = ["production"];
 

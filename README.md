@@ -241,7 +241,7 @@ Actions → Variables). None is secret: the workflow holds no credential.
 | `GCP_ARTIFACT_REPO` | `appilibrium` |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | printed by the last command above |
 | `GCP_DEPLOY_SERVICE_ACCOUNT` | `github-deploy@<project>.iam.gserviceaccount.com` |
-| `BACKEND_CORS_ORIGINS` | the frontend site's origin, `scheme://host` with no path — `https://<project>.pages.dev` for the Cloudflare site below; empty if one host serves both |
+| `BACKEND_CORS_ORIGINS` | the frontend site's origin, `scheme://host` with no path — `https://<name>.<subdomain>.workers.dev` for the Cloudflare site below; empty if one host serves both |
 
 Finally, **set a budget alert** (Billing → Budgets & alerts) at an amount you
 would notice, say €1. The free tier covers normal use, but a budget alert is
@@ -252,42 +252,44 @@ the caller's address to `X-Forwarded-For`) and `--max-instances=1`, which the
 rate limiter requires. The run's summary prints the service URL — that is the
 `VITE_BACKEND_URL` the frontend build needs.
 
-### Deploying the frontend to Cloudflare Pages
+### Deploying the frontend to Cloudflare
 
-The version with the AI features is published to Cloudflare Pages by the
+The version with the AI features is published to Cloudflare by the
 `deploy-cloudflare` job, on every push to `deploy`, from the same commit and
 behind the same checks as the demo on GitHub Pages. It holds a visitor's API key
 in the tab, so it gets an address of its own; and Cloudflare serves the
 `_headers` file the build writes, so the Content-Security-Policy — including
 `frame-ancestors`, which a `<meta>` tag cannot carry — arrives as real response
-headers.
+headers. `wrangler dev --assets=dist` shows the same thing locally.
 
-The one-off setup:
+It is a **Worker serving static assets**, not a Cloudflare Pages project:
+Cloudflare labels Pages "legacy" and adds new features to Workers only. An
+assets-only Worker has no code and needs no configuration file in the
+repository — the job passes the directory, name and compatibility date to
+`wrangler deploy` — and **the first deploy creates it**, so there is nothing to
+set up in the dashboard beyond a token.
 
-1. Create the project, as a direct-upload project (not connected to Git — CI
-   builds and uploads it):
+The one-off setup, all in the browser:
 
-   ```bash
-   npx wrangler pages project create <project> --production-branch=main
-   ```
-
-   Its address is `https://<project>.pages.dev`. The job always publishes to
-   `main`, the production branch; any other branch name would be a preview on a
-   different address, which the backend's CORS would refuse.
-2. Create an API token (My Profile → API Tokens) with the single permission
-   **Account → Cloudflare Pages → Edit**, and note your account ID (on the
+1. Create an API token (My Profile → API Tokens) with the single permission
+   **Account → Workers Scripts → Edit**, and note your account ID (on the
    dashboard's Workers & Pages overview).
+2. Choose the Worker's name. Its address will be
+   `https://<name>.<subdomain>.workers.dev`, where `<subdomain>` is your
+   account's workers.dev subdomain (Workers & Pages → Settings). A name cannot
+   be changed without deploying a new Worker, and the address goes into the
+   backend's CORS setting.
 3. In GitHub, Settings → Secrets and variables → Actions:
 
    | Kind | Name | Value |
    | --- | --- | --- |
    | secret | `CLOUDFLARE_API_TOKEN` | the token |
    | secret | `CLOUDFLARE_ACCOUNT_ID` | the account ID |
-   | variable | `CLOUDFLARE_PAGES_PROJECT` | `<project>` |
+   | variable | `CLOUDFLARE_WORKER_NAME` | `<name>` |
    | variable | `VITE_BACKEND_URL` | the Cloud Run URL from the backend deploy |
-4. Set `BACKEND_CORS_ORIGINS` to `https://<project>.pages.dev` (plus any custom
-   domain) and run the backend deploy again, so the new origin reaches the
-   server.
+4. Set `BACKEND_CORS_ORIGINS` to `https://<name>.<subdomain>.workers.dev` (plus
+   any custom domain) and run the backend deploy again, so the new origin
+   reaches the server.
 
 Deploy the backend first: the frontend job refuses to build until
 `VITE_BACKEND_URL` is an `https://` address, and a site pointed at a backend
@@ -332,7 +334,7 @@ Two shapes of deployment, and the build says which by what it is given
 
 Nothing in the code names a hosting provider. `.github/workflows/ci.yml` carries
 one worked example for each piece — the demo to GitHub Pages, the version with
-the AI features to Cloudflare Pages, the backend to a container host — and each
+the AI features to Cloudflare, the backend to a container host — and each
 reads its destination from repository settings, so moving one is a change of
 setting rather than of code.
 

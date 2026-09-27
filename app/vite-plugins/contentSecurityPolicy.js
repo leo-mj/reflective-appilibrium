@@ -26,9 +26,9 @@
  *
  * What a meta tag cannot do: `frame-ancestors`, `report-uri` and `sandbox` are
  * ignored when delivered this way, so clickjacking protection is not something
- * GitHub Pages can offer. Cloudflare Pages (and Netlify) can: they read a
- * `_headers` file from the site root and send what it lists as real response
- * headers. So every build also writes one, carrying the **same** policy plus
+ * GitHub Pages can offer. Cloudflare (Workers static assets or Pages) and Netlify
+ * can: they read a `_headers` file from the site root and send what it lists as
+ * real response headers. So every build also writes one, carrying the **same** policy plus
  * the header-only `frame-ancestors 'none'` — one directive list, two
  * deliveries, so the two cannot drift. A browser given both enforces both,
  * which is harmless when one is the other plus a directive. On GitHub Pages
