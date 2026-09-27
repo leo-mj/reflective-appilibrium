@@ -115,6 +115,22 @@ frontend-e2e:
   # Generous next to a green run, but retries: 2 in playwright.config.js mean a
   # genuinely failing suite takes three passes.
   timeout: 25m
+  # The backend's dependencies, for the live-backend project: it starts the real
+  # FastAPI server with `python3 -m uvicorn` (playwright.config.js). The image is
+  # Ubuntu with its own Python 3.12, which pip may not install into (PEP 668), so
+  # they go into a virtualenv put first on PATH — that is the `python3` the config
+  # then finds. pypblib has no wheel for 3.12 and is compiled: g++, and the
+  # headers python:3.12 carries and Ubuntu's Python does not. Capped as the GitHub
+  # job caps its apt step: a mirror that stops answering must fail the job, not
+  # hang it.
+  before_script:
+    - timeout 300 apt-get update
+    - timeout 300 apt-get install -y --no-install-recommends python3-venv python3-dev g++
+    - python3 -m venv /opt/backend
+    - export PATH=/opt/backend/bin:$PATH
+    - pip install --upgrade pip
+    - pip install -r backend/requirements.txt
+    - !reference [.node, before_script]
   script:
     - npm run test:e2e
   # The report holds the trace and screenshot of every failure.
