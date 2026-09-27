@@ -30,6 +30,7 @@ import { C } from "../../constants/colors.js";
 import { BACKEND_ENABLED } from "../../config.js";
 import { useBackendCapabilities } from "../../hooks/useBackendCapabilities.js";
 import { btn } from "./appHeaderStyles.js";
+import { useDialog } from "../../hooks/useDialog.js";
 
 const BROWSER =
   "Your work is autosaved in this browser, so a closed tab can be resumed. On a shared computer, discard it from the start screen when you are done.";
@@ -88,6 +89,7 @@ function privacySections({ backend, capabilities }) {
 /** @param {{ open: boolean, onClose: () => void }} props */
 export function PrivacyModal({ open, onClose }) {
   const capabilities = useBackendCapabilities();
+  const { dialogProps } = useDialog({ open, onClose });
   if (!open) return null;
 
   const sections = privacySections({ backend: BACKEND_ENABLED, capabilities });
@@ -99,7 +101,7 @@ export function PrivacyModal({ open, onClose }) {
         onClick={onClose}
       />
       <div
-        role="dialog"
+        {...dialogProps}
         aria-labelledby="privacy-title"
         style={{
           position: "fixed",

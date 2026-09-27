@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { btn } from "./appHeaderStyles.js";
+import { useDialog } from "../../hooks/useDialog.js";
 
 const FONTS = [
   {
@@ -27,6 +28,9 @@ export function FontSettingsModal({ open, onClose }) {
     () => localStorage.getItem("fontId") ?? "system"
   );
 
+  const titleId = useId();
+  const { dialogProps } = useDialog({ open, onClose });
+
   const handleSelect = (id) => {
     setFontId(id);
     localStorage.setItem("fontId", id);
@@ -42,6 +46,8 @@ export function FontSettingsModal({ open, onClose }) {
         onClick={onClose}
       />
       <div
+        {...dialogProps}
+        aria-labelledby={titleId}
         style={{
           position: "fixed",
           top: "50%",
@@ -57,6 +63,7 @@ export function FontSettingsModal({ open, onClose }) {
         }}
       >
         <div
+          id={titleId}
           style={{
             fontWeight: "bold",
             marginBottom: 12,

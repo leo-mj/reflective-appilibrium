@@ -7,10 +7,11 @@
  * @module components/ModalShell
  */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId } from "react";
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { FIELD_STYLE, LABEL_STYLE } from "../../constants/modalConstants.js";
+import { useDialog } from "../../hooks/useDialog.js";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -25,10 +26,6 @@ export function FormField({ label, children }) {
 }
 
 // ─── Shell ────────────────────────────────────────────────────────────────────
-
-/** What Tab can land on inside the dialog. */
-const FOCUSABLE =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * Centred modal overlay with a standard two-button footer.
@@ -45,7 +42,8 @@ const FOCUSABLE =
  * it and no key to close it. Every add, edit and withdraw form is this shell,
  * so they all had the same gap. A dropdown inside keeps Escape for itself
  * while its list is open (`Dropdown` stops it), so Escape there closes the
- * list and not the dialog.
+ * list and not the dialog. All of that is `useDialog`, which the header's
+ * settings and privacy modals share.
  *
  * @param {Object}           props
  * @param {string}           props.title        - Bold heading shown at the top of the modal.
@@ -72,21 +70,7 @@ export function ModalShell({
 }) {
   const titleId = useId();
   const subtitleId = useId();
-  const boxRef = useRef(null);
-  // Whatever had the focus when the dialog opened: read on the first render,
-  // before a field inside can take the focus with `autoFocus`.
-  const [opener] = useState(() =>
-    typeof document === "undefined" ? null : document.activeElement,
-  );
-
-  useEffect(() => {
-    const box = boxRef.current;
-    if (box && !box.contains(document.activeElement))
-      (box.querySelector(FOCUSABLE) ?? box).focus();
-    return () => {
-      if (opener && document.contains(opener)) opener.focus?.();
-    };
-  }, [opener]);
+  const { dialogProps } = useDialog({ onClose: onCancel });
 
   const onKeyDown = (e) => {
     if (e.key === "Enter" && e.ctrlKey && !saveDisabled) {
@@ -94,26 +78,7 @@ export function ModalShell({
       onSave();
       return;
     }
-    if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      onCancel();
-      return;
-    }
-    if (e.key !== "Tab") return;
-    const stops = [...boxRef.current.querySelectorAll(FOCUSABLE)].filter(
-      (el) => el.offsetParent !== null || el === document.activeElement,
-    );
-    if (!stops.length) return;
-    const first = stops[0];
-    const last = stops.at(-1);
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
+    dialogProps.onKeyDown(e);
   };
 
   return (
@@ -130,12 +95,9 @@ export function ModalShell({
       }}
     >
       <div
-        ref={boxRef}
-        role="dialog"
-        aria-modal="true"
+        {...dialogProps}
         aria-labelledby={titleId}
         aria-describedby={subtitle ? subtitleId : undefined}
-        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
         style={{

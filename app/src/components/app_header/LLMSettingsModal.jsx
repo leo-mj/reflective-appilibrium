@@ -7,7 +7,7 @@
  * @module components/app_header/LLMSettingsModal
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { LLM_PROVIDERS } from "../../constants/llmProviders.js";
@@ -23,6 +23,7 @@ import {
   notifyLLMKeyChanged,
 } from "../../utils/llmKey.js";
 import { unwrapDetail } from "../../utils/backendError.js";
+import { useDialog } from "../../hooks/useDialog.js";
 
 /** Why the inert controls are inert, for hover and assistive technology. */
 const DEMO_REASON = "Unavailable in the demo — this build has no backend.";
@@ -64,6 +65,8 @@ export function LLMSettingsModal({ open, onClose }) {
   const [testing, setTesting] = useState(false);
   const [serverKeyUrls, setServerKeyUrls] = useState(new Set());
   const [usage, setUsage] = useState({ input: 0, output: 0 });
+  const titleId = useId();
+  const { dialogProps } = useDialog({ open, onClose });
 
   useEffect(() => {
     if (!open) return;
@@ -185,6 +188,8 @@ export function LLMSettingsModal({ open, onClose }) {
       />
       {/* Modal */}
       <div
+        {...dialogProps}
+        aria-labelledby={titleId}
         style={{
           position: "fixed",
           top: "50%",
@@ -202,6 +207,7 @@ export function LLMSettingsModal({ open, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div
+          id={titleId}
           style={{
             fontSize: 14,
             fontWeight: "bold",
