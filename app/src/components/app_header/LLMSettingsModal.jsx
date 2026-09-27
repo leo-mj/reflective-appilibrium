@@ -39,12 +39,42 @@ function getInitialProvider() {
   return LLM_PROVIDERS.find((p) => p.id === defaultId) ?? LLM_PROVIDERS[0];
 }
 
+/**
+ * The model last saved for `provider`, else the build's default where it is
+ * this provider's, else none: the app does not pick a model for a key it does
+ * not pay for. See {@link module:constants/llmProviders}.
+ */
 function getInitialModel(provider) {
   const saved = readLLMSettings();
-  if (saved?.model) return saved.model;
-  const defaultModel = import.meta.env.VITE_DEFAULT_MODEL;
-  if (defaultModel) return defaultModel;
-  return provider.models[0];
+  if (saved?.baseUrl === provider.baseUrl && saved.model) return saved.model;
+  const env = import.meta.env;
+  const forThisProvider =
+    !env.VITE_DEFAULT_PROVIDER || env.VITE_DEFAULT_PROVIDER === provider.id;
+  return (forThisProvider && env.VITE_DEFAULT_MODEL) || "";
+}
+
+/** The key this tab holds for `provider`, if the last save was for it. */
+function savedKeyFor(provider) {
+  const saved = readLLMSettings();
+  return saved?.baseUrl === provider.baseUrl ? (saved.apiKey ?? "") : "";
+}
+
+/**
+ * Asks the provider, through the backend, which models `key` can use.
+ *
+ * @returns {Promise<{ ok: true, models: string[] } | { ok: false, message: string }>}
+ */
+async function requestModels(provider, key) {
+  const headers = { "x-base-url": provider.baseUrl };
+  if (key) headers["x-api-key"] = key;
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/llm/models`, { headers });
+    if (res.ok) return { ok: true, models: (await res.json()).models ?? [] };
+    // The provider's own words, as for the connection test below.
+    return { ok: false, message: unwrapDetail(await res.text()) || `Error ${res.status}` };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
 }
 
 /**
@@ -61,10 +91,16 @@ export function LLMSettingsModal({ open, onClose }) {
     getInitialModel(getInitialProvider()),
   );
   const [apiKey, setApiKey] = useState("");
-  const [testStatus, setTestStatus] = useState(null); // null | { ok: boolean, message: string }
+  // null | { ok: boolean, message: string, note?: boolean } — a note is
+  // neither success nor failure: the key works, but there is no model yet.
+  const [testStatus, setTestStatus] = useState(null);
   const [testing, setTesting] = useState(false);
   const [serverKeyUrls, setServerKeyUrls] = useState(new Set());
   const [usage, setUsage] = useState({ input: 0, output: 0 });
+  // Tagged with the provider asked, so a list that arrives after the reader
+  // has moved to another provider is not offered under it.
+  const [listed, setListed] = useState({ baseUrl: null, models: [] });
+  const models = listed.baseUrl === provider.baseUrl ? listed.models : [];
   const titleId = useId();
   const { dialogProps } = useDialog({ open, onClose });
 
@@ -78,20 +114,33 @@ export function LLMSettingsModal({ open, onClose }) {
       .catch(() => {});
   }, [open, demo]);
 
+  // With a key already saved for this provider, the list can be had without
+  // asking the reader to test first. Otherwise Test connection fetches it.
+  useEffect(() => {
+    const key = savedKeyFor(provider);
+    if (!open || demo || !key) return;
+    requestModels(provider, key).then((r) => {
+      if (r.ok) setListed({ baseUrl: provider.baseUrl, models: r.models });
+    });
+  }, [open, demo, provider]);
+
   // Subscribed rather than read once: Clear writes and closes, and the "· Key
   // saved" line beside the field has to have moved by the time it reopens.
   const hasSessionKey = useHasLLMKey();
   const hasSavedKey = hasSessionKey || serverKeyUrls.has(provider.baseUrl);
 
-  const effectiveApiKey = apiKey || provider.defaultApiKey || "";
+  // The saved key counts when the field is left empty: changing only the model
+  // used to save an empty key over it.
+  const effectiveApiKey =
+    apiKey || savedKeyFor(provider) || provider.defaultApiKey || "";
   // Save is enabled if: last test succeeded OR a key is already saved (model-only change)
   const saveEnabled = testStatus?.ok || (hasSavedKey && testStatus === null);
-  const canSave = saveEnabled && !demo;
+  const canSave = saveEnabled && !demo && model.trim() !== "";
 
   function handleProviderChange(e) {
     const next = LLM_PROVIDERS.find((p) => p.id === e.target.value);
     setProvider(next);
-    setModel(next.models[0]);
+    setModel(getInitialModel(next));
     setTestStatus(null);
   }
 
@@ -103,6 +152,26 @@ export function LLMSettingsModal({ open, onClose }) {
   async function handleTest() {
     setTesting(true);
     setTestStatus(null);
+    // The listing needs only the key, so it is also the test of the key when
+    // no model has been chosen yet — which, with no default, is the first visit.
+    const listing = await requestModels(provider, effectiveApiKey);
+    if (listing.ok)
+      setListed({ baseUrl: provider.baseUrl, models: listing.models });
+    if (!model.trim()) {
+      setTestStatus(
+        listing.ok
+          ? {
+              ok: false,
+              note: true,
+              message: `Key accepted. Choose one of the ${listing.models.length} models this key can use, then test again.`,
+            }
+          : { ok: false, message: listing.message },
+      );
+      setTesting(false);
+      return;
+    }
+    // With a model, the completion below is the test; a provider that lists no
+    // models can still pass it.
     try {
       const headers = { "x-model": model, "x-base-url": provider.baseUrl };
       if (effectiveApiKey) headers["x-api-key"] = effectiveApiKey;
@@ -261,13 +330,17 @@ export function LLMSettingsModal({ open, onClose }) {
             list="llm-model-suggestions"
             value={model}
             onChange={handleModelChange}
-            placeholder={provider.models[0]}
+            placeholder={
+              models.length
+                ? `Choose or type, e.g. ${models[0]}`
+                : "Test connection to list this key's models"
+            }
             style={inputStyle}
             autoComplete="off"
             spellCheck={false}
           />
           <datalist id="llm-model-suggestions">
-            {provider.models.map((m) => (
+            {models.map((m) => (
               <option key={m} value={m} />
             ))}
           </datalist>
@@ -350,7 +423,11 @@ export function LLMSettingsModal({ open, onClose }) {
           <div
             style={{
               fontSize: 11,
-              color: testStatus.ok ? C.supports : C.conflicts,
+              color: testStatus.note
+                ? C.dim
+                : testStatus.ok
+                  ? C.supports
+                  : C.conflicts,
               marginBottom: 12,
               wordBreak: "break-word",
             }}

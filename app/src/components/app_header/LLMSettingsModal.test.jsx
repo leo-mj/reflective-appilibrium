@@ -126,6 +126,76 @@ describe("when BYOK is available", () => {
   });
 });
 
+// The model list is the provider's, not the app's: no default is picked for a
+// key the app does not pay for, and the suggestions are what that key can use.
+describe("choosing a model", () => {
+  beforeEach(() => {
+    flags.byok = true;
+    fetchMock.mockImplementation((url) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            String(url).includes("/api/llm/models")
+              ? { models: ["newest-model", "older-model"] }
+              : String(url).includes("/api/llm/test")
+                ? { model: "newest-model" }
+                : { base_urls: [] },
+          ),
+      }),
+    );
+  });
+
+  const modelField = () => document.querySelector("input[list]");
+  const suggestions = () =>
+    [...document.querySelectorAll("#llm-model-suggestions option")].map((o) => o.value);
+
+  it("starts with no model chosen and nothing suggested", () => {
+    open();
+    expect(modelField().value).toBe("");
+    expect(suggestions()).toEqual([]);
+  });
+
+  it("lists the key's models on a test, and asks for a choice before saving", async () => {
+    open();
+    fireEvent.change(keyField(), { target: { value: "sk-live" } });
+    fireEvent.click(button("Test connection"));
+    await waitFor(() =>
+      expect(suggestions()).toEqual(["newest-model", "older-model"]),
+    );
+    expect(document.body.textContent).toContain("Key accepted");
+    expect(button("Save").disabled).toBe(true);
+    const listCall = fetchMock.mock.calls.find(([u]) => u.includes("/api/llm/models"));
+    expect(listCall[1].headers["x-api-key"]).toBe("sk-live");
+  });
+
+  it("lists them on opening when a key is already saved for the provider", async () => {
+    sessionStorage.setItem(
+      "llmSettings",
+      JSON.stringify({ apiKey: "sk-saved", baseUrl: "https://api.openai.com/v1", model: "older-model" }),
+    );
+    open();
+    expect(modelField().value).toBe("older-model");
+    await waitFor(() => expect(suggestions()).toContain("newest-model"));
+  });
+
+  it("keeps the saved key when only the model changes", async () => {
+    sessionStorage.setItem(
+      "llmSettings",
+      JSON.stringify({ apiKey: "sk-saved", baseUrl: "https://api.openai.com/v1", model: "older-model" }),
+    );
+    open();
+    fireEvent.change(modelField(), { target: { value: "newest-model" } });
+    fireEvent.click(button("Test connection"));
+    await waitFor(() => expect(button("Save").disabled).toBe(false));
+    fireEvent.click(button("Save"));
+    expect(JSON.parse(sessionStorage.getItem("llmSettings"))).toMatchObject({
+      apiKey: "sk-saved",
+      model: "newest-model",
+    });
+  });
+});
+
 // What a save has to reach. The header names the model in its menu and every
 // assist tab decides from the key whether to show live suggestions or samples,
 // and none of them are anywhere near this modal in the tree — so a save that

@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 
 _ANTHROPIC_BASE = "https://api.anthropic.com"
 
+# More than any provider lists today, and a bound on the pages followed if one
+# ever paginates without end.
+_MAX_LISTED_MODELS = 300
+
 
 def _is_unsupported_schema(exc: BadRequestError) -> bool:
     """True when a provider 400 is about ``response_format`` / structured output.
@@ -179,6 +183,28 @@ class LLMService:
                 timeout=openai.Timeout(config.timeout_seconds, connect=connect),
                 max_retries=config.max_retries,
             )
+
+    async def list_models(self) -> list[str]:
+        """The model ids this key can use, newest first.
+
+        Asked of the provider rather than kept in a list here, so what the
+        settings modal suggests is never out of date and never chosen for the
+        user. Anthropic returns its models newest first already; the
+        OpenAI-compatible listings (OpenAI, Mistral, Ollama) carry a ``created``
+        timestamp and are sorted on it. Unfiltered: OpenAI's includes models
+        that do not chat, such as embeddings, and telling them apart from the id
+        would be a guess that goes stale.
+        """
+        client = self._anthropic if self._anthropic is not None else self._openai
+        assert client is not None
+        listed = []
+        async for model in client.models.list():
+            listed.append(model)
+            if len(listed) >= _MAX_LISTED_MODELS:
+                break
+        if self._openai is not None:
+            listed.sort(key=lambda m: getattr(m, "created", None) or 0, reverse=True)
+        return [m.id for m in listed]
 
     async def complete(
         self,

@@ -547,6 +547,42 @@ describe("handleRelEditSave", () => {
     });
     expect(result.current.editingRel).toBeNull();
   });
+
+  // A joint argument: two premises, one relation each, one argumentId.
+  const jointArgument = () =>
+    baseState({
+      elements: [makeEl(), makeEl({ id: "J2" }), makeEl({ id: "P1", type: "principle" })],
+      relations: [
+        makeRel({ type: "jointly_entails", argumentId: "a1", explanation: "Together" }),
+        makeRel({ from: "J2", type: "jointly_entails", argumentId: "a1", explanation: "Together" }),
+      ],
+    });
+
+  it("revises every premise of an argument, not only the row pressed", () => {
+    const { result } = renderHook(() => useREActions(jointArgument()));
+    act(() => result.current.setEditingRel(result.current.state.relations[1]));
+    act(() => {
+      result.current.handleRelEditSave({ type: "jointly_precludes", explanation: "Rather not" });
+    });
+    for (const rel of result.current.state.relations) {
+      expect(rel.type).toBe("jointly_precludes");
+      expect(rel.explanation).toBe("Rather not");
+      expect(rel.argumentId).toBe("a1");
+      expect(rel.status).toBe("revised");
+    }
+    expect(result.current.state.log.at(-1).findings).toBe(
+      "Argument J1, J2 → P1 was edited by the user.",
+    );
+  });
+
+  it("gives a relation turned into entails an argument of its own", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.setEditingRel(result.current.state.relations[0]));
+    act(() => {
+      result.current.handleRelEditSave({ type: "entails", explanation: "x" });
+    });
+    expect(result.current.state.relations[0].argumentId).toBeTruthy();
+  });
 });
 
 // ─── Revision history ─────────────────────────────────────────────────────────

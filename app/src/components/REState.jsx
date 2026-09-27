@@ -752,6 +752,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         editingRel={editingRel}
         setEditingRel={setEditingRel}
         onRelEditSave={handleRelEditSave}
+        relations={state.relations}
+        argumentsOnly={hideNonEntailsRels}
         round={state.round}
         withdrawingId={withdrawingId}
         onWithdrawConfirm={handleWithdrawConfirm}

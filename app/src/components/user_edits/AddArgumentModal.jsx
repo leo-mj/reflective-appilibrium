@@ -176,6 +176,13 @@ export function AddArgumentModal({
             </button>
           ))}
         </div>
+        {/* The other inferential types are these two with several premises —
+            not a further choice, which is why only two are offered. */}
+        <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+          {premises.length > 1
+            ? `The premises together ${negated ? "preclude" : "entail"} the conclusion: recorded as "jointly ${negated ? "precludes" : "entails"}".`
+            : `Add a premise and this becomes "jointly ${negated ? "precludes" : "entails"}".`}
+        </div>
       </FormField>
 
       <FormField label="Conclusion">

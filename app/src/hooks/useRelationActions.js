@@ -12,6 +12,7 @@ import {
   makeLogEntry,
   ARGUMENT_RELATION_TYPES,
   argumentRelationType,
+  argumentRelationsOf,
   newArgumentId,
   nextElementId,
   withEvent,
@@ -32,39 +33,51 @@ export function useRelationActions({
 }) {
   const [editingRel, setEditingRel] = useState(null);
 
+  /**
+   * Saves the revise dialog. An argument step revises the whole argument, as
+   * withdrawing one does: every premise takes the new type and explanation, so
+   * the argument cannot end up with premises disagreeing about what they
+   * establish, nor with an explanation on a row the card does not show.
+   */
   const handleRelEditSave = (formData) => {
     const newRound = state.round + 1;
-    // The edit form has no Origin field, so any text change to a relation
-    // that came from an LLM suggestion is auto-attributed as user-edited too.
-    const textChanged = formData.explanation !== editingRel.explanation;
-    const origin = textChanged
-      ? withUserEdit(editingRel.origin)
-      : editingRel.origin;
+    const argument = argumentRelationsOf(state.relations, editingRel);
+    const revising = new Set(argument ?? [editingRel]);
+    // A relation turned into entails or precludes is a one-premise argument
+    // from then on, and needs an id of its own, as when one is added so.
+    const argumentId =
+      !editingRel.argumentId && ARGUMENT_RELATION_TYPES.has(formData.type)
+        ? newArgumentId()
+        : editingRel.argumentId;
     const diffs = makeDiff(["type", "explanation"], editingRel, formData);
+    const revise = (r) => ({
+      ...r,
+      ...formData,
+      ...(argumentId && { argumentId }),
+      // The edit form has no Origin field, so any text change to a relation
+      // that came from an LLM suggestion is auto-attributed as user-edited too.
+      origin:
+        formData.explanation !== r.explanation ? withUserEdit(r.origin) : r.origin,
+      status: "revised",
+      revisedRound: newRound,
+      history: withEvent(r, {
+        round: newRound,
+        type: "revised",
+        previousText: r.explanation,
+      }),
+    });
+    const what = argument
+      ? `Argument ${argument.map((r) => r.from).join(", ")} → ${editingRel.to}`
+      : `Relation ${editingRel.from} → ${editingRel.to}`;
     mutate((prev) => ({
       ...prev,
       round: newRound,
-      relations: prev.relations.map((r) =>
-        r === editingRel
-          ? {
-              ...editingRel,
-              ...formData,
-              origin,
-              status: "revised",
-              revisedRound: newRound,
-              history: withEvent(editingRel, {
-                round: newRound,
-                type: "revised",
-                previousText: editingRel.explanation,
-              }),
-            }
-          : r,
-      ),
+      relations: prev.relations.map((r) => (revising.has(r) ? revise(r) : r)),
       log: [
         ...prev.log,
         makeLogEntry(
           newRound,
-          `Relation ${editingRel.from} → ${editingRel.to} was edited by the user.`,
+          `${what} was edited by the user.`,
           "Changes applied",
           diffs.length ? diffs.join("; ") : "No fields changed",
         ),

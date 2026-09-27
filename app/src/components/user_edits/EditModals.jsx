@@ -6,6 +6,7 @@
 import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
 import { WithdrawReasonModal } from "./WithdrawReasonModal.jsx";
+import { argumentRelationsOf } from "../../utils/stateUtils.js";
 
 export function EditModals({
   editingEl,
@@ -14,6 +15,8 @@ export function EditModals({
   editingRel,
   setEditingRel,
   onRelEditSave,
+  relations,
+  argumentsOnly,
   round,
   withdrawingId,
   onWithdrawConfirm,
@@ -32,6 +35,8 @@ export function EditModals({
       {editingRel && (
         <EditRelationModal
           relation={editingRel}
+          argument={argumentRelationsOf(relations, editingRel)}
+          argumentsOnly={argumentsOnly}
           currentRound={round}
           onSave={onRelEditSave}
           onCancel={() => setEditingRel(null)}

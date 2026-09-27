@@ -381,6 +381,21 @@ export const ARGUMENT_RELATION_TYPES = new Set([
 ]);
 
 /**
+ * The relations making up the argument `rel` is a step of — one per premise —
+ * or null when it is not an argument step.
+ *
+ * @param {RERelation[]} relations
+ * @param {RERelation}   rel
+ * @returns {RERelation[]|null}
+ */
+export function argumentRelationsOf(relations, rel) {
+  if (!rel.argumentId || !ARGUMENT_RELATION_TYPES.has(rel.type)) return null;
+  return relations.filter(
+    (r) => r.argumentId === rel.argumentId && ARGUMENT_RELATION_TYPES.has(r.type),
+  );
+}
+
+/**
  * Elements a new relation or argument may be built from — everything except
  * `possible`, which the user has not affirmed yet.
  *

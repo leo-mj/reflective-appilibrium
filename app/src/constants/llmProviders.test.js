@@ -13,8 +13,11 @@ describe("LLM_PROVIDERS", () => {
       expect(p.id).toBeTruthy();
       expect(p.label).toBeTruthy();
       expect(p.baseUrl).toMatch(/^https?:\/\//);
-      expect(p.models.length).toBeGreaterThan(0);
     }
+  });
+
+  it("names no models: the provider is asked which a key can use", () => {
+    for (const p of LLM_PROVIDERS) expect(p.models).toBeUndefined();
   });
 
   it("no two providers share an id", () => {
@@ -33,7 +36,7 @@ describe("LLM_PROVIDERS", () => {
     }
   });
 
-  it("constructor throws on empty models list", () => {
-    expect(() => new LLMProvider("x", "X", "https://x.com/v1", [])).toThrow();
+  it("constructor throws on a missing base URL", () => {
+    expect(() => new LLMProvider("x", "X", "")).toThrow();
   });
 });

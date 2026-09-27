@@ -51,6 +51,24 @@ class CompletionResponse(BaseModel):
     usage: TokenUsage
 
 
+class ModelsResponse(BaseModel):
+    """Response from ``GET /api/llm/models``."""
+
+    models: list[str]
+
+
+def _provider_refusal(exc: Exception, what: str) -> HTTPException:
+    """A provider's error, scrubbed, as the 400 the settings modal shows.
+
+    For the two endpoints whose job is to say why a key or model does not work.
+    Safe to log once scrubbed: neither sends anything of anyone's reasoning, so
+    the provider's reply can quote only the key it just rejected.
+    """
+    message = scrub_provider_error(getattr(exc, "message", None) or str(exc))
+    logger.info(f"{what} failed: {message}")
+    return HTTPException(status_code=400, detail=message)
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 
@@ -79,12 +97,26 @@ async def test_connection(
             json_mode=False,
         )
     except Exception as exc:  # noqa: BLE001 — this endpoint's job is to report why
-        # Safe to log once scrubbed: the prompt above is fixed, so the provider's
-        # reply cannot quote anyone's reasoning, only the key it just rejected.
-        message = scrub_provider_error(getattr(exc, "message", None) or str(exc))
-        logger.info(f"Connection test failed for model '{llm.model}': {message}")
-        raise HTTPException(status_code=400, detail=message)
+        raise _provider_refusal(exc, f"Connection test for model '{llm.model}'")
     return {"status": "ok", "model": llm.model}
+
+
+@router.get("/models", response_model=ModelsResponse)
+async def list_models(
+    llm: Annotated[LLMService, Depends(get_llm_service)],
+) -> ModelsResponse:
+    """The models the supplied key can use, newest first.
+
+    What the settings modal suggests for the Model field, asked of the provider
+    so the app keeps no list of its own to go stale. Through
+    ``get_llm_service`` like every endpoint that uses a key, so the provider
+    allowlist, the rule on server-side keys and the rate limit all apply.
+    """
+    try:
+        models = await llm.list_models()
+    except Exception as exc:  # noqa: BLE001 — as the connection test
+        raise _provider_refusal(exc, "Listing models")
+    return ModelsResponse(models=models)
 
 
 @router.post("/complete", response_model=CompletionResponse)
