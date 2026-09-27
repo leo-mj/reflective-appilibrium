@@ -173,7 +173,9 @@ export function TextTab({
   );
 
   useEffect(() => {
-    if (!BACKEND_ENABLED) return;
+    // Nothing to score at round 0, and the server refuses an empty element
+    // list (422) — History arrives there on every visit.
+    if (!BACKEND_ENABLED || state.elements.length === 0) return;
     let cancelled = false;
     scoreChanges(state, true, weights).then((result) => {
       if (cancelled || !result) return;
