@@ -49,6 +49,14 @@ pins that.
 Frontend tests are Vitest (`npm test` in `app/`) plus Playwright (`npm run test:e2e`,
 see `app/e2e/README.md`); the backend is pytest from the repo root.
 
+## Commits
+
+Author and commit as `leo-mj <leo.maedje@gmail.com>` — set `git config user.name`
+and `user.email` in the repository before the first commit of a session. No
+`Co-Authored-By` or `Claude-Session` trailers. Never rewrite pushed history: every
+commit is pushed to both GitHub and GitLab, so a force-push on one leaves the
+other diverged.
+
 ## RE domain model
 
 ### Element types

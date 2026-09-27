@@ -14,11 +14,12 @@
  * @module vite-plugins/basePath
  */
 
-// Listed by destination rather than tested as `mode === "production"`, which was
-// wrong in a way nothing caught: `build:backend` runs `--mode backend`, so the
-// BYOK build — the one deployed to Pages — took the "/" branch and shipped asset
-// URLs that 404 there. The dev server and `build:local` are served from a root.
-const PAGES_MODES = ["production", "backend"];
+// Listed by destination rather than tested as `mode === "production"`. Only the
+// demo goes to GitHub Pages. `build:backend` used to as well, which is why this
+// list once named `backend` too; that build now goes to a host serving from its
+// root (Cloudflare Pages, the nginx image), so it takes "/" like the dev server
+// and `build:local`. A backend build bound for a sub-path sets VITE_BASE_PATH.
+const PAGES_MODES = ["production"];
 
 const DEFAULT_REPO = "reflective-appilibrium";
 

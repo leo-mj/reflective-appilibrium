@@ -190,7 +190,7 @@ The one-off setup, once per Google Cloud project:
 PROJECT=your-project-id          # gcloud projects create … or the console
 REGION=europe-west3              # Frankfurt; any region works
 REPO=appilibrium
-GITHUB_REPO=leo-mj/assistive-equilibrium
+GITHUB_REPO=leo-mj/reflective-appilibrium
 
 gcloud config set project "$PROJECT"
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
@@ -241,7 +241,7 @@ Actions → Variables). None is secret: the workflow holds no credential.
 | `GCP_ARTIFACT_REPO` | `appilibrium` |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | printed by the last command above |
 | `GCP_DEPLOY_SERVICE_ACCOUNT` | `github-deploy@<project>.iam.gserviceaccount.com` |
-| `BACKEND_CORS_ORIGINS` | the frontend site's origin, `scheme://host` with no path; empty if one host serves both |
+| `BACKEND_CORS_ORIGINS` | the frontend site's origin, `scheme://host` with no path — `https://<project>.pages.dev` for the Cloudflare site below; empty if one host serves both |
 
 Finally, **set a budget alert** (Billing → Budgets & alerts) at an amount you
 would notice, say €1. The free tier covers normal use, but a budget alert is
@@ -251,6 +251,47 @@ The deploy sets `DEPLOYMENT=hosted`, `TRUSTED_PROXY_HOPS=1` (Cloud Run appends
 the caller's address to `X-Forwarded-For`) and `--max-instances=1`, which the
 rate limiter requires. The run's summary prints the service URL — that is the
 `VITE_BACKEND_URL` the frontend build needs.
+
+### Deploying the frontend to Cloudflare Pages
+
+The version with the AI features is published to Cloudflare Pages by the
+`deploy-cloudflare` job, on every push to `deploy`, from the same commit and
+behind the same checks as the demo on GitHub Pages. It holds a visitor's API key
+in the tab, so it gets an address of its own; and Cloudflare serves the
+`_headers` file the build writes, so the Content-Security-Policy — including
+`frame-ancestors`, which a `<meta>` tag cannot carry — arrives as real response
+headers.
+
+The one-off setup:
+
+1. Create the project, as a direct-upload project (not connected to Git — CI
+   builds and uploads it):
+
+   ```bash
+   npx wrangler pages project create <project> --production-branch=main
+   ```
+
+   Its address is `https://<project>.pages.dev`. The job always publishes to
+   `main`, the production branch; any other branch name would be a preview on a
+   different address, which the backend's CORS would refuse.
+2. Create an API token (My Profile → API Tokens) with the single permission
+   **Account → Cloudflare Pages → Edit**, and note your account ID (on the
+   dashboard's Workers & Pages overview).
+3. In GitHub, Settings → Secrets and variables → Actions:
+
+   | Kind | Name | Value |
+   | --- | --- | --- |
+   | secret | `CLOUDFLARE_API_TOKEN` | the token |
+   | secret | `CLOUDFLARE_ACCOUNT_ID` | the account ID |
+   | variable | `CLOUDFLARE_PAGES_PROJECT` | `<project>` |
+   | variable | `VITE_BACKEND_URL` | the Cloud Run URL from the backend deploy |
+4. Set `BACKEND_CORS_ORIGINS` to `https://<project>.pages.dev` (plus any custom
+   domain) and run the backend deploy again, so the new origin reaches the
+   server.
+
+Deploy the backend first: the frontend job refuses to build until
+`VITE_BACKEND_URL` is an `https://` address, and a site pointed at a backend
+that does not answer yet is just a broken site.
 
 ### Where your work lives
 
@@ -290,9 +331,10 @@ Two shapes of deployment, and the build says which by what it is given
   site and forwards `/api` itself, so a host routes one name to one container.
 
 Nothing in the code names a hosting provider. `.github/workflows/ci.yml` carries
-one worked example for each half — the demo to GitHub Pages, the backend to a
-container host — and both read their destination from repository variables, so
-moving either is a change of setting rather than of code.
+one worked example for each piece — the demo to GitHub Pages, the version with
+the AI features to Cloudflare Pages, the backend to a container host — and each
+reads its destination from repository settings, so moving one is a change of
+setting rather than of code.
 
 See [app/README.md](app/README.md) for the full build-target and feature-flag tables.
 

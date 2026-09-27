@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    # `deploy` is the release branch: every push to it publishes to GitHub Pages.
+    # `deploy` is the release branch: every push to it publishes the demo to
+    # GitHub Pages and the version with the AI features to Cloudflare Pages.
     branches: [main, visualisation, deploy]
   pull_request:
     branches: [main]
@@ -269,26 +270,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The public site is the BYOK build, and it needs to know where the backend
-      # is. VITE_BACKEND_URL is a repository *variable* rather than a secret: it
-      # ends up in the bundle in plain text either way. Checked before building
-      # because app/.env.backend carries a placeholder, and a build that fell back
-      # to it would publish a site whose every request fails.
-      - name: Check the backend URL is configured
-        env:
-          VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
-        run: |
-          case "$VITE_BACKEND_URL" in
-            https://*) echo "Building against $VITE_BACKEND_URL" ;;
-            *) echo "::error::Set the VITE_BACKEND_URL repository variable (Settings → Secrets and variables → Actions → Variables) to the backend's https:// address."
-               exit 1 ;;
-          esac
-
-      # An environment variable wins over the placeholder in app/.env.backend.
+      # The demo: no backend, no LLM, no key in the tab, so it is safe on a
+      # shared github.io host. The version that holds a visitor's key goes to
+      # an address of its own — the deploy-cloudflare job below.
       - name: Build
-        env:
-          VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
-        run: npm run build:backend
+        run: npm run build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
@@ -298,6 +284,102 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+  # The version with the AI features, to Cloudflare Pages. Same trigger, gates
+  # and main-ancestry check as the demo: both sites are released from one commit.
+  #
+  # Cloudflare rather than GitHub Pages because this build holds a visitor's API
+  # key in the tab. Its own address keeps that key off a shared github.io origin,
+  # and Cloudflare serves the _headers file the CSP plugin writes, so
+  # frame-ancestors and the rest of the policy arrive as real response headers —
+  # a <meta> tag cannot carry them.
+  #
+  # Built here and uploaded with wrangler, rather than by Cloudflare's own Git
+  # integration, which would build every push whether or not the tests passed.
+  #
+  # The backend is deployed separately (deploy-backend, manually). This reads
+  # its address from VITE_BACKEND_URL, which is stable across backend deploys.
+  deploy-cloudflare:
+    name: Deploy to Cloudflare Pages
+    needs: [test, test-backend, backend-image, e2e]
+    if: github.ref == 'refs/heads/deploy' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The same check as the demo's; see the deploy job above.
+      - name: Check every commit being published is on main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::deploy has commits that are not on main. Merge them into main, then reset deploy to a commit on main."
+            git log --oneline origin/main..HEAD
+            exit 1
+          fi
+
+      # Said before anything is built, naming what is missing. VITE_BACKEND_URL
+      # is checked for https:// because app/.env.backend carries a placeholder,
+      # and a build that fell back to it would publish a site whose every
+      # request fails. It is a variable rather than a secret: it ends up in the
+      # bundle in plain text either way.
+      - name: Check the deployment is configured
+        env:
+          VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+          HAS_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+        run: |
+          missing=
+          case "$VITE_BACKEND_URL" in https://*) ;; *) missing="$missing VITE_BACKEND_URL(https://)" ;; esac
+          [ -n "$PROJECT" ] || missing="$missing CLOUDFLARE_PAGES_PROJECT"
+          [ "$HAS_TOKEN" = true ] || missing="$missing CLOUDFLARE_API_TOKEN(secret)"
+          [ "$HAS_ACCOUNT" = true ] || missing="$missing CLOUDFLARE_ACCOUNT_ID(secret)"
+          if [ -n "$missing" ]; then
+            echo "::error::Set these in Settings → Secrets and variables → Actions, see README 'Deploying the frontend to Cloudflare Pages':$missing"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Environment variables win over the placeholder in app/.env.backend.
+      # The build writes dist/_headers beside index.html (contentSecurityPolicy.js).
+      - name: Build
+        env:
+          VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
+          VITE_BASE_PATH: /
+        run: |
+          npm run build:backend
+          test -f dist/_headers
+
+      # --branch=main publishes to the project's production branch — the one
+      # it was created with (README). Any other name would be a preview
+      # deployment on a URL of its own, which CORS_ORIGINS does not name.
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: app
+          command: >-
+            pages deploy dist
+            --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+            --branch=main
+            --commit-hash=${{ github.sha }}
 
   # The backend, to Cloud Run. Manual only: this replaces the server people are
   # using, and a push should never do that on its own. Run it from the Actions

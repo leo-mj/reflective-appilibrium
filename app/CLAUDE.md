@@ -6,7 +6,7 @@ follow `BACKEND_ENABLED`.
 
 Two more build-time values decide where a build is *served* and where it *calls*,
 and both have one home each: `VITE_BASE_PATH` through `vite-plugins/basePath.js`
-(unset, a Pages-bound build keeps the repo prefix), and `VITE_BACKEND_URL` through
+(unset, the demo keeps the repo prefix GitHub Pages needs, and every other build is served from the root), and `VITE_BACKEND_URL` through
 `src/backendUrl.js`, exported as `BACKEND_URL` from `config.js` — every client
 imports that rather than reading the variable, which is what keeps the clients and
 `vite-plugins/contentSecurityPolicy.js` agreeing on one address. `/` there means

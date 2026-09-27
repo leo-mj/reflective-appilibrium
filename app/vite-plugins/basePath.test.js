@@ -10,13 +10,16 @@ describe("basePath", () => {
       expect(basePath({ mode: "local", githubRepository: "leo-mj/repo" })).toBe("/");
     });
 
-    it("prefixes a Pages-bound build with the repo name from Actions", () => {
+    it("prefixes the demo, the one Pages-bound build, with the repo name from Actions", () => {
       expect(basePath({ mode: "production", githubRepository: "leo-mj/some-repo" })).toBe(
         "/some-repo/",
       );
-      expect(basePath({ mode: "backend", githubRepository: "leo-mj/some-repo" })).toBe(
-        "/some-repo/",
-      );
+    });
+
+    // Built in the same Actions run as the demo, so GITHUB_REPOSITORY is set —
+    // and must still not prefix a site that Cloudflare serves from its root.
+    it("serves the backend build from the root even in Actions", () => {
+      expect(basePath({ mode: "backend", githubRepository: "leo-mj/some-repo" })).toBe("/");
     });
 
     it("falls back to the repo's own name outside Actions", () => {

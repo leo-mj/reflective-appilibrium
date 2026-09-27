@@ -153,6 +153,10 @@ instances are reclaimed, and the June change arrived with no notice.
 
 ### The frontend stays where it is
 
+*Superseded by "Decision — 2026-09-22" below: the demo stays on GitHub Pages and
+the version with the AI features moves to Cloudflare Pages. The argument against
+serving the frontend from Cloud Run still stands.*
+
 The backend serves no static files — `main.py` has no `StaticFiles` mount, and
 its only HTML is the two docs endpoints that a `hosted` instance 404s. Serving
 `dist/` from the same service would mean adding one, and relaxing
@@ -279,7 +283,10 @@ URL is the demo" true.
   boost, a budget alert, and no minimum instance — the `/api/health` fetch on
   page load already hides the cold start, and an always-on instance would
   spend the free tier idling. Plus `TRUSTED_PROXY_HOPS=1`, below.
-- Whether Cloud Run is deployed from CI or by hand is still open.
+- Cloud Run is deployed from CI, but only by hand: `deploy-backend` runs from
+  the Actions tab, never on a push. The two static sites deploy on every push
+  to `deploy` (`deploy` and `deploy-cloudflare`), the Cloudflare one reading the
+  backend's address from `VITE_BACKEND_URL`.
 
 **Both defects are fixed on `backend-server`.** The image no longer passes
 `--forwarded-allow-ips="*"`. A new setting, `TRUSTED_PROXY_HOPS`, makes
