@@ -8,9 +8,7 @@ It is part of a research project exploring in how far LLMs can assist in RE proc
 The app ships in two configurations. Both are the same React SPA — the demo is not a reduced build, it is the full interface with the AI and simulation features switched off and replaced by pre-set examples.
 
 - **Demo version** — a static site. No server, no API key, nothing leaves the browser. Published at <https://leo-mj.github.io/reflective-appilibrium/>.
-- **Backend version** — the SPA plus a FastAPI server that provides LLM access and the rethon RE simulation. The server keeps nothing: your work stays in the browser and leaves it as a Markdown export. Run it locally, or deploy it — the two halves are published separately from the demo, at whatever addresses their deployment gives them.
-
-The two are published as **separate sites, deliberately**. The demo holds no key and makes no requests, so it is safe on a shared host; the backend version holds a visitor's API key in the browser tab, so it belongs on an address of its own rather than one shared with unrelated pages. Which host each uses is a deployment decision, not a property of the code: both builds come from this repository and are pointed at their destination by `VITE_BASE_PATH`, `VITE_BACKEND_URL` and the backend's `CORS_ORIGINS`.
+- **Backend version** — the SPA plus a FastAPI server that provides LLM access and the rethon RE simulation. The server keeps nothing: your work stays in the browser and leaves it as a Markdown export. See below for running it locally.
 
 | Capability                                                                                  | Demo                   | Backend  |
 | ------------------------------------------------------------------------------------------- | ---------------------- | -------- |
@@ -32,17 +30,18 @@ Neither version stores anything on a server. Both autosave the working state to 
 
 ## Demo version
 
-Nothing to install — open <https://leo-mj.github.io/reflective-appilibrium/>. That address serves the demo only; the version with the AI features is deployed separately, and its address depends on where it is hosted.
+Nothing to install — open <https://leo-mj.github.io/reflective-appilibrium/>.
 
-To build it yourself:
+To build and preview it yourself:
 
 ```bash
 cd app
 npm install
 npm run build
+npm run preview
 ```
 
-Deploy the resulting `dist/` folder to any static host. Note that the production build is served from `/reflective-appilibrium/` by default, the path GitHub Pages uses; set `VITE_BASE_PATH` (e.g. `/` for a site served from its root) if you deploy at a different path. See [app/vite-plugins/basePath.js](app/vite-plugins/basePath.js).
+The demo build is served from `/reflective-appilibrium/`, so the preview is at `http://localhost:4173/reflective-appilibrium/`. Set `VITE_BASE_PATH=/` at build time to serve it from the root instead (see [app/vite-plugins/basePath.js](app/vite-plugins/basePath.js)).
 
 ## Backend version
 
@@ -100,6 +99,8 @@ CORS_ORIGINS=http://localhost:5173
 
 **Bring-your-own-key (BYOK):** users can also enter an API key directly in the LLM settings modal in the browser. It is held in `sessionStorage`, sent as an `x-api-key` header, and never stored server-side. Server-side keys are only served to localhost — remote browsers must supply their own key.
 
+Every other setting is documented in [backend/.env.example](backend/.env.example). The one to know about is `DEPLOYMENT`: leave it at `local` only while uvicorn and the browser are on the same machine. Anything else — a LAN, a tunnel, a container behind a proxy — is `hosted`, which stops lending server-side keys and turns on rate limits, timeouts and a size cap on rethon computations.
+
 ### 4. Start / stop the backend
 
 From the **repo root**:
@@ -122,221 +123,23 @@ The API is then available at `http://localhost:8000`. Interactive docs at `http:
 ```bash
 cd app
 npm install
+echo "VITE_APP_ENV=dev" > .env   # once; app/.env is gitignored
 npm run dev
 ```
 
-The app runs at `http://localhost:5173` with all backend features enabled.
+The app runs at `http://localhost:5173` with all backend features enabled, calling the backend at `http://localhost:8000`. Without `VITE_APP_ENV=dev` in `app/.env` the dev server runs with the backend features switched off, as in the demo.
 
-### Deploying the backend version
+### Or with Docker
 
-Set `DEPLOYMENT=hosted` in `backend/.env`. Whether anyone but you can reach the
-server cannot be detected at runtime — behind a reverse proxy `request.client` is
-the proxy, not the caller — so it is declared, and these protections follow:
-
-| | `local` (default) | `hosted` |
-| --- | --- | --- |
-| Server-side API keys | lent to callers on localhost | never; every user brings their own |
-| Rate limits, per caller per minute | none | 60 LLM calls, 5 simulations, 30 steps, 300 score lookups |
-| LLM call timeout | 600s (SDK default) | 90s |
-| rethon computation | no size cap, no timeout | at most 20 elements, stopped after 60s |
-
-The server writes nothing to disk in either mode — see "Where your work lives"
-below.
-
-"Local" means uvicorn and the browser on the same machine. A LAN, a tunnel, a VPS
-or a container behind nginx is `hosted`. Each protection can still be set
-individually to depart from the mode — see `backend/.env.example`.
-
-On a hosted instance you should also set **`APP_ACCESS_TOKENS`**, a
-comma-separated list. Without it the API is open to anyone who can reach the
-port. Issue **one token per participant** for a class or study: the rate limiter
-buckets by whichever token matched, so distinct tokens give each person their own
-allowance, whereas a single shared token puts a whole seminar room into one.
-
-The rate limiter lives in one process, so run **one** uvicorn worker unless you
-replace it with a shared store — and, on a platform that autoscales, one
-instance (`--max-instances=1` on Cloud Run).
-
-**Behind a reverse proxy, set `TRUSTED_PROXY_HOPS`.** Without tokens the rate
-limiter identifies callers by address, and a proxy's address is the same for
-every visitor — so all of them share one allowance, and the caps become either
-useless or a site-wide outage. Set it to the number of proxies in front that
-append to `X-Forwarded-For` (1 on Cloud Run, Fly or Render); the backend then
-reads the entry that proxy wrote. **Do not** start uvicorn with
-`--forwarded-allow-ips="*"`: it takes the leftmost entry, which the caller
-writes, so anyone can pick a fresh allowance per request. The backend logs a
-warning at startup when neither tokens nor `TRUSTED_PROXY_HOPS` are set, and a
-second, once per process, when a request shows a proxy it is ignoring.
-
-### Deploying the backend to a container host — a worked example
-
-Any host that runs a container works, and the image needs nothing from a
-particular one. What follows is one example end to end, Google Cloud Run,
-because a deployment is easier to adapt than to invent. The `deploy-backend` job
-in `.github/workflows/ci.yml` runs it **only from the Actions tab** ("Run
-workflow"), never on a push, and only after the backend tests and the image
-check have passed.
-
-Why Cloud Run: its free tier — 180,000 vCPU-seconds, 360,000 GiB-seconds and
-2M requests a month, counted only while a request is being served — covers a
-research tool with room to spare, and there is no server to maintain. The price
-is a few seconds' cold start after an idle spell, since the service scales to
-zero: the container starts, imports rethon, and the first simulation also starts
-its worker process.
-
-The one-off setup, once per Google Cloud project:
-
-```bash
-PROJECT=your-project-id          # gcloud projects create … or the console
-REGION=europe-west3              # Frankfurt; any region works
-REPO=appilibrium
-GITHUB_REPO=leo-mj/reflective-appilibrium
-
-gcloud config set project "$PROJECT"
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
-    iamcredentials.googleapis.com
-
-# Where the image lives. The cleanup policy is what keeps storage inside the
-# free half-gigabyte: without it every deploy leaves an image behind for good.
-gcloud artifacts repositories create "$REPO" --repository-format=docker --location="$REGION"
-cat > /tmp/cleanup.json <<'JSON'
-[{"name": "keep-3", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 3}},
- {"name": "drop-the-rest", "action": {"type": "Delete"}, "condition": {"olderThan": "7d"}}]
-JSON
-gcloud artifacts repositories set-cleanup-policies "$REPO" --location="$REGION" \
-    --policy=/tmp/cleanup.json
-
-# The identity the workflow acts as.
-gcloud iam service-accounts create github-deploy
-SA="github-deploy@$PROJECT.iam.gserviceaccount.com"
-for role in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccountUser; do
-  gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="$role"
-done
-
-# Workload Identity Federation: GitHub proves which repository is asking, and
-# Google trusts that. No service-account key is stored in the repository, so
-# there is no long-lived credential to leak. The attribute condition is what
-# stops any other repository using this.
-gcloud iam workload-identity-pools create github --location=global
-gcloud iam workload-identity-pools providers create-oidc github \
-    --location=global --workload-identity-pool=github \
-    --issuer-uri="https://token.actions.githubusercontent.com" \
-    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
-    --attribute-condition="assertion.repository=='$GITHUB_REPO'"
-NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
-gcloud iam service-accounts add-iam-policy-binding "$SA" \
-    --role=roles/iam.workloadIdentityUser \
-    --member="principalSet://iam.googleapis.com/projects/$NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/$GITHUB_REPO"
-
-echo "GCP_WORKLOAD_IDENTITY_PROVIDER=projects/$NUMBER/locations/global/workloadIdentityPools/github/providers/github"
-```
-
-Then set these **repository variables** (Settings → Secrets and variables →
-Actions → Variables). None is secret: the workflow holds no credential.
-
-| Variable | Value |
-| --- | --- |
-| `GCP_PROJECT_ID` | the project id |
-| `GCP_REGION` | e.g. `europe-west3` |
-| `GCP_ARTIFACT_REPO` | `appilibrium` |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | printed by the last command above |
-| `GCP_DEPLOY_SERVICE_ACCOUNT` | `github-deploy@<project>.iam.gserviceaccount.com` |
-| `BACKEND_CORS_ORIGINS` | the frontend site's origin, `scheme://host` with no path — `https://<name>.<subdomain>.workers.dev` for the Cloudflare site below; empty if one host serves both |
-
-Finally, **set a budget alert** (Billing → Budgets & alerts) at an amount you
-would notice, say €1. The free tier covers normal use, but a budget alert is
-what tells you if that ever stops being true.
-
-The deploy sets `DEPLOYMENT=hosted`, `TRUSTED_PROXY_HOPS=1` (Cloud Run appends
-the caller's address to `X-Forwarded-For`) and `--max-instances=1`, which the
-rate limiter requires. The run's summary prints the service URL — that is the
-`VITE_BACKEND_URL` the frontend build needs.
-
-### Deploying the frontend to Cloudflare
-
-The version with the AI features is published to Cloudflare by the
-`deploy-cloudflare` job, on every push to `deploy`, from the same commit and
-behind the same checks as the demo on GitHub Pages. It holds a visitor's API key
-in the tab, so it gets an address of its own; and Cloudflare serves the
-`_headers` file the build writes, so the Content-Security-Policy — including
-`frame-ancestors`, which a `<meta>` tag cannot carry — arrives as real response
-headers. `wrangler dev --assets=dist` shows the same thing locally.
-
-It is a **Worker serving static assets**, not a Cloudflare Pages project:
-Cloudflare labels Pages "legacy" and adds new features to Workers only. An
-assets-only Worker has no code and needs no configuration file in the
-repository — the job passes the directory, name and compatibility date to
-`wrangler deploy` — and **the first deploy creates it**, so there is nothing to
-set up in the dashboard beyond a token.
-
-The one-off setup, all in the browser:
-
-1. Create an API token (My Profile → API Tokens) with the single permission
-   **Account → Workers Scripts → Edit**, and note your account ID (on the
-   dashboard's Workers & Pages overview).
-2. Choose the Worker's name. Its address will be
-   `https://<name>.<subdomain>.workers.dev`, where `<subdomain>` is your
-   account's workers.dev subdomain (Workers & Pages → Settings). A name cannot
-   be changed without deploying a new Worker, and the address goes into the
-   backend's CORS setting.
-3. In GitHub, Settings → Secrets and variables → Actions:
-
-   | Kind | Name | Value |
-   | --- | --- | --- |
-   | secret | `CLOUDFLARE_API_TOKEN` | the token |
-   | secret | `CLOUDFLARE_ACCOUNT_ID` | the account ID |
-   | variable | `CLOUDFLARE_WORKER_NAME` | `<name>` |
-   | variable | `VITE_BACKEND_URL` | the Cloud Run URL from the backend deploy |
-4. Set `BACKEND_CORS_ORIGINS` to `https://<name>.<subdomain>.workers.dev` (plus
-   any custom domain) and run the backend deploy again, so the new origin
-   reaches the server.
-
-Deploy the backend first: the frontend job refuses to build until
-`VITE_BACKEND_URL` is an `https://` address, and a site pointed at a backend
-that does not answer yet is just a broken site.
+`docker compose up --build` from the repo root runs the backend and a frontend container that serves the app and forwards `/api` to it, at `http://localhost:8080`. The backend runs `hosted` there, so it lends no server-side keys: enter your own in the LLM settings modal.
 
 ### Where your work lives
 
 The working state is written to the browser's `localStorage` as you go, and the
 home page offers it back under "Continue where you left off". That is the only
-persistence there is, in either deployment mode: the server has no endpoint that
-writes to disk, so nothing of anyone's reasoning is stored on it. Encourage
-exporting to Markdown for anything that needs to outlive a browser profile.
-
-Then build the frontend:
-
-```bash
-cd app
-npm run build:backend
-```
-
-This reads `app/.env.backend`, which is tracked and carries a placeholder for the
-backend address. Supply the real one in the environment at build time, where it
-takes priority over the file:
-
-```bash
-VITE_BACKEND_URL=https://<your-deployed-backend> npm run build:backend
-```
-
-A build that falls back to the placeholder logs an error at load, and every
-backend request from it fails.
-
-Two shapes of deployment, and the build says which by what it is given
-(see [app/src/backendUrl.js](app/src/backendUrl.js)):
-
-- **Backend on its own host** — `VITE_BACKEND_URL=https://…`, and the backend's
-  `CORS_ORIGINS` names the site's origin. The site and the server can then be
-  hosted independently of each other.
-- **Both behind one host**, one proxy routing `/api` to the backend —
-  `VITE_BACKEND_URL=/`, and `CORS_ORIGINS` empty, since no request crosses an
-  origin. `docker-compose.yml` runs that pair; the frontend image serves the
-  site and forwards `/api` itself, so a host routes one name to one container.
-
-Nothing in the code names a hosting provider. `.github/workflows/ci.yml` carries
-one worked example for each piece — the demo to GitHub Pages, the version with
-the AI features to Cloudflare, the backend to a container host — and each
-reads its destination from repository settings, so moving one is a change of
-setting rather than of code.
+persistence there is: the server has no endpoint that writes to disk, so nothing
+of anyone's reasoning is stored on it. Export to Markdown for anything that
+needs to outlive a browser profile.
 
 See [app/README.md](app/README.md) for the full build-target and feature-flag tables.
 
@@ -352,8 +155,9 @@ Freivogel, Andreas & Cacean, Sebastian (2024). Assessing a Formal Model of Refle
 ## Tests
 
 ```bash
-pytest backend/      # backend
-cd app && npm test   # frontend
+pytest backend/          # backend, from the repo root
+cd app && npm test       # frontend unit tests (Vitest)
+cd app && npm run test:e2e   # browser tests (Playwright), see app/e2e/README.md
 ```
 
 ---

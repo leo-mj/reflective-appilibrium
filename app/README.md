@@ -6,10 +6,11 @@ A React + Vite visualisation tool for wide reflective equilibrium (RE) in ethics
 
 ```bash
 npm install
+echo "VITE_APP_ENV=dev" > .env   # once; .env is gitignored
 npm run dev
 ```
 
-For AI features, the FastAPI backend must also be running (see the root README).
+For AI features, the FastAPI backend must also be running (see the root README). Without `app/.env` the dev server has no `VITE_APP_ENV` and runs with the backend features off.
 
 ## Build targets
 
@@ -18,30 +19,29 @@ Three environments, controlled by `VITE_APP_ENV`:
 | Command                 | Mode / env file   | `VITE_APP_ENV` | Backend / LLM | Intended use               |
 | ----------------------- | ----------------- | -------------- | ------------- | -------------------------- |
 | `npm run dev`           | `.env`            | `dev`          | enabled       | Local development          |
-| `npm run build`         | `.env.production` | `demo`         | disabled      | Public static deploy       |
-| `npm run build:backend` | `.env.backend`    | `backend`      | enabled       | Public deploy with backend |
+| `npm run build`         | `.env.production` | `demo`         | disabled      | Static demo, no backend    |
+| `npm run build:backend` | `.env.backend`    | `backend`      | enabled       | Built app with backend     |
 
-### Public demo build (no LLM)
+### Demo build (no LLM)
 
 ```bash
 npm run build
+npm run preview
 ```
 
-Produces a static site with all tabs present. LLM-dependent features (Assist workflow tabs, RE simulation) fall back to pre-set sample data and show a "No LLM API connection" banner. Deploy the `dist/` folder to any static host.
+Produces a static site with all tabs present. LLM-dependent features (Assist workflow tabs, RE simulation) fall back to pre-set sample data and show a "No LLM API connection" banner.
 
-### Backend build (deployed backend)
+### Backend build
 
-```bash
-npm run build:backend
-```
-
-Includes all LLM features. Users enter their own API key (BYOK) in the LLM settings modal: a backend deployed with `DEPLOYMENT=hosted` never lends its server-side keys. `.env.backend` is tracked with a placeholder address, so supply the real one in the environment at build time:
+Includes all LLM features. Users enter their own API key (BYOK) in the LLM settings modal: a backend running with `DEPLOYMENT=hosted` never lends its server-side keys. `.env.backend` is tracked with a placeholder address, so supply the real one in the environment at build time:
 
 ```bash
-VITE_BACKEND_URL=https://<your-deployed-backend> npm run build:backend
+VITE_BACKEND_URL=http://localhost:8000 npm run build:backend
 # …or, when one host serves the site and routes /api to the backend:
-VITE_BACKEND_URL=/ VITE_BASE_PATH=/ npm run build:backend
+VITE_BACKEND_URL=/ npm run build:backend
 ```
+
+To try the first form with `npm run preview`, add `http://localhost:4173` to `CORS_ORIGINS` in `backend/.env`. The second is what the frontend image in `docker-compose.yml` builds.
 
 ## Feature flags
 

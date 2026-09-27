@@ -305,6 +305,25 @@ jobs:
   #
   # The backend is deployed separately (deploy-backend, manually). This reads
   # its address from VITE_BACKEND_URL, which is stable across backend deploys.
+  # Deploy the backend first: a site pointed at a backend that does not answer
+  # yet is just a broken site.
+  #
+  # One-off setup, all in the browser — the first deploy creates the Worker:
+  #   1. Cloudflare, My Profile → API Tokens: a token with the single permission
+  #      Account → Workers Scripts → Edit. Note the account ID (Workers & Pages
+  #      overview).
+  #   2. Choose the Worker's name. The site is then at
+  #      https://<name>.<subdomain>.workers.dev, <subdomain> being the account's
+  #      workers.dev subdomain (Workers & Pages → Settings). Changing the name
+  #      means a new Worker, and the address goes into the backend's CORS.
+  #   3. GitHub, Settings → Secrets and variables → Actions:
+  #        secret    CLOUDFLARE_API_TOKEN     the token
+  #        secret    CLOUDFLARE_ACCOUNT_ID    the account ID
+  #        variable  CLOUDFLARE_WORKER_NAME   <name>
+  #        variable  VITE_BACKEND_URL         the URL the deploy-backend run printed
+  #   4. Set BACKEND_CORS_ORIGINS to https://<name>.<subdomain>.workers.dev (plus
+  #      any custom domain) and run deploy-backend again.
+  # `wrangler dev --assets=dist` serves a build as this Worker will.
   deploy-cloudflare:
     name: Deploy to Cloudflare
     needs: [test, test-backend, backend-image, e2e]
@@ -349,7 +368,7 @@ jobs:
           [ "$HAS_TOKEN" = true ] || missing="$missing CLOUDFLARE_API_TOKEN(secret)"
           [ "$HAS_ACCOUNT" = true ] || missing="$missing CLOUDFLARE_ACCOUNT_ID(secret)"
           if [ -n "$missing" ]; then
-            echo "::error::Set these in Settings → Secrets and variables → Actions, see README 'Deploying the frontend to Cloudflare':$missing"
+            echo "::error::Set these in Settings → Secrets and variables → Actions, see the comment above the deploy-cloudflare job in ci.yml:$missing"
             exit 1
           fi
 
@@ -397,7 +416,70 @@ jobs:
   # Authentication is Workload Identity Federation — GitHub proves which repo
   # and workflow is asking, and Google trusts that directly. No service-account
   # key is stored in the repository; there is no long-lived credential to leak.
-  # README "Deploying to Cloud Run" has the one-off setup.
+  #
+  # Cloud Run because its free tier (180,000 vCPU-seconds, 360,000 GiB-seconds
+  # and 2M requests a month, counted only while serving) covers a research tool
+  # with room to spare. The price is a few seconds' cold start after an idle
+  # spell, since the service scales to zero.
+  #
+  # One-off setup, once per Google Cloud project:
+  #
+  #   PROJECT=your-project-id
+  #   REGION=europe-west3
+  #   REPO=appilibrium
+  #   GITHUB_REPO=leo-mj/reflective-appilibrium
+  #
+  #   gcloud config set project "$PROJECT"
+  #   gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
+  #       iamcredentials.googleapis.com
+  #
+  #   # Where the image lives. The cleanup policy keeps storage inside the free
+  #   # half-gigabyte: without it every deploy leaves an image behind for good.
+  #   gcloud artifacts repositories create "$REPO" --repository-format=docker --location="$REGION"
+  #   cat > /tmp/cleanup.json <<'JSON'
+  #   [{"name": "keep-3", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 3}},
+  #    {"name": "drop-the-rest", "action": {"type": "Delete"}, "condition": {"olderThan": "7d"}}]
+  #   JSON
+  #   gcloud artifacts repositories set-cleanup-policies "$REPO" --location="$REGION" \
+  #       --policy=/tmp/cleanup.json
+  #
+  #   # The identity this job acts as.
+  #   gcloud iam service-accounts create github-deploy
+  #   SA="github-deploy@$PROJECT.iam.gserviceaccount.com"
+  #   for role in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccountUser; do
+  #     gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="$role"
+  #   done
+  #
+  #   # Workload Identity Federation. The attribute condition is what stops any
+  #   # other repository using this.
+  #   gcloud iam workload-identity-pools create github --location=global
+  #   gcloud iam workload-identity-pools providers create-oidc github \
+  #       --location=global --workload-identity-pool=github \
+  #       --issuer-uri="https://token.actions.githubusercontent.com" \
+  #       --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  #       --attribute-condition="assertion.repository=='$GITHUB_REPO'"
+  #   NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
+  #   gcloud iam service-accounts add-iam-policy-binding "$SA" \
+  #       --role=roles/iam.workloadIdentityUser \
+  #       --member="principalSet://iam.googleapis.com/projects/$NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/$GITHUB_REPO"
+  #   echo "GCP_WORKLOAD_IDENTITY_PROVIDER=projects/$NUMBER/locations/global/workloadIdentityPools/github/providers/github"
+  #
+  # Then these repository variables (Settings → Secrets and variables → Actions
+  # → Variables). None is secret: the workflow holds no credential.
+  #   GCP_PROJECT_ID                  the project id
+  #   GCP_REGION                      e.g. europe-west3
+  #   GCP_ARTIFACT_REPO               appilibrium
+  #   GCP_WORKLOAD_IDENTITY_PROVIDER  printed by the last command above
+  #   GCP_DEPLOY_SERVICE_ACCOUNT      github-deploy@<project>.iam.gserviceaccount.com
+  #   BACKEND_CORS_ORIGINS            the frontend's origin, scheme://host with no
+  #                                   path — the deploy-cloudflare Worker's address
+  #
+  # And set a budget alert (Billing → Budgets & alerts) at an amount you would
+  # notice, say €1: the free tier covers normal use, and the alert is what says
+  # when that stops being true.
+  #
+  # The run's summary prints the service URL, which is the VITE_BACKEND_URL the
+  # deploy-cloudflare job needs.
   deploy-backend:
     name: Deploy backend to Cloud Run
     if: github.event_name == 'workflow_dispatch'
@@ -431,7 +513,7 @@ jobs:
             [ -n "$value" ] || missing="$missing $name"
           done
           if [ -n "$missing" ]; then
-            echo "::error::Set these repository variables (Settings → Secrets and variables → Actions → Variables), see README 'Deploying to Cloud Run':$missing"
+            echo "::error::Set these repository variables (Settings → Secrets and variables → Actions → Variables), see the comment above the deploy-backend job in ci.yml:$missing"
             exit 1
           fi
 
@@ -463,7 +545,7 @@ jobs:
         run: |
           # --max-instances=1 is required, not tuning: the rate limiter counts
           #   in one process's memory, so a second instance doubles every
-          #   allowance (README "Deploying the backend version").
+          #   allowance (backend/.env.example, "Overrides").
           # --min-instances=0 is what keeps this inside the free tier; the
           #   price is a few seconds' cold start after an idle spell.
           # TRUSTED_PROXY_HOPS=1: Cloud Run's front end appends the caller's
