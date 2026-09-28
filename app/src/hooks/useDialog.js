@@ -25,12 +25,19 @@ const activeElement = () =>
  * The opener is read during render, before a field inside can take the focus
  * with `autoFocus` in the commit.
  *
+ * **When the opener is gone, `returnFocusTo` takes the focus instead.** The
+ * header's modals open from ☰ menu items, and the menu closes — unmounting the
+ * item — in the same press that opens the dialog; restoring to a detached
+ * element focused nothing, and the next Tab started from the top of the page.
+ *
  * @param {Object}           args
  * @param {boolean}          [args.open]  Whether the dialog is showing.
  * @param {function(): void} args.onClose Called on Escape.
+ * @param {{ current: HTMLElement|null }} [args.returnFocusTo] Where the focus
+ *   goes on closing when the element that opened the dialog is no longer there.
  * @returns {{ dialogProps: Object }}
  */
-export function useDialog({ open = true, onClose }) {
+export function useDialog({ open = true, onClose, returnFocusTo }) {
   const boxRef = useRef(null);
   const [shown, setShown] = useState(open);
   const [opener, setOpener] = useState(() => (open ? activeElement() : null));
@@ -44,10 +51,16 @@ export function useDialog({ open = true, onClose }) {
     const box = boxRef.current;
     if (box && !box.contains(document.activeElement))
       (box.querySelector(FOCUSABLE) ?? box).focus();
+    // Taken as the dialog opens: the fallback — ☰ — is there throughout.
+    const fallback = returnFocusTo?.current;
     return () => {
-      if (opener && document.contains(opener)) opener.focus?.();
+      // <body> is where the focus rests when nothing held it — a click in
+      // Safari does not focus the button pressed — so it is no opener either.
+      if (opener && opener !== document.body && document.contains(opener))
+        opener.focus?.();
+      else fallback?.focus?.();
     };
-  }, [open, opener]);
+  }, [open, opener, returnFocusTo]);
 
   const onKeyDown = (e) => {
     if (e.key === "Escape") {

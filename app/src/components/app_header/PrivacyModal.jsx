@@ -86,10 +86,10 @@ function privacySections({ backend, capabilities }) {
   ];
 }
 
-/** @param {{ open: boolean, onClose: () => void }} props */
-export function PrivacyModal({ open, onClose }) {
+/** @param {{ open: boolean, onClose: () => void, returnFocusTo?: { current: HTMLElement|null } }} props */
+export function PrivacyModal({ open, onClose, returnFocusTo }) {
   const capabilities = useBackendCapabilities();
-  const { dialogProps } = useDialog({ open, onClose });
+  const { dialogProps } = useDialog({ open, onClose, returnFocusTo });
   if (!open) return null;
 
   const sections = privacySections({ backend: BACKEND_ENABLED, capabilities });

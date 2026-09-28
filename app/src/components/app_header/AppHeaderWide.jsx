@@ -3,7 +3,7 @@
  * @module components/app_header/AppHeaderWide
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { TOUR_Z } from "../tour/tourZ.js";
 import { useTheme } from "../../hooks/useTheme.js";
@@ -30,6 +30,7 @@ import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { useLLMSettings, useLLMSettingsRequested } from "../../utils/llmKey.js";
+import { useMenuEscape } from "../../hooks/useMenuEscape.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
@@ -83,6 +84,15 @@ export function AppHeaderWide({
   tourMenuOpen,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // Where the focus goes back to when the menu, or a dialog opened from it,
+  // closes: the item that was pressed is gone with the menu.
+  const menuButtonRef = useRef(null);
+  useMenuEscape({
+    open: menuOpen,
+    onClose: () => setMenuOpen(false),
+    buttonRef: menuButtonRef,
+    enabled: !tourMenuOpen,
+  });
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -286,6 +296,7 @@ export function AppHeaderWide({
           <div style={{ position: "relative" }}>
             <Tooltip text="Settings, import and export.">
               <button
+                ref={menuButtonRef}
                 data-tutorial="btn-menu"
                 onClick={() => setMenuOpen((o) => !o)}
                 aria-label="Settings menu"
@@ -604,9 +615,21 @@ export function AppHeaderWide({
         </div>
       </div>
 
-      <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
-      <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
-      <PrivacyModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
+      <LLMSettingsModal
+        open={llmOpen}
+        onClose={() => setLlmOpen(false)}
+        returnFocusTo={menuButtonRef}
+      />
+      <FontSettingsModal
+        open={fontOpen}
+        onClose={() => setFontOpen(false)}
+        returnFocusTo={menuButtonRef}
+      />
+      <PrivacyModal
+        open={privacyOpen}
+        onClose={() => setPrivacyOpen(false)}
+        returnFocusTo={menuButtonRef}
+      />
 
       {/* Row 2: tab bar */}
       {!hideTabBar && (

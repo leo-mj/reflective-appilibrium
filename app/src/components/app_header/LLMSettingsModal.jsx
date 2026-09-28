@@ -82,9 +82,9 @@ async function requestModels(provider, key) {
 }
 
 /**
- * @param {{ open: boolean, onClose: () => void }} props
+ * @param {{ open: boolean, onClose: () => void, returnFocusTo?: { current: HTMLElement|null } }} props
  */
-export function LLMSettingsModal({ open, onClose }) {
+export function LLMSettingsModal({ open, onClose, returnFocusTo }) {
   // The demo build has no backend to relay a key to, but the modal is still
   // shown so visitors can see what configuring a provider involves. Everything
   // that would reach the network, or bank a key for a request that cannot be
@@ -106,7 +106,7 @@ export function LLMSettingsModal({ open, onClose }) {
   const [listed, setListed] = useState({ baseUrl: null, models: [] });
   const models = listed.baseUrl === provider.baseUrl ? listed.models : [];
   const titleId = useId();
-  const { dialogProps } = useDialog({ open, onClose });
+  const { dialogProps } = useDialog({ open, onClose, returnFocusTo });
 
   // Only what this backend will relay to: a hosted one refuses Ollama, whose
   // "localhost" would be the server. A saved or default choice it refuses gives

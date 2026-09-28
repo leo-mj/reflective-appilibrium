@@ -372,4 +372,37 @@ test.describe("Accessibility", () => {
     );
     expect(unreachable, `not tabbable: ${unreachable.join(" | ")}`).toEqual([]);
   });
+
+  // Both headers, the narrow one by a phone-sized window: the mobile project
+  // does not run this file. Each ☰ item that opens a dialog is gone by the time
+  // the dialog closes, so the focus used to fall to <body>.
+  for (const [layout, size, menuName] of [
+    ["wide", { width: 1280, height: 800 }, "Settings menu"],
+    ["narrow", { width: 390, height: 844 }, "Menu"],
+  ]) {
+    test(`the ${layout} ☰ menu closes on Escape, and its dialogs hand the focus back to ☰`, async ({ page }) => {
+      await page.setViewportSize(size);
+      await gotoHome(page);
+      await loadSample(page);
+      await park(page);
+      const burger = page.getByRole("button", { name: menuName, exact: true });
+      // Named with its icon: "ⓘ Privacy".
+      const privacy = page.getByRole("button", { name: /Privacy$/ });
+
+      await burger.focus();
+      await page.keyboard.press("Enter");
+      await expect(privacy).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(privacy).toBeHidden();
+      await expect(burger).toBeFocused();
+
+      await page.keyboard.press("Enter");
+      await privacy.focus();
+      await page.keyboard.press("Enter");
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(burger).toBeFocused();
+    });
+  }
 });

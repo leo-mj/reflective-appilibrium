@@ -22,14 +22,14 @@ export function applyFont(fontId) {
   document.documentElement.style.setProperty("--font-family", font.value);
 }
 
-/** @param {{ open: boolean, onClose: () => void }} props */
-export function FontSettingsModal({ open, onClose }) {
+/** @param {{ open: boolean, onClose: () => void, returnFocusTo?: { current: HTMLElement|null } }} props */
+export function FontSettingsModal({ open, onClose, returnFocusTo }) {
   const [fontId, setFontId] = useState(
     () => localStorage.getItem("fontId") ?? "system"
   );
 
   const titleId = useId();
-  const { dialogProps } = useDialog({ open, onClose });
+  const { dialogProps } = useDialog({ open, onClose, returnFocusTo });
 
   const handleSelect = (id) => {
     setFontId(id);

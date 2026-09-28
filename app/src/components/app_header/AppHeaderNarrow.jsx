@@ -3,12 +3,13 @@
  * @module components/app_header/AppHeaderNarrow
  */
 
-import { cloneElement, useState } from "react";
+import { cloneElement, useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { useTheme } from "../../hooks/useTheme.js";
 import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { useLLMSettings, useLLMSettingsRequested } from "../../utils/llmKey.js";
+import { useMenuEscape } from "../../hooks/useMenuEscape.js";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
@@ -91,6 +92,15 @@ export function AppHeaderNarrow({
     toggleAccessible,
   } = useTheme();
 
+  // As in the wide header: Escape and the menu's dialogs hand the focus back to ☰.
+  const menuButtonRef = useRef(null);
+  useMenuEscape({
+    open: menuOpen,
+    onClose: () => setMenuOpen(false),
+    buttonRef: menuButtonRef,
+    enabled: !tourActive,
+  });
+
   // Both of these are the wide header's, line for line — see the comments there.
   const settings = useLLMSettings();
   const llmSaved = BYOK_ENABLED && settings?.apiKey ? settings : null;
@@ -153,6 +163,7 @@ export function AppHeaderNarrow({
         </div>
         <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }}>
           <button
+            ref={menuButtonRef}
             data-tutorial="btn-menu"
             onClick={() => setMenuOpen((m) => !m)}
             aria-label="Menu"
@@ -163,9 +174,21 @@ export function AppHeaderNarrow({
           </button>
         </div>
       </div>
-      <LLMSettingsModal open={llmOpen} onClose={() => setLlmOpen(false)} />
-      <FontSettingsModal open={fontOpen} onClose={() => setFontOpen(false)} />
-      <PrivacyModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
+      <LLMSettingsModal
+        open={llmOpen}
+        onClose={() => setLlmOpen(false)}
+        returnFocusTo={menuButtonRef}
+      />
+      <FontSettingsModal
+        open={fontOpen}
+        onClose={() => setFontOpen(false)}
+        returnFocusTo={menuButtonRef}
+      />
+      <PrivacyModal
+        open={privacyOpen}
+        onClose={() => setPrivacyOpen(false)}
+        returnFocusTo={menuButtonRef}
+      />
       {menuOpen && (
         <div
           style={{
