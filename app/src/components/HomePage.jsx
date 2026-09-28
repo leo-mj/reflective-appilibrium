@@ -7,12 +7,24 @@
 import { useState } from "react";
 import { C, inkOn } from "../constants/colors.js";
 import { Tooltip } from "./Tooltip.jsx";
+import { ModalShell } from "./user_edits/ModalShell.jsx";
 import { useTheme, usePalette } from "../hooks/useTheme.js";
 import {
   clearDraft,
   isWorthResuming,
   loadDraft,
 } from "../utils/draftStorage.js";
+import {
+  DEFAULT_EXPORT_SECTIONS,
+  downloadMarkdown,
+} from "../utils/exportMarkdown.js";
+
+// The export as the editor writes it by default, less the graph and cluster
+// images: those are drawn from a layout, and only the editor has one. The full
+// history — what Import reads back — is in it.
+const LANDING_EXPORT_SECTIONS = new Set(
+  [...DEFAULT_EXPORT_SECTIONS].filter((k) => k !== "graph" && k !== "clusters"),
+);
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -150,7 +162,8 @@ function ResumeCard({ draft, onResume, onDiscard }) {
         {state.elements.length === 1 ? "" : "s"}
         {when ? ` · saved ${when}` : ""}
         <br />
-        Kept in this browser only. Export it to keep a copy elsewhere.
+        Kept in this browser only, and replaced by the next process you start.
+        Export it to keep a copy elsewhere.
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button
@@ -172,6 +185,75 @@ function ResumeCard({ draft, onResume, onDiscard }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Asks before a new process takes the draft's place.
+ *
+ * There is one draft slot, and a new process's first autosave writes over it —
+ * so without this, Start threw away the process on offer beside it, unasked.
+ * Export is offered here rather than only named, so the reader who wants both
+ * is not sent back to Resume, the menu and Home to get them.
+ *
+ * @param {Object}   props
+ * @param {Object}   props.draft     From draftStorage.loadDraft().
+ * @param {string}   props.topic     The new process's topic.
+ * @param {Function} props.onReplace
+ * @param {Function} props.onCancel
+ */
+function ReplaceDraftDialog({ draft, topic, onReplace, onCancel }) {
+  const [exported, setExported] = useState(false);
+  const { state } = draft;
+  const count = state.elements.length;
+  const exportDraft = () => {
+    downloadMarkdown(state, {}, LANDING_EXPORT_SECTIONS);
+    setExported(true);
+  };
+
+  return (
+    <ModalShell
+      title="Replace the process you left off?"
+      subtitle={
+        `This browser keeps one unfinished process. Starting “${topic}” ` +
+        `replaces “${state.topic || "Untitled"}” (round ${state.round}, ` +
+        `${count} element${count === 1 ? "" : "s"}).`
+      }
+      onCancel={onCancel}
+      onSave={onReplace}
+      saveLabel="Replace"
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 20,
+          fontSize: 12,
+          color: C.dim,
+          lineHeight: 1.6,
+        }}
+      >
+        <button
+          style={{
+            ...BTN_STYLE,
+            alignSelf: "center",
+            flexShrink: 0,
+            background: "transparent",
+            border: `1px solid ${C.supportsText}`,
+            color: C.supportsText,
+          }}
+          onClick={exportDraft}
+        >
+          Export it first
+        </button>
+        <span role="status">
+          {exported
+            ? "Exported. Import the file to pick it up again."
+            : "Downloads it as Markdown, which Import reads back in."}
+        </span>
+      </div>
+    </ModalShell>
   );
 }
 
@@ -290,6 +372,10 @@ export function HomePage({
     clearDraft();
     setDraft(null);
   };
+  // The topic waiting on ReplaceDraftDialog, when there is a draft to lose.
+  const [pendingTopic, setPendingTopic] = useState(null);
+  const startFresh = (topic) =>
+    isWorthResuming(draft) ? setPendingTopic(topic) : onStartFresh(topic);
   return (
     // <main>: the landing page's one main landmark. Semantic only — it lays out
     // exactly as the div it replaces.
@@ -415,7 +501,7 @@ export function HomePage({
             onLoadSample();
           }}
         />
-        <NewProcessCard onStart={onStartFresh} />
+        <NewProcessCard onStart={startFresh} />
         {QUESTIONNAIRE_SPECS.map((spec) => (
           <QuestionnaireCard
             key={spec.name}
@@ -424,6 +510,14 @@ export function HomePage({
           />
         ))}
       </section>
+      {pendingTopic !== null && (
+        <ReplaceDraftDialog
+          draft={draft}
+          topic={pendingTopic}
+          onReplace={() => onStartFresh(pendingTopic)}
+          onCancel={() => setPendingTopic(null)}
+        />
+      )}
       <div
         style={{
           ...DESC_STYLE,

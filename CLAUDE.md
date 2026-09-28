@@ -29,7 +29,9 @@ the app: the workflows hold the examples, and they read repository variables.
 
 **Nothing is stored on a server, in either build.** The working state is
 autosaved to the browser (`localStorage`, offered back as "Continue where you
-left off") and Markdown export is the only way out of it.
+left off") and Markdown export is the only way out of it. There is one draft
+slot, so Start on the landing page asks before a new process replaces a draft
+on offer (`ReplaceDraftDialog` in `HomePage.jsx`), offering its export first.
 
 **Export asks what to write.** ☰ → Export opens `ExportModal`, which offers the
 sections of `EXPORT_SECTIONS` in `utils/exportMarkdown.js` — elements,

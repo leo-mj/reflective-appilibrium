@@ -43,6 +43,30 @@ test.describe("Session draft", () => {
 
     await expect(page.getByRole("heading", { name: "Continue where you left off" })).toBeHidden();
   });
+
+  test("starting another process asks before replacing the draft", async ({ page }) => {
+    await gotoHome(page);
+    await startFresh(page, "First process");
+    await addElement(page, "judgment", "A judgment in the first process.");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await park(page);
+    const topic = page.getByLabel("Topic of your reflective equilibrium process");
+    await topic.fill("Second process");
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+
+    // One draft slot: the new process's first autosave would write over it.
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("First process");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+
+    // Cancel changed nothing, so a reload still offers the first process.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await park(page);
+    await expect(page.getByRole("heading", { name: "Continue where you left off" })).toBeVisible();
+    await expect(page.locator("body")).toContainText("First process");
+  });
 });
 
 test.describe("Export and import", () => {

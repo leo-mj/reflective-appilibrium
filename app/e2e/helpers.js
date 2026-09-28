@@ -51,8 +51,15 @@ export async function startFresh(page, topic) {
     .locator("div")
     .filter({ has: page.locator('input[aria-label*="Topic"]') })
     .last();
+  // A draft on offer means Start asks before replacing it. Read before the
+  // press, not raced after it: the landing page reads the draft as it mounts.
+  const replacesDraft = await page
+    .getByRole("heading", { name: "Continue where you left off" })
+    .isVisible();
   await card.locator('input[aria-label*="Topic"]').fill(topic);
   await card.getByRole("button", { name: /^Start/ }).click();
+  if (replacesDraft)
+    await page.getByRole("dialog").getByRole("button", { name: "Replace" }).click();
   await expect(page.locator("h1")).toContainText(/Round \d+/);
   await expect(addBar(page)).toBeVisible();
   await waitForReady(page);
