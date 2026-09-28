@@ -62,20 +62,25 @@ const DEFAULT_COLLAPSED_SECTIONS = {
  * Static nav config: keys and labels only. Counts/visibility computed at
  * runtime. `name` spells out the abbreviated labels for the accessible name —
  * "J" reads as the letter, which says nothing about where the pill goes.
+ *
+ * Letters for the three element types only, being the prefixes of the ids the
+ * reader sees on every node and card. Every other section is a word: "G", "C"
+ * and "L" explained themselves only in a hover tooltip, and a finger has no
+ * hover. The pills are drawn at wide widths only, where the words fit.
  */
 const NAV_SECTIONS = [
   { key: "judgments", label: "J", name: "judgments" },
   { key: "principles", label: "P", name: "principles" },
   { key: "theories", label: "T", name: "theories" },
-  { key: "arguments", label: "A", name: "arguments" },
-  { key: "relations", label: "R", name: "relations" },
+  { key: "arguments", label: "Arguments", name: "arguments" },
+  { key: "relations", label: "Relations", name: "relations" },
   // The user's own filing, before the analysis of it.
-  { key: "groups", label: "G", name: "groups" },
+  { key: "groups", label: "Groups", name: "groups" },
   // One pill, because it is one section: tensions, orphans and clusters are
   // all answers to how the commitments hang together. It used to be two — "!"
   // for the findings and "C" for the clusters — which split the question.
-  { key: "coherence", label: "C", name: "coherence" },
-  { key: "log", label: "L", name: "log" },
+  { key: "coherence", label: "Coherence", name: "coherence" },
+  { key: "log", label: "Log", name: "log" },
 ];
 
 // ─── TextTab ──────────────────────────────────────────────────────────────────
@@ -356,7 +361,7 @@ export function TextTab({
     const asArguments = key === "relations" && hideNonEntailsRels;
     return {
       key,
-      label: asArguments ? "A" : label,
+      label: asArguments ? "Arguments" : label,
       name: asArguments ? "arguments" : name,
       ...sectionMeta[key],
     };

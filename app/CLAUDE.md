@@ -4,7 +4,7 @@ React SPA (Vite). `src/config.js` derives every feature flag from one build-time
 `VITE_APP_ENV` (`dev` | `demo` | `backend`) — `LLM_ENABLED` and `BYOK_ENABLED` both
 follow `BACKEND_ENABLED`.
 
-Two more build-time values decide where a build is *served* and where it *calls*,
+Two more build-time values decide where a build is _served_ and where it _calls_,
 and both have one home each: `VITE_BASE_PATH` through `vite-plugins/basePath.js`
 (unset, the demo keeps the repo prefix GitHub Pages needs, and every other build is served from the root), and `VITE_BACKEND_URL` through
 `src/backendUrl.js`, exported as `BACKEND_URL` from `config.js` — every client
@@ -12,7 +12,7 @@ imports that rather than reading the variable, which is what keeps the clients a
 `vite-plugins/contentSecurityPolicy.js` agreeing on one address. `/` there means
 the backend is behind the page's own host, so `connect-src` stays `'self'` and no
 CORS is involved. **No hosting provider is named anywhere in `src/`**; a deployment
-is those three values and the server's `CORS_ORIGINS`. Mock data is a *runtime* choice, not a flag: the assist
+is those three values and the server's `CORS_ORIGINS`. Mock data is a _runtime_ choice, not a flag: the assist
 panel's "use sample suggestions" checkbox passes `useDummy` down to
 `llmClientFactory`, which also falls back to samples whenever `LLM_ENABLED` is false.
 **Samples are the demo process's only** (`suggestionsAreSample` in `GraphPanel`):
@@ -69,7 +69,7 @@ matters on this side:
 - **`utils/citation.js` is one ordering function with two renderers** —
   `<Citation>` maps its runs to `<em>`, `citationMarkdown` wraps them in `*`. That
   is what lets the export carry italics without a parser or model-supplied
-  markup, and what stops screen and export drifting apart. `esc` is passed *into*
+  markup, and what stops screen and export drifting apart. `esc` is passed _into_
   `citationMarkdown` to be applied per run: escaping the finished string would
   put a backslash in front of every emphasis marker it had just added.
 - **The card shows references with their verification state, and the element card
@@ -111,7 +111,7 @@ where contrast actually fails: a tab that changed shape when you switched theme
 would read as a rendering fault rather than as a property of the mode. The badge
 goes on the run button too, since it carries the same accent.
 
-An earlier version filled the badge with black instead and applied it to *every*
+An earlier version filled the badge with black instead and applied it to _every_
 header. Two things went wrong, both worth not repeating: the black ground made
 the badge a foreign object next to the nodes it names, and Review — which takes
 no graph colour — got a black chip carrying the panel's own text colour, which in
@@ -143,7 +143,7 @@ they double as general UI accents (a primary button's teal, a reject's orange)
 and must not move when the graph's palette does.
 
 The accessible set is the same five hues moved into the luminance band that is
-legible on both canvases *and* as type on the header chip: roughly 0.175–0.265,
+legible on both canvases _and_ as type on the header chip: roughly 0.175–0.265,
 which is narrow. They are deliberately not all at one luminance, since that is
 the channel red-green deficiency leaves intact. What the set fixes is contrast,
 not hue separation — orange, yellow and green stay confusable, and what carries
@@ -156,7 +156,7 @@ callers — `Graph` and `HistoryTab` — pass it in), `Legend`, and `generateSVG
 
 ## Process review
 
-`ProcessReviewTab` — the one Assist tab whose output is prose *about* the graph
+`ProcessReviewTab` — the one Assist tab whose output is prose _about_ the graph
 rather than a change to it. The domain note is in the root `CLAUDE.md`; what
 matters on this side:
 
@@ -168,7 +168,7 @@ matters on this side:
   the five before it are the iteration's phases, in run order, and this one runs
   after all five.
 - **The round gate holds the auto-fetch, not only the button.** `autoFetch` is
-  on for the *whole panel* whenever a workflow is running, so this tab fires on
+  on for the _whole panel_ whenever a workflow is running, so this tab fires on
   arrival like the other five; `state.log.length >= 2` is what stops it asking
   for a reading of a process too short to have moved, which a reader looping
   quickly can reach. Every phase carries a gate of this shape — Theories has the
@@ -181,7 +181,7 @@ matters on this side:
   went to another. Two routers is one too many.
 - **One review is carried as a one-element `suggestions` list.** That is the
   shape `useSuggestionWorkflow` consumes, and the fit is otherwise exact: a
-  review *is* a suggestion the user accepts, rejects, or modifies. The sample
+  review _is_ a suggestion the user accepts, rejects, or modifies. The sample
   fixture is stored already in that shape, since `makeLLMClient` serves
   `dummyData` without running `transformResponse`.
 - **Modify is per-section**, so `editing.draft` is an object of five strings
@@ -211,7 +211,7 @@ them out of the primitives in `TextTabPrimitives.jsx`.
   spends the width twice and leaves a row of pills that all look alike to be
   read one at a time. With the names on their own line the values line up down
   the column and can be scanned without them. `MetaChip` is still right for a
-  *set* of short values, where the name belongs to the set: the ids a principle
+  _set_ of short values, where the name belongs to the set: the ids a principle
   covers, a cluster's members. **Its border is the chip colour at a third only
   when that colour is a hex** — `C.dim` is `var(--c-dim)` and `var(--c-dim)55`
   is not a colour, so the declaration was dropped and the default chip had no
@@ -222,14 +222,14 @@ them out of the primitives in `TextTabPrimitives.jsx`.
   different place on every line. Values are held to one ellipsised line for the
   same reason — a value that wraps moves the rows under it — which is why
   anything that might not fit passes `title`. `Covers` is the exception and
-  takes `span={2}` with `wrap`: the ids *are* the content, so that is the one
+  takes `span={2}` with `wrap`: the ids _are_ the content, so that is the one
   field whose tail must not be eaten.
 - **The details fold is one answer for the whole panel**, not one per card —
   `text_panel/cardDetails.js`, a module store on `storedPref` in the shape
   `tourWidth.js` uses, read by every card through `useCardDetails()`. The
   statement is what a reader scans a list for and the stats are what they look
   at once they have found one, so folding is them saying how they want to read
-  the *list*; per card it took two dozen presses to mean it. It outlives the
+  the _list_; per card it took two dozen presses to mean it. It outlives the
   panel too, since leaving the text tab and coming back is not an instruction
   to unfold everything again. The region is hidden with `display` rather than
   unmounted.
@@ -245,7 +245,7 @@ them out of the primitives in `TextTabPrimitives.jsx`.
   (`C.supportsText`), the teal being illegible as type on the light panel.
 - **Their scale is `utils/withdrawalScale.js`, and it is neither 0–1 nor a
   fixed maximum.** Withdrawing an element moves account by `(2D ± 1)/N²` — a
-  few hundredths on any real process, and *smaller the larger the process gets*
+  few hundredths on any real process, and _smaller the larger the process gets_
   (the sample's own numbers are 0.014–0.048 for account and 0.052–0.172 for
   systematicity), so a 0–1 bar spent 95% of its width on unreachable ground.
   That `1/N²` is also why no fixed maximum serves: generous enough for a
@@ -270,7 +270,7 @@ them out of the primitives in `TextTabPrimitives.jsx`.
 `title`**. A native tooltip is a different box in a different font on a different
 delay, it cannot be reached by a finger at all, and having both meant a disabled
 run button was explained twice at once — the native box over the app's own. The
-shared primitives take the hover text as a `title` *prop* and render a `Tooltip`
+shared primitives take the hover text as a `title` _prop_ and render a `Tooltip`
 with it (`MetaChip`, `StatField`, `DeltaBar`, `SectionHeader`'s add button), so
 most call sites never mention it.
 
@@ -298,7 +298,7 @@ portal says.
 Colorblind-safe palette. Two modules, and the split matters:
 
 - `src/constants/colors.js` — everything that does **not** vary by mode: edges,
-  states, surfaces, and the per-type *foreground* tones (`C.judgment.text`, …).
+  states, surfaces, and the per-type _foreground_ tones (`C.judgment.text`, …).
 - `src/constants/palettes.js` — the node **fills** and the label ink, which do.
 
 Edges: teal (supports), orange (conflicts), amber (undermines);
@@ -311,12 +311,12 @@ rose at 35%.
 Two palettes, resolved by `resolvePalette(accessible)` and reached in components
 through `usePalette()` from `hooks/useTheme.js`. **Never import a node fill
 directly** — a component holding a hex is a component that is wrong in one of the
-modes. The theme is *not* a parameter: the fills are the same on both grounds.
+modes. The theme is _not_ a parameter: the fills are the same on both grounds.
 
-| Mode | Judgment · Principle · Theory | Ink | Guarantee |
-|---|---|---|---|
-| `default` | blue · violet · amber, pale → saturated | white, bold | none — see below |
-| `accessible` | pale blue · pink · yellow | black, normal | AAA (7:1) throughout |
+| Mode         | Judgment · Principle · Theory           | Ink           | Guarantee            |
+| ------------ | --------------------------------------- | ------------- | -------------------- |
+| `default`    | blue · violet · amber, pale → saturated | white, bold   | none — see below     |
+| `accessible` | pale blue · pink · yellow               | black, normal | AAA (7:1) throughout |
 
 **The default palette does not clear AA on its pale end, and that is a decision,
 not a bug.** No single ink can serve that ramp: it runs from tints that want dark
@@ -333,7 +333,7 @@ palette can't arrive with the wrong one.
 The mode lives on `<html>` (`data-theme`, `data-contrast`) — that is the single
 source of truth, and `useTheme` reads it rather than mirroring it.
 
-Two things deliberately do *not* use `palette.ink`: the graph's `+J/+P/+T`
+Two things deliberately do _not_ use `palette.ink`: the graph's `+J/+P/+T`
 buttons and the questionnaire card's button. They are HTML, where axe enforces AA
 in the e2e audit, so they take `inkOn(fill)` instead. The nodes are the exception
 to AA; a button generally is not — the add buttons are the exception, and are
@@ -347,7 +347,7 @@ node's `stroke` and written in `typeTokens(type).text`, and that ink is a CSS
 variable that varies by theme but **not** by contrast mode: in high-contrast the
 tint moved to the accessible ramp and the ink stayed on the default one, so a
 magenta node wore a violet badge. A tint cannot be fixed in place, either — its
-ink has to read against the *panel*, and neither ramp holds a tone dark enough to
+ink has to read against the _panel_, and neither ramp holds a tone dark enough to
 do that on the light one, which is why the badge is filled rather than re-tinted.
 
 **Any button on a filled ground asks for its ink rather than naming one.** What
@@ -355,7 +355,7 @@ it asks is settled by whether the fill is a graph colour the reader is meant to
 recognise. A one-off fill asks `inkOn(fill)`, which picks whichever of the two
 inks reads on it; a control wearing a graph constant takes `palette.ink` and
 `inkWeight()` of it, which is how the mode's own ink follows the colour. Either
-way the *fill* is untouched — re-toning one to chase a ratio is the thing that is
+way the _fill_ is untouched — re-toning one to chase a ratio is the thing that is
 forbidden.
 
 **Every add button is one button** — which since the bar became the app's only
@@ -395,7 +395,7 @@ User-defined boxes around nodes, collapsible to one node each. State lives in
   which `Graph.jsx` passes to `useGraphClick` as `toSourceRel`. Relations it had
   no reason to rewrite are the very objects passed in — don't "simplify" that
   into copying them all.
-- Identity is drawn in SVG (the hull, the disc, the name); the *actions* are HTML
+- Identity is drawn in SVG (the hull, the disc, the name); the _actions_ are HTML
   buttons in `graphs_shared/GroupChips.jsx`, so they get a tab stop and a name.
 - The layout knows about groups: `useStablePositions` pulls members together and
   packs collapsed ones tighter. The History tab deliberately does not collapse —
@@ -404,8 +404,8 @@ User-defined boxes around nodes, collapsible to one node each. State lives in
 **Two ways in, and they mean different things.** `createGroup` takes a canvas
 selection, which is a vague instruction — "these belong together" — so it folds
 into whatever group the selection already touches, which is what makes "pick a
-node and a member, then Group" read as *adding* to that group. `upsertGroup`
-takes the dialog's list, which is exact: an element ticked there *moves* out of
+node and a member, then Group" read as _adding_ to that group. `upsertGroup`
+takes the dialog's list, which is exact: an element ticked there _moves_ out of
 the group that had it, and a group left under two members is dissolved.
 
 **Where the feature announces itself.** A canvas gives no hint that a modifier
@@ -426,12 +426,12 @@ not drawing it.
 **A group can be selected, exactly as an element can** — from its disc, from
 inside an expanded group's box, from the panel's group chip, or from an element's
 group tag. Selection is still one id, so `selectionIds()` is what turns that id
-into what it covers: the group's node *and* its members. Both `Graph.jsx` and
+into what it covers: the group's node _and_ its members. Both `Graph.jsx` and
 `useTextTabData.js` highlight from it, which is what keeps them agreeing.
 Reading the id literally is what left a selected group showing "G1" over an
 empty card, since neither surface holds anything by that name.
 
-**Two rules the canvas depends on.** Clicking a collapsed group *opens* it — a
+**Two rules the canvas depends on.** Clicking a collapsed group _opens_ it — a
 group is a lid, and it re-asserts the selection rather than toggling it, because
 the thing clicked is about to be replaced by the members underneath. And chips
 are drawn for the selected group only: one over every group turned the canvas
@@ -452,7 +452,7 @@ Reads two ways, and does **not** fade the node: it tints the fill (`low` → `hi
 and, mainly, scales the radius — 65%–120% of base, so a confident element has
 ~3.4× the area of a tentative one. The 65% floor is set by the label, being the
 smallest node that still contains a three-character id at 11px bold. Opacity is
-reserved for *state*: dimmed by a selection elsewhere, withdrawn, rejected.
+reserved for _state_: dimmed by a selection elsewhere, withdrawn, rejected.
 
 Selection follows the user's pointer only: clicking a node or a text card. Actions
 taken on an element (revising, withdrawing) deliberately leave it alone, since
@@ -496,7 +496,7 @@ What that walk found, and what fixed it:
 
 The spec's catch-all — nothing showing a pointer that neither takes the focus
 nor holds something that does — would not have found the first two: both held
-*a* button, just not one that did their job. The walk's explicit steps did.
+_a_ button, just not one that did their job. The walk's explicit steps did.
 
 ### Search, on the graph
 
@@ -532,7 +532,7 @@ too big to show whole, is centred; one that is only cut off moves just far
 enough to be whole, which also applies to a click on a half-hidden node. The
 card a click pins moves with the view (`glideTo`'s `onMove`), being placed in
 page coordinates. A pointer, the wheel or the fit button takes the
-view over mid-glide and keeps it. Two guards: it acts on a *change* of
+view over mid-glide and keeps it. Two guards: it acts on a _change_ of
 selection only, not on the graph mounting with one (the opening fit has the
 view then), and a selection arriving in the same render as the tour's `focus`
 does not glide — the tour selects and frames together, and its framing wins.
@@ -624,7 +624,7 @@ lands on the border.
 - **A card, not a node with a label under it.** The first version hung the text
   under an enlarged node, and two objects per element was the mess. The badge
   keeps shape for type and size and fill for confidence, so nothing the node
-  said is lost. Text does not fit *inside* a node at any readable size.
+  said is lost. Text does not fit _inside_ a node at any readable size.
 - **Everything reads the card off a display copy** (`card` on the element, never
   on state). Edges meet it at its border through `boundaryDistance`, clicks
   land on it through `hitsElement` — ask those rather than `elementRadius`
@@ -767,7 +767,7 @@ squeezed out from under them. So the bar carries **no height at all** — an aut
 height on a column is the height of what is in it — floored by the dragged
 height (or the stylesheet's `ADD_BAR_MIN_HEIGHT`) and capped by `HEIGHT_CAP`;
 past the content the top edge moves up, and past the cap the bar scrolls. Which
-also means a bar that *opens* taller than the floor is one carrying a dragged
+also means a bar that _opens_ taller than the floor is one carrying a dragged
 height, not a layout fault: double-clicking the top edge gives it back.
 
 `height: max-content` says the same thing and was tried first. Don't: one engine
@@ -794,9 +794,9 @@ which is the other way a growing row goes wrong, and the one that gives the whol
 page a scrollbar. `HEIGHT_CAP` is `min(50dvh, 100%)`: the window's share, and the
 panel it sits in, whichever is smaller. The statement box keeps the floor
 `TEXT_FIELD_MIN_HEIGHT` puts under every one of them — that floor is what the bar
-grows *by*.
+grows _by_.
 
-Nothing in the app is read by scrolling sideways — the graph is *panned*, which
+Nothing in the app is read by scrolling sideways — the graph is _panned_, which
 is a transform — so a horizontal scrollbar is always a row that has failed to
 wrap; `REState`'s `overflow-x: hidden` says so, but the fix is always the
 wrapping — and the field width above, which is the other way one appears.
@@ -823,7 +823,7 @@ fills the relation and argument forms whichever one is on show.
 
 `ADD_BAR_PRESETS` in `constants/tabConstants.jsx` maps a tab to `{tab,
 elementType}`; `REState` hands the bar `ADD_BAR_PRESETS[tab] ?? null`, and the bar
-applies it exactly when the object's *identity* changes — the same
+applies it exactly when the object's _identity_ changes — the same
 adjust-during-render trackers the graph selection uses, and for a sharper reason:
 forced every render, neither the tab buttons nor the type picker could be moved
 off the preset at all. Hence frozen module constants rather than an object built
@@ -882,7 +882,7 @@ itself.
 the window.
 
 **The tour's column** — `tour/tourWidth.js`, and the one of the three that is a
-*module-level store* rather than a hook's own state, for the reason `useTheme`
+_module-level store_ rather than a hook's own state, for the reason `useTheme`
 is one: the tour draws itself at this width and `REState` pads the app by it,
 and those two are nowhere near each other in the tree. A column at 520 with the
 app making room for 460 sits over the controls it is pointing at. `TOUR_W` in
@@ -910,7 +910,7 @@ itself. The geometry is in the hooks, the hover and focus states in `index.css`
 ## Guided tour
 
 One script, two layouts. `tour/tourSections.js` is the whole tour — an ordered
-list of sections, each describing what the reader should *see* while they read
+list of sections, each describing what the reader should _see_ while they read
 it (tab, chrome, graph framing, selection, control to ring). `tour/GuidedTour.jsx`
 applies it and renders it either as a `column` down a wide screen's left edge or
 as a `sheet` along a narrow one's bottom, both scroll-driven, with the app
@@ -922,7 +922,7 @@ and `tourHelpers.js` drops sections the state cannot carry.
 **Never fork the script.** A phone used to get a separate nine-card tour that
 walked the ☰ menu and never mentioned reflective equilibrium — the one thing a
 first-time visitor is there to find out. What may legitimately differ between
-the widths is the *route* to a control, never the substance:
+the widths is the _route_ to a control, never the substance:
 
 - `narrow: { … }` on a section overrides where its control lives at that width
   (`btn-undo` → `menu-undo`) and what has to be on screen to see it.
@@ -938,7 +938,7 @@ paragraph counts, so dropping a paragraph rather than rewording it fails.
 `forLayout` fills `tab: "graph"` in for any section carrying `focus`, `select`,
 `argument` or `quote` and not naming one itself, so the rule cannot be forgotten
 on a new section. Trusting the tab the tour happens to open over works only from
-the home page's Tutorial button, where the app lands on the graph; from the ?
+the home page's "Guided tour", where the app lands on the graph; from the ?
 button — or scrolling backwards out of the Assist chapter, which does change
 tabs — the graph chapters were being read against an Assist panel, describing
 nodes that were nowhere on screen. An explicit `tab` still wins, which is what

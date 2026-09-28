@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { HomePage } from "./components/HomePage.jsx";
 import REState from "./components/REState.jsx";
-import { SAMPLE_STATE, makeEmptyState, makeQuestionnaireState } from "./state.js";
+import {
+  SAMPLE_STATE,
+  makeEmptyState,
+  makeQuestionnaireState,
+} from "./state.js";
 import { C } from "./constants/colors.js";
 
 function Spinner() {
@@ -47,7 +51,7 @@ export default function App() {
     setSession((n) => n + 1);
   };
 
-  // The home page's Tutorial button, reached from inside the editor.
+  // The home page's "Guided tour", reached from inside the editor.
   const startDemoTour = () => {
     sessionStorage.setItem("startTour", "1");
     navigate(SAMPLE_STATE, true);
@@ -58,7 +62,9 @@ export default function App() {
       <HomePage
         onStartFresh={(topic) => navigate(makeEmptyState(topic))}
         onLoadSample={() => navigate(SAMPLE_STATE, true)}
-        onLoadQuestionnaire={(spec) => navigate(makeQuestionnaireState(spec), true)}
+        onLoadQuestionnaire={(spec) =>
+          navigate(makeQuestionnaireState(spec), true)
+        }
         onLoadSession={(state) => navigate(state)}
       />
     );

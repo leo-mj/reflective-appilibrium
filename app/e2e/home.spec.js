@@ -52,7 +52,7 @@ test.describe("Landing page", () => {
 
   test("the tutorial opens and steps forward", async ({ page }) => {
     await gotoHome(page);
-    await page.locator('button:text-is("Tutorial")').click();
+    await page.locator('button:text-is("Guided tour")').click();
 
     const next = page.getByRole("button", { name: /Next/ });
     await expect(next).toBeVisible();

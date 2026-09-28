@@ -55,7 +55,7 @@ function tourLeavesBehind(state, isSample) {
 /**
  * @param {Object}   props
  * @param {Function} [props.onStartDemoTour] - Leaves this process for a fresh
- *   demo with the tour open, as the home page's Tutorial button does.
+ *   demo with the tour open, as the home page's "Guided tour" does.
  */
 export default function REState({
   initialState,
@@ -86,7 +86,7 @@ export default function REState({
   // On by default: a merge is asked for, and being able to tell the processes
   // apart afterwards is the point of the tags.
   const [showProcessTags, setShowProcessTags] = useState(true);
-  // The home page's "Tutorial" button sets this flag and then loads the demo,
+  // The home page's "Guided tour" sets this flag and then loads the demo,
   // so the tour opens on the state it describes rather than on the landing page.
   const [tourActive, setTourActive] = useState(() => {
     if (sessionStorage.getItem("startTour") === "1") {

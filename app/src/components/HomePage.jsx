@@ -272,7 +272,10 @@ function SampleProcessCard({ onLoad, onTour }) {
         future generations. <br /> Explore the graph, review the element
         history, and see how judgments, principles, and theories fit together.
       </div>
-      <div style={{ display: "flex", gap: 8 }}>
+      {/* Both buttons open the demo, so both say so; the second used to read
+          "Skip tutorial", naming what it left out rather than what it did.
+          Wrapping, since the labels no longer fit one row on a narrow card. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <button
           style={{
             ...BTN_STYLE,
@@ -281,7 +284,7 @@ function SampleProcessCard({ onLoad, onTour }) {
           }}
           onClick={onTour}
         >
-          Tutorial
+          Guided tour
         </button>
         <button
           style={{
@@ -292,7 +295,7 @@ function SampleProcessCard({ onLoad, onTour }) {
           }}
           onClick={onLoad}
         >
-          Skip tutorial
+          Skip guided tour
         </button>
       </div>
     </div>

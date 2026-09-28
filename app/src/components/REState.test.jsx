@@ -4,7 +4,13 @@
 // whose controls are gated on a backend — so in a demo build every visitor
 // landed on a screen of dead buttons with no explanation.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 
 import REState from "./REState.jsx";
 import { SAMPLE_STATE, makeQuestionnaireState } from "../state.js";
@@ -92,9 +98,12 @@ describe("the graph's full-screen toggle", () => {
     );
     const { container } = open();
     const nodeOpacity = (id) =>
-      [...container.querySelectorAll('svg > g[transform*="scale"] g[transform^="translate("]')]
-        .find((g) => g.querySelector(":scope > text")?.textContent === id)
-        ?.style.opacity;
+      [
+        ...container.querySelectorAll(
+          'svg > g[transform*="scale"] g[transform^="translate("]',
+        ),
+      ].find((g) => g.querySelector(":scope > text")?.textContent === id)?.style
+        .opacity;
     await waitFor(() => expect(nodeOpacity("P1")).toBeDefined());
     fireEvent.change(container.querySelector('input[type="search"]'), {
       target: { value: "J1" },
@@ -155,7 +164,7 @@ describe("the guided tour", () => {
   afterEach(() => sessionStorage.removeItem("startTour"));
 
   it("opens on the demo the home page loaded for it", () => {
-    // The home page's Tutorial button sets this flag and then loads the sample,
+    // The home page's "Guided tour" sets this flag and then loads the sample,
     // so the tour opens on the state it is about to describe.
     sessionStorage.setItem("startTour", "1");
     open();
@@ -412,8 +421,7 @@ describe("merged-process tags", () => {
   // The text cards' process fields — "Process A", captioned by the letter, with
   // the process's own name as the value. Found by the stat's name rather than by
   // a `title`, which is now the app's own Tooltip and so opens only on hover.
-  const chips = () =>
-    document.querySelectorAll('[data-stat^="Process "]');
+  const chips = () => document.querySelectorAll('[data-stat^="Process "]');
   const key = () => screen.queryAllByTestId("legend-process");
 
   it("has no toggle before a merge", () => {
@@ -461,7 +469,9 @@ describe("changing between analyze and assist", () => {
     try {
       open();
       const check = () => {
-        const divider = screen.getByRole("separator", { name: "Resize panels" });
+        const divider = screen.getByRole("separator", {
+          name: "Resize panels",
+        });
         expect(divider.previousElementSibling.style.width).toBe("40%");
         expect(divider.style.justifyContent).toBe("flex-start");
       };

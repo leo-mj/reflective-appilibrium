@@ -98,7 +98,7 @@ export async function waitForReady(page) {
  * @param {import('@playwright/test').Page} page
  */
 export async function loadSample(page) {
-  await page.locator('button:text-is("Skip tutorial")').click();
+  await page.locator('button:text-is("Open the demo")').click();
   // The narrow header shortens this to just "Round n", so match the part both
   // layouts share rather than the desktop wording.
   await expect(page.locator("h1")).toContainText(/Round \d+/);

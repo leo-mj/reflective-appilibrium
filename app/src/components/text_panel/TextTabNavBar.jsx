@@ -7,7 +7,7 @@
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 
-/** "judgments" → "Judgments". The pills are single letters on their own. */
+/** "judgments" → "Judgments". Three of the pills are single letters on their own. */
 const titleCase = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 /**
