@@ -15,6 +15,11 @@ CORS is involved. **No hosting provider is named anywhere in `src/`**; a deploym
 is those three values and the server's `CORS_ORIGINS`. Mock data is a *runtime* choice, not a flag: the assist
 panel's "use sample suggestions" checkbox passes `useDummy` down to
 `llmClientFactory`, which also falls back to samples whenever `LLM_ENABLED` is false.
+**Samples are the demo process's only** (`suggestionsAreSample` in `GraphPanel`):
+they are about its topic, so in a reader's own process, with no LLM or no key,
+the assist tabs are disabled instead and the key notice asks for a key. The
+guided tour likewise runs on the demo — from anywhere else, ☰/? asks before
+leaving for a fresh demo (`requestTour` in `REState`).
 
 Tests: `npm test` (Vitest, jsdom) and `npm run test:e2e` (Playwright — see `e2e/README.md`).
 Both pin `VITE_APP_ENV=demo` (`test.env` in `vite.config.js`, `webServer.env` in

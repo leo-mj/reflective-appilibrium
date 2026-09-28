@@ -33,6 +33,7 @@ import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { ProgressWorkflowBtn, ToolbarStrip } from "./workflowComponents.jsx";
 import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
 import { suggestionsUnavailable } from "../../utils/disabledReason.js";
+import { useKeyMissing } from "../../utils/llmKey.js";
 
 const ACCENT = C.judgment.accent;
 /** The same accent where it is type rather than a shape — see index.css. */
@@ -326,6 +327,7 @@ export function DetectArgumentsTab({
   nextPhaseIsEnabled,
 }) {
   const header = useHeaderAccent("detectArguments");
+  const keyMissing = useKeyMissing();
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -485,9 +487,13 @@ export function DetectArgumentsTab({
     });
   };
 
-  const disabled = loading || activeCount < 3;
+  // `suggestionsDisabled` too, as every other tab's run button: without it a
+  // press in a reader's own process fetched the demo's recorded arguments.
+  const disabled = loading || suggestionsDisabled || activeCount < 3;
   const why = suggestionsUnavailable({
     loading,
+    noBackend: suggestionsDisabled && !keyMissing,
+    noKey: suggestionsDisabled && keyMissing,
     needs:
       activeCount < 3 ? "Add at least three active elements first." : undefined,
   });

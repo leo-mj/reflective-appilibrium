@@ -34,7 +34,36 @@ import { useTourResizing, useTourWidth } from "./tour/tourWidth.js";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { GroupModal } from "./user_edits/GroupModal.jsx";
 import { AddBar } from "./user_edits/AddBar.jsx";
-export default function REState({ initialState, isSample, onHome, onReady }) {
+import { ModalShell } from "./user_edits/ModalShell.jsx";
+
+/**
+ * What becomes of the process on screen when the tour leaves it for the demo,
+ * said as it is. A reader's own process is autosaved as it is left, and the
+ * demo that replaces it never is, so it is still offered back on the home page
+ * — only its undo history goes. The demo and a questionnaire are never saved:
+ * what was done in them is lost.
+ */
+function tourLeavesBehind(state, isSample) {
+  if (state.model === "questionnaire") return "Your answers here are not kept.";
+  if (isSample)
+    return "Your changes to the demo are not kept: the tour starts it afresh.";
+  const topic = state.topic || "Untitled";
+  if (!state.elements.length)
+    return `“${topic}” has nothing in it yet, so nothing of is saved.`;
+  return `“${topic}” is kept in this browser: “Continue where you left off” on the home page brings it back, though not its undo history.`;
+}
+/**
+ * @param {Object}   props
+ * @param {Function} [props.onStartDemoTour] - Leaves this process for a fresh
+ *   demo with the tour open, as the home page's Tutorial button does.
+ */
+export default function REState({
+  initialState,
+  isSample,
+  onHome,
+  onReady,
+  onStartDemoTour,
+}) {
   // Graph, not the Assist panel: assist controls are gated on a backend, so in
   // a demo build the old default landed every visitor on dead buttons.
   const [tab, setTab] = useState(
@@ -167,6 +196,19 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   }
   const showSampleNotice = sampleNotice !== "done" && sampleNotice === state;
 
+  // The tour is written about the demo process and reads it off whatever is
+  // on screen, so opened anywhere else it narrated the reader's own process as
+  // "the demo". It runs in place only on the demo as it opened; from anywhere
+  // else it leaves for a fresh demo, as from the home page — after saying what
+  // becomes of the process left behind.
+  const tourInPlace =
+    isSample && state.model !== "questionnaire" && state === initialState;
+  const [tourLeaving, setTourLeaving] = useState(false);
+  const requestTour = () =>
+    tourInPlace || !onStartDemoTour
+      ? setTourActive(true)
+      : setTourLeaving(true);
+
   useEffect(() => {
     const onKeyDown = (e) => {
       // Never while typing: in a textarea these are the editor's own undo.
@@ -268,11 +310,11 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const simDims = useCoarseDims({ w: graphW, h: dims.h * 0.8 });
   // Where the reader drops a node is kept on the state, so the export carries
   // it: see utils/pinUtils.js.
-  const { positions, ready, drag: nodeDrag } = useStablePositions(
-    state,
-    simDims,
-    handlePinNodes,
-  );
+  const {
+    positions,
+    ready,
+    drag: nodeDrag,
+  } = useStablePositions(state, simDims, handlePinNodes);
   useEffect(() => {
     if (ready) onReady?.();
   }, [ready, onReady]);
@@ -454,6 +496,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     isSample,
     hideNonEntailsRels,
     verifyArguments,
+    // What an empty graph says: the whole guide, unless the text panel is
+    // beside it carrying that already — a second copy side by side would only
+    // be the same paragraph twice. See EmptyProcessGuide.
+    emptyGuide: showingTextPanel ? "brief" : "full",
   };
 
   // The panel the tab is about: the graph, history or cluster view in analyze
@@ -673,7 +719,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onWeightsChange={setWeights}
         onResetWeights={() => setWeights(DEFAULT_WEIGHTS)}
         tourActive={tourActive}
-        onStartTour={() => setTourActive(true)}
+        onStartTour={requestTour}
         hideTabBar={tourHidesChrome}
         tourMenuOpen={tourActive && !!tourChrome.menu}
       />
@@ -750,6 +796,27 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         layout={isWide ? "column" : "sheet"}
         onExpandChange={setTourExpanded}
       />
+
+      {tourLeaving && (
+        <ModalShell
+          title="Open the tour on the demo?"
+          subtitle="The tour walks through the demo process, so it leaves this one."
+          onCancel={() => setTourLeaving(false)}
+          onSave={onStartDemoTour}
+          saveLabel="Open the tour"
+        >
+          <p
+            style={{
+              fontSize: 12,
+              lineHeight: 1.6,
+              color: C.text,
+              margin: "0 0 20px",
+            }}
+          >
+            {tourLeavesBehind(state, isSample)}
+          </p>
+        </ModalShell>
+      )}
 
       {editingGroup && (
         <GroupModal

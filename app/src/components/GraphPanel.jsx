@@ -24,6 +24,8 @@ import { linkableElements } from "../utils/stateUtils.js";
 import { processesOf } from "../utils/mergeStates.js";
 import { useHasLLMKey } from "../utils/llmKey.js";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
+import { EmptyProcessGuide } from "./EmptyProcessGuide.jsx";
+import { SampleSuggestionsContext } from "./sampleSuggestions.js";
 
 /**
  * Hands the whole row to the graph by folding away whatever sits beside it,
@@ -176,16 +178,19 @@ export function GraphPanel({
   fullscreenHides = "panel beside it",
   focus,
   search = "",
+  emptyGuide = null,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
-  const suggestionsDisabled = !LLM_ENABLED && !isSample;
   // The public site's ordinary first state: the build has the LLM features, the
-  // visitor has not supplied a key yet. Folded into the sample gate below rather
-  // than made a gate of its own — a keyless visitor and a visitor who ticked
-  // "Use sample data" need exactly the same thing from every tab, and a second
-  // parallel condition is how the two would drift.
+  // visitor has not supplied a key yet.
   const hasKey = useHasLLMKey();
   const keyMissing = LLM_ENABLED && !hasKey;
+  // Nothing to ask, outside the demo. The recorded suggestions are the demo's
+  // own — about its topic, written for its elements — so offered in a reader's
+  // process they answer a question nobody there asked. Without an LLM, or
+  // without a key, a reader's own process gets no suggestions at all; the demo
+  // gets the recorded ones, as below.
+  const suggestionsDisabled = !isSample && (!LLM_ENABLED || keyMissing);
   // True whenever the suggestions on screen came from the sample fixtures
   // rather than a live model — the same condition makeLLMClient branches on.
   // Note this covers demo builds, where LLM_ENABLED is false and the "Use
@@ -197,289 +202,320 @@ export function GraphPanel({
   // this flag for display, and the two agreed only by coincidence: a keyless
   // visitor would have been shown "these are samples" while the tab fired a
   // real request that could only 400. One value, so they cannot disagree.
-  const suggestionsAreSample = !LLM_ENABLED || useDummyAssist || keyMissing;
+  //
+  // The demo only: a keyless visitor and one who ticked "Use sample data" need
+  // the same thing from every tab there, which is why the two are one gate.
+  const suggestionsAreSample =
+    isSample && (!LLM_ENABLED || useDummyAssist || keyMissing);
   const autoFetch = !!workflowPhase;
   const isAssistPanel =
     ASSIST_TABS.includes(tab) || SIMULATE_TABS.includes(tab);
   return (
-    <div
-      style={{
-        flex: 1,
-        minWidth: 0,
-        minHeight: 0,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {!isAssistPanel && (
-        // One row: the legend takes what it needs and wraps, the full-screen
-        // toggle stays pinned to the right edge above the graph.
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <Legend
-              hiddenLegendKeys={hiddenLegendKeys}
-              setHiddenLegendKeys={setHiddenLegendKeys}
-              hideNonEntailsRels={hideNonEntailsRels}
-              processes={processesOf(state)}
-            />
-          </div>
-          {onToggleFullscreen && (
-            <FullscreenButton
-              isFullscreen={isFullscreen}
-              onClick={onToggleFullscreen}
-              hides={fullscreenHides}
-            />
-          )}
-        </div>
-      )}
-      {APP_ENV === "dev" &&
-        isAssistPanel &&
-        isSample &&
-        state.model !== "questionnaire" && (
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 11,
-              color: C.dim,
-              padding: "4px 0 2px",
-              userSelect: "none",
-              cursor: "pointer",
-            }}
-          >
-            {/* Forced on and inert without a key: unticking it would promise
-                live suggestions the tab cannot fetch, leaving the checkbox
-                saying one thing and the panel below it doing another. */}
-            <Tooltip text={keyMissing ? "No API key configured." : ""} wrap>
-              <input
-                type="checkbox"
-                checked={useDummyAssist || keyMissing}
-                disabled={keyMissing}
-                onChange={(e) => setUseDummyAssist(e.target.checked)}
-                style={{
-                  accentColor: C.supports,
-                  cursor: keyMissing ? "not-allowed" : "pointer",
-                }}
-              />
-            </Tooltip>
-            Use sample data
-          </label>
-        )}
+    // For the key notice on every tab below, which says samples are samples
+    // only where they are.
+    <SampleSuggestionsContext.Provider value={suggestionsAreSample}>
       <div
         style={{
           flex: 1,
+          minWidth: 0,
           minHeight: 0,
-          marginTop: 4,
-          // For the narrow layout's floating +, which is anchored to the corner
-          // of whichever tab body is in here.
-          position: "relative",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        {/* An assist tab's way in by hand where there is no room for the strip.
+        {!isAssistPanel && (
+          // One row: the legend takes what it needs and wraps, the full-screen
+          // toggle stays pinned to the right edge above the graph.
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Legend
+                hiddenLegendKeys={hiddenLegendKeys}
+                setHiddenLegendKeys={setHiddenLegendKeys}
+                hideNonEntailsRels={hideNonEntailsRels}
+                processes={processesOf(state)}
+              />
+            </div>
+            {onToggleFullscreen && (
+              <FullscreenButton
+                isFullscreen={isFullscreen}
+                onClick={onToggleFullscreen}
+                hides={fullscreenHides}
+              />
+            )}
+          </div>
+        )}
+        {APP_ENV === "dev" &&
+          isAssistPanel &&
+          isSample &&
+          state.model !== "questionnaire" && (
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 11,
+                color: C.dim,
+                padding: "4px 0 2px",
+                userSelect: "none",
+                cursor: "pointer",
+              }}
+            >
+              {/* Forced on and inert without a key: unticking it would promise
+                live suggestions the tab cannot fetch, leaving the checkbox
+                saying one thing and the panel below it doing another. */}
+              <Tooltip text={keyMissing ? "No API key configured." : ""} wrap>
+                <input
+                  type="checkbox"
+                  checked={useDummyAssist || keyMissing}
+                  disabled={keyMissing}
+                  onChange={(e) => setUseDummyAssist(e.target.checked)}
+                  style={{
+                    accentColor: C.supports,
+                    cursor: keyMissing ? "not-allowed" : "pointer",
+                  }}
+                />
+              </Tooltip>
+              Use sample data
+            </label>
+          )}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            marginTop: 4,
+            // For the narrow layout's floating +, which is anchored to the corner
+            // of whichever tab body is in here.
+            position: "relative",
+          }}
+        >
+          {/* An assist tab's way in by hand where there is no room for the strip.
             The wide layout keeps that strip under every tab, this one cannot —
             an add bar and a column of suggestions do not both fit on a phone —
             so the bar comes up as a sheet over the tab instead, on the same
             button the text tab uses and carrying the same preset the strip
             would have had. Simulate is left out: it is the one assist-side tab
             with nothing to add to. */}
-        {!isWide && ASSIST_TABS.includes(tab) && (
-          <MobileAddButton
-            elements={linkableElements(state.elements)}
-            onAddElement={onAddElement}
-            onAddRelation={onAddRelation}
-            onAddNewArgument={onAddNewArgument}
-            hideNonEntailsRels={hideNonEntailsRels}
-            preset={ADD_BAR_PRESETS[tab] ?? null}
-          />
-        )}
-        {tab === "graph" && (
-          <Graph
-            state={state}
-            hiddenLegendKeys={hiddenLegendKeys}
-            positions={positions}
-            nodeDrag={nodeDrag}
-            selected={selected}
-            onSelect={onSelect}
-            selectedRel={selectedRel}
-            onSelectRel={onSelectRel}
-            onAddElement={onAddElement}
-            onAddRelation={onAddRelation}
-            onEditRequest={onEditRequest}
-            onWithdrawRequest={onWithdrawRequest}
-            onReinstate={onReinstate}
-            onCtrlChainSelect={onCtrlChainSelect}
-            onCreateGroup={onCreateGroup}
-            onToggleGroup={onToggleGroup}
-            onEditGroupRequest={onEditGroupRequest}
-            onUngroup={onUngroup}
-            ready={ready}
-            recentlyAdded={recentlyAdded}
-            hideNonEntailsRels={hideNonEntailsRels}
-            equilibriumPreviewWithdrawnIds={equilibriumPreviewWithdrawnIds}
-            focus={focus}
-            search={search}
-          />
-        )}
-        {tab === "history" && (
-          <HistoryTab
-            state={state}
-            positions={positions}
-            onRoundChange={onRoundChange}
-            isWide={isWide}
-            hideNonEntailsRels={hideNonEntailsRels}
-          />
-        )}
-        {tab === "clusters" && (
-          <ClusterTab
-            state={state}
-            positions={positions}
-            hideNonEntailsRels={hideNonEntailsRels}
-          />
-        )}
-        {tab === "suggestRelations" && (
-          <Suspense fallback={null}>
-            <RelationSuggestTab
-              state={state}
+          {!isWide && ASSIST_TABS.includes(tab) && (
+            <MobileAddButton
+              elements={linkableElements(state.elements)}
+              onAddElement={onAddElement}
               onAddRelation={onAddRelation}
-              onScrollToRelations={onScrollToRelations}
-              onRejectRelations={onRejectRelations}
-              autoFetch={autoFetch}
-              workflowPhase={workflowPhase}
-              workflowNextPhase={workflowNextPhase}
-              onAdvanceWorkflow={onAdvanceWorkflow}
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={suggestionsAreSample}
-              suggestionsAreSample={suggestionsAreSample}
-              suggestionsDisabled={suggestionsDisabled}
+              onAddNewArgument={onAddNewArgument}
+              hideNonEntailsRels={hideNonEntailsRels}
+              preset={ADD_BAR_PRESETS[tab] ?? null}
             />
-          </Suspense>
-        )}
-        {tab === "suggestPrinciples" && (
-          <Suspense fallback={null}>
-            <PrincipleSuggestTab
+          )}
+          {tab === "graph" && (
+            <Graph
               state={state}
+              hiddenLegendKeys={hiddenLegendKeys}
+              positions={positions}
+              nodeDrag={nodeDrag}
+              selected={selected}
+              onSelect={onSelect}
+              selectedRel={selectedRel}
+              onSelectRel={onSelectRel}
               onAddElement={onAddElement}
-              onRejectElements={onRejectElements}
-              autoFetch={autoFetch}
-              workflowPhase={workflowPhase}
-              workflowNextPhase={workflowNextPhase}
-              onAdvanceWorkflow={onAdvanceWorkflow}
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={suggestionsAreSample}
-              suggestionsAreSample={suggestionsAreSample}
-              suggestionsDisabled={suggestionsDisabled}
-              weights={weights}
+              onAddRelation={onAddRelation}
+              onEditRequest={onEditRequest}
+              onWithdrawRequest={onWithdrawRequest}
+              onReinstate={onReinstate}
+              onCtrlChainSelect={onCtrlChainSelect}
+              onCreateGroup={onCreateGroup}
+              onToggleGroup={onToggleGroup}
+              onEditGroupRequest={onEditGroupRequest}
+              onUngroup={onUngroup}
+              ready={ready}
+              recentlyAdded={recentlyAdded}
+              hideNonEntailsRels={hideNonEntailsRels}
+              equilibriumPreviewWithdrawnIds={equilibriumPreviewWithdrawnIds}
+              focus={focus}
+              search={search}
             />
-          </Suspense>
-        )}
-        {tab === "elicitJudgments" && (
-          <Suspense fallback={null}>
-            <JudgmentElicitTab
+          )}
+          {/* Over the empty canvas, centred, and taking no pointer but its own:
+            the add buttons in the canvas's corner stay reachable around it. */}
+          {tab === "graph" && emptyGuide && state.elements.length === 0 && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 24,
+                textAlign: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <div style={{ pointerEvents: "auto" }}>
+                <EmptyProcessGuide
+                  brief={emptyGuide === "brief"}
+                  isWide={isWide}
+                />
+              </div>
+            </div>
+          )}
+          {tab === "history" && (
+            <HistoryTab
               state={state}
-              onAddElement={onAddElement}
-              onRejectElements={onRejectElements}
-              autoFetch={autoFetch}
-              workflowPhase={workflowPhase}
-              workflowNextPhase={workflowNextPhase}
-              onAdvanceWorkflow={onAdvanceWorkflow}
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={suggestionsAreSample}
-              suggestionsAreSample={suggestionsAreSample}
-              suggestionsDisabled={suggestionsDisabled}
-              weights={weights}
+              positions={positions}
+              onRoundChange={onRoundChange}
+              isWide={isWide}
+              hideNonEntailsRels={hideNonEntailsRels}
             />
-          </Suspense>
-        )}
-        {tab === "suggestTheories" && (
-          <Suspense fallback={null}>
-            <TheorySuggestTab
+          )}
+          {tab === "clusters" && (
+            <ClusterTab
               state={state}
-              onAddElement={onAddElement}
-              onRejectElements={onRejectElements}
-              autoFetch={autoFetch}
-              workflowPhase={workflowPhase}
-              workflowNextPhase={workflowNextPhase}
-              onAdvanceWorkflow={onAdvanceWorkflow}
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={suggestionsAreSample}
-              suggestionsDisabled={suggestionsDisabled}
+              positions={positions}
+              hideNonEntailsRels={hideNonEntailsRels}
             />
-          </Suspense>
-        )}
-        {tab === "processReview" && (
-          <Suspense fallback={null}>
-            {/* The workflow stops here every fifth iteration, so this tab takes
+          )}
+          {tab === "suggestRelations" && (
+            <Suspense fallback={null}>
+              <RelationSuggestTab
+                state={state}
+                onAddRelation={onAddRelation}
+                onScrollToRelations={onScrollToRelations}
+                onRejectRelations={onRejectRelations}
+                autoFetch={autoFetch}
+                workflowPhase={workflowPhase}
+                workflowNextPhase={workflowNextPhase}
+                onAdvanceWorkflow={onAdvanceWorkflow}
+                nextPhaseIsEnabled={nextPhaseIsEnabled}
+                useDummy={suggestionsAreSample}
+                suggestionsAreSample={suggestionsAreSample}
+                suggestionsDisabled={suggestionsDisabled}
+              />
+            </Suspense>
+          )}
+          {tab === "suggestPrinciples" && (
+            <Suspense fallback={null}>
+              <PrincipleSuggestTab
+                state={state}
+                onAddElement={onAddElement}
+                onRejectElements={onRejectElements}
+                autoFetch={autoFetch}
+                workflowPhase={workflowPhase}
+                workflowNextPhase={workflowNextPhase}
+                onAdvanceWorkflow={onAdvanceWorkflow}
+                nextPhaseIsEnabled={nextPhaseIsEnabled}
+                useDummy={suggestionsAreSample}
+                suggestionsAreSample={suggestionsAreSample}
+                suggestionsDisabled={suggestionsDisabled}
+                weights={weights}
+              />
+            </Suspense>
+          )}
+          {tab === "elicitJudgments" && (
+            <Suspense fallback={null}>
+              <JudgmentElicitTab
+                state={state}
+                onAddElement={onAddElement}
+                onRejectElements={onRejectElements}
+                autoFetch={autoFetch}
+                workflowPhase={workflowPhase}
+                workflowNextPhase={workflowNextPhase}
+                onAdvanceWorkflow={onAdvanceWorkflow}
+                nextPhaseIsEnabled={nextPhaseIsEnabled}
+                useDummy={suggestionsAreSample}
+                suggestionsAreSample={suggestionsAreSample}
+                suggestionsDisabled={suggestionsDisabled}
+                weights={weights}
+              />
+            </Suspense>
+          )}
+          {tab === "suggestTheories" && (
+            <Suspense fallback={null}>
+              <TheorySuggestTab
+                state={state}
+                onAddElement={onAddElement}
+                onRejectElements={onRejectElements}
+                autoFetch={autoFetch}
+                workflowPhase={workflowPhase}
+                workflowNextPhase={workflowNextPhase}
+                onAdvanceWorkflow={onAdvanceWorkflow}
+                nextPhaseIsEnabled={nextPhaseIsEnabled}
+                useDummy={suggestionsAreSample}
+                suggestionsDisabled={suggestionsDisabled}
+              />
+            </Suspense>
+          )}
+          {tab === "processReview" && (
+            <Suspense fallback={null}>
+              {/* The workflow stops here every fifth iteration, so this tab takes
                 the same props the phases do. `workflowPhase` is what puts the
                 next-phase control in its toolbar; the tab's own round gate is
                 what keeps `autoFetch` from asking for a reading of a process
                 too short to have one. */}
-            <ProcessReviewTab
-              state={state}
-              onSaveReview={onSaveReview}
-              onDiscardReview={onDiscardReview}
-              autoFetch={autoFetch}
-              workflowPhase={workflowPhase}
-              workflowNextPhase={workflowNextPhase}
-              onAdvanceWorkflow={onAdvanceWorkflow}
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-              useDummy={suggestionsAreSample}
-              suggestionsAreSample={suggestionsAreSample}
-              suggestionsDisabled={suggestionsDisabled}
-            />
-          </Suspense>
-        )}
-        {tab === "mergeElements" && (
-          <Suspense fallback={null}>
-            {/* Not a phase, and never fetched on arrival: it is asked for once
+              <ProcessReviewTab
+                state={state}
+                onSaveReview={onSaveReview}
+                onDiscardReview={onDiscardReview}
+                autoFetch={autoFetch}
+                workflowPhase={workflowPhase}
+                workflowNextPhase={workflowNextPhase}
+                onAdvanceWorkflow={onAdvanceWorkflow}
+                nextPhaseIsEnabled={nextPhaseIsEnabled}
+                useDummy={suggestionsAreSample}
+                suggestionsAreSample={suggestionsAreSample}
+                suggestionsDisabled={suggestionsDisabled}
+              />
+            </Suspense>
+          )}
+          {tab === "mergeElements" && (
+            <Suspense fallback={null}>
+              {/* Not a phase, and never fetched on arrival: it is asked for once
                 a merge has happened, not every iteration. */}
-            <ElementMergeTab
-              state={state}
-              processes={processes}
-              onMergeElements={onMergeElements}
-              useDummy={suggestionsAreSample}
-              suggestionsDisabled={suggestionsDisabled}
-            />
-          </Suspense>
-        )}
-        {tab === "simulateRethon" && (
-          <Suspense fallback={null}>
-            <SimulateRethonTab
-              state={state}
-              onApplyRethonEquilibrium={onApplyRethonEquilibrium}
-              onSetEquilibriumPreview={onSetEquilibriumPreview}
-              weights={weights}
-            />
-          </Suspense>
-        )}
-        {tab === "detectArguments" && (
-          <Suspense fallback={null}>
-            <DetectArgumentsTab
-              state={state}
-              useDummy={suggestionsAreSample}
-              suggestionsDisabled={suggestionsDisabled}
-              verifyArguments={verifyArguments}
-              onAddElement={onAddElement}
-              onReviseElementText={onReviseElementText}
-              onAddRelation={onAddRelation}
-              onDeleteRelationsByArgId={onDeleteRelationsByArgId}
-              autoFetch={autoFetch}
-              workflowPhase={workflowPhase}
-              workflowNextPhase={workflowNextPhase}
-              onAdvanceWorkflow={onAdvanceWorkflow}
-              nextPhaseIsEnabled={nextPhaseIsEnabled}
-            />
-          </Suspense>
-        )}
-        {tab === "questionnaire" && (
-          <Suspense fallback={null}>
-            <QuestionnaireTab
-              state={state}
-              onSelectAnswer={onQuestionnaireSelectAnswer}
-            />
-          </Suspense>
-        )}
+              <ElementMergeTab
+                state={state}
+                processes={processes}
+                onMergeElements={onMergeElements}
+                useDummy={suggestionsAreSample}
+                suggestionsDisabled={suggestionsDisabled}
+              />
+            </Suspense>
+          )}
+          {tab === "simulateRethon" && (
+            <Suspense fallback={null}>
+              <SimulateRethonTab
+                state={state}
+                onApplyRethonEquilibrium={onApplyRethonEquilibrium}
+                onSetEquilibriumPreview={onSetEquilibriumPreview}
+                weights={weights}
+              />
+            </Suspense>
+          )}
+          {tab === "detectArguments" && (
+            <Suspense fallback={null}>
+              <DetectArgumentsTab
+                state={state}
+                useDummy={suggestionsAreSample}
+                suggestionsDisabled={suggestionsDisabled}
+                verifyArguments={verifyArguments}
+                onAddElement={onAddElement}
+                onReviseElementText={onReviseElementText}
+                onAddRelation={onAddRelation}
+                onDeleteRelationsByArgId={onDeleteRelationsByArgId}
+                autoFetch={autoFetch}
+                workflowPhase={workflowPhase}
+                workflowNextPhase={workflowNextPhase}
+                onAdvanceWorkflow={onAdvanceWorkflow}
+                nextPhaseIsEnabled={nextPhaseIsEnabled}
+              />
+            </Suspense>
+          )}
+          {tab === "questionnaire" && (
+            <Suspense fallback={null}>
+              <QuestionnaireTab
+                state={state}
+                onSelectAnswer={onQuestionnaireSelectAnswer}
+              />
+            </Suspense>
+          )}
+        </div>
       </div>
-    </div>
+    </SampleSuggestionsContext.Provider>
   );
 }

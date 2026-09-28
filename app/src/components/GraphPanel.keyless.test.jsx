@@ -120,14 +120,14 @@ function saveKey() {
   notifyLLMKeyChanged();
 }
 
-describe("an assist tab with no API key saved", () => {
+describe("an assist tab on the demo with no API key saved", () => {
   it("says the suggestions on screen are samples", async () => {
-    await renderPanel();
+    await renderPanel({ isSample: true });
     expect(screen.getByText(/These are sample suggestions/)).toBeTruthy();
   });
 
   it("offers a way to supply one", async () => {
-    await renderPanel();
+    await renderPanel({ isSample: true });
     expect(screen.getByRole("button", { name: /Add a key/ })).toBeTruthy();
   });
 
@@ -135,8 +135,34 @@ describe("an assist tab with no API key saved", () => {
   // a tab that auto-fetches, must be served the fixture rather than a request
   // that can only 400.
   it("fires no LLM request when the workflow auto-fetches", async () => {
-    await renderPanel({ workflowPhase: "elicitJudgments" });
+    await renderPanel({ isSample: true, workflowPhase: "elicitJudgments" });
     expect(llmCalls()).toEqual([]);
+  });
+});
+
+// The recorded suggestions are the demo's, about its topic: offered in a
+// reader's own process they answered a question nobody there had asked.
+describe("an assist tab in the reader's own process with no API key", () => {
+  it("offers no samples, and says a key is what it needs", async () => {
+    await renderPanel();
+    expect(screen.queryByText(/These are sample suggestions/)).toBeNull();
+    expect(screen.getByText(/Suggestions need your own API key/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add a key/ })).toBeTruthy();
+  });
+
+  it("will not run, and fetches nothing on an auto-fetch", async () => {
+    await renderPanel({ workflowPhase: "elicitJudgments" });
+    expect(screen.getByRole("button", { name: /Elicit/ }).disabled).toBe(true);
+    expect(llmCalls()).toEqual([]);
+    // Not the fixtures either: a sample fetch would have put cards on screen.
+    expect(screen.queryByText(/No suggestions remaining|Accept/)).toBeNull();
+  });
+
+  it("runs live once a key is saved", async () => {
+    await renderPanel();
+    await act(async () => saveKey());
+    expect(screen.queryByText(/Suggestions need your own API key/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Elicit/ }).disabled).toBe(false);
   });
 });
 
@@ -156,7 +182,7 @@ describe("once a key is saved", () => {
   // No reload: the panel is already mounted when the key arrives, which is what
   // the store in utils/llmKey.js exists for.
   it("switches a mounted panel from samples to live without remounting", async () => {
-    await renderPanel();
+    await renderPanel({ isSample: true });
     expect(screen.getByText(/These are sample suggestions/)).toBeTruthy();
 
     await act(async () => saveKey());
@@ -167,7 +193,15 @@ describe("once a key is saved", () => {
 describe("a build with no LLM at all", () => {
   it("shows no key notice, since there is nothing a key would buy", async () => {
     flags.llm = false;
-    await renderPanel();
+    await renderPanel({ isSample: true });
     expect(screen.queryByText(/These are sample suggestions/)).toBeNull();
+    expect(screen.queryByText(/Suggestions need your own API key/)).toBeNull();
+  });
+
+  // Recorded suggestions stay the demo's here too.
+  it("will not run in the reader's own process", async () => {
+    flags.llm = false;
+    await renderPanel();
+    expect(screen.getByRole("button", { name: /Elicit/ }).disabled).toBe(true);
   });
 });

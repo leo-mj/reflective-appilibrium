@@ -6,6 +6,7 @@ import { SpinnerIcon } from "../Icons.jsx";
 import { quickScore } from "../../utils/simulateRethonClient.js";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { suggestionsUnavailable } from "../../utils/disabledReason.js";
+import { useKeyMissing } from "../../utils/llmKey.js";
 import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
 import { useBackendCapabilities } from "../../hooks/useBackendCapabilities.js";
 
@@ -82,7 +83,8 @@ export function ToolbarStrip({ disclosure, children }) {
  * @param {boolean}          props.hasResult
  * @param {Function}         props.onRun
  * @param {string|undefined} props.model
- * @param {boolean}          [props.disabled]  No backend, so nothing can be asked.
+ * @param {boolean}          [props.disabled]  Nothing can be asked: no backend,
+ *   or, outside the demo, no API key.
  * @param {string}           [props.needs]     What the process still lacks, if
  *   anything, e.g. "Add at least two elements first." Also disables the button.
  * @param {ReactNode}        [props.disclosure] The AI notice, pinned with the
@@ -107,7 +109,15 @@ export function SuggestionToolbar({
   disclosure,
 }) {
   const isDisabled = loading || disabled || Boolean(needs);
-  const why = suggestionsUnavailable({ loading, noBackend: disabled, needs });
+  // Disabled in a build with the LLM means a key is what is missing — in a
+  // reader's own process, where the demo's recorded suggestions are not offered.
+  const keyMissing = useKeyMissing();
+  const why = suggestionsUnavailable({
+    loading,
+    noBackend: disabled && !keyMissing,
+    noKey: disabled && keyMissing,
+    needs,
+  });
   const { accent, ink, weight, marker, badge } = useHeaderAccent(tab);
   return (
     <ToolbarStrip disclosure={disclosure}>

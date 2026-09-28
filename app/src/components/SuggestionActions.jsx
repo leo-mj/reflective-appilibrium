@@ -5,10 +5,12 @@
  * @module components/SuggestionActions
  */
 
+import { useContext } from "react";
 import { C } from "../constants/colors.js";
 import { CheckIcon, XIcon, EditIcon, RevertIcon, ChatIcon } from "./Icons.jsx";
 import { Tooltip } from "./Tooltip.jsx";
 import { requestLLMSettings, useKeyMissing } from "../utils/llmKey.js";
+import { SampleSuggestionsContext } from "./sampleSuggestions.js";
 
 const CIRCLE_BTN = {
   width: 26,
@@ -229,6 +231,7 @@ export function ErrorBanner({ message }) {
  */
 export function NeedsKeyNotice() {
   const keyMissing = useKeyMissing();
+  const sample = useContext(SampleSuggestionsContext);
   if (!keyMissing) return null;
   return (
     <div
@@ -247,13 +250,23 @@ export function NeedsKeyNotice() {
         gap: 8,
       }}
     >
-      <span style={{ flex: 1, minWidth: 180 }}>
-        <span style={{ fontWeight: "bold", color: C.text }}>
-          These are sample suggestions.
-        </span>{" "}
-        Add your own API key to get suggestions about the position you are
-        actually building.
-      </span>
+      {sample ? (
+        <span style={{ flex: 1, minWidth: 180 }}>
+          <span style={{ fontWeight: "bold", color: C.text }}>
+            These are sample suggestions.
+          </span>{" "}
+          Add your own API key to get suggestions about the position you are
+          actually building.
+        </span>
+      ) : (
+        <span style={{ flex: 1, minWidth: 180 }}>
+          <span style={{ fontWeight: "bold", color: C.text }}>
+            Suggestions need your own API key.
+          </span>{" "}
+          Add one to get suggestions about the position you are building. The
+          demo process shows recorded ones without a key.
+        </span>
+      )}
       <button
         onClick={requestLLMSettings}
         style={{

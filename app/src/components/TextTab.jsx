@@ -33,6 +33,7 @@ import { HistoryRoundBanner } from "./text_panel/TextTabPrimitives.jsx";
 import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
 import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
+import { EmptyProcessGuide } from "./EmptyProcessGuide.jsx";
 
 // ─── Module-level constants ───────────────────────────────────────────────────
 /**
@@ -432,6 +433,14 @@ export function TextTab({
             }}
           >
             <HistoryRoundBanner historyView={historyView} />
+
+            {/* A new process, not History's round 0: that is a projection of
+                one that has elements, and says so in the banner above. */}
+            {!historyView && state.elements.length === 0 && (
+              <div style={{ padding: "12px 8px 4px" }}>
+                <EmptyProcessGuide isWide={isWide} />
+              </div>
+            )}
 
             {highlightedIds && (
               <HighlightedSection
