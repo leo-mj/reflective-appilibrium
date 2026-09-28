@@ -8,6 +8,7 @@ import {
   addElement,
   expectCounts,
   exportDownload,
+  loadSample,
   openMenu,
   park,
 } from "./helpers.js";
@@ -66,6 +67,55 @@ test.describe("Session draft", () => {
     await park(page);
     await expect(page.getByRole("heading", { name: "Continue where you left off" })).toBeVisible();
     await expect(page.locator("body")).toContainText("First process");
+  });
+
+  // The sample is not autosaved — it would take the one draft slot — so what the
+  // reader is owed instead is being told, before a reload takes the edits.
+  test("edits to the sample are not kept, and the app says so", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    const notice = page.getByRole("status").filter({ hasText: "Changes to the demo are not saved" });
+    await expect(notice).toBeHidden();
+
+    await addElement(page, "judgment", "A judgment added to the demo.");
+    await expect(notice).toBeVisible();
+
+    // Its Export is the ☰ one, a press away.
+    await notice.getByRole("button", { name: "Export" }).click();
+    await expect(page.getByRole("dialog")).toContainText("Choose what goes into the Markdown file.");
+    await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+
+    // As the notice says: a reload keeps nothing, and offers nothing back.
+    await page.waitForTimeout(1_200); // past the autosave's debounce, were there one
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await park(page);
+    await expect(page.getByRole("heading", { name: "Continue where you left off" })).toBeHidden();
+  });
+
+  // Said once: a line kept up over every later edit stops being read.
+  test("the notice goes with the next edit, and stays gone", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    const notice = page.getByRole("status").filter({ hasText: "Changes to the demo are not saved" });
+    await addElement(page, "judgment", "The edit that brings the notice up.");
+    await expect(notice).toBeVisible();
+
+    await addElement(page, "judgment", "The edit that puts it away.");
+    await expect(notice).toBeHidden();
+    await addElement(page, "judgment", "And one that does not bring it back.");
+    await expect(notice).toBeHidden();
+  });
+
+  test("the notice can be closed, and stays closed", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    const notice = page.getByRole("status").filter({ hasText: "Changes to the demo are not saved" });
+    await addElement(page, "judgment", "The edit that brings the notice up.");
+    await notice.getByRole("button", { name: "Close notice" }).click();
+    await expect(notice).toBeHidden();
+
+    await addElement(page, "judgment", "A later edit.");
+    await expect(notice).toBeHidden();
   });
 });
 

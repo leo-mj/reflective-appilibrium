@@ -150,8 +150,22 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   } = useREActions(initialState);
 
   // Not the sample: it is a fixed demonstration anyone can reload from the home
-  // page, and autosaving it would bury the visitor's own work under it.
+  // page, and autosaving it would bury the visitor's own work under it. It can
+  // still be edited, though, so the first edit brings up a notice that the
+  // edits are not kept. Said once: the next change, or its close button, puts
+  // it away for as long as the sample stays open. The state only changes by an
+  // action, so being a different object is the test for a change. A
+  // questionnaire is loaded as a sample too, and is left out: the notice speaks
+  // of the demo.
   useAutosaveDraft(state, !isSample);
+  // null until the first edit; then the state it appeared on; then "done".
+  const [sampleNotice, setSampleNotice] = useState(null);
+  if (isSample && state.model !== "questionnaire" && sampleNotice !== "done") {
+    if (sampleNotice === null && state !== initialState) setSampleNotice(state);
+    else if (sampleNotice !== null && state !== sampleNotice)
+      setSampleNotice("done");
+  }
+  const showSampleNotice = sampleNotice !== "done" && sampleNotice === state;
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -624,6 +638,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onPrepareMerge={handlePrepareMerge}
         onConfirmMerge={handleConfirmMerge}
         isSample={isSample}
+        showSampleNotice={showSampleNotice}
+        onDismissSampleNotice={() => setSampleNotice("done")}
         hasExistingState={state.elements.length > 0}
         onHome={onHome}
         isWide={isWide}

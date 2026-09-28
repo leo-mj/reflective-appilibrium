@@ -8,6 +8,7 @@ import { TutorialOverlay } from "./TutorialOverlay.jsx";
 import { ModalShell } from "./user_edits/ModalShell.jsx";
 import { MergeModal } from "./user_edits/MergeModal.jsx";
 import { ExportModal } from "./user_edits/ExportModal.jsx";
+import { SampleEditsNotice } from "./app_header/SampleEditsNotice.jsx";
 import {
   ASSIST_TABS,
   SIMULATE_TABS,
@@ -47,6 +48,10 @@ import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
  * @param {function} [props.onConfirmMerge] - Performs a merge prepared above.
  * @param {boolean} [props.isSample] - Whether the open process is the sample
  *   one, which is what the "Merge (demo)" row is offered on.
+ * @param {boolean} [props.showSampleNotice] - Whether to say, under the header,
+ *   that edits to the sample are not kept — with the export it owns a press
+ *   away. REState decides when: from the first edit until the next.
+ * @param {function} [props.onDismissSampleNotice] - The notice's close button.
  * @param {boolean}  props.hasExistingState
  * @param {function} props.onHome
  * @param {boolean}  props.isWide
@@ -87,6 +92,8 @@ export function AppHeader({
   onConfirmMerge,
   hasExistingState,
   isSample = false,
+  showSampleNotice = false,
+  onDismissSampleNotice,
   onHome,
   isWide,
   workflowPhase,
@@ -326,6 +333,13 @@ export function AppHeader({
     onStartStepper: onStartTour,
   };
 
+  const sampleNotice = showSampleNotice && (
+    <SampleEditsNotice
+      onExport={() => setExportOpen(true)}
+      onClose={onDismissSampleNotice}
+    />
+  );
+
   if (!isWide) {
     // Both tours are mounted by REState — they read the demo graph, so they
     // need the selection and the framing only that component holds. What the
@@ -343,6 +357,7 @@ export function AppHeader({
           visibleSubTabs={visibleSubTabs}
           tourActive={tourActive}
         />
+        {sampleNotice}
       </>
     );
   }
@@ -360,6 +375,7 @@ export function AppHeader({
         hideTabBar={hideTabBar}
         tourMenuOpen={tourMenuOpen}
       />
+      {sampleNotice}
     </>
   );
 }

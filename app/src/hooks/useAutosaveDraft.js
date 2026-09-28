@@ -23,8 +23,9 @@ const DEBOUNCE_MS = 800;
  * never run at all.
  *
  * @param {import('../types.js').REState} state
- * @param {boolean} [enabled=true]  False for states not worth keeping, like the
- *   read-only sample process.
+ * @param {boolean} [enabled=true]  False for states that are not the reader's
+ *   own, like the sample process. That one can be edited, and REState tells
+ *   the reader once it has been that the edits are not kept.
  */
 export function useAutosaveDraft(state, enabled = true) {
   // The debounce closes over `state` directly. The ref exists only for the
