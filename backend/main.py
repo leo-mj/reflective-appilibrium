@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from .body_limit import BodySizeLimitMiddleware
 from .config import Settings, get_settings
 from .dependencies import (
     proxy_startup_warning,
@@ -79,6 +80,19 @@ settings = get_settings()
 if _proxy_warning := proxy_startup_warning(settings):
     logging.getLogger("backend.main").warning(_proxy_warning)
 
+
+def _body_limit() -> int:
+    """The body limit of the settings in force, asked per request.
+
+    Through the dependency, overrides included, as health and the docs routes
+    read the mode — a middleware cannot declare a dependency itself.
+    """
+    return app.dependency_overrides.get(get_settings, get_settings)().request_body_limit
+
+
+# Added first so it sits inside CORS: a browser can only read the 413 it is sent
+# if the answer carries the CORS headers.
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=_body_limit)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,

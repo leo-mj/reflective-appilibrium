@@ -44,7 +44,9 @@ server {
         # the computation (routers/simulate_rethon.py).
         proxy_read_timeout 300s;
 
-        # A discussion carries the whole RE state and every earlier turn.
+        # A discussion carries the whole RE state and every earlier turn. The
+        # same 10 MiB the backend refuses above when hosted
+        # (MAX_REQUEST_BODY_BYTES, backend/config.py): change the two together.
         client_max_body_size 10m;
     }
 

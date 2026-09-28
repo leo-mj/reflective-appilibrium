@@ -40,6 +40,7 @@ Deployment = Literal["local", "hosted"]
 # LLM call timeout             600s (SDK)        90s
 # rethon computation timeout   none              60s
 # rethon element cap           none              20
+# request body size            none              10 MiB
 #
 # Nothing is written to disk in either mode; the browser keeps the state.
 #
@@ -106,6 +107,19 @@ _HOSTED_MAX_ELEMENTS = 20
 # one computation, however many rounds it simulates. None locally, where the one
 # caller can watch a long simulation and decide for themselves.
 _HOSTED_COMPUTATION_TIMEOUT = 60.0
+
+# Largest request body, in bytes, refused before it is read (body_limit.py). The
+# Pydantic caps bound each field, but only once the body has been parsed, on the
+# one worker everyone shares.
+#
+# Sized from what is legitimately sent. Measured: the sample process merged with
+# sample-process-climate-duties.md is 23 KB as JSON (33 elements, 43 relations,
+# about 250 bytes each). A discussion at its caps adds about 1.2 MB of messages to
+# its state. The largest any route's own caps admit, short of the state's nested
+# histories, is /api/llm/complete — 100 messages of 100,000 characters, just
+# under 10 MB. 10 MiB covers that, and matches client_max_body_size in the
+# compose stack's nginx (app/nginx/default.conf.template), so the two agree.
+_HOSTED_MAX_BODY_BYTES = 10 * 1024 * 1024
 
 
 class Settings(BaseSettings):
@@ -197,6 +211,9 @@ class Settings(BaseSettings):
 
     # Seconds one rethon computation may run; 0 disables the limit.
     simulation_timeout_seconds: Optional[float] = Field(default=None, ge=0)
+
+    # Bytes a request body may carry before it is refused with 413; 0 disables.
+    max_request_body_bytes: Optional[int] = Field(default=None, ge=0)
 
     # ── Simulation workers ────────────────────────────────────────────────────
 
@@ -388,6 +405,17 @@ class Settings(BaseSettings):
         if self.simulation_timeout_seconds is not None:
             return self.simulation_timeout_seconds
         return _HOSTED_COMPUTATION_TIMEOUT if self.is_hosted else 0
+
+    @property
+    def request_body_limit(self) -> int:
+        """Bytes a request body may carry; 0 = unlimited.
+
+        Unlimited locally for the reason the caps above are: the only sender is
+        the person running the server, whose own payload cannot crowd anyone out.
+        """
+        if self.max_request_body_bytes is not None:
+            return self.max_request_body_bytes
+        return _HOSTED_MAX_BODY_BYTES if self.is_hosted else 0
 
 
 @lru_cache
