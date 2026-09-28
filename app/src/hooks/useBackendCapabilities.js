@@ -18,6 +18,8 @@ import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
  * @property {boolean} reachable   Whether the backend answered at all.
  * @property {number}  maxElements Largest sentence pool it will compute over;
  *   0 means no cap, which is also what an older backend is assumed to have.
+ * @property {"local"|"hosted"|null} deployment The server's declared posture;
+ *   null until known. Hosted, it refuses loopback provider URLs.
  */
 
 /** What we assume before the health check answers, and if it never does. */
@@ -25,6 +27,7 @@ const UNAVAILABLE = {
   loaded: false,
   reachable: false,
   maxElements: 0,
+  deployment: null,
 };
 
 // One check per page load, shared by every caller.
@@ -68,6 +71,7 @@ function load() {
         // `?? 0`: absence means "no cap known", and guessing a number would
         // hide badges a backend would have answered.
         maxElements: data?.max_simulation_elements ?? 0,
+        deployment: data?.deployment ?? null,
       }),
     )
     .catch(() => settle({ ...UNAVAILABLE, loaded: true }));

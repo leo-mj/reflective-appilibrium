@@ -32,6 +32,7 @@ Deployment = Literal["local", "hosted"]
 #
 #                              local            hosted
 # server-side API keys         lent to loopback  never (BYOK only)
+# loopback provider (Ollama)   accepted          refused (it is the server's)
 # LLM rate limit               none              60/min per caller
 # simulation rate limit        none              5/min per caller
 # stepping rate limit          none              30/min per caller

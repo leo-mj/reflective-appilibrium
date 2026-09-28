@@ -13,12 +13,15 @@ import {
   waitFor,
 } from "@testing-library/react";
 
-const flags = vi.hoisted(() => ({ byok: false }));
+const flags = vi.hoisted(() => ({ byok: false, deployment: null }));
 vi.mock("../../config.js", async (importOriginal) => ({
   ...(await importOriginal()),
   get BYOK_ENABLED() {
     return flags.byok;
   },
+}));
+vi.mock("../../hooks/useBackendCapabilities.js", () => ({
+  useBackendCapabilities: () => ({ deployment: flags.deployment }),
 }));
 
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
@@ -40,6 +43,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   sessionStorage.clear();
   flags.byok = false;
+  flags.deployment = null;
 });
 
 const open = () => render(<LLMSettingsModal open onClose={() => {}} />);
@@ -123,6 +127,42 @@ describe("when BYOK is available", () => {
     open();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toContain("/api/llm/configured-providers");
+  });
+});
+
+// On a hosted backend "localhost" is the server, which refuses the Ollama URL,
+// so the option could only ever fail there.
+describe("which providers are offered", () => {
+  beforeEach(() => {
+    flags.byok = true;
+  });
+
+  const options = () =>
+    [...document.querySelectorAll("select option")].map((o) => o.textContent);
+  const select = () => document.querySelector("select");
+
+  it("leaves out Ollama when the backend is hosted", () => {
+    flags.deployment = "hosted";
+    open();
+    expect(options()).toEqual(["OpenAI", "Mistral", "Anthropic"]);
+  });
+
+  it("offers Ollama when the backend is local", () => {
+    flags.deployment = "local";
+    open();
+    expect(options()).toContain("Local (Ollama)");
+  });
+
+  it("moves a saved Ollama choice to one a hosted backend accepts", () => {
+    sessionStorage.setItem(
+      "llmSettings",
+      JSON.stringify({ apiKey: "ollama", baseUrl: "http://localhost:11434/v1", model: "qwen3" }),
+    );
+    flags.deployment = "hosted";
+    open();
+    expect(select().value).toBe("openai");
+    expect(document.querySelector("input[list]").value).toBe("");
+    expect(document.body.textContent).not.toContain("Ollama runs locally");
   });
 });
 

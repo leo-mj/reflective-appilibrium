@@ -10,7 +10,11 @@
 import { useState, useEffect, useId } from "react";
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
-import { LLM_PROVIDERS } from "../../constants/llmProviders.js";
+import {
+  LLM_PROVIDERS,
+  offeredProviders,
+} from "../../constants/llmProviders.js";
+import { useBackendCapabilities } from "../../hooks/useBackendCapabilities.js";
 import { BYOK_ENABLED, BACKEND_URL } from "../../config.js";
 import { btn } from "./appHeaderStyles.js";
 import {
@@ -104,6 +108,18 @@ export function LLMSettingsModal({ open, onClose }) {
   const titleId = useId();
   const { dialogProps } = useDialog({ open, onClose });
 
+  // Only what this backend will relay to: a hosted one refuses Ollama, whose
+  // "localhost" would be the server. A saved or default choice it refuses gives
+  // way to the first it accepts, adjusted during render as the add bar's presets
+  // are, so the form never shows a provider the list does not.
+  const { deployment } = useBackendCapabilities();
+  const providers = offeredProviders(deployment);
+  if (!providers.includes(provider)) {
+    setProvider(providers[0]);
+    setModel(getInitialModel(providers[0]));
+    setTestStatus(null);
+  }
+
   useEffect(() => {
     if (!open) return;
     setUsage(getSessionUsage());
@@ -138,7 +154,7 @@ export function LLMSettingsModal({ open, onClose }) {
   const canSave = saveEnabled && !demo && model.trim() !== "";
 
   function handleProviderChange(e) {
-    const next = LLM_PROVIDERS.find((p) => p.id === e.target.value);
+    const next = providers.find((p) => p.id === e.target.value);
     setProvider(next);
     setModel(getInitialModel(next));
     setTestStatus(null);
@@ -314,7 +330,7 @@ export function LLMSettingsModal({ open, onClose }) {
             onChange={handleProviderChange}
             style={inputStyle}
           >
-            {LLM_PROVIDERS.map((p) => (
+            {providers.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
               </option>

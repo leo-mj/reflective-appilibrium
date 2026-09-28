@@ -89,7 +89,7 @@ DEFAULT_MODEL=gpt-4o-mini
 CORS_ORIGINS=http://localhost:5173
 ```
 
-To run against a local model only (e.g. Ollama):
+To run against a local model only (e.g. Ollama) — local mode only, since the backend makes the call and a hosted server's `localhost` is the server itself; `DEPLOYMENT=hosted` refuses the URL and the settings modal stops offering it:
 
 ```env
 LLM_API_KEYS={"http://localhost:11434/v1":"ollama"}

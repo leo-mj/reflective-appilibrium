@@ -1,5 +1,14 @@
 from unittest.mock import patch
 
+import pytest
+from fastapi.routing import APIRoute
+from fastapi.testclient import TestClient
+
+from backend.config import get_settings
+from backend.dependencies import ALLOWED_BASE_URLS, allowed_base_urls, get_llm_service
+from backend.main import app
+from backend.tests.conftest import make_settings
+
 
 def test_test_endpoint_returns_ok(client, mock_llm_complete):
     res = client.post(
@@ -139,3 +148,73 @@ def test_complete_uses_byok_key(client, mock_llm_complete):
     assert res.status_code == 200
     call_kwargs = mock_llm_complete.call_args.kwargs
     assert call_kwargs["api_key"] == "user-key"
+
+
+# ── The Ollama URL is the server's own loopback ───────────────────────────────
+
+OLLAMA = "http://localhost:11434/v1"
+
+
+def _uses_llm_service(dependant) -> bool:
+    return any(
+        d.call is get_llm_service or _uses_llm_service(d)
+        for d in dependant.dependencies
+    )
+
+
+# Every route that can reach a provider, found rather than listed, so a new one
+# is covered without anyone remembering to add it here.
+LLM_ROUTES = sorted(
+    (next(iter(r.methods)), r.path)
+    for r in app.routes
+    if isinstance(r, APIRoute) and _uses_llm_service(r.dependant)
+)
+
+
+def test_the_llm_routes_are_found():
+    """Guards the guard: a walk that found nothing would pass silently."""
+    assert ("GET", "/api/llm/models") in LLM_ROUTES
+    assert ("POST", "/api/llm/test") in LLM_ROUTES
+    assert len(LLM_ROUTES) >= 10
+
+
+@pytest.mark.parametrize("method, path", LLM_ROUTES)
+def test_a_hosted_server_refuses_the_ollama_url(method, path):
+    """Hosted, localhost is the server, not the visitor.
+
+    The body is empty on purpose: the allowlist has to answer before the payload
+    is looked at, as the access-token gate does.
+    """
+    app.dependency_overrides[get_settings] = lambda: make_settings(deployment="hosted")
+    headers = {"x-api-key": "ollama", "x-base-url": OLLAMA}
+    res = TestClient(app).request(
+        method, path, headers=headers, json=None if method == "GET" else {}
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Unsupported provider URL"
+
+
+def test_a_hosted_server_still_accepts_the_remote_providers(mock_llm_complete):
+    app.dependency_overrides[get_settings] = lambda: make_settings(deployment="hosted")
+    res = TestClient(app).post(
+        "/api/llm/test",
+        headers={"x-api-key": "k", "x-base-url": "https://api.openai.com/v1"},
+    )
+    assert res.status_code == 200
+
+
+def test_a_local_server_accepts_the_ollama_url(mock_llm_complete):
+    app.dependency_overrides[get_settings] = lambda: make_settings(deployment="local")
+    res = TestClient(app).post(
+        "/api/llm/test",
+        headers={"x-api-key": "ollama", "x-base-url": OLLAMA, "x-model": "qwen3"},
+    )
+    assert res.status_code == 200
+    assert mock_llm_complete.call_args.kwargs["base_url"] == OLLAMA
+
+
+def test_hosted_drops_every_loopback_url_and_nothing_else():
+    hosted = allowed_base_urls(make_settings(deployment="hosted"))
+    assert OLLAMA not in hosted
+    assert hosted == {u for u in ALLOWED_BASE_URLS if "localhost" not in u}
+    assert allowed_base_urls(make_settings()) == ALLOWED_BASE_URLS

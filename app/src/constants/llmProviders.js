@@ -27,7 +27,18 @@ export class LLMProvider {
     this.baseUrl = baseUrl;
     this.defaultApiKey = defaultApiKey;
   }
+
+  /**
+   * Whether the URL names the machine the backend runs on. The backend makes
+   * the call, so this reaches the reader's own machine only when that is where
+   * the backend runs.
+   */
+  get loopback() {
+    return LOOPBACK.has(new URL(this.baseUrl).hostname);
+  }
 }
+
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 export const LLM_PROVIDERS = [
   new LLMProvider("openai", "OpenAI", "https://api.openai.com/v1"),
@@ -35,3 +46,18 @@ export const LLM_PROVIDERS = [
   new LLMProvider("anthropic", "Anthropic", "https://api.anthropic.com/v1"),
   new LLMProvider("local", "Local (Ollama)", "http://localhost:11434/v1", "ollama"),
 ];
+
+/**
+ * The providers worth offering against a backend in `deployment` mode, as
+ * `/api/health` reports it. A hosted backend refuses every loopback URL
+ * (`allowed_base_urls` in backend/dependencies.py, by the same test): there
+ * "localhost" is the server, never the visitor. Anything else, including a
+ * mode not yet known, offers the whole list — the backend still decides.
+ *
+ * @param {string|null|undefined} deployment
+ * @returns {LLMProvider[]}
+ */
+export function offeredProviders(deployment) {
+  if (deployment !== "hosted") return LLM_PROVIDERS;
+  return LLM_PROVIDERS.filter((p) => !p.loopback);
+}

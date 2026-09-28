@@ -9,6 +9,7 @@ import logging
 import secrets
 from functools import lru_cache
 from typing import Annotated, Optional
+from urllib.parse import urlsplit
 
 from fastapi import Depends, Header, HTTPException, Request
 
@@ -17,7 +18,8 @@ from .ratelimit import FixedWindowLimiter
 from .services.llm import LLMConfig, LLMService
 
 # Must stay in sync with LLM_PROVIDERS in app/src/constants/llmProviders.js.
-# This is the security boundary — the frontend list is UX only.
+# This is the security boundary — the frontend list is UX only. Read it through
+# allowed_base_urls(), which takes the deployment into account.
 ALLOWED_BASE_URLS = {
     "https://api.openai.com/v1",
     "https://api.mistral.ai/v1",
@@ -29,6 +31,21 @@ logger = logging.getLogger(__name__)
 
 
 _LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+
+
+def allowed_base_urls(settings: Settings) -> set[str]:
+    """The provider URLs this deployment will relay to.
+
+    A loopback URL names the machine the *server* runs on. Locally that is the
+    user's own, and Ollama there is the point. Hosted it is not: a visitor
+    picking "Local (Ollama)" would have the server call its own loopback — never
+    the visitor's machine — and hand back whatever answered there. So hosted,
+    every loopback entry is dropped, and the frontend stops offering them by the
+    same test (``offeredProviders`` in llmProviders.js).
+    """
+    if not settings.is_hosted:
+        return ALLOWED_BASE_URLS
+    return {u for u in ALLOWED_BASE_URLS if urlsplit(u).hostname not in _LOOPBACK}
 
 
 def _matching_token(supplied: Optional[str], accepted: set) -> Optional[str]:
@@ -271,7 +288,7 @@ def get_llm_service(
     """
     if not x_base_url:
         raise HTTPException(status_code=400, detail="Missing x-base-url header")
-    if x_base_url not in ALLOWED_BASE_URLS:
+    if x_base_url not in allowed_base_urls(settings):
         raise HTTPException(status_code=400, detail="Unsupported provider URL")
 
     _enforce_rate_limit(settings.llm_rate_limit, "llm", identity)

@@ -102,6 +102,20 @@ describe("useBackendCapabilities", () => {
     expect(result.current.maxElements).toBe(20);
   });
 
+  // Which providers the LLM settings offer: hosted, the server refuses Ollama.
+  it("reports the deployment, and null when the backend does not say", async () => {
+    respondWith({ status: "ok", deployment: "hosted" });
+    const { result } = renderHook(() => useBackendCapabilities());
+    expect(result.current.deployment).toBeNull();
+    await waitFor(() => expect(result.current.deployment).toBe("hosted"));
+
+    resetBackendCapabilities();
+    respondWith({ status: "ok" });
+    const older = renderHook(() => useBackendCapabilities());
+    await waitFor(() => expect(older.result.current.loaded).toBe(true));
+    expect(older.result.current.deployment).toBeNull();
+  });
+
   it("treats a missing cap as no cap", async () => {
     respondWith({ status: "ok" });
     const { result } = renderHook(() => useBackendCapabilities());
