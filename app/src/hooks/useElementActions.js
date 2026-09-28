@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import {
+  ELEMENT_EDIT_FIELDS,
   nextElementId,
   makeDiff,
   makeLogEntry,
@@ -47,8 +48,13 @@ export function useElementActions({
   };
 
   const handleEditSave = (formData) => {
-    const newRound = state.round + 1;
     const oldEl = editingEl;
+    // Nothing changed, so nothing was revised: no round, no status, no log.
+    if (!makeDiff(ELEMENT_EDIT_FIELDS, oldEl, formData).length) {
+      setEditingEl(null);
+      return;
+    }
+    const newRound = state.round + 1;
     /* eslint-disable-next-line no-unused-vars */
     const { withdrawnRound, reinstatedRound, withdrawals, reason, ...oldElBase } =
       oldEl;
@@ -77,11 +83,7 @@ export function useElementActions({
       revisedRound: newRound,
       history,
     };
-    const diffs = makeDiff(
-      ["type", "confidence", "status", "origin", "text"],
-      oldEl,
-      { ...formData, origin },
-    );
+    const diffs = makeDiff(ELEMENT_EDIT_FIELDS, oldEl, { ...formData, origin });
     mutate((prev) => ({
       ...prev,
       round: newRound,
@@ -92,7 +94,7 @@ export function useElementActions({
           newRound,
           `${oldEl.id} was edited by the user.`,
           "Changes applied",
-          diffs.length ? diffs.join("; ") : "No fields changed",
+          diffs.join("; "),
         ),
       ],
     }));

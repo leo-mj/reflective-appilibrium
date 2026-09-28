@@ -9,6 +9,7 @@ import { useState } from "react";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
 import { ConfidenceInput } from "./ConfidenceInput.jsx";
+import { ELEMENT_EDIT_FIELDS, makeDiff } from "../../utils/stateUtils.js";
 
 /**
  * @typedef {Object} EditFormData
@@ -20,7 +21,8 @@ import { ConfidenceInput } from "./ConfidenceInput.jsx";
 
 /**
  * Modal for revising all user-facing properties of an RE element.
- * Saving always sets the element's status to `"revised"`.
+ * Saving sets the element's status to `"revised"`, and is offered only once a
+ * field has changed.
  *
  * @param {Object}    props
  * @param {REElement} props.element       - The element to revise (read-only initial values).
@@ -39,6 +41,8 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
 
   const set = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
+  // Off until something differs: an unchanged save is not a revision.
+  const unchanged = !makeDiff(ELEMENT_EDIT_FIELDS, element, form).length;
 
   return (
     <ModalShell
@@ -46,6 +50,7 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
       subtitle={`Saving will mark this element as revised and create Round ${currentRound + 1}`}
       onCancel={onCancel}
       onSave={() => onSave(form)}
+      saveDisabled={unchanged}
     >
       <FormField label="Type">
         <select

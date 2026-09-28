@@ -11,6 +11,7 @@ import {
   makeDiff,
   makeLogEntry,
   ARGUMENT_RELATION_TYPES,
+  RELATION_EDIT_FIELDS,
   argumentRelationType,
   argumentRelationsOf,
   newArgumentId,
@@ -40,6 +41,13 @@ export function useRelationActions({
    * establish, nor with an explanation on a row the card does not show.
    */
   const handleRelEditSave = (formData) => {
+    const diffs = makeDiff(RELATION_EDIT_FIELDS, editingRel, formData);
+    // Nothing changed, so nothing was revised — neither the relation nor, for
+    // an argument step, every premise along with it.
+    if (!diffs.length) {
+      setEditingRel(null);
+      return;
+    }
     const newRound = state.round + 1;
     const argument = argumentRelationsOf(state.relations, editingRel);
     const revising = new Set(argument ?? [editingRel]);
@@ -49,7 +57,6 @@ export function useRelationActions({
       !editingRel.argumentId && ARGUMENT_RELATION_TYPES.has(formData.type)
         ? newArgumentId()
         : editingRel.argumentId;
-    const diffs = makeDiff(["type", "explanation"], editingRel, formData);
     const revise = (r) => ({
       ...r,
       ...formData,
@@ -79,7 +86,7 @@ export function useRelationActions({
           newRound,
           `${what} was edited by the user.`,
           "Changes applied",
-          diffs.length ? diffs.join("; ") : "No fields changed",
+          diffs.join("; "),
         ),
       ],
     }));

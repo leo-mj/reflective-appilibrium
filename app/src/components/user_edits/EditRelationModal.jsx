@@ -9,7 +9,12 @@ import { useState } from "react";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
 import { relationTypeOptions } from "./RelationTypeOptions.jsx";
-import { argumentRelationType, sortElementIds } from "../../utils/stateUtils.js";
+import {
+  argumentRelationType,
+  makeDiff,
+  RELATION_EDIT_FIELDS,
+  sortElementIds,
+} from "../../utils/stateUtils.js";
 
 /**
  * @typedef {Object} EditRelationFormData
@@ -59,6 +64,9 @@ export function EditRelationModal({
 
   const set = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
+  // Off until something differs: an unchanged save is not a revision, and on
+  // an argument it would have marked every premise revised.
+  const unchanged = !makeDiff(RELATION_EDIT_FIELDS, relation, form).length;
 
   const nextRound = `create Round ${currentRound + 1}`;
 
@@ -71,6 +79,7 @@ export function EditRelationModal({
         subtitle={`${premises.join(", ")} → ${relation.to} · Saving will mark this argument as revised and ${nextRound}`}
         onCancel={onCancel}
         onSave={() => onSave(form)}
+        saveDisabled={unchanged}
       >
         <FormField label="Relation to conclusion">
           <select
@@ -119,6 +128,7 @@ export function EditRelationModal({
       subtitle={`${relation.from} → ${relation.to} · Saving will mark this relation as revised and ${nextRound}`}
       onCancel={onCancel}
       onSave={() => onSave(form)}
+      saveDisabled={unchanged}
     >
       <FormField label="Relation type">
         <select

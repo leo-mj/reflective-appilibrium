@@ -302,6 +302,19 @@ export function makeDiff(fields, oldObj, newObj) {
 }
 
 /**
+ * What the Revise dialogs let a reader change, for an element and for a
+ * relation. A revision is a change to one of these: the dialogs keep Save off
+ * until one differs, and the save handlers record nothing when none does —
+ * a no-op save used to advance the round, mark the item revised and log "No
+ * fields changed". One list for both, so they cannot disagree.
+ *
+ * `status` is not among them: the dialog has no such field, and comparing it
+ * logged "status: active → undefined" on every element revision.
+ */
+export const ELEMENT_EDIT_FIELDS = ["type", "confidence", "origin", "text"];
+export const RELATION_EDIT_FIELDS = ["type", "explanation"];
+
+/**
  * Constructs a round log entry object.
  *
  * @param {number} round    - Round number this entry documents.

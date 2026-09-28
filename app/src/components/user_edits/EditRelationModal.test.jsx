@@ -60,6 +60,22 @@ describe("revising an argument", () => {
     expect(onSave).toHaveBeenCalledWith({ type: "jointly_precludes", explanation: "why" });
   });
 
+  // A save here revises every premise, so an unchanged one must not be offered.
+  it("offers Save only once the argument has changed", () => {
+    render(
+      <EditRelationModal
+        relation={argument[0]}
+        argument={argument}
+        currentRound={1}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(true);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "precludes" } });
+    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(false);
+  });
+
   it("uses the plain form for one premise", () => {
     const one = [rel({ type: "entails", argumentId: "a2" })];
     const onSave = vi.fn();
@@ -108,6 +124,18 @@ describe("revising a relation", () => {
       />,
     );
     expect(optionValues()).toEqual(["entails", "precludes"]);
+  });
+
+  it("offers Save only once a field has changed", () => {
+    render(
+      <EditRelationModal relation={rel()} currentRound={1} onSave={() => {}} onCancel={() => {}} />,
+    );
+    const save = () => screen.getByRole("button", { name: "Save" });
+    expect(save().disabled).toBe(true);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "why not" } });
+    expect(save().disabled).toBe(false);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "why" } });
+    expect(save().disabled).toBe(true);
   });
 
   it("still opens on a hidden type if that is the relation's own", () => {

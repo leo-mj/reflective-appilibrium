@@ -417,8 +417,12 @@ describe("handleEditSave", () => {
     expect(changes).toContain("confidence:");
   });
 
-  it("appends log entry noting 'No fields changed' when nothing differs", () => {
-    const { result } = renderHook(() => useREActions(baseState()));
+  // This used to advance the round, mark the element revised and log "No
+  // fields changed": a revision that did not happen, in the history, the log and
+  // what the process review reads.
+  it("changes nothing when nothing differs, and closes the dialog", () => {
+    const initial = baseState();
+    const { result } = renderHook(() => useREActions(initial));
     act(() => result.current.handleEditRequest("J1"));
     act(() => {
       result.current.handleEditSave({
@@ -426,10 +430,38 @@ describe("handleEditSave", () => {
         confidence: 1.0,
         type: "judgment",
         origin: "user",
-        status: "active",
       });
     });
-    expect(result.current.state.log[0].changes).toBe("No fields changed");
+    expect(result.current.state).toBe(initial);
+    expect(result.current.editingEl).toBeNull();
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("leaves a withdrawn element withdrawn when nothing differs", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawConfirm("J1", "Too broad"));
+    const before = result.current.state;
+    act(() => result.current.handleEditRequest("J1"));
+    act(() => {
+      result.current.handleEditSave({
+        text: "Original text",
+        confidence: 1.0,
+        type: "judgment",
+        origin: "user",
+      });
+    });
+    expect(result.current.state).toBe(before);
+    expect(isWithdrawnNow(result.current.state.elements[0])).toBe(true);
+  });
+
+  it("logs only the fields the dialog changed", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleEditRequest("J1"));
+    act(() => {
+      result.current.handleEditSave({ text: "New text", confidence: 1.0, type: "judgment", origin: "user" });
+    });
+    // The dialog has no status field; comparing one logged "status: active → undefined".
+    expect(result.current.state.log[0].changes).toBe("text: Original text → New text");
   });
 
   it("clears editingEl after save", () => {
@@ -573,6 +605,30 @@ describe("handleRelEditSave", () => {
     expect(result.current.state.log.at(-1).findings).toBe(
       "Argument J1, J2 → P1 was edited by the user.",
     );
+  });
+
+  it("changes nothing when a relation's fields are unchanged", () => {
+    const initial = baseState();
+    const { result } = renderHook(() => useREActions(initial));
+    act(() => result.current.setEditingRel(result.current.state.relations[0]));
+    act(() => {
+      result.current.handleRelEditSave({ type: "supports", explanation: "J1 supports P1" });
+    });
+    expect(result.current.state).toBe(initial);
+    expect(result.current.editingRel).toBeNull();
+  });
+
+  // Every premise is revised with the argument, so a no-op save here used to
+  // mark them all revised.
+  it("changes nothing when an argument's fields are unchanged", () => {
+    const initial = jointArgument();
+    const { result } = renderHook(() => useREActions(initial));
+    act(() => result.current.setEditingRel(result.current.state.relations[1]));
+    act(() => {
+      result.current.handleRelEditSave({ type: "jointly_entails", explanation: "Together" });
+    });
+    expect(result.current.state).toBe(initial);
+    expect(result.current.state.relations.map((r) => r.status)).toEqual([undefined, undefined]);
   });
 
   it("gives a relation turned into entails an argument of its own", () => {
