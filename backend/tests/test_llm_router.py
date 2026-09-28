@@ -1,5 +1,8 @@
 from unittest.mock import patch
 
+import anthropic
+import httpx
+import openai
 import pytest
 from fastapi.testclient import TestClient
 
@@ -113,6 +116,109 @@ def test_models_reports_a_refused_key(client, mock_llm_complete):
     )
     assert res.status_code == 400
     assert "Incorrect API key" in res.json()["detail"]
+
+
+# ── A refused key reads as the provider's sentence, not its payload ───────────
+
+
+def _response(url: str, status: int = 401) -> httpx.Response:
+    return httpx.Response(status, request=httpx.Request("GET", url))
+
+
+def _anthropic_refusal(message: str) -> anthropic.AuthenticationError:
+    """As the Anthropic client raises it: the whole response body kept."""
+    body = {
+        "type": "error",
+        "error": {"type": "authentication_error", "message": message},
+    }
+    return anthropic.AuthenticationError(
+        f"Error code: 401 - {body}",
+        response=_response("https://api.anthropic.com/v1/models"),
+        body=body,
+    )
+
+
+def _openai_refusal(message: str) -> openai.AuthenticationError:
+    """As the OpenAI client raises it: ``error`` already unwrapped from the body."""
+    body = {
+        "message": message,
+        "type": "invalid_request_error",
+        "code": "invalid_api_key",
+    }
+    return openai.AuthenticationError(
+        f"Error code: 401 - {{'error': {body}}}",
+        response=_response("https://api.openai.com/v1/models"),
+        body=body,
+    )
+
+
+def _raises(exc):
+    def list_models():
+        raise exc
+
+    return list_models
+
+
+def test_an_anthropic_refusal_reads_as_its_message(client):
+    with patch("backend.services.llm.AsyncAnthropic") as mock:
+        mock.return_value.models.list = _raises(
+            _anthropic_refusal("API key is invalid.")
+        )
+        res = client.get(
+            "/api/llm/models",
+            headers={"x-api-key": "bad", "x-base-url": "https://api.anthropic.com/v1"},
+        )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "401: API key is invalid."
+
+
+def test_an_openai_refusal_reads_as_its_message(client, mock_llm_complete):
+    mock_llm_complete.return_value.models.list = _raises(
+        _openai_refusal("Incorrect API key provided.")
+    )
+    res = client.get(
+        "/api/llm/models",
+        headers={"x-api-key": "bad", "x-base-url": "https://api.openai.com/v1"},
+    )
+    assert res.json()["detail"] == "401: Incorrect API key provided."
+
+
+def test_the_connection_test_reads_the_same_way(client, mock_llm_complete):
+    create = mock_llm_complete.return_value.chat.completions.create
+    create.side_effect = _openai_refusal("Incorrect API key provided.")
+    res = client.post(
+        "/api/llm/test",
+        headers={"x-api-key": "bad", "x-base-url": "https://api.openai.com/v1"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "401: Incorrect API key provided."
+
+
+def test_a_key_quoted_in_the_message_is_still_redacted(client, mock_llm_complete):
+    # Assembled, as in test_security_controls, so a scanner does not take it for a leak.
+    key = "sk-proj-" + "AbCdEfGhIjKlMnOpQr"
+    mock_llm_complete.return_value.models.list = _raises(
+        _openai_refusal(f"Incorrect API key provided: {key}.")
+    )
+    res = client.get(
+        "/api/llm/models",
+        headers={"x-api-key": "bad", "x-base-url": "https://api.openai.com/v1"},
+    )
+    detail = res.json()["detail"]
+    assert key not in detail
+    assert detail.startswith("401: Incorrect API key provided: [redacted]")
+
+
+def test_an_error_with_no_body_falls_back_to_its_text(client, mock_llm_complete):
+    """A connection failure has no response to read; its own text is what there is."""
+    mock_llm_complete.return_value.models.list = _raises(
+        RuntimeError("Connection refused")
+    )
+    res = client.get(
+        "/api/llm/models",
+        headers={"x-api-key": "k", "x-base-url": "https://api.openai.com/v1"},
+    )
+    assert res.json()["detail"] == "Connection refused"
 
 
 def test_models_goes_through_the_same_gates(client, mock_llm_complete):

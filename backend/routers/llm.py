@@ -57,6 +57,29 @@ class ModelsResponse(BaseModel):
     models: list[str]
 
 
+def _provider_message(exc: Exception) -> str:
+    """The provider's own words, where its SDK kept them apart.
+
+    Both SDKs raise with the parsed response body on ``exc.body``, but not the
+    same part of it. Anthropic's is the whole response,
+    ``{"type": "error", "error": {"message": ...}}``; the OpenAI client — which
+    Mistral and Ollama go through too — has already unwrapped ``error``, leaving
+    ``{"message": ...}``. Their ``message``, by contrast, is "Error code: 401 - "
+    followed by the body's Python repr, which is what the modal used to show.
+    """
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        inner = body.get("error")
+        for candidate in (
+            inner.get("message") if isinstance(inner, dict) else inner,
+            body.get("message"),
+        ):
+            if isinstance(candidate, str) and candidate.strip():
+                status = getattr(exc, "status_code", None)
+                return f"{status}: {candidate.strip()}" if status else candidate.strip()
+    return getattr(exc, "message", None) or str(exc)
+
+
 def _provider_refusal(exc: Exception, what: str) -> HTTPException:
     """A provider's error, scrubbed, as the 400 the settings modal shows.
 
@@ -64,7 +87,7 @@ def _provider_refusal(exc: Exception, what: str) -> HTTPException:
     Safe to log once scrubbed: neither sends anything of anyone's reasoning, so
     the provider's reply can quote only the key it just rejected.
     """
-    message = scrub_provider_error(getattr(exc, "message", None) or str(exc))
+    message = scrub_provider_error(_provider_message(exc))
     logger.info(f"{what} failed: {message}")
     return HTTPException(status_code=400, detail=message)
 
