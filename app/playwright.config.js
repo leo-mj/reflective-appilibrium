@@ -5,8 +5,12 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * The suite drives the real SPA in a browser, so it needs a dev server. Rather
  * than expecting one to be up, `webServer` starts vite itself and waits for the
- * port — and reuses a server you already have running locally, so a manual
- * `npm run dev` is never killed out from under you.
+ * port — its own port, not vite's default 5173, and never a server already
+ * there. It used to reuse one outside CI, so that a manual `npm run dev` was
+ * not killed; but that server carries the developer's own .env, and the pinned
+ * demo below applied only to a server the suite started. A reused backend build
+ * ran the whole suite against a real backend, and the assist audit failed on
+ * score badges the demo never draws.
  *
  * VITE_APP_ENV is pinned to "demo" so the run is deterministic: demo turns off
  * the backend, the LLM, and BYOK, which is also what a fresh CI checkout gets
@@ -30,7 +34,8 @@ import { defineConfig, devices } from "@playwright/test";
  * the server's behaviour is pinned here, so a developer's backend/.env — keys,
  * tokens, a hosted posture — cannot change what it tests.
  */
-const PORT = 5173;
+// Not 5173, which is where a developer's own `npm run dev` lives.
+const PORT = 5175;
 const BACKEND_BUILD_PORT = 5174;
 const LIVE_APP_PORT = 5176;
 const LIVE_API_PORT = 8766;
@@ -139,7 +144,8 @@ export default defineConfig({
     running("chromium", "mobile") && {
       command: "npm run dev -- --port " + PORT + " --strictPort",
       url: `http://localhost:${PORT}/`,
-      reuseExistingServer: !process.env.CI,
+      // Never reused, as the backend build's is not: see the header comment.
+      reuseExistingServer: false,
       timeout: 120_000,
       env: { VITE_APP_ENV: "demo" },
     },

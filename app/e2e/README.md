@@ -21,9 +21,12 @@ The first run on a new machine needs the browser once:
 npx playwright install chromium
 ```
 
-You do **not** need to start the dev server. `playwright.config.js` starts one
-and waits for the port, and `reuseExistingServer` is on outside CI, so a
-`npm run dev` you already have running is reused rather than killed.
+You do **not** need to start the dev server. `playwright.config.js` starts its
+own, built as the demo, on a port of its own (5175), and stops it afterwards. A
+`npm run dev` you already have running on 5173 is left alone and never used:
+it carries your own `.env`, and a suite that assumes the demo build, run against
+a backend build, fails in ways that have nothing to do with the code — the
+score badges a backend answers for, for instance, which the demo never shows.
 
 ## How it is put together
 
