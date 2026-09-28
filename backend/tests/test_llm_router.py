@@ -1,11 +1,10 @@
 from unittest.mock import patch
 
 import pytest
-from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from backend.config import get_settings
-from backend.dependencies import ALLOWED_BASE_URLS, allowed_base_urls, get_llm_service
+from backend.dependencies import ALLOWED_BASE_URLS, allowed_base_urls
 from backend.main import app
 from backend.tests.conftest import make_settings
 
@@ -155,24 +154,32 @@ def test_complete_uses_byok_key(client, mock_llm_complete):
 OLLAMA = "http://localhost:11434/v1"
 
 
-def _uses_llm_service(dependant) -> bool:
-    return any(
-        d.call is get_llm_service or _uses_llm_service(d)
-        for d in dependant.dependencies
+def _llm_routes() -> list[tuple[str, str]]:
+    """Every route that can reach a provider, found rather than listed.
+
+    Read off the OpenAPI schema: each route that depends on ``get_llm_service``
+    declares its ``x-base-url`` header there. Not off ``app.routes``, whose shape
+    is FastAPI's own business — from 0.13x an included router stays one opaque
+    entry there, and a walk over it found nothing.
+    """
+    paths = app.openapi()["paths"]
+    return sorted(
+        (method.upper(), path)
+        for path, operations in paths.items()
+        for method, operation in operations.items()
+        if any(
+            p["in"] == "header" and p["name"] == "x-base-url"
+            for p in operation.get("parameters", [])
+        )
     )
 
 
-# Every route that can reach a provider, found rather than listed, so a new one
-# is covered without anyone remembering to add it here.
-LLM_ROUTES = sorted(
-    (next(iter(r.methods)), r.path)
-    for r in app.routes
-    if isinstance(r, APIRoute) and _uses_llm_service(r.dependant)
-)
+# So that a new one is covered without anyone remembering to add it here.
+LLM_ROUTES = _llm_routes()
 
 
 def test_the_llm_routes_are_found():
-    """Guards the guard: a walk that found nothing would pass silently."""
+    """Guards the guard: a search that found nothing would pass silently."""
     assert ("GET", "/api/llm/models") in LLM_ROUTES
     assert ("POST", "/api/llm/test") in LLM_ROUTES
     assert len(LLM_ROUTES) >= 10
