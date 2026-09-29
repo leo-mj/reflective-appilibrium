@@ -175,6 +175,10 @@ class Settings(BaseSettings):
     # Comma-separated. When non-empty, every /api route except /api/health
     # requires one of these values in an x-app-token header.
     #
+    # For API clients only: the web app never sends x-app-token, so an instance
+    # the site talks to must leave this empty or the site is refused everywhere
+    # but /api/health. See backend/.env.example.
+    #
     # A list rather than a single token so that a class or study can be issued
     # one token each: the rate limiter buckets by whichever token matched, so
     # distinct tokens give each participant their own allowance. A single shared

@@ -6,9 +6,18 @@
 /** @import { REState } from '../types.js' */
 
 import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
-import { getLLMHeaders, accumulateUsage } from "./openaiClient.js";
+import { accumulateUsage } from "./openaiClient.js";
 import { ARGUMENT_RELATION_TYPES } from "./stateUtils.js";
 import { backendError } from "./backendError.js";
+
+/**
+ * The headers of every call here: none of these routes reads the visitor's API
+ * key or model, so neither is sent. They used to carry both, as the LLM clients
+ * do, which put the key on the network with every edit — score_changes fires on
+ * each one — for routes that never looked at it, and made the privacy text's
+ * "sent with each AI request" untrue.
+ */
+const JSON_ONLY = Object.freeze({ "Content-Type": "application/json" });
 
 /**
  * The console line for a scoring call that failed.
@@ -49,7 +58,7 @@ export async function simulateRethonStep(state, local, evolution = null, weights
   const res = await fetch(url, {
     method: "POST",
     signal,
-    headers: { "Content-Type": "application/json", ...getLLMHeaders() },
+    headers: JSON_ONLY,
     body: JSON.stringify({
       elements: state.elements,
       relations: state.relations.filter(
@@ -107,7 +116,7 @@ export async function quickScore(elements, relations, weights = null) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/quick_score`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...getLLMHeaders() },
+      headers: JSON_ONLY,
       body: JSON.stringify({ elements, relations, weights }),
     });
     // Still null rather than a throw: this decorates the suggestion cards with a
@@ -132,7 +141,7 @@ export async function scorePerRound(state, local = true, weights = null) {
   const url = `${BACKEND_URL}/api/simulate_rethon/score_per_round`;
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getLLMHeaders() },
+    headers: JSON_ONLY,
     body: JSON.stringify({
       elements: state.elements,
       relations: state.relations,
@@ -176,7 +185,7 @@ export async function scoreChanges(state, local = true, weights = null) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/score_changes`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...getLLMHeaders() },
+      headers: JSON_ONLY,
       body: JSON.stringify({
         elements: state.elements,
         relations: state.relations.filter(
@@ -207,7 +216,7 @@ export async function simulateRethon(state, local, evolution = null, weights = n
   const res = await fetch(url, {
     method: "POST",
     signal,
-    headers: { "Content-Type": "application/json", ...getLLMHeaders() },
+    headers: JSON_ONLY,
     body: JSON.stringify({
       elements: state.elements,
       relations: state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type)),

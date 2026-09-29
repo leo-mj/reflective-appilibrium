@@ -101,6 +101,8 @@ CORS_ORIGINS=http://localhost:5173
 
 Every other setting is documented in [backend/.env.example](backend/.env.example). The one to know about is `DEPLOYMENT`: leave it at `local` only while uvicorn and the browser are on the same machine. Anything else — a LAN, a tunnel, a container behind a proxy — is `hosted`, which stops lending server-side keys and turns on rate limits, timeouts and limits on how large a rethon computation may be (see [What a hosted instance computes](#what-a-hosted-instance-computes)).
 
+`APP_ACCESS_TOKENS` is for API clients, not the web app: the site never sends the `x-app-token` header it checks, so setting it on an instance the site uses locks the site out of every route but `/api/health`. Leave it empty behind the web app, as the published deployment does.
+
 ### 4. Start / stop the backend
 
 From the **repo root**:

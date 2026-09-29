@@ -11,6 +11,12 @@ on:
   # it replaces the server people are using. See the deploy-backend job.
   workflow_dispatch:
 
+# Read-only unless a job says otherwise. The test jobs need nothing more than
+# to check the code out; the three deploy jobs declare what they need themselves,
+# which replaces this for them.
+permissions:
+  contents: read
+
 jobs:
   test-backend:
     name: Backend tests
@@ -494,7 +500,21 @@ jobs:
       id-token: write
 
     steps:
+      # Full history, so main is there to compare against below.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Started by hand from any branch, so this is what keeps unreviewed code
+      # off the server people are using — the check the two site deploys make.
+      # Run from main, or from `deploy`, it passes.
+      - name: Check the commit being deployed is on main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::This run is from a commit that is not on main. Merge it into main, then run the deploy from main."
+            git log --oneline origin/main..HEAD
+            exit 1
+          fi
 
       # Said before anything is built, naming what is missing: the alternative
       # is gcloud failing several minutes later on an empty flag.
