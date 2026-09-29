@@ -39,7 +39,8 @@ Deployment = Literal["local", "hosted"]
 # scoring rate limit           none              300/min per caller
 # LLM call timeout             600s (SDK)        90s
 # rethon computation timeout   none              60s
-# rethon element cap           none              20
+# rethon cap: elements argued  none              20
+# rethon cap: elements in all  none              50
 # request body size            none              10 MiB
 #
 # Nothing is written to disk in either mode; the browser keeps the state.
@@ -78,28 +79,37 @@ _SDK_DEFAULT_LLM_TIMEOUT = 600.0
 # The other half of restraining the simulation, and the half a rate limit cannot
 # reach: the cost of one request rather than how many are allowed.
 #
-# Every one of these computations enumerates the consistent complete positions of
-# a dialectical structure over the sentence pool, and that count grows like the
-# Fibonacci numbers in the element count — roughly x1.6 per element. Measured on
-# a development machine, for a chain of two-premise arguments:
+# **What costs is the elements arguments tie together, not the element count.**
+# Every one of these computations works over the consistent positions of a
+# dialectical structure, and an element no argument mentions adds almost nothing
+# to that: the BDD leaves it free. Where the elements are tied together the cost
+# grows like the Fibonacci numbers — roughly x1.6 per element. Measured on a
+# development machine, a full simulation:
 #
-#     n=20   1.0s      n=24   8.0s      n=26  21.4s
-#     n=22   2.8s      n=25  13.1s      n=28  >30s
+#     chain of two-premise arguments, every element in one
+#         n=20   5.4s      n=24  29.9s      n=28  over the 60s limit
+#     the demo's processes, few elements in arguments
+#         22 elements (10 argued)   0.08s
+#         33 elements (13 argued)   0.24s    (the demo merged with its second)
+#         50 elements (20 argued)   2.0s     (built from the two, as a test)
 #
-# A rate limit of 5/min is no protection against any of those; 200, which is what
-# the schema permits, is not a long wait but an unbounded one.
+# So the cap that matters counts elements that take part in an argument, and it
+# is set where the worst case, a dense chain, stays about five seconds. It was a
+# cap of 20 on all elements, which refused the demo itself: 22 elements, ten
+# of them in arguments. "Argued" counts what rethon is given — the elements of
+# its arguments (``RETHON_ARGUMENT_TYPES``) — since nothing else reaches it.
+# The total gets a looser cap of its own, since an unargued element is cheap
+# but not free — History's per-step scoring runs a simulation
+# per step, and took 17s over 50 elements and 61 steps.
 #
-# 20 rather than 25 because of what a slow request costs *other* callers — which
-# is waiting, not a frozen server. An earlier version of this comment said a long
-# computation froze the event loop; measured, it does not: rethon is pure Python,
-# the interpreter hands the GIL back every few milliseconds, and a 16-second
-# simulation in a thread stalled the loop by at most 0.1s. The real cost is that
+# A slow request costs *other* callers waiting, not a frozen server: rethon is
+# pure Python, the interpreter hands the GIL back every few milliseconds, and a
+# 16-second simulation in a thread stalled the event loop by at most 0.1s. But
 # rethon computations run in single-worker pools (process_pool), so one large
-# request holds up every other visitor's computation of the same kind for as long
-# as it runs. Set where a request stays about a second. The timeout below now
-# bounds the worst case, so this can be raised; each element added roughly
-# multiplies how long everyone behind a large request may wait, up to that bound.
-_HOSTED_MAX_ELEMENTS = 20
+# request holds up every other visitor's computation of the same kind for as
+# long as it runs. The timeout below bounds that worst case.
+_HOSTED_MAX_ARGUED_ELEMENTS = 20
+_HOSTED_MAX_ELEMENTS = 50
 
 # Seconds a single rethon computation may run before its worker is killed and
 # the caller gets a 504. What lets a cap above be wrong without a request running
@@ -208,6 +218,10 @@ class Settings(BaseSettings):
     # cap, which is right on a machine whose only user can watch it work and
     # wrong anywhere a stranger can send a payload.
     max_simulation_elements: Optional[int] = None
+
+    # Most elements that take part in arguments a rethon computation will
+    # accept — the number its cost grows with. 0 disables the cap.
+    max_argued_elements: Optional[int] = None
 
     # Seconds one rethon computation may run; 0 disables the limit.
     simulation_timeout_seconds: Optional[float] = Field(default=None, ge=0)
@@ -398,6 +412,26 @@ class Settings(BaseSettings):
         if self.max_simulation_elements is not None:
             return self.max_simulation_elements
         return _HOSTED_MAX_ELEMENTS if self.is_hosted else 0
+
+    @property
+    def simulation_max_argued_elements(self) -> int:
+        """Most elements in arguments a rethon computation will accept; 0 = unlimited.
+
+        The cap that bounds the cost: see the note at ``_HOSTED_MAX_ARGUED_ELEMENTS``.
+        """
+        if self.max_argued_elements is not None:
+            return self.max_argued_elements
+        return _HOSTED_MAX_ARGUED_ELEMENTS if self.is_hosted else 0
+
+    @property
+    def simulation_element_caps(self) -> "ElementCaps":
+        """Both caps, as the rethon services take them."""
+        from .services.rethon_caps import ElementCaps
+
+        return ElementCaps(
+            total=self.simulation_max_elements,
+            argued=self.simulation_max_argued_elements,
+        )
 
     @property
     def simulation_timeout(self) -> float:

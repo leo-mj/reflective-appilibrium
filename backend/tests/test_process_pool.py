@@ -14,6 +14,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from backend.services.rethon_caps import NO_CAPS
 from backend import process_pool
 from backend.config import get_settings
 from backend.main import app
@@ -74,7 +75,7 @@ def _payload() -> dict:
 
 def test_quick_score_is_identical_in_a_worker():
     req = ScoreChangesRequest.model_validate(_payload())
-    args = (req.elements, req.relations, req.weights, 0)
+    args = (req.elements, req.relations, req.weights, NO_CAPS)
 
     direct = compute_quick_score(*args)
     pooled = asyncio.run(
@@ -87,7 +88,7 @@ def test_quick_score_is_identical_in_a_worker():
 
 def test_score_changes_are_identical_in_a_worker():
     req = ScoreChangesRequest.model_validate(_payload())
-    args = (req.elements, req.relations, req.local, req.weights, 0)
+    args = (req.elements, req.relations, req.local, req.weights, NO_CAPS)
 
     direct = compute_score_changes(*args)
     pooled = asyncio.run(
@@ -230,7 +231,7 @@ def test_a_score_does_not_wait_behind_a_simulation():
         await asyncio.sleep(0.1)  # let the simulation get under way
         started = time.monotonic()
         score = await process_pool.run_in_pool(
-            "scoring", compute_quick_score, req.elements, req.relations, None, 0
+            "scoring", compute_quick_score, req.elements, req.relations, None, NO_CAPS
         )
         waited = time.monotonic() - started
         still_simulating = not simulation.done()

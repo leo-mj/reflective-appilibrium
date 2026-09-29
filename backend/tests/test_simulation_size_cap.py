@@ -140,11 +140,23 @@ def test_a_local_install_accepts_a_pool_that_hosted_would_refuse():
 
 
 def test_hosted_caps_the_pool_by_default():
-    assert make_settings(deployment="hosted").simulation_max_elements == 20
+    hosted = make_settings(deployment="hosted")
+    # Loose on the total, tight on what drives the cost; see config.py.
+    assert hosted.simulation_max_elements == 50
+    assert hosted.simulation_max_argued_elements == 20
+
+
+def test_hosted_takes_the_demo_and_its_merge():
+    """The sample is 22 elements, 10 of them in arguments; merged with the second
+    sample process, 33 and 13. The old cap of 20 on all elements refused it."""
+    hosted = make_settings(deployment="hosted")
+    assert hosted.simulation_max_elements >= 33
+    assert hosted.simulation_max_argued_elements >= 13
 
 
 def test_local_does_not():
     assert make_settings().simulation_max_elements == 0
+    assert make_settings().simulation_max_argued_elements == 0
 
 
 def test_an_explicit_zero_lifts_the_cap_even_when_hosted():
@@ -169,3 +181,130 @@ def test_score_per_round_still_accepts_a_realistic_round_count(client):
         "/api/simulate_rethon/score_per_round", json=payload(CAP, round=12)
     )
     assert res.status_code == 200
+
+
+# ── The cap that bounds the cost: elements in arguments ───────────────────────
+
+ARGUED_CAP = 4
+
+
+@pytest.fixture
+def argued_client():
+    """A cap on argued elements only, so what it refuses is down to that."""
+    app.dependency_overrides[get_settings] = lambda: make_settings(
+        deployment="hosted", max_simulation_elements=0, max_argued_elements=ARGUED_CAP
+    )
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+def chain(argued: int) -> list[dict]:
+    """Two-premise arguments down the first ``argued`` elements, each element
+    taking part in one: the dense structure whose cost the cap is for."""
+    ids = [e["id"] for e in elements(argued)]
+    return [
+        {
+            "from": premise,
+            "to": ids[i + 2],
+            "type": "jointly_entails",
+            "explanation": "",
+            "addedRound": 1,
+            "argumentId": f"a{i}",
+        }
+        for i in range(argued - 2)
+        for premise in (ids[i], ids[i + 1])
+    ]
+
+
+@pytest.mark.parametrize("path, extra", ENDPOINTS)
+def test_too_many_argued_elements_are_refused(argued_client, path, extra):
+    body = {
+        "elements": elements(ARGUED_CAP + 1),
+        "relations": chain(ARGUED_CAP + 1),
+        **extra,
+    }
+    res = argued_client.post(path, json=body)
+    assert res.status_code == 422
+    detail = res.json()["detail"]
+    assert "take part in arguments" in detail and str(ARGUED_CAP) in detail
+
+
+@pytest.mark.parametrize("path, extra", ENDPOINTS)
+def test_elements_outside_arguments_do_not_count(argued_client, path, extra):
+    """Thirty elements, three of them argued: an unargued element costs next to
+    nothing, which is what lets the demo's 22 through a cap that refused them."""
+    body = {"elements": elements(30), "relations": relations(), **extra}
+    res = argued_client.post(path, json=body)
+    assert res.status_code != 422, res.text
+
+
+def test_only_what_rethon_is_given_counts_as_argued(argued_client):
+    """Dialectical relations never reach rethon, so a chain of them is not the
+    cost the cap is for. (Single-premise arguments do; see
+    test_single_premise_arguments.py.)"""
+    loose = [
+        {**r, "type": "supports", "argumentId": None} for r in chain(ARGUED_CAP + 3)
+    ]
+    body = {"elements": elements(ARGUED_CAP + 3), "relations": relations() + loose}
+    res = argued_client.post("/api/simulate_rethon/quick_score", json=body)
+    assert res.status_code == 200, res.text
+
+
+def test_an_explicit_zero_lifts_the_argued_cap_even_when_hosted():
+    s = make_settings(deployment="hosted", max_argued_elements=0)
+    assert s.simulation_max_argued_elements == 0
+
+
+# ── How long a simulation may run, in steps ───────────────────────────────────
+
+
+def test_a_process_with_many_commitments_to_revise_reaches_its_fixed_point():
+    """rethon stops at 50 steps by default and raised MaxLoopsWarning, which the
+    reader saw as a 500. One principle ruling out forty judgments needs 66: the
+    judgments go one step at a time, with a theory step between each."""
+    judgments = [
+        {
+            "id": f"J{i}",
+            "type": "judgment",
+            "status": "active",
+            "confidence": 0.5,
+            "text": f"judgment {i}",
+            "addedRound": 1,
+        }
+        for i in range(2, 42)
+    ]
+    principle = {
+        "id": "P1",
+        "type": "principle",
+        "status": "active",
+        "confidence": 1.0,
+        "text": "the principle",
+        "addedRound": 1,
+    }
+    rules_out = [
+        {
+            "from": "P1",
+            "to": j["id"],
+            "type": "jointly_precludes",
+            "explanation": "",
+            "addedRound": 1,
+            "argumentId": f"a{j['id']}",
+        }
+        for j in judgments
+    ]
+    app.dependency_overrides[get_settings] = lambda: make_settings()
+    try:
+        res = TestClient(app).post(
+            "/api/simulate_rethon/simulate",
+            json={
+                "elements": [principle, *judgments],
+                "relations": rules_out,
+                "round": "1",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+    assert res.status_code == 200, res.text[:300]
+    state = res.json()["translated_re_state"]
+    assert state["finished"]
+    assert len(state["evolution"]) > 50

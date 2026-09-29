@@ -130,8 +130,8 @@ test.describe("History playback", () => {
   test("the slider projects the process back to earlier rounds", async ({ page }) => {
     await gotoHome(page);
     await startFresh(page, "History playback");
-    await addElement(page, "judgment", "The first judgment, added in round two.");
-    await addElement(page, "judgment", "The second judgment, added in round three.");
+    await addElement(page, "judgment", "The first judgment, added at step one.");
+    await addElement(page, "judgment", "The second judgment, added at step two.");
 
     await page.locator('button:has-text("History")').click();
     await park(page);
@@ -144,12 +144,12 @@ test.describe("History playback", () => {
     await park(page);
     await expectCounts(page, { J: 0 });
 
-    // Step 2 is the first judgment only.
-    await slider.fill("2");
+    // Step 1 is the first judgment only.
+    await slider.fill("1");
     await park(page);
     await expectCounts(page, { J: 1 });
-    await expect(page.locator("body")).toContainText("added in round two");
-    await expect(page.locator("body")).not.toContainText("added in round three");
+    await expect(page.locator("body")).toContainText("added at step one");
+    await expect(page.locator("body")).not.toContainText("added at step two");
 
     // The last step is everything.
     const max = await slider.getAttribute("max");

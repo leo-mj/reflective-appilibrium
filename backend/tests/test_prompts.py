@@ -9,6 +9,7 @@ one below it.  The prompts are strings, so nothing but a test notices.
 import json
 
 import pytest
+from pydantic import ValidationError
 
 from backend.models.re_state import (
     DEFAULT_CONFIDENCE,
@@ -614,3 +615,14 @@ def test_a_replaced_argument_link_is_accepted():
         ],
     )
     assert state.relations[0].superseded_by == "a2"
+
+
+# ── A new process ────────────────────────────────────────────────────────────
+
+
+def test_a_new_process_at_step_zero_is_a_valid_state():
+    # `round` counts steps, and a process nothing has happened in is at step 0.
+    # Refused, it made a new process's first Discuss call a 422.
+    assert REState.model_validate({"topic": "t", "round": 0}).round == 0
+    with pytest.raises(ValidationError):
+        REState.model_validate({"topic": "t", "round": -1})

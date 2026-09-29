@@ -13,9 +13,14 @@ from ..routers.rethon_schemas import (
     ScoreChangesResponse,
     QuickScoreResponse,
 )
+from .rethon_caps import (
+    NO_CAPS,
+    RETHON_ARGUMENT_TYPES,
+    ElementCaps,
+    enforce_element_cap,
+)
 from .rethon_simulation import (
     build_numerical_arguments,
-    enforce_element_cap,
     get_final_score,
 )
 
@@ -69,7 +74,7 @@ def compute_score_changes(
     relations: List[RERelation],
     local: bool = True,
     weights: Optional[ModelWeights] = None,
-    max_elements: int = 0,
+    caps: ElementCaps = NO_CAPS,
 ) -> ScoreChangesResponse:
     """Batch-compute withdrawal Z-score deltas for all active/revised elements.
 
@@ -87,7 +92,7 @@ def compute_score_changes(
     # Before the try below, deliberately: that block turns any exception into an
     # empty response, so a cap raised inside it would be swallowed and the
     # oversized BDD would simply be built again on the next keystroke.
-    enforce_element_cap(n, max_elements)
+    enforce_element_cap(elements, relations, caps)
     target_elements = [
         el
         for el in elements
@@ -102,9 +107,7 @@ def compute_score_changes(
     )
     if n < 3:
         return empty
-    arg_relations = [
-        r for r in relations if r.type in ("jointly_entails", "jointly_precludes")
-    ]
+    arg_relations = [r for r in relations if r.type in RETHON_ARGUMENT_TYPES]
     if not arg_relations:
         return empty
     try:
@@ -224,7 +227,7 @@ def compute_quick_score(
     elements: List[REElement],
     relations: List[RERelation],
     weights: Optional[ModelWeights] = None,
-    max_elements: int = 0,
+    caps: ElementCaps = NO_CAPS,
 ) -> QuickScoreResponse:
     """Compute account and systematicity for the current element set analytically.
 
@@ -239,14 +242,12 @@ def compute_quick_score(
     what happened is that this deployment declined to.
     """
     # Outside the try for the reason given in compute_score_changes.
-    enforce_element_cap(len(elements), max_elements)
+    enforce_element_cap(elements, relations, caps)
     try:
         n = len(elements)
         if n < 3:
             return QuickScoreResponse(account=None, systematicity=None)
-        arg_relations = [
-            r for r in relations if r.type in ("jointly_entails", "jointly_precludes")
-        ]
+        arg_relations = [r for r in relations if r.type in RETHON_ARGUMENT_TYPES]
         if not arg_relations:
             return QuickScoreResponse(account=None, systematicity=None)
         if not any(

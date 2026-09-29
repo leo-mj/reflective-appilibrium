@@ -383,7 +383,9 @@ class REState(BaseModel):
     # rounds a reader sees are runs of steps, and ``round_ends`` lists the last
     # step of each closed one — "Steps and rounds" in app/src/utils/stateUtils.js.
     # Absent from states written before rounds and steps were told apart.
-    round: int = Field(ge=1)
+    # From 0: a new process has taken no step yet, and its first Assist call is
+    # made from there.
+    round: int = Field(ge=0)
     round_ends: list[int] = Field(
         default_factory=list, alias="roundEnds", max_length=1_000
     )

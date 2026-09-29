@@ -42,9 +42,9 @@ from .rethon_schemas import (
 )
 from ..config import Settings, get_settings
 from ..process_pool import ComputationStopped, run_in_pool
+from ..services.rethon_caps import enforce_element_cap
 from ..services.rethon_simulation import (
     SimulationFinished,
-    enforce_element_cap,
     simulate_one_step,
     simulate_to_fixed_point,
     validate_and_build,
@@ -157,7 +157,7 @@ async def simulate_rethon(
         request.elements,
         request.relations,
         sentence_pool_minimum,
-        settings.simulation_max_elements,
+        settings.simulation_element_caps,
     )
     try:
         return await _until_disconnected(
@@ -204,7 +204,7 @@ async def simulate_rethon_step(
         request.elements,
         request.relations,
         sentence_pool_minimum,
-        settings.simulation_max_elements,
+        settings.simulation_element_caps,
     )
     try:
         return await _until_disconnected(
@@ -252,7 +252,9 @@ async def score_per_round(
     #
     # In this process, not the worker: the refusal is an HTTPException, which
     # cannot be pickled back out of one.
-    enforce_element_cap(len(request.elements), settings.simulation_max_elements)
+    enforce_element_cap(
+        request.elements, request.relations, settings.simulation_element_caps
+    )
 
     round_scores = await _until_disconnected(
         http_request,
@@ -288,7 +290,9 @@ async def score_changes(
     # Here as well as inside compute_score_changes: raised in the worker, the
     # HTTPException would fail to unpickle and surface as a 500. Checked here
     # first, the worker's own check can never fire.
-    enforce_element_cap(len(request.elements), settings.simulation_max_elements)
+    enforce_element_cap(
+        request.elements, request.relations, settings.simulation_element_caps
+    )
     return await run_in_pool(
         "scoring",
         compute_score_changes,
@@ -296,7 +300,7 @@ async def score_changes(
         request.relations,
         request.local,
         request.weights,
-        settings.simulation_max_elements,
+        settings.simulation_element_caps,
         timeout=settings.simulation_timeout,
     )
 
@@ -316,13 +320,15 @@ async def quick_score(
     elements, no argument relations, or no active principle/theory elements.
     """
     # In this process first, for the reason given in score_changes.
-    enforce_element_cap(len(request.elements), settings.simulation_max_elements)
+    enforce_element_cap(
+        request.elements, request.relations, settings.simulation_element_caps
+    )
     return await run_in_pool(
         "scoring",
         compute_quick_score,
         request.elements,
         request.relations,
         request.weights,
-        settings.simulation_max_elements,
+        settings.simulation_element_caps,
         timeout=settings.simulation_timeout,
     )

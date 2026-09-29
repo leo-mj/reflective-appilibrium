@@ -85,7 +85,10 @@ export const SAMPLE_STATE = _sampleState;
  * @returns {REState}
  */
 export function makeEmptyState(topic) {
-  return { ..._inlineState, topic, phase: 1, round: 1 };
+  // Step 0: nothing has happened yet, and every change takes the next step, so
+  // the first one is step 1. It started at 1 from when `round` counted rounds,
+  // and a new process read "Step 1" with nothing done (issue #36 made it steps).
+  return { ..._inlineState, topic, phase: 1, round: 0 };
 }
 
 /**

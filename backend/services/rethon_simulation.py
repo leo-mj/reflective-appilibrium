@@ -2,7 +2,6 @@
 
 from fastapi import HTTPException
 from typing import List, Dict, Optional, Union
-from collections import defaultdict
 import logging
 import time
 
@@ -13,6 +12,14 @@ from rethon import (
     REState,
 )
 from ..models.re_state import REElement, RERelation
+from .rethon_caps import (  # noqa: F401 — enforce_element_cap re-exported for the routers
+    NEGATING_TYPES,
+    NO_CAPS,
+    RETHON_ARGUMENT_TYPES,
+    ElementCaps,
+    enforce_element_cap,
+    rethon_arguments,
+)
 from ..routers.arguments_schemas import DetectArgumentsResponse, translate_from_lookup
 from ..routers.rethon_schemas import (
     ModelWeights,
@@ -36,19 +43,14 @@ def build_numerical_arguments(
     lookup: Dict[int, REElement] = {i + 1: el for i, el in enumerate(elements)}
     id_to_index: Dict[str, int] = {el.id: i + 1 for i, el in enumerate(elements)}
 
-    args_by_id: Dict[str, List[RERelation]] = defaultdict(list)
-    for rel in relations:
-        if rel.type in ("jointly_entails", "jointly_precludes") and rel.argument_id:
-            args_by_id[rel.argument_id].append(rel)
-
     numerical_arguments: List[List[int]] = []
-    for arg_rels in args_by_id.values():
+    for arg_rels in rethon_arguments(relations):
         conclusion_idx = id_to_index.get(arg_rels[0].to_id)
         premise_indices = [id_to_index.get(rel.from_id) for rel in arg_rels]
         if conclusion_idx is None or any(idx is None for idx in premise_indices):
             logger.warning("Skipping argument with unknown element IDs.")
             continue
-        if arg_rels[0].type == "jointly_precludes":
+        if arg_rels[0].type in NEGATING_TYPES:
             conclusion_idx = -conclusion_idx
         numerical_arguments.append(
             [idx for idx in premise_indices if idx is not None] + [conclusion_idx]
@@ -70,6 +72,20 @@ def _add_negated_to_lookup(lookup: Dict) -> Dict:
         **lookup,
         **{-k: e.model_copy(update={"negated": True}) for k, e in lookup.items()},
     }
+
+
+def max_steps_for(n: int) -> int:
+    """How many steps a process over ``n`` elements may take to reach a fixed point.
+
+    rethon stops at 50 by default and raises ``MaxLoopsWarning``, which reached
+    the reader as a 500. Local search changes a commitment or two per step and a
+    theory step comes between every two of those, so a process with many
+    commitments to revise needs more than 50 — the demo side by side with a copy
+    of itself, 44 elements, ran out while still withdrawing one at a time. Room
+    for every element to change once, twice over, with the old floor kept. The
+    computation's timeout, not this, is what bounds how long it may take.
+    """
+    return max(50, 4 * n)
 
 
 def get_rethon_final_state(
@@ -116,7 +132,7 @@ def get_rethon_final_state(
     if weights is not None:
         re.set_model_parameters({"weights": weights.model_dump()})
     re.set_model_parameters(neighbourhood_depth=neighbourhood_depth)
-    re.re_process()
+    re.re_process(max_steps=max_steps_for(n_unnegated_sentence_pool))
     end = time.time()
     logger.info(f"Completed rethon simulation in {end - start:.2f} seconds'")
     return re
@@ -302,57 +318,29 @@ def translate_re_state(
     return result
 
 
-def enforce_element_cap(n: int, max_elements: int) -> None:
-    """Refuse a sentence pool too large to compute over, or return quietly.
-
-    ``max_elements`` of 0 means unlimited, which is how a local install opts out.
-
-    Every rethon computation here builds a BDD whose size grows exponentially in
-    the sentence pool, so this is a wall-clock guard, not a fairness one: past
-    some width a single request stops being slow and starts being one that never
-    returns, taking the worker with it. 422 rather than 413, because the payload
-    is well-formed and the right size for a different deployment — it is this
-    server that cannot answer it.
-
-    Called by every entry point that builds a structure, including the two in
-    ``rethon_scoring`` that build their own rather than going through
-    ``validate_and_build``.
-    """
-    if max_elements and n > max_elements:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"This instance computes over at most {max_elements} elements; "
-                f"the request has {n}. Run the backend locally to lift the cap."
-            ),
-        )
-
-
 def validate_and_build(
     elements: List[REElement],
     relations: List[RERelation],
     sentence_pool_minimum: int = 3,
-    max_elements: int = 0,
+    caps: ElementCaps = NO_CAPS,
 ) -> tuple[DetectArgumentsResponse, Dict[int, REElement], int]:
     """Validate the request payload and build the numerical argument structures.
 
     Raises HTTPException on invalid input.  Returns the built arguments, the
     negated lookup, and the sentence pool size.
 
-    ``max_elements`` is passed in rather than read from settings so this stays a
+    ``caps`` is passed in rather than read from settings so this stays a
     pure function of its arguments — which is what lets it be called from a
     worker process without carrying configuration across the pipe.
     """
     n = len(elements)
-    enforce_element_cap(n, max_elements)
+    enforce_element_cap(elements, relations, caps)
     if n < sentence_pool_minimum:
         raise HTTPException(
             status_code=422,
             detail=f"There are fewer than {sentence_pool_minimum} elements forming the sentence pool.",
         )
-    arg_relations = [
-        r for r in relations if r.type in ("jointly_entails", "jointly_precludes")
-    ]
+    arg_relations = [r for r in relations if r.type in RETHON_ARGUMENT_TYPES]
     if not arg_relations:
         raise HTTPException(
             status_code=422,
@@ -420,7 +408,7 @@ def simulate_to_fixed_point(
             neighbourhood_depth,
         )
         re.set_state(reconstructed)
-        re.re_process()
+        re.re_process(max_steps=max_steps_for(n))
     else:
         re = get_rethon_final_state(
             numerical_arguments=built_arguments.num_arguments,

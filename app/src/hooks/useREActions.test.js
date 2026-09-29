@@ -4,6 +4,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useREActions } from "./useREActions.js";
 import { textAtRound, isWithdrawnNow } from "../utils/stateUtils.js";
+import { makeEmptyState } from "../state.js";
 
 // The real validator stays: the Argdown reader validates what it builds with it.
 vi.mock("../utils/importMarkdown.js", async (importOriginal) => ({
@@ -52,6 +53,34 @@ function baseState(overrides = {}) {
     ...overrides,
   };
 }
+
+// ─── A new process ────────────────────────────────────────────────────────────
+
+// `round` counts steps, one per change. A process nothing has happened in is
+// at step 0, so two additions reach step 2 — it used to start at 1, from when
+// the field counted rounds, and read "Step 3".
+describe("a new process", () => {
+  it("starts at step 0, and its first change is step 1", () => {
+    const fresh = makeEmptyState("A topic");
+    expect(fresh.round).toBe(0);
+
+    const { result } = renderHook(() => useREActions(fresh));
+    for (const text of ["First.", "Second."]) {
+      act(() => {
+        result.current.handleAddElement({
+          type: "judgment",
+          text,
+          confidence: 0.67,
+          origin: "user",
+        });
+      });
+    }
+    expect(result.current.state.round).toBe(2);
+    expect(result.current.state.elements.map((e) => e.addedRound)).toEqual([
+      1, 2,
+    ]);
+  });
+});
 
 // ─── handleAddElement ─────────────────────────────────────────────────────────
 
