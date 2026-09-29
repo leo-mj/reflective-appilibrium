@@ -332,6 +332,32 @@ export function TextTab({
       requestAnimationFrame(() => navigateTo("relations"));
   }, [scrollToRelationsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A selection rebuilds the list with what was selected at the top — the
+  // card, its neighbours, its relations — but the list kept its scroll, so a
+  // card picked well down the panel left the reader looking at the faded "All
+  // elements" instead. So the panel goes to the top whenever the selection
+  // changes, and on letting go comes back to where the reader had scrolled,
+  // since the list they were reading is what returns.
+  const scrollBeforeSelection = useRef(null);
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box) return;
+    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)")
+      ?.matches
+      ? "auto"
+      : "smooth";
+    if (selected || selectedRel) {
+      if (scrollBeforeSelection.current === null)
+        scrollBeforeSelection.current = box.scrollTop;
+      box.scrollTo({ top: 0, behavior });
+    } else if (scrollBeforeSelection.current !== null) {
+      const top = scrollBeforeSelection.current;
+      scrollBeforeSelection.current = null;
+      // After the list is back, or there is nothing yet to scroll to.
+      requestAnimationFrame(() => box.scrollTo({ top, behavior: "auto" }));
+    }
+  }, [selected, selectedRel]);
+
   const activeSection = useActiveSection(sectionRefs, scrollRef);
 
   // ── Nav bar items ─────────────────────────────────────────────────────────
