@@ -75,6 +75,16 @@ const ON_SCREEN_MARGIN = 24;
 const RIGHT_CONTROLS_WIDTH = 96 + ON_SCREEN_MARGIN;
 
 /**
+ * The canvas height both control stacks need down its right edge: the add
+ * buttons' column from the top (six buttons, about 246px) and the zoom column
+ * from the bottom (four, about 193px), with room between. Below it the add
+ * buttons go along the top edge instead (`AddButtonsOverlay`'s `row`), or the
+ * two overlap — which is what a phone's canvas under the tour's sheet did,
+ * hiding the statement toggle the tour was pointing at.
+ */
+const STACKED_CONTROLS_HEIGHT = 460;
+
+/**
  * The elements a relation joins: its two ends, or for one step of a joint
  * argument, every premise of that argument and its conclusion.
  *
@@ -678,6 +688,7 @@ export function Graph({
               onAddArg={() => setAddingArg(true)}
               onAddGroup={() => onEditGroupRequest?.()}
               hideNonEntailsRels={hideNonEntailsRels}
+              row={dims.h > 0 && dims.h < STACKED_CONTROLS_HEIGHT}
             />
             <GroupChips
               hulls={hulls}

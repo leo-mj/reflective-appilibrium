@@ -60,6 +60,13 @@ export function NetworkIcon({ size = "2em" }) {
   );
 }
 
+/**
+ * A clock face with an arrow turning it back: the process, replayed.
+ *
+ * Drawn at the weight and size of its neighbours. It had a face half their
+ * size in lines a third as thick, and beside them on the phone's tiles read as
+ * a disabled one.
+ */
 export function HistoryIcon({ size = "2em" }) {
   return (
     <svg
@@ -68,29 +75,19 @@ export function HistoryIcon({ size = "2em" }) {
       viewBox="0 0 512 512"
       style={{ display: "block" }}
     >
-      <defs>
-        <linearGradient id="bgGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#2ec4b6" />
-          <stop offset="100%" stopColor="#7b2cbf" />
-        </linearGradient>
-      </defs>
-
-      {/* <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#bgGradient)" /> */}
-
       <g
         stroke="currentColor"
-        strokeWidth="8"
+        strokeWidth="24"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       >
-        <path d="M180 220a100 100 0 1 1 -10 90" />
-        <polyline points="170,190 180,220 210,210" />
-      </g>
-
-      <g stroke="currentColor" strokeWidth="8" strokeLinecap="round">
-        <line x1="256" y1="256" x2="256" y2="220" />
-        <line x1="256" y1="256" x2="292" y2="256" />
+        {/* Round from left of top, clockwise, to left of bottom; the gap
+            between the two ends is where the arrow turns it back. */}
+        <path d="M91 196 A176 176 0 1 1 91 316" />
+        <polyline points="71,136 91,196 151,176" />
+        <line x1="256" y1="256" x2="256" y2="160" />
+        <line x1="256" y1="256" x2="326" y2="256" />
       </g>
     </svg>
   );

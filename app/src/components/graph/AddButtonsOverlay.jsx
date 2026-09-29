@@ -1,6 +1,7 @@
 /**
  * @fileoverview The Graph tab's own add buttons — + J, + P, + T, + Rel, + Arg,
- * + Grp — stacked in the canvas's top-right corner.
+ * + Grp — stacked in the canvas's top-right corner, or along its top edge when
+ * the canvas is too short for the stack.
  * @module components/graph/AddButtonsOverlay
  */
 
@@ -8,12 +9,26 @@ import { C, typeTokens, inkOn } from "../../constants/colors.js";
 import { usePalette } from "../../hooks/useTheme.js";
 import { Tooltip } from "../Tooltip.jsx";
 
+/**
+ * The zoom column's 44px buttons, 8px in from the right edge, and a gap: what
+ * a row of add buttons stays left of.
+ */
+const ZOOM_COLUMN_CLEARANCE = 8 + 44 + 8;
+
+/**
+ * @param {Object}  props
+ * @param {boolean} [props.row] - Along the top edge rather than down the right
+ *   one. The zoom column stands in the bottom-right corner, and on a canvas too
+ *   short for both — a phone's, under the guided tour's sheet — the two stacks
+ *   ran into each other, the add buttons over the zoom and statement controls.
+ */
 export function AddButtonsOverlay({
   onAddEl,
   onAddRel,
   onAddArg,
   onAddGroup,
   hideNonEntailsRels,
+  row = false,
 }) {
   const palette = usePalette();
   return (
@@ -25,7 +40,17 @@ export function AddButtonsOverlay({
         top: 12,
         right: 12,
         display: "flex",
-        flexDirection: "column",
+        flexDirection: row ? "row" : "column",
+        // A row keeps clear of the zoom column's strip down the right edge —
+        // on the shortest canvases that column reaches the top — and wraps
+        // rather than running off the left edge, gathered to the right, where
+        // the column stood.
+        ...(row && {
+          right: ZOOM_COLUMN_CLEARANCE,
+          left: 12,
+          flexWrap: "wrap",
+          justifyContent: "flex-end",
+        }),
         gap: 6,
       }}
     >
@@ -109,7 +134,7 @@ export function AddButtonsOverlay({
             padding: "8px 12px",
             fontSize: 13,
             cursor: "pointer",
-            width: "100%",
+            width: row ? "auto" : "100%",
           }}
         >
           + Grp

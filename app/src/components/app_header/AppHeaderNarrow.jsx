@@ -3,7 +3,13 @@
  * @module components/app_header/AppHeaderNarrow
  */
 
-import { cloneElement, useEffect, useRef, useState } from "react";
+import {
+  cloneElement,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { C } from "../../constants/colors.js";
 import { BACKEND_ENABLED } from "../../config.js";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
@@ -34,9 +40,10 @@ import { MergeIcon } from "../Icons.jsx";
 
 /**
  * What sits above the ☰ menu — the app's padding, the round, the topic — and so
- * has to come off the height the menu is allowed. Deliberately generous: too
- * much only makes the menu start scrolling a little early, while too little
- * puts its last entry back off the bottom of the screen.
+ * has to come off the height the menu is allowed, until the header has been
+ * measured (`headerBottom`). Deliberately generous: too much only makes the
+ * menu start scrolling a little early, while too little puts its last entry
+ * back off the bottom of the screen.
  */
 const MENU_TOP_ALLOWANCE = 96;
 
@@ -149,6 +156,25 @@ export function AppHeaderNarrow({
     if (tourMenuView) setView(tourMenuView);
   }
 
+  // The bottom of the header row, measured as the menu opens — before it
+  // paints, so nothing jumps — and again if the window changes size under it
+  // (a phone turned on its side). The backdrop starts there, and the card's
+  // height is what is left below it: a fixed allowance for the header left
+  // the bottom of the screen empty whenever the topic took fewer lines than
+  // assumed, while the card scrolled.
+  const headerRowRef = useRef(null);
+  const [headerBottom, setHeaderBottom] = useState(0);
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+    const measure = () =>
+      setHeaderBottom(
+        headerRowRef.current?.getBoundingClientRect().bottom ?? 0,
+      );
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [menuOpen]);
+
   // Switching views replaces the rows under the finger, so the list starts from
   // its top, and the focus goes to the row that leads back — Back into
   // Settings, the Settings row out of it — where a keyboard would look for it.
@@ -180,7 +206,7 @@ export function AppHeaderNarrow({
       key={key}
       onClick={onClick}
       aria-current={current ? "page" : undefined}
-      style={{ ...btn(current), ...TILE_STYLE }}
+      style={{ ...btn(current), ...TILE_STYLE, height: tileHeight }}
       {...rest}
     >
       <span aria-hidden="true" style={TILE_ICON_STYLE}>
@@ -221,6 +247,18 @@ export function AppHeaderNarrow({
           run: handleMergeClick,
         }
       : null;
+  // How many lines of tiles the first view holds, three to a line, which is
+  // what the tiles are sized by.
+  const analyzeTiles =
+    1 +
+    ANALYZE_TABS.filter(isTabVisible).length +
+    (BACKEND_ENABLED ? SIMULATE_TABS.filter(isTabVisible).length : 0) +
+    (mergeAction ? 1 : 0);
+  const tileHeight = tileHeightFor(
+    Math.ceil(ASSIST_TABS.filter(isTabVisible).length / 3) +
+      Math.ceil(analyzeTiles / 3),
+  );
+
   const mergeTile = mergeAction && (
     <Tooltip key="merge" text={mergeAction.tooltip}>
       {tile({
@@ -254,6 +292,7 @@ export function AppHeaderNarrow({
   return (
     <div style={{ position: "relative", marginBottom: 6 }}>
       <div
+        ref={headerRowRef}
         style={{
           display: "flex",
           // Top, not centre: the topic wraps to as many lines as it needs, and
@@ -318,6 +357,32 @@ export function AppHeaderNarrow({
         onClose={() => setPrivacyOpen(false)}
         returnFocusTo={menuButtonRef}
       />
+      {/* Behind the card, over everything below the header: a tap on it
+          closes the menu, and dimming and blurring set the card apart from the
+          graph under it — which through the gap above the card showed as stray
+          outlines. From the header down rather than over it, so the round, the
+          topic and ☰ stay on their own ground and legible in either theme.
+          Not while the tour walks the menu: the tour has a dim of its own, and
+          this would swallow every tap meant for it. */}
+      {menuOpen && !tourActive && (
+        <div
+          data-testid="menu-backdrop"
+          aria-hidden="true"
+          onClick={() => setMenuOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            top: headerBottom,
+            zIndex: 99,
+            background: "rgba(0, 0, 0, 0.5)",
+            // Blurred as well as dimmed: on the dark canvas a dim alone left
+            // the controls under the gap crisp enough to read as part of the
+            // menu.
+            backdropFilter: "blur(3px)",
+            WebkitBackdropFilter: "blur(3px)",
+          }}
+        />
+      )}
       {menuOpen && (
         <div
           ref={menuRef}
@@ -346,7 +411,7 @@ export function AppHeaderNarrow({
             // needs them worse than anyone: it rings them one at a time, and
             // scrolls this box to bring each one out from behind its sheet,
             // whose height it publishes on <html> for exactly that.
-            maxHeight: `calc(100dvh - var(--tour-sheet-h, 0px) - ${MENU_TOP_ALLOWANCE + 2 * MENU_MARGIN}px)`,
+            maxHeight: `calc(100dvh - var(--tour-sheet-h, 0px) - ${(headerBottom || MENU_TOP_ALLOWANCE) + 2 * MENU_MARGIN}px)`,
             overflowY: "auto",
             boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
           }}
@@ -536,14 +601,29 @@ const tileGrid = (columns) => ({
   gap: NAV_GAP,
 });
 
+/**
+ * A tile's height, for a first view holding `rows` lines of tiles.
+ *
+ * Steeper than a plain share of the screen's height: an SE-sized screen
+ * (667px) has room for the usual four lines, and the card's margins, at about
+ * their floor, a taller one for tiles much bigger — about 57px there, about
+ * 96px at 844. A fifth line — "All relations" on after a merge puts seven
+ * tiles in Assist — shrinks every tile in proportion, down to a lower floor
+ * that is still a finger's target, rather than making the menu scroll.
+ *
+ * @param {number} rows
+ * @returns {string} A CSS height.
+ */
+function tileHeightFor(rows) {
+  const share = Math.min(1, 4 / rows);
+  const floor = rows > 4 ? 48 : 56;
+  return `clamp(${floor}px, calc((22dvh - 90px) * ${share}), 100px)`;
+}
+
 const TILE_STYLE = {
   flexDirection: "column",
   justifyContent: "center",
   gap: 6,
-  // Steeper than a plain share of the height: an SE-sized screen (667px) has
-  // room for four rows of tiles, and the card's margins, at about their floor,
-  // a taller one for tiles much bigger — about 57px there, about 96px at 844.
-  height: "clamp(56px, calc(22dvh - 90px), 100px)",
   padding: "4px 2px",
   fontSize: 13,
   lineHeight: 1.2,

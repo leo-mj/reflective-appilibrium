@@ -134,8 +134,10 @@ export default defineConfig({
       name: "mobile",
       use: { ...devices["iPhone 13"], browserName: "chromium" },
       // statement-cards.spec.js too, for what a finger does to a card: there
-      // is no hover on a phone, and the card view grows a card on hover.
-      testMatch: /(responsive|statement-cards)\.spec\.js/,
+      // is no hover on a phone, and the card view grows a card on hover. And
+      // tour.spec.js, since the phone's tour reaches its controls through the
+      // ☰ menu rather than the tab bar.
+      testMatch: /(responsive|statement-cards|tour)\.spec\.js/,
     },
   ],
 

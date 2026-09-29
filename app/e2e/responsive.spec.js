@@ -68,6 +68,39 @@ test.describe("Narrow layout", () => {
     expect(settings.filter((r) => r.height !== 44)).toEqual([]);
   });
 
+  // The most the first view holds today: "All relations" on after a merge puts
+  // seven tiles in Assist, a fifth line of tiles. They shrink to make room
+  // rather than the menu scrolling, on the shortest screen the spec checks.
+  test("the ☰ menu still fits with every view on offer", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await gotoHome(page);
+    await loadSample(page);
+    const burger = page.locator('button[aria-label="Menu"]');
+    await burger.click();
+    await page.getByRole("button", { name: "Merge", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Merge", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await burger.click();
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByRole("button", { name: /All relations/ }).click();
+    await page.getByRole("button", { name: /Back$/ }).click();
+
+    const menu = page.locator('[data-tutorial="menu-assist"]').locator("xpath=..");
+    // Seven Assist views, and Graph, History and Clusters; Text and Merge
+    // carry no tab id.
+    await expect(menu.locator('[data-tutorial^="tab-"]')).toHaveCount(10);
+    const { scrollHeight, clientHeight } = await menu.evaluate((m) => ({
+      scrollHeight: m.scrollHeight,
+      clientHeight: m.clientHeight,
+    }));
+    expect(scrollHeight).toBeLessThanOrEqual(clientHeight + 1);
+    const heights = await menu
+      .locator("button")
+      .evaluateAll((bs) => bs.map((b) => b.getBoundingClientRect().height));
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
+  });
+
   // Fitted whole to a phone, the sample's ids were drawn at 6–7px. The graph
   // now opens no smaller than a 10px id, and the legend, which wrapped to
   // three lines above it, opens folded.

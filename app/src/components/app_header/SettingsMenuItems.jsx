@@ -26,6 +26,7 @@ import {
 } from "./appHeaderStyles.js";
 import { MENU_HEADINGS, MENU_LABELS, MENU_TOOLTIPS } from "./menuText.js";
 import { MoonIcon, SearchIcon } from "./menuIcons.jsx";
+import { MergeIcon } from "../Icons.jsx";
 import { MenuToggle } from "./MenuToggle.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
@@ -289,7 +290,9 @@ export function SettingsMenuItems({
         {handleMergeClick && (
           <Tooltip text={MENU_TOOLTIPS.merge}>
             <button onClick={leaving(handleMergeClick)} style={itemStyle}>
-              <span style={menuIconStyle}>⊕</span>
+              <span style={menuIconStyle}>
+                <MergeIcon size={18} />
+              </span>
               {MENU_LABELS.merge}
             </button>
           </Tooltip>
@@ -297,7 +300,9 @@ export function SettingsMenuItems({
         {handleMergeSampleClick && (
           <Tooltip text={MENU_TOOLTIPS.mergeSample}>
             <button onClick={leaving(handleMergeSampleClick)} style={itemStyle}>
-              <span style={menuIconStyle}>⊕</span>
+              <span style={menuIconStyle}>
+                <MergeIcon size={18} />
+              </span>
               {MENU_LABELS.mergeSample}
             </button>
           </Tooltip>

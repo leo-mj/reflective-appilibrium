@@ -299,6 +299,53 @@ A test cannot read a `title` any more: `components/tooltipTestUtils.js` has
 `tooltipText(node)`, which hovers, waits out the delay and returns what the
 portal says.
 
+## The ☰ menu
+
+**One list of settings, two menus.** `app_header/SettingsMenuItems.jsx` is
+everything the wide header's ☰ holds — Home, Content, Model, Appearance, Text
+panel, Session — and both headers render it. The narrow header used to carry a
+copy of those rows, which is how a setting comes to exist on one width only.
+`AppHeader.test.jsx` ("the narrow Settings view") compares the rows each offers.
+
+**The narrow ☰ is navigation first** (`AppHeaderNarrow.jsx`), with the
+settings one level down:
+
+- **Its first view** holds what the wide header keeps *beside* its ☰, plus the
+  views. A strip of four across the top — Settings, Undo, Redo, Tour — then
+  Close round while offered, Start Workflow at the head of Assist, and the
+  views as **tiles**, three to a line, the current one filled
+  (`aria-current`). Simulate and Merge (merging another process in) are
+  tiles in Analyze. One list of rows at a finger's height ran past the bottom
+  of a phone.
+- **Settings** swaps in `SettingsMenuItems` under a Back row: a list, since a
+  switch reads best on a row. Switching views scrolls to the top and puts the
+  focus on the row that leads back; closing the menu returns to the first view.
+- **The tour opens either view.** A section's `menu: "settings"` (narrow only)
+  opens it on Settings, where the wide ☰'s entries are at that width;
+  `tourSections.test.js` holds every section ringing one of them to it.
+
+**Every tile name is one line.** A name that wraps pushes its icon up and its
+last line through the border. So the Merge tile is "Merge" whether it runs the
+file merge or, on the sample, the demo one — its tooltip says which — and the
+Merge Elements view is **"Duplicates" on a tile** (`TILE_LABELS`), which also
+stops it reading as a second Merge. The wide tab bar keeps "Merge Elements".
+Their icons follow the same split: `MergeIcon` is the old two-circle Clusters
+icon, and Clusters and Duplicates have icons of their own.
+
+**The sizes follow the screen's height** — tiles, the strip and the workflow
+row are `clamp()`s on `dvh`, steeper than a plain share of it — so the first
+view fits without scrolling from an SE-sized 375×667, where they sit near their
+floors, to a 390×844, where the tiles are about 96px against 57.
+`e2e/responsive.spec.js` checks both sizes; a new row on that view has to fit
+them. Every target is 44px or more, and the ☰ button is 44px square.
+
+**The graph at phone width.** The opening fit, on the Graph and History tabs,
+stops at `NARROW_FIT_MIN_ZOOM` (`utils/graphHelpers.js`), where the smallest id
+is drawn at 10px — fitted whole, the sample's were 6–7px — and the rest is
+panned to; the fit button still frames everything, having been asked to. The
+legend folds behind one button (`Legend`'s `collapsible`), which counts what
+the legend is hiding, since a folded filter still filters.
+
 ## Visualization conventions
 
 Colorblind-safe palette. Two modules, and the split matters:
@@ -959,6 +1006,16 @@ now also refuses to spend more than half an axis on margins and floors the zoom
 at `usePan`'s own `ZOOM_MIN`: `extent - padding` reaching zero drew nothing, and
 going negative mirrored the graph and blew it up to several times the strip.
 `resetView` takes what it is handed without clamping, so the clamp has to be here.
+
+**`e2e/tour.spec.js` walks the whole tour at both widths**, reading what
+each section rings from `buildTourSections` itself, and checks each control is
+drawn, ringed and uncovered at its top edge. The unit tests hold the script to
+its rules; only a browser shows whether the ring lands. It found the phone's
+graph controls overlapping under the tour's sheet — the canvas there is a
+couple of hundred pixels tall, too short for the add buttons' column and the
+zoom column both, and the add buttons covered the statement toggle the tour
+was pointing at. On a canvas under `STACKED_CONTROLS_HEIGHT` (`Graph.jsx`) the
+add buttons now run along the top edge, left of the zoom column.
 
 **The AI chapter stops at one Assist tab and not at the other five.** The cycle
 section names the iteration's phases — and is pinned to `WORKFLOW_NEXT_PHASE`'s

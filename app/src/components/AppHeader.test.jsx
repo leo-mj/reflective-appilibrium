@@ -475,6 +475,25 @@ describe("what closes the menu", () => {
     });
   }
 
+  // The narrow menu is laid over the graph with a backdrop behind it; a tap
+  // there is how a finger puts it away.
+  it("closes on a tap beside the narrow menu", () => {
+    render(<AppHeader {...PROPS} isWide={false} />);
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    expect(menuIsOpen()).toBe(true);
+    fireEvent.click(screen.getByTestId("menu-backdrop"));
+    expect(menuIsOpen()).toBe(false);
+  });
+
+  it("lays no backdrop over the tour, which has its own dim", () => {
+    const { rerender } = render(
+      <AppHeader {...PROPS} tourActive isWide={false} />,
+    );
+    rerender(<AppHeader {...PROPS} tourActive isWide={false} tourMenuOpen />);
+    expect(menuIsOpen()).toBe(true);
+    expect(screen.queryByTestId("menu-backdrop")).toBeNull();
+  });
+
   it("closes when the narrow menu is used to switch tabs", () => {
     render(<AppHeader {...PROPS} isWide={false} />);
     fireEvent.click(screen.getAllByText("☰")[0]);
