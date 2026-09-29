@@ -13,6 +13,7 @@ from backend.config import get_settings
 from backend.main import app
 from backend.models.re_state import REElement, RERelation
 from backend.services.rethon_caps import argued_element_ids
+from backend.services.rethon_scoring import relations_at_step
 from backend.services.rethon_simulation import build_numerical_arguments
 from backend.tests.conftest import make_settings
 
@@ -115,3 +116,57 @@ def test_a_process_argued_one_premise_at_a_time_is_simulated(client):
     res = client.post("/api/simulate_rethon/simulate", json=body)
     assert res.status_code == 200, res.text[:300]
     assert len(res.json()["translated_arguments"]) == 2
+
+
+# ── What History scores at each step ──────────────────────────────────────────
+
+
+def link(from_, to, argument_id, added, **extra):
+    return RERelation.model_validate(
+        {
+            "from": from_,
+            "to": to,
+            "type": "entails",
+            "explanation": "",
+            "addedRound": added,
+            "argumentId": argument_id,
+            **extra,
+        }
+    )
+
+
+IDS = {"P1", "J2", "J3", "J4"}
+
+
+def test_a_replaced_link_counts_until_the_revision_that_replaced_it():
+    """P1 entails J2 until step 5, when a revision swaps the premise for J3."""
+    old = link(
+        "P1",
+        "J2",
+        "a1",
+        2,
+        supersededBy="a2",
+        status="withdrawn",
+        history=[{"round": 5, "type": "withdrawn"}],
+    )
+    new = link("J3", "J2", "a2", 5)
+    at = lambda step: [
+        r.argument_id for r in relations_at_step([old, new], IDS, step)
+    ]  # noqa: E731
+    assert at(4) == ["a1"]
+    assert at(5) == ["a2"]
+    assert at(9) == ["a2"]
+
+
+def test_an_argument_the_reader_withdrew_keeps_counting():
+    """Withdrawn, not replaced: it stays in the structure, so a withdrawn element
+    can earn its way back."""
+    withdrawn = link(
+        "P1",
+        "J2",
+        "a1",
+        2,
+        status="withdrawn",
+        history=[{"round": 5, "type": "withdrawn"}],
+    )
+    assert relations_at_step([withdrawn], IDS, 9) == [withdrawn]

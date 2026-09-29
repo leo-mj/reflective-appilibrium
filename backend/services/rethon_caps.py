@@ -52,6 +52,15 @@ def rethon_arguments(relations: Iterable[RERelation]) -> list[list[RERelation]]:
     A single-premise argument is its one relation, whether or not it carries an
     ``argumentId``: states written before every argument was given one still
     say plainly what it is.
+
+    **Whatever their status, withdrawn included, and deliberately.** An
+    argument the reader has withdrawn is still an inference that holds, and
+    keeping it in the structure is what lets the simulation find that
+    re-including a withdrawn element would make the position more coherent —
+    RE's second look, which a withdrawal is not meant to rule out. What is left
+    out is an argument a revision *replaced* (``supersededBy``): that is the
+    record of a position, not an argument, and the frontend drops it before
+    sending (``presentState`` in ``REState``).
     """
     grouped: dict[str, list[RERelation]] = {}
     arguments: list[list[RERelation]] = []

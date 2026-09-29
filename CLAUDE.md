@@ -109,6 +109,19 @@ prefer that set over listing them by hand. Each such relation carries an
 together: the graph draws the group as converging lines into a junction dot, and
 withdrawing, reinstating or deleting any one of them applies to the whole argument.
 
+**All four reach the rethon simulation, withdrawn ones included**
+(`rethon_arguments` in `backend/services/rethon_caps.py`). Single-premise
+arguments used to be left out, which simulated a process argued one premise at
+a time as though it had none. Withdrawn arguments stay deliberately: an
+argument still holds when the reader sets it aside, and keeping it is what
+lets the simulation find that re-including a withdrawn element would make the
+position more coherent. Only links a revision *replaced* are left out — from
+the step of the revision on, in History's per-step scores too
+(`relations_at_step` in `rethon_scoring.py`). Those scores take each step as it
+stood: every element with the status its history gives it at that step
+(`elements_at_step`, folding events as `foldHistory` does), withdrawn ones kept
+in the pool uncommitted, as the full simulation keeps them.
+
 #### Revising an argument
 
 Revise on an argument opens `ReviseArgumentModal`, which works on its premises:

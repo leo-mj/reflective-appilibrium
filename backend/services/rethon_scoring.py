@@ -5,7 +5,7 @@ import logging
 
 from theodias import Position, StandardPosition, BDDDialecticalStructure
 from rethon import StandardLocalReflectiveEquilibrium
-from ..models.re_state import REElement, RERelation
+from ..models.re_state import REElement, REHistoryEvent, RERelation
 from ..routers.rethon_schemas import (
     ModelWeights,
     ElementDelta,
@@ -180,6 +180,106 @@ def compute_score_changes(
         return empty
 
 
+def _history(el: REElement) -> List[REHistoryEvent]:
+    """An element's events, oldest first, rebuilt from the single-event fields
+    older states carry when there is no list — as ``historyOf`` does in
+    app/src/utils/stateUtils.js."""
+    if el.history is not None:
+        return sorted(el.history, key=lambda e: e.round)
+    events = []
+    if el.revised_round:
+        events.append(REHistoryEvent(round=el.revised_round, type="revised"))
+    if el.rejected_round:
+        events.append(REHistoryEvent(round=el.rejected_round, type="rejected"))
+    if el.withdrawn_round:
+        events.append(REHistoryEvent(round=el.withdrawn_round, type="withdrawn"))
+    return sorted(events, key=lambda e: e.round)
+
+
+def status_at_step(el: REElement, step: int) -> str:
+    """The element's status as it stood at ``step``: its events up to and
+    including that step, folded as ``foldHistory`` in app/src/utils/stateUtils.js
+    folds them. An element with no events keeps the status it has — a
+    ``possible`` one, and anything never touched."""
+    events = _history(el)
+    if not events:
+        return el.status
+    status, revised = "active", False
+    for ev in events:
+        if ev.round > step:
+            break
+        if ev.type == "withdrawn":
+            status = "withdrawn"
+        elif ev.type == "rejected":
+            status = "rejected"
+        elif ev.type == "reinstated":
+            status = "revised" if revised else "active"
+        elif ev.type == "revised":
+            revised = True
+            if status == "active":
+                status = "revised"
+    return status
+
+
+def elements_at_step(elements: List[REElement], step: int) -> List[REElement]:
+    """The elements of the process as it stood at ``step``: those added by then,
+    each with the status it had then.
+
+    Statuses are of that step, not of now. They used to be now's, so an element
+    withdrawn at step 50 was scored as withdrawn at step 10, and History's early
+    scores reflected today's commitments rather than the ones then held.
+
+    A withdrawn element stays in, uncommitted: the sentence pool is the process's
+    whole vocabulary, as it is for the full simulation, and an element the reader
+    set aside can still be the one that makes the position more coherent. They
+    used to be dropped from the pool at their withdrawal, and only if withdrawn
+    by the single-event field older states use.
+    """
+    return [
+        el.model_copy(update={"status": status_at_step(el, step)})
+        for el in elements
+        if (el.added_round or 1) <= step
+    ]
+
+
+def replaced_by_step(rel: RERelation, step: int) -> bool:
+    """Whether a revision had replaced this link by ``step``.
+
+    A link an argument's revision replaced carries ``superseded_by`` and was
+    withdrawn at that step, never to be reinstated. Up to it, it is part of the
+    argument as it then stood; from it on, it is the record of what the argument
+    was, and no premise. A withdrawal the reader made is another matter: that
+    argument stays, so a withdrawn element can earn its way back (see
+    ``rethon_arguments``). Without a withdrawal step to go by, a replaced link
+    counts as replaced throughout.
+    """
+    if not rel.superseded_by:
+        return False
+    withdrawals = [e.round for e in rel.history or [] if e.type == "withdrawn"]
+    replaced_at = max(withdrawals) if withdrawals else rel.withdrawn_round
+    return replaced_at is None or replaced_at <= step
+
+
+def relations_at_step(
+    relations: List[RERelation], element_ids: set, step: int
+) -> List[RERelation]:
+    """The relations of the process as it stood at ``step``: added by then,
+    between elements present then, and not yet replaced by a revision.
+
+    The whole process is sent for History's scores, replaced links included,
+    since they are what the early steps are made of. Kept after the step that
+    replaced them, they had the old premises scored beside the new ones.
+    """
+    return [
+        rel
+        for rel in relations
+        if (rel.added_round or 1) <= step
+        and rel.from_id in element_ids
+        and rel.to_id in element_ids
+        and not replaced_by_step(rel, step)
+    ]
+
+
 def compute_score_per_round(
     elements: List[REElement],
     relations: List[RERelation],
@@ -200,20 +300,9 @@ def compute_score_per_round(
     """
     results: List[RoundScores] = []
     for r in range(1, rounds + 1):
-        elements_at_r = [
-            el
-            for el in elements
-            if (el.added_round or 1) <= r
-            and not (el.withdrawn_round and el.withdrawn_round <= r)
-        ]
+        elements_at_r = elements_at_step(elements, r)
         el_ids = {el.id for el in elements_at_r}
-        relations_at_r = [
-            rel
-            for rel in relations
-            if (rel.added_round or 1) <= r
-            and rel.from_id in el_ids
-            and rel.to_id in el_ids
-        ]
+        relations_at_r = relations_at_step(relations, el_ids, r)
         results.append(
             RoundScores(
                 round=r,
