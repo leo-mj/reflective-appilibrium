@@ -15,7 +15,11 @@ const EASING_FACTOR = 0.08;
 /**
  * Manages all playback state and side-effects for the History tab.
  *
- * @param {number} maxRound
+ * Counts notches, not steps: the tab hands it how many there are, and maps a
+ * notch to a step itself — every step, or the end of each round (stateUtils,
+ * "Steps and rounds"). The names still say "round" from when the two were one.
+ *
+ * @param {number} maxRound - The last notch.
  * @returns {{ displayRound, targetRound, setTargetRound, playing, setPlaying,
  *             speed, setSpeed, snappedRound, resetPlayback, togglePlay }}
  */
@@ -75,6 +79,13 @@ export function usePlayback(maxRound) {
     setDisplayRound(0);
     setPlaying(false);
   };
+  /** Goes straight to a notch, without easing — for a change of unit, where
+   *  the slider is re-scaled and a glide across it would show nothing real. */
+  const jumpTo = (index) => {
+    setTargetRound(index);
+    setDisplayRound(index);
+    setPlaying(false);
+  };
   const togglePlay = () => {
     if (targetRound >= maxRound) resetPlayback();
     setPlaying((p) => !p);
@@ -91,5 +102,6 @@ export function usePlayback(maxRound) {
     snappedRound,
     resetPlayback,
     togglePlay,
+    jumpTo,
   };
 }

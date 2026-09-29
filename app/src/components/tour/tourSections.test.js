@@ -293,7 +293,7 @@ describe("what the tour claims", () => {
     // which is also why passing through one mid-process is safe.
     const review = textOf(build().find((s) => s.id === "process-review"));
     expect(review).toMatch(/every fifth/i);
-    expect(review).toMatch(/advances no round/i);
+    expect(review).toMatch(/takes no step/i);
     expect(review).toMatch(/not an entry in it/i);
   });
 

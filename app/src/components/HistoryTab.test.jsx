@@ -5,6 +5,7 @@
 // playback. The canvas itself is the Graph tab's, tested there.
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, cleanup, act } from "@testing-library/react";
+import { useState } from "react";
 
 import { HistoryTab } from "./HistoryTab.jsx";
 import {
@@ -249,3 +250,62 @@ describe("the History tab's edges", () => {
   });
 });
 
+
+// By step, or by round (stateUtils, "Steps and rounds"). STATE runs to step 4;
+// closing a round at step 2 makes Round 1 steps 1–2 and Round 2 steps 3–4.
+describe("playing back by round", () => {
+  function RoundsHarness({ onStep }) {
+    const [unit, setUnit] = useState("step");
+    return (
+      <HistoryTab
+        state={{ ...STATE, roundEnds: [2] }}
+        positions={POSITIONS}
+        onRoundChange={onStep}
+        isWide={false}
+        hideNonEntailsRels={false}
+        unit={unit}
+        onUnitChange={setUnit}
+      />
+    );
+  }
+
+  function setupRounds() {
+    const played = [];
+    const utils = render(<RoundsHarness onStep={(s) => played.push(s)} />);
+    const slider = () => utils.container.querySelector('input[type="range"]');
+    const to = (notch) => {
+      fireEvent.change(slider(), { target: { value: String(notch) } });
+      settle();
+    };
+    const lastStep = () => played.at(-1);
+    return { ...utils, slider, to, lastStep };
+  }
+
+  it("moves by step until switched", () => {
+    const { slider, getByRole } = setupRounds();
+    expect(slider().max).toBe("4");
+    expect(getByRole("button", { name: "Steps" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("stops at the end of each round, and plays that round's last step", () => {
+    const { slider, to, lastStep, getByRole, container } = setupRounds();
+    fireEvent.click(getByRole("button", { name: "Rounds" }));
+    expect(slider().max).toBe("2");
+    to(1);
+    expect(lastStep()).toBe(2);
+    expect(container.textContent).toContain("step 2 of 4");
+    to(2);
+    expect(lastStep()).toBe(4);
+  });
+
+  it("keeps its place on a switch, at the round reached so far", () => {
+    const { to, lastStep, getByRole, slider } = setupRounds();
+    to(3);
+    fireEvent.click(getByRole("button", { name: "Rounds" }));
+    settle();
+    // Step 3 is inside round 2, which has not ended by then: round 1 is the
+    // last reached, so the slider shows that rather than a round not yet over.
+    expect(slider().value).toBe("1");
+    expect(lastStep()).toBe(2);
+  });
+});

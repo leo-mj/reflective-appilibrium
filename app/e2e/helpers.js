@@ -98,7 +98,7 @@ export async function waitForReady(page) {
  * @param {import('@playwright/test').Page} page
  */
 export async function loadSample(page) {
-  await page.locator('button:text-is("Open the demo")').click();
+  await page.locator('button:text-is("Skip guided tour")').click();
   // The narrow header shortens this to just "Round n", so match the part both
   // layouts share rather than the desktop wording.
   await expect(page.locator("h1")).toContainText(/Round \d+/);
@@ -219,14 +219,22 @@ export async function addElement(page, type, text) {
  * @returns {Promise<Record<string, number>>}
  */
 export async function chipCounts(page) {
-  return page.evaluate(() =>
-    Object.fromEntries(
+  return page.evaluate(() => {
+    // The element types are letters on the pills; every other section is a
+    // word (TextTab's NAV_SECTIONS). Keyed by letter either way, as the specs
+    // have always asked for them.
+    const KEY = { Arguments: "A", Relations: "R", Coherence: "C", Log: "L" };
+    return Object.fromEntries(
       [...document.querySelectorAll("button")]
-        .map((b) => b.textContent.trim().match(/^([JPTACL]) \((\d+)\)$/))
+        .map((b) =>
+          b.textContent
+            .trim()
+            .match(/^([JPT]|Arguments|Relations|Coherence|Log) \((\d+)\)$/),
+        )
         .filter(Boolean)
-        .map((m) => [m[1], Number(m[2])]),
-    ),
-  );
+        .map((m) => [KEY[m[1]] ?? m[1], Number(m[2])]),
+    );
+  });
 }
 
 /**

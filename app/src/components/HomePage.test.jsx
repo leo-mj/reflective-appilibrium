@@ -66,7 +66,7 @@ describe("starting a new process", () => {
     expect(onStartFresh).not.toHaveBeenCalled();
     expect(dialog().textContent).toContain("Second process");
     expect(dialog().textContent).toContain("First process");
-    expect(dialog().textContent).toContain(`round ${SAMPLE_STATE.round}`);
+    expect(dialog().textContent).toContain(`round 8, step ${SAMPLE_STATE.round}`);
   });
 
   it("asks on Ctrl+Enter in the topic field too", () => {

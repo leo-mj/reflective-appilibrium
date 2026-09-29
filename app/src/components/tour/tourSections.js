@@ -227,8 +227,8 @@ function graphSections() {
         ),
         "The principle below went in round 3, once it turned out to conflict with judgments its owner was far more sure of.",
         byLayout(
-          "And nothing is final either way: Undo, ringed in the header, steps back through the changes, as does Ctrl+Z. They are grouped by round rather than by keystroke, so it walks back through the thinking rather than through the typing.",
-          "And nothing is final either way: Undo, ringed in the ☰ menu, steps back through the changes. They are grouped by round rather than by keystroke, so it walks back through the thinking rather than through the typing.",
+          "And nothing is final either way: Undo, ringed in the header, steps back through the changes, as does Ctrl+Z. Each is one step — a whole change, not a keystroke — so it walks back through the thinking rather than through the typing.",
+          "And nothing is final either way: Undo, ringed in the ☰ menu, steps back through the changes. Each is one step — a whole change, not a keystroke — so it walks back through the thinking rather than through the typing.",
         ),
       ],
       quote: ["P4"],
@@ -239,7 +239,7 @@ function graphSections() {
       id: "text",
       title: byLayout("The text panel", "The text view"),
       body: [
-        "Reading the contents of your position is not limited to the graph. Every element and relation with its round, its confidence, its history, and the same buttons to revise, withdraw or reinstate it can be found in the text panel.",
+        "Reading the contents of your position is not limited to the graph. Every element and relation with the step it was added at, its confidence, its history, and the same buttons to revise, withdraw or reinstate it can be found in the text panel.",
         byLayout(
           "(You reach it via Assist → Text and Analyze → Graph in the tab bar. The tab bar is hidden while the tour is reading the graph — it comes back a few sections below.)",
           "(You reach it via ☰ → Analyze → Text, and come back the same way.)",
@@ -256,7 +256,7 @@ function graphSections() {
       id: "menu-files",
       title: "Saving your progress",
       body: [
-        "Nothing you do here is stored on a server, so closing the tab is the end of the process. Export writes it out as a Markdown file instead, with the sections you pick — elements and relations, the round-by-round log, the graph, an Argdown map — and Import reads one back, yours or one someone sent you, as long as it carries the full history.",
+        "Nothing you do here is stored on a server, so closing the tab is the end of the process. Export writes it out as a Markdown file instead, with the sections you pick — elements and relations, the log, step by step and round by round, the graph, an Argdown map — and Import reads one back, yours or one someone sent you, as long as it carries the full history.",
         "Both are in the ☰ menu, open beside this card, along with the settings. Hover any entry to find out what it does.",
       ],
       target: "menu-files",
@@ -322,7 +322,7 @@ function assistSections(cycle, llmEnabled) {
       body: [
         "Review is the one Assist tab whose output is not a change to the graph. It reads the process itself and reports in five parts: the arc your position has travelled, what is surprising in it, coherence that was available and not taken, and how you have been working — adding rather than revising, accepting suggestions as written rather than rewording them first.",
         "The workflow stops here every fifth time round the loop, and the reviews accumulate. Each new one is given the earlier ones and asked what has moved since, and whether an opportunity a previous review named was ever taken.",
-        "Accepting or discarding one advances no round and writes nothing to the log — a review is a reading of the record, not an entry in it — so there is no cost to running one in the middle of a process.",
+        "Accepting or discarding one takes no step and writes nothing to the log — a review is a reading of the record, not an entry in it — so there is no cost to running one in the middle of a process.",
       ],
       target: "tab-processReview",
       tab: "processReview",
@@ -357,7 +357,7 @@ function chromeSections() {
       chapter: "The rest of the interface",
       title: "Analyze — where you stand",
       body: [
-        "The Analyze part of the app is for looking at the position rather than growing it. Graph is what you have been reading. History replays the process round by round. Clusters finds the largest sets of your accepted elements that hold no conflict.",
+        "The Analyze part of the app is for looking at the position rather than growing it. Graph is what you have been reading. History replays the process step by step, or round by round. Clusters finds the largest sets of your accepted elements that hold no conflict.",
       ],
       target: "meta-analyze",
       tab: "graph",
@@ -378,7 +378,7 @@ function chromeSections() {
           "Hover a card to read a statement too long for it, and hover an arrow to read what its relation says. Zoomed far out, the cards shrink to a line each.",
           "Tap a card to read a statement too long for it, and tap an arrow to read what its relation says. Zoomed far out, the cards shrink to a line each.",
         ),
-        "The switch holds for History too, where each card shows the wording of the round being played — and for the graph in an export.",
+        "The switch holds for History too, where each card shows the wording of the step being played — and for the graph in an export.",
       ],
       target: "statement-toggle",
       tab: "graph",
@@ -389,7 +389,10 @@ function chromeSections() {
       id: "history",
       title: "History",
       body: [
-        "Drag the slider or press Play and the position rebuilds itself round by round, each element appearing in the round it was added and greying out in the round it was withdrawn.",
+        byLayout(
+          "Drag the slider or press Play and the position rebuilds itself one step at a time — every change is a step — each element appearing at the step it was added and greying out at the step it was withdrawn. Switched to Rounds, it moves a round at a time instead: a round closes as each iteration of the workflow ends, or when you press Close round beside the heading.",
+          "Drag the slider or press Play and the position rebuilds itself one step at a time — every change is a step — each element appearing at the step it was added and greying out at the step it was withdrawn. Switched to Rounds, it moves a round at a time instead: a round closes as each iteration of the workflow ends, or with Close round in the ☰ menu.",
+        ),
       ],
       target: "tab-history",
       tab: "history",

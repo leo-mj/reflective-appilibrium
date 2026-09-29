@@ -18,7 +18,11 @@ import {
   cardDivider,
   cardActions,
 } from "../../constants/textTabStyles.js";
-import { sortElementIds, statusTag } from "../../utils/stateUtils.js";
+import {
+  sortElementIds,
+  statusTag,
+  stepLabel,
+} from "../../utils/stateUtils.js";
 import { groupOfElement } from "../../utils/groupUtils.js";
 import { processesOf, processesOfElement } from "../../utils/mergeStates.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
@@ -160,7 +164,9 @@ export function ElementCard({ e, dim }) {
             </StatField>
           ))}
           {e.addedRound && (
-            <StatField label="Added">Round {e.addedRound}</StatField>
+            <StatField label="Added">
+              {stepLabel(state, e.addedRound)}
+            </StatField>
           )}
           {!revisionShown && <StatusField tag={tag} />}
           {pCovers[e.id]?.length > 0 && (
@@ -481,7 +487,9 @@ export function ArgumentCard({ rels, dim }) {
         )}
         {/* One round for the whole argument: its relations are added together. */}
         {rels[0].addedRound && (
-          <StatField label="Added">Round {rels[0].addedRound}</StatField>
+          <StatField label="Added">
+            {stepLabel(state, rels[0].addedRound)}
+          </StatField>
         )}
       </div>
     </div>
@@ -595,7 +603,7 @@ export function RelationCard({ r, dim }) {
           </StatField>
         )}
         {r.addedRound && (
-          <StatField label="Added">Round {r.addedRound}</StatField>
+          <StatField label="Added">{stepLabel(state, r.addedRound)}</StatField>
         )}
         <StatusField tag={statusTag(r, state.round)} />
       </div>

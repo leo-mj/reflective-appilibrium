@@ -36,7 +36,7 @@ export function MergeModal({ preview, onConfirm, onCancel }) {
   return (
     <ModalShell
       title={`Merge “${label}”?`}
-      subtitle={`Adds ${plural(added, "element")} and ${plural(relationsAdded, "relation")} in one round. Undo takes it back.`}
+      subtitle={`Adds ${plural(added, "element")} and ${plural(relationsAdded, "relation")} as one step. Undo takes it back.`}
       onCancel={onCancel}
       onSave={onConfirm}
       saveLabel="Merge"

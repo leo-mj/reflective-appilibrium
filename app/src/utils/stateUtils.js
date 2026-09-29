@@ -354,7 +354,91 @@ export function stateAtRound(state, round) {
           visIds.has(r.from) && visIds.has(r.to) && (r.addedRound || 1) <= round,
       )
       .map((r) => asOfRound(r, round)),
+    // Only the rounds closed by then, as `processes` shows only those merged.
+    ...(state.roundEnds && {
+      roundEnds: roundEndsOf(state).filter((end) => end <= round),
+    }),
   };
+}
+
+// ─── Steps and rounds ─────────────────────────────────────────────────────────
+//
+// `state.round`, and every `addedRound`, `revisedRound` and history `round`, is
+// a *step*: one per change, which is what makes playback exact. The field keeps
+// its name because every saved file uses it. What the reader sees as a *round*
+// is a run of consecutive steps, closed when a workflow iteration completes or
+// when the reader closes it by hand; `state.roundEnds` lists the last step of
+// each closed round, ascending. The steps since the last of them are the open
+// round, numbered one past the closed ones.
+
+/**
+ * The step each closed round ended on, ascending. Absent from every state
+ * written before rounds and steps were told apart — read it through this.
+ *
+ * @param {REState} state
+ * @returns {number[]}
+ */
+export function roundEndsOf(state) {
+  return Array.isArray(state?.roundEnds) ? state.roundEnds : [];
+}
+
+/**
+ * The round step `step` belongs to, from 1.
+ *
+ * @param {REState} state
+ * @param {number}  step
+ * @returns {number}
+ */
+export function roundOfStep(state, step) {
+  let round = 1;
+  for (const end of roundEndsOf(state)) {
+    if (step > end) round++;
+    else break;
+  }
+  return round;
+}
+
+/**
+ * When something happened, as the reader is shown it: "Round 2 · Step 14".
+ * The step pins the change; the round is where it falls in the method.
+ *
+ * @param {REState} state - Anything carrying `roundEnds`.
+ * @param {number}  step
+ * @returns {string}
+ */
+export function stepLabel(state, step) {
+  return `Round ${roundOfStep(state, step)} · Step ${step}`;
+}
+
+/** The round now open: one past those closed. */
+export function currentRound(state) {
+  return roundEndsOf(state).length + 1;
+}
+
+/**
+ * Whether the open round has anything in it to close. Every change writes a
+ * log entry at its step, so an entry past the last close is a change in this
+ * round; grouping, pinning or a review advance no step and do not count.
+ *
+ * @param {REState} state
+ * @returns {boolean}
+ */
+export function canCloseRound(state) {
+  const lastEnd = roundEndsOf(state).at(-1) ?? 0;
+  return state.round > lastEnd && state.log.some((l) => l.round > lastEnd);
+}
+
+/**
+ * The steps History stops at when it moves by round: before anything (0), the
+ * end of each closed round, and the latest step while the open round has any.
+ *
+ * @param {REState} state
+ * @returns {number[]}
+ */
+export function roundStops(state) {
+  const ends = roundEndsOf(state).filter((end) => end <= state.round);
+  const last = ends.at(-1) ?? 0;
+  return [0, ...ends, ...(state.round > last ? [state.round] : [])];
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * @fileoverview Animated round-by-round history playback tab.
+ * @fileoverview Animated history playback, step by step or round by round.
  * @module components/HistoryTab
  */
 
@@ -16,6 +16,7 @@ import {
   elementsAtRound,
   asOfRound,
   ARGUMENT_RELATION_TYPES,
+  roundStops,
 } from "../utils/stateUtils.js";
 import {
   CardBackgrounds,
@@ -48,17 +49,45 @@ import { PlaybackControls } from "./history/HistoryPlaybackControls.jsx";
 import { LogOverlay } from "./history/LogOverlay.jsx";
 
 /**
- * Renders the History tab: animated, slider-controlled playback of the RE process
- * round by round.
+ * The steps the slider stops at, one per notch: every step, or the end of each
+ * round and the latest step.
+ *
+ * @param {REState} state
+ * @param {"step"|"round"} unit
+ * @returns {number[]}
+ */
+function stopsOf(state, unit) {
+  return unit === "round"
+    ? roundStops(state)
+    : Array.from({ length: state.round + 1 }, (_, i) => i);
+}
+
+/**
+ * Renders the History tab: animated, slider-controlled playback of the RE process.
+ *
+ * It moves by step — one per change, exact — or by round, stopping at the end
+ * of each (stateUtils, "Steps and rounds"). Either way what it plays is a
+ * step: `snappedRound` below is always one, whichever unit the slider counts.
  *
  * @param {Object}      props
  * @param {REState}     props.state
  * @param {PositionMap} props.positions
- * @param {function(number): void} props.onRoundChange - Notifies parent of the current round.
+ * @param {function(number): void} props.onRoundChange - Notifies parent of the
+ *   step being played.
+ * @param {"step"|"round"} [props.unit] - What the slider moves by.
+ * @param {function("step"|"round"): void} [props.onUnitChange]
  * @param {boolean}     props.isWide
  * @returns {React.ReactElement}
  */
-export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEntailsRels }) {
+export function HistoryTab({
+  state,
+  positions,
+  onRoundChange,
+  isWide,
+  hideNonEntailsRels,
+  unit = "step",
+  onUnitChange,
+}) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
   // For the joint-argument renderer, which is a plain function and cannot hook.
@@ -80,8 +109,23 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
     zoomOut,
     resetView,
   } = usePan();
-  const playback = usePlayback(state.round);
-  const { snappedRound } = playback;
+  const stops = useMemo(() => stopsOf(state, unit), [state, unit]);
+  const playback = usePlayback(stops.length - 1);
+  // The step being played, whatever the slider counts in.
+  const snappedRound = stops[Math.min(playback.snappedRound, stops.length - 1)];
+
+  // A change of unit keeps the place: the notch at or before the step on
+  // screen, so switching never shows a round not yet reached.
+  const changeUnit = (next) => {
+    if (next === unit) return;
+    const nextStops = stopsOf(state, next);
+    let index = 0;
+    nextStops.forEach((step, i) => {
+      if (step <= snappedRound) index = i;
+    });
+    onUnitChange?.(next);
+    playback.jumpTo(index);
+  };
 
   useEffect(() => {
     onRoundChange?.(snappedRound);
@@ -171,7 +215,10 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
 
   /** Frames the whole graph again, as it opened — the Graph tab's fit button. */
   const fitHistory = () => {
-    const view = fitView(viewPositions, null, dims, { padding: 96, maxZoom: 1 });
+    const view = fitView(viewPositions, null, dims, {
+      padding: 96,
+      maxZoom: 1,
+    });
     if (view) resetView(view.pan, view.zoom);
   };
 
@@ -192,7 +239,13 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
   };
   /** The node or card at a point, and failing one, the edge. */
   const pointedAt = ({ sx, sy }) => {
-    const el = cardAt(displayEls.filter(inPlay), displayPositions, overlay, sx, sy);
+    const el = cardAt(
+      displayEls.filter(inPlay),
+      displayPositions,
+      overlay,
+      sx,
+      sy,
+    );
     return {
       el,
       rel: el
@@ -221,9 +274,17 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <PlaybackControls playback={playback} maxRound={state.round} />
+      <PlaybackControls
+        playback={playback}
+        maxRound={stops.length - 1}
+        unit={unit}
+        onUnitChange={onUnitChange ? changeUnit : null}
+        step={snappedRound}
+        maxStep={state.round}
+      />
 
       <GraphCanvas
+        roundEnds={state.roundEnds}
         containerRef={containerRef}
         dims={dims}
         pan={pan}
@@ -347,7 +408,8 @@ export function HistoryTab({ state, positions, onRoundChange, isWide, hideNonEnt
             hit={shown}
             zoom={zoom}
             color={
-              historyEdgeVisuals(shown.rel, wIds, snappedRound, shown.rels).isWithdrawn
+              historyEdgeVisuals(shown.rel, wIds, snappedRound, shown.rels)
+                .isWithdrawn
                 ? C.withdrawn
                 : palette.edges[shown.rel.type]
             }

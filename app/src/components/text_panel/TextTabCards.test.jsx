@@ -87,8 +87,8 @@ describe("ElementCard metadata order", () => {
       "Added",
       "Status",
     ]);
-    expect(stat(container, "Added")).toBe("Round 3");
-    expect(stat(container, "Status")).toBe("Revised · Round 5");
+    expect(stat(container, "Added")).toBe("Round 1 · Step 3");
+    expect(stat(container, "Status")).toBe("Revised · Step 5");
   });
 
   it("dates the status from the element's history", () => {
@@ -106,7 +106,7 @@ describe("ElementCard metadata order", () => {
       />,
       { state: { elements: [], relations: [], round: 9 } },
     );
-    expect(stat(container, "Status")).toBe("Withdrawn · Round 8");
+    expect(stat(container, "Status")).toBe("Withdrawn · Step 8");
   });
 
   it("dates it by the round being viewed in history playback", () => {
@@ -121,7 +121,7 @@ describe("ElementCard metadata order", () => {
     const { container } = renderIn(<ElementCard e={e} dim={false} />, {
       state: { elements: [], relations: [], round: 5 },
     });
-    expect(stat(container, "Status")).toBe("Withdrawn · Round 4");
+    expect(stat(container, "Status")).toBe("Withdrawn · Step 4");
   });
 
   it("marks an element that came back, which its status alone cannot show", () => {
@@ -138,7 +138,7 @@ describe("ElementCard metadata order", () => {
       />,
       { state: { elements: [], relations: [], round: 9 } },
     );
-    expect(stat(container, "Status")).toBe("Reinstated · Round 7");
+    expect(stat(container, "Status")).toBe("Reinstated · Step 7");
     // Back in play, so it reads as live text rather than a withdrawal.
     expect(container.textContent).not.toContain("Withdrawn: Too broad");
   });
@@ -153,9 +153,20 @@ describe("ElementCard metadata order", () => {
     expect(stat(container, "Status")).toBe("Withdrawn");
   });
 
+  // The step pins the change; the round says where it falls in the method.
+  it("names the round and the step it was added at", () => {
+    const { container } = renderIn(
+      <ElementCard e={el({ addedRound: 5 })} dim={false} />,
+      {
+        state: { elements: [], relations: [], roundEnds: [2, 4] },
+      },
+    );
+    expect(stat(container, "Added")).toBe("Round 3 · Step 5");
+  });
+
   it("names only the added round for an element in play", () => {
     const { container } = renderIn(<ElementCard e={el()} dim={false} />);
-    expect(stat(container, "Added")).toBe("Round 3");
+    expect(stat(container, "Added")).toBe("Round 1 · Step 3");
     expect(captions(container)).not.toContain("Status");
     expect(container.textContent).not.toContain("Withdrawn");
     expect(container.textContent).not.toContain("Revised");
@@ -175,7 +186,7 @@ describe("ElementCard metadata order", () => {
       />,
     );
     expect(captions(container)).not.toContain("Status");
-    expect(container.textContent).toContain("Revised in round 5");
+    expect(container.textContent).toContain("Revised at step 5");
     expect(container.textContent).toContain("Torture is bad.");
   });
 
@@ -187,7 +198,7 @@ describe("ElementCard metadata order", () => {
         dim={false}
       />,
     );
-    expect(stat(container, "Status")).toBe("Revised · Round 5");
+    expect(stat(container, "Status")).toBe("Revised · Step 5");
   });
 
   it("strikes through a withdrawn element and shows its reason", () => {
@@ -237,7 +248,7 @@ describe("RelationCard metadata order", () => {
       <RelationCard r={rel({ status: "withdrawn" })} dim={false} />,
     );
     expect(captions(container)).toEqual(["Origin", "Added", "Status"]);
-    expect(stat(container, "Added")).toBe("Round 2");
+    expect(stat(container, "Added")).toBe("Round 1 · Step 2");
     expect(stat(container, "Status")).toBe("Withdrawn");
   });
 

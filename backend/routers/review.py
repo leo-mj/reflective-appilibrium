@@ -4,7 +4,7 @@ Review router — /api/review
 Asks the configured LLM to read a whole RE process and report what it amounts to:
 where the position moved, where it turned unexpectedly, and what coherence was
 available and not taken.  Deliberately macro-level — the app already replays the
-process round by round, so a recap would add nothing.
+process step by step and round by round, so a recap would add nothing.
 """
 
 import logging
@@ -32,7 +32,7 @@ class ReviewRequest(BaseModel):
     """Payload for ``POST /api/review/analyze``.
 
     The whole state, because a review reads the *shape* of the process: the
-    history trails on elements and relations, the round each thing arrived in,
+    history trails on elements and relations, the step each thing arrived at,
     and who introduced it.  Any previously accepted reviews ride along inside
     ``state.reviews``, which is what lets this one carry their thread forward —
     so there is no separate field for them.
@@ -69,7 +69,7 @@ async def analyze_process(
     """Ask the LLM for a macro-level review of the process so far."""
     state = request.state
     logger.info(
-        f"Requesting process review from model '{llm.model}' at round {state.round} "
+        f"Requesting process review from model '{llm.model}' at step {state.round} "
         f"({len(state.elements)} elements, {len(state.reviews)} earlier reviews)."
     )
     prompt = build_review_prompt(state)

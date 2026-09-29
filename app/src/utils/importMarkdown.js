@@ -541,6 +541,19 @@ export function validateState(raw) {
     }
   }
 
+  // The last step of each closed round (stateUtils, "Steps and rounds"). Kept
+  // ascending and within the process; an end past the last step, or a repeat,
+  // is dropped rather than refused, as a stray pin is — how the steps were
+  // grouped is not worth losing a file over.
+  if (raw.roundEnds !== undefined) {
+    const ends = arr(raw.roundEnds, "roundEnds", 1_000).map((e, i) =>
+      num(e, `roundEnds[${i}]`),
+    );
+    result.roundEnds = [...new Set(ends)]
+      .filter((e) => Number.isInteger(e) && e >= 1 && e <= result.round)
+      .sort((a, b) => a - b);
+  }
+
   if (raw.model !== undefined) {
     if (raw.model !== "questionnaire")
       throw new Error(`"model" must be "questionnaire" if present, got "${raw.model}"`);

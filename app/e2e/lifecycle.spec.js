@@ -40,7 +40,7 @@ test.describe("Element lifecycle", () => {
     await park(page);
 
     await expect(page.locator("body")).toContainText("usually wrong");
-    // The card's previous-wording panel, headed "Revised in round N · Previous
+    // The card's previous-wording panel, headed "Revised at step N · Previous
     // wording", with the old text under it.
     await expect(page.locator("body")).toContainText(/Previous wording/i);
     await expect(page.locator("body")).toContainText(/revised/i);
@@ -84,22 +84,44 @@ test.describe("History playback", () => {
     const slider = page.locator('input[type="range"]');
     await expect(slider).toBeVisible();
 
-    // Round 0 is before anything was recorded, so nothing should be listed.
+    // Step 0 is before anything was recorded, so nothing should be listed.
     await slider.fill("0");
     await park(page);
     await expectCounts(page, { J: 0 });
 
-    // Round 2 is the first judgment only.
+    // Step 2 is the first judgment only.
     await slider.fill("2");
     await park(page);
     await expectCounts(page, { J: 1 });
     await expect(page.locator("body")).toContainText("added in round two");
     await expect(page.locator("body")).not.toContainText("added in round three");
 
-    // The last round is everything.
+    // The last step is everything.
     const max = await slider.getAttribute("max");
     await slider.fill(max);
     await park(page);
     await expectCounts(page, { J: 2 });
+  });
+
+  test("Rounds moves the slider a round at a time", async ({ page }) => {
+    await gotoHome(page);
+    await startFresh(page, "Rounds playback");
+    await addElement(page, "judgment", "Alone in the first round.");
+    await page.getByRole("button", { name: "Close round" }).click();
+    await addElement(page, "judgment", "First of the second round.");
+    await addElement(page, "judgment", "Second of the second round.");
+
+    await page.locator('button:has-text("History")').click();
+    await park(page);
+    await page.getByRole("button", { name: "Rounds", exact: true }).click();
+
+    const slider = page.locator('input[type="range"]');
+    await expect(slider).toHaveAttribute("max", "2");
+    await slider.fill("1");
+    await park(page);
+    await expectCounts(page, { J: 1 });
+    await slider.fill("2");
+    await park(page);
+    await expectCounts(page, { J: 3 });
   });
 });

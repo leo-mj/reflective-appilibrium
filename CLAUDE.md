@@ -112,11 +112,47 @@ withdrawing, reinstating or deleting any one of them applies to the whole argume
 Which pairs of element types may legally hold which relation is the full matrix in
 `skill/re-relations-reference.md`.
 
+### Steps and rounds
+
+Two units, decided in issue #36 (its third alternative):
+
+- **A step is one change** — an element or relation added, revised, withdrawn,
+  reinstated, rejected, a merge. `state.round` counts steps, and so does every
+  `addedRound`, `revisedRound` and history event `round`: **the fields keep their
+  names** because every saved file uses them, and no file needs migrating. One
+  step per change is what makes playback exact and undo one change at a time.
+- **A round is an iteration of the method**: a run of consecutive steps.
+  `state.roundEnds` lists the last step of each closed round, ascending; the
+  steps after the last one are the open round, numbered one past them. A round
+  closes **as a workflow iteration completes** (`advanceWorkflow` in `REState`)
+  or **by hand** — Close round beside the wide header's heading, ☰ on a phone —
+  and only once something has changed in it (`canCloseRound`). Closing one is an
+  undo step, but takes no step and writes no log entry: it records how the
+  changes are grouped, not a change.
+
+The reader sees both: the header reads "Round 3 · Step 23"; cards, the log, the
+history events and the export are stamped in steps; the export's log is grouped
+under round headings; History's slider moves by step or, switched to Rounds,
+stops at the end of each round, and the Z-score chart follows it. Read the rounds
+through the helpers in `utils/stateUtils.js` — `roundEndsOf`, `roundOfStep`,
+`currentRound`, `roundStops` — since `roundEnds` is absent from every state
+written before it existed, which then reads as one open round. The backend model
+carries it (`round_ends`), and the review prompt gives the model its timeline by
+round and step and asks for steps to be cited as steps.
+
+The sample process is eight rounds of many steps, numbered as the app would
+have recorded them: every change a step, an argument's premises sharing one, and
+within a round elements before relations before revisions and withdrawals. Its
+log keeps one entry per round, at the round's last step, and its review speaks
+of rounds. `rounds.test.js` holds it to that shape. Cards and node tooltips say
+when something was added as "Round 2 · Step 14" (`stepLabel`). A merge keeps the current process's rounds and drops
+the incoming one's, whose steps are not this process's.
+
 ### Groups
 
 A **group** is a set of elements the user has bracketed together to tidy the
 graph — `state.groups`, `app/src/utils/groupUtils.js`. It is a view device and
-nothing more: grouping does not advance the round, does not appear in the log,
+nothing more: grouping takes no step, does not appear in the log,
 and does not enter the coherence analysis. Don't confuse it with the *coherent
 cluster* of `utils/clusterUtils.js`, which is computed from the relations rather
 than chosen, and lives on its own tab.
@@ -138,7 +174,7 @@ read it through `groupsOf(state)`, never directly.
 
 Dragging a node on the Graph tab (mouse only; a finger pans) pins it where it
 is dropped — `state.pins`, `{ J1: { x, y } }`, `utils/pinUtils.js`, read through
-`pinsOf(state)`. Like a group it is a view device: no round, no log entry, not in
+`pinsOf(state)`. Like a group it is a view device: no step, no log entry, not in
 the coherence analysis. Unlike a group it is **not an undo step** either — the
 `pins` action in `useREActions` changes the present without recording it, and
 undo and redo carry the present's pins across (`carryPins`), so undoing an edit
@@ -235,13 +271,13 @@ moved), `surprises`, `missed` (coherence available and not taken), and `method`
 were reworded before acceptance, read off `origin` and `confidence`).
 
 Reviews **accumulate**, oldest first. A later run is given the earlier ones —
-the newest in full, the rest as round plus headline, which is what keeps the
+the newest in full, the rest as step plus headline, which is what keeps the
 prompt bounded — and is asked to say what has moved since and whether an
 opportunity an earlier review named was taken. That series is the feature; a
 single end-of-run summary cannot comment on the process's own development.
 
 Like grouping and for a sharper reason, accepting or discarding a review
-**does not advance the round and does not appear in the log**: a review is a
+**takes no step and does not appear in the log**: a review is a
 reading *of* the process, so recording it as a change would alter the record it
 describes — and would reach the next review's timeline as though it were a move
 in the argument. That is also what makes running one mid-process safe.
@@ -251,7 +287,7 @@ It is **not a phase of the iteration** — it is absent from
 **stop here every fifth iteration** (`REVIEW_EVERY`, `nextWorkflowPhase` in
 `utils/workflowUtils.js`), which is where the accumulating series comes from
 under a reader who only ever presses on. That is a stop *between* iterations,
-and the paragraph above is why it can be: passing through advances no round and
+and the paragraph above is why it can be: passing through takes no step and
 writes no log entry, so a review still cannot alter the record it describes.
 
 `state.reviews` is absent from every state written before the feature existed —
@@ -273,7 +309,7 @@ relations, so a tension it could find is one the other process had already drawn
 — never a disagreement between the two that nobody drew — and an empty list would
 read as reassurance it cannot give.
 
-The merge is **one round** of the current process: every incoming item arrives in
+The merge is **one step** of the current process: every incoming item arrives in
 it, as it stands at the end of its own process — withdrawn and rejected items as
 such, a revised one as `active` with the wording it reached. The incoming history,
 log and reviews are not replayed, since none of it happened *here*; playback would
@@ -289,8 +325,8 @@ process has already grouped. Questionnaire sessions cannot be merged on either s
 
 **Which process an element came from** stays visible afterwards: `state.processes`
 (`[{ id: "A", label, members, round }]`, lettered in merge order, labelled by
-topic, stamped with the merge's round) — read it through `processesOf(state)`,
-which leaves out processes merged after the state's own round, so playback and a
+topic, stamped with the merge's step) — read it through `processesOf(state)`,
+which leaves out processes merged after the state's own step, so playback and a
 `stateAtRound` projection show no letters before the merge that made them. Every
 node wears its letter (`"A+B"` when fused) on the Graph, History and Cluster tabs
 and in the exported SVGs; the legend and the export's "Merged Processes" section
@@ -316,7 +352,7 @@ common — that make the *same claim* in different words. `POST /api/merge/pairs
 returns; a model's say-so never puts a pair on screen. `state.processes` is not in
 the backend's state model, so the client sends it alongside the elements, and the
 tab re-checks each pair with `isMergeablePair` as the state moves on under it.
-Accepting one (`mergeElementPair` in `utils/elementMerge.js`) is one round: the
+Accepting one (`mergeElementPair` in `utils/elementMerge.js`) is one step: the
 reader picks which wording stays, may reword it (recorded as a revision) and sets
 its confidence; the other element is **removed outright**, its relations
 re-pointed at the kept one — loops and duplicates dropped, a joint argument that
@@ -402,7 +438,8 @@ naming the original type is for a human reader; the parser drops comments.
 
 ```javascript
 {
-  topic: String, phase: Number, round: Number,
+  topic: String, phase: Number, round: Number,   // `round` is the step
+  ?roundEnds: [Number],             // last step of each closed round
   ?model: "questionnaire",          // present only in questionnaire mode
   ?questionnaireSpec: {             // present only in questionnaire mode
     name: String,
@@ -427,7 +464,7 @@ helpers (`llmOrigin`, `withUserEdit`) — don't parse it by hand.
 
 ### Item history
 
-`status` on an element or relation is its state *now*. The round-by-round record
+`status` on an element or relation is its state *now*. The step-by-step record
 is `history`: an ordered list of `{ round, type, ?reason, ?previousText }` events,
 where `type` is `withdrawn`, `reinstated`, `revised`, or `rejected`. An item may
 be withdrawn and reinstated any number of times.

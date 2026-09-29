@@ -217,7 +217,7 @@ describe("StatusField", () => {
       <StatusField tag={{ type: "withdrawn", round: 5 }} />,
     );
     expect(container.querySelector("[data-stat]").dataset.stat).toBe("Status");
-    expect(container.textContent).toBe("StatusWithdrawn · Round 5");
+    expect(container.textContent).toBe("StatusWithdrawn · Step 5");
   });
 
   it("omits the round when nothing recorded it", () => {
@@ -277,7 +277,7 @@ describe("HistoryRoundBanner", () => {
     const { container } = render(
       <HistoryRoundBanner historyView={{ round: 3, maxRound: 9 }} />,
     );
-    expect(container.textContent).toBe("Round 3 of 9");
+    expect(container.textContent).toBe("Step 3 of 9");
   });
 
   it("marks the last round as current", () => {
@@ -318,7 +318,7 @@ describe("StatusLabel", () => {
     const { container } = render(
       <StatusLabel tag={{ type: "withdrawn", round: 5 }} />,
     );
-    expect(container.textContent).toBe("withdrawn · Round 5");
+    expect(container.textContent).toBe("withdrawn · Step 5");
   });
 
   it("omits the round when nothing recorded it", () => {

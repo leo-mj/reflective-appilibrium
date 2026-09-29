@@ -290,7 +290,7 @@ const TAG_COLOR = {
 };
 
 /**
- * The last thing that happened to an item, dated by the round it happened in.
+ * The last thing that happened to an item, dated by the step it happened at.
  * Renders nothing for an item nothing has happened to.
  *
  * @param {Object} props
@@ -303,14 +303,14 @@ export function StatusLabel({ tag }) {
   return (
     <MetaChip color={color}>
       {tag.type}
-      {tag.round ? ` · Round ${tag.round}` : ""}
+      {tag.round ? ` · Step ${tag.round}` : ""}
     </MetaChip>
   );
 }
 
 /**
  * What last happened to the item, as a stat field: "Status / Withdrawn ·
- * Round 8", coloured by the event. Renders nothing for an item nothing has
+ * Step 8", coloured by the event. Renders nothing for an item nothing has
  * happened to, so an untouched card carries no such column at all.
  *
  * @param {Object} props
@@ -320,7 +320,7 @@ export function StatusField({ tag }) {
   const color = TAG_COLOR[tag?.type];
   if (!color) return null;
   const word = `${tag.type[0].toUpperCase()}${tag.type.slice(1)}`;
-  const text = `${word}${tag.round ? ` · Round ${tag.round}` : ""}`;
+  const text = `${word}${tag.round ? ` · Step ${tag.round}` : ""}`;
   return (
     <StatField label="Status" color={color} title={text}>
       {text}
@@ -598,7 +598,7 @@ export function PreviousWording({ text, round }) {
       }}
     >
       <div style={{ ...STAT_LABEL_STYLE, color: C.revised, marginBottom: 2 }}>
-        {round ? `Revised in round ${round} · ` : ""}Previous wording
+        {round ? `Revised at step ${round} · ` : ""}Previous wording
       </div>
       <div
         style={{ fontSize: CONTENT_FONT_SIZE, color: C.dim, lineHeight: 1.6 }}
@@ -612,16 +612,17 @@ export function PreviousWording({ text, round }) {
 // ─── History round banner ─────────────────────────────────────────────────────
 
 /**
- * Sticky marker naming the round the panel is showing. Only rendered while the
+ * Sticky marker naming the step the panel is showing, and its round. Only rendered while the
  * history slider is driving it — without this the text reads as the live state,
  * which is wrong in every round but the last.
  *
  * @param {Object} props
- * @param {{ round: number, maxRound: number }|null} props.historyView
+ * @param {{ round: number, maxRound: number, inRound?: number }|null} props.historyView
+ *   `round` and `maxRound` are steps; `inRound` is the round that step is in.
  */
 export function HistoryRoundBanner({ historyView }) {
   if (!historyView) return null;
-  const { round, maxRound } = historyView;
+  const { round, maxRound, inRound } = historyView;
   return (
     <div
       style={{
@@ -639,8 +640,8 @@ export function HistoryRoundBanner({ historyView }) {
       }}
     >
       {round === 0
-        ? `Round 0 of ${maxRound} — before anything was recorded`
-        : `Round ${round} of ${maxRound}${round === maxRound ? " — current" : ""}`}
+        ? `Step 0 of ${maxRound} — before anything was recorded`
+        : `Step ${round} of ${maxRound}${inRound ? ` · Round ${inRound}` : ""}${round === maxRound ? " — current" : ""}`}
     </div>
   );
 }

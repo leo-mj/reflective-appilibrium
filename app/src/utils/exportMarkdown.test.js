@@ -60,8 +60,8 @@ describe("buildMarkdown history trail", () => {
       {},
     );
     const block = elementsBlock(md);
-    expect(block).toContain('Round 3: reworded from "First wording"');
-    expect(block).toContain('Round 6: reworded from "Second wording"');
+    expect(block).toContain('Step 3: reworded from "First wording"');
+    expect(block).toContain('Step 6: reworded from "Second wording"');
   });
 
   it("records withdrawal with its reason, and reinstatement", () => {
@@ -80,8 +80,8 @@ describe("buildMarkdown history trail", () => {
       {},
     );
     const block = elementsBlock(md);
-    expect(block).toContain("Round 2: withdrawn — Too broad");
-    expect(block).toContain("Round 5: reinstated");
+    expect(block).toContain("Step 2: withdrawn — Too broad");
+    expect(block).toContain("Step 5: reinstated");
   });
 
   it("reads the legacy fields for states saved before history existed", () => {
@@ -98,7 +98,7 @@ describe("buildMarkdown history trail", () => {
       }),
       {},
     );
-    expect(elementsBlock(md)).toContain("Round 4: withdrawn — No longer held");
+    expect(elementsBlock(md)).toContain("Step 4: withdrawn — No longer held");
   });
 
   it("tags a rejected element, which the export used to leave unmarked", () => {
@@ -133,14 +133,14 @@ describe("buildMarkdown history trail", () => {
       }),
       {},
     );
-    expect(md).toContain("  - Round 4: withdrawn");
-    expect(md).toContain("  - Round 7: reinstated");
+    expect(md).toContain("  - Step 4: withdrawn");
+    expect(md).toContain("  - Step 7: reinstated");
   });
 
   it("leaves an untouched element with no trail", () => {
     const block = elementsBlock(buildMarkdown(makeState(), {}));
     expect(block).toContain("Current wording");
-    expect(block).not.toContain("Round ");
+    expect(block).not.toContain("Step ");
   });
 
   it("still embeds the machine-readable state block", () => {
@@ -191,8 +191,8 @@ describe("buildMarkdown process reviews", () => {
       {},
     );
     expect(md).toContain("## Process Reviews");
-    expect(md).toContain("### Round 3 — First reading.");
-    expect(md).toContain("### Round 7 — Second reading.");
+    expect(md).toContain("### Step 3 — First reading.");
+    expect(md).toContain("### Step 7 — Second reading.");
     // Oldest first, so a later review's back-references land after what they
     // refer to rather than before it.
     expect(md.indexOf("First reading.")).toBeLessThan(md.indexOf("Second reading."));
@@ -390,7 +390,7 @@ describe("buildMarkdown merged processes", () => {
   it("keys the letters the graph images carry", () => {
     const md = buildMarkdown(merged, {});
     expect(md).toContain("## Merged Processes");
-    expect(md).toContain("- **A** — Lying *(merged in round 5)*: J1");
+    expect(md).toContain("- **A** — Lying *(merged at step 5)*: J1");
   });
 
   it("says nothing about processes when there was no merge", () => {

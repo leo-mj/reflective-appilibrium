@@ -36,7 +36,7 @@ const ANNOTATIONS = {
     row: 2,
   },
   "tab-history": {
-    text: "Replay your RE process round by round using the history slider.",
+    text: "Replay your RE process step by step, or round by round, with the history slider.",
     row: 0,
   },
   "tab-clusters": {

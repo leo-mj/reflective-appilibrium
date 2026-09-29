@@ -102,6 +102,7 @@ function ClusterGraph({
 
   return (
     <GraphCanvas
+      roundEnds={state.roundEnds}
       containerRef={containerRef}
       dims={dims}
       pan={pan}

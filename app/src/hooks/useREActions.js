@@ -14,6 +14,7 @@ import {
   previewMerge,
 } from "../utils/mergeStates.js";
 import { mergeElementPair } from "../utils/elementMerge.js";
+import { canCloseRound, roundEndsOf } from "../utils/stateUtils.js";
 import { useElementActions } from "./useElementActions.js";
 import { carryPins, pinsOf, withPins, withoutPins } from "../utils/pinUtils.js";
 import { useGroupActions } from "./useGroupActions.js";
@@ -127,6 +128,20 @@ export function useREActions(initialState) {
    */
   const handleResetLayout = () =>
     mutate((prev) => withoutPins(prev, Object.keys(pinsOf(prev))));
+
+  /**
+   * Closes the open round at the latest step — by hand, or as a workflow
+   * iteration completes. An undo step, so a mistaken close can be taken back;
+   * but not a step of its own and not a log entry, since it records how the
+   * changes are grouped rather than a change. A round with nothing in it is
+   * not closed.
+   */
+  const handleCloseRound = () => {
+    // Checked here as well as in the updater: an empty undo step is a press of
+    // Undo that does nothing.
+    if (!canCloseRound(state)) return;
+    mutate((prev) => ({ ...prev, roundEnds: [...roundEndsOf(prev), prev.round] }));
+  };
 
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
@@ -320,6 +335,8 @@ export function useREActions(initialState) {
     canRedo,
     handlePinNodes,
     handleResetLayout,
+    handleCloseRound,
+    canCloseRound: canCloseRound(state),
     ...elementActions,
     ...relationActions,
     ...groupActions,

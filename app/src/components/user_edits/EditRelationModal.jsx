@@ -68,7 +68,7 @@ export function EditRelationModal({
   // an argument it would have marked every premise revised.
   const unchanged = !makeDiff(RELATION_EDIT_FIELDS, relation, form).length;
 
-  const nextRound = `create Round ${currentRound + 1}`;
+  const nextRound = `record it as step ${currentRound + 1}`;
 
   if (argument) {
     const negated = form.type.endsWith("precludes");

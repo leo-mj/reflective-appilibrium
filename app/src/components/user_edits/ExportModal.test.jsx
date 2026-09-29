@@ -65,7 +65,7 @@ describe("ExportModal", () => {
 
   it("will not download an empty file", () => {
     const onExport = setup({ sections: EXPORT_SECTIONS.filter((s) => s.key === "log") });
-    fireEvent.click(box("Round log"));
+    fireEvent.click(box("Log"));
     expect(screen.getByRole("button", { name: "Download" }).disabled).toBe(true);
     download();
     expect(onExport).not.toHaveBeenCalled();

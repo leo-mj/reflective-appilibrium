@@ -82,6 +82,8 @@ export function StatementToggle({ on, onToggle }) {
  * @param {Function}            [props.onDoubleClick] - On the SVG itself.
  * @param {React.ReactNode}     [props.viewControls] - Drawn above the zoom buttons.
  * @param {Object|null}         props.tooltip
+ * @param {number[]}            [props.roundEnds] - The process's round
+ *   boundaries, so the tooltip can say which round a step was in.
  * @param {React.CSSProperties} [props.containerStyle]
  * @param {React.ReactNode}     [props.overlay]
  * @param {React.ReactNode}     [props.children]
@@ -105,6 +107,7 @@ export function GraphCanvas({
   viewControls,
   tooltip,
   tooltipActions,
+  roundEnds,
   containerStyle,
   overlay,
   children,
@@ -181,7 +184,11 @@ export function GraphCanvas({
           {viewControls}
           {onFit && (
             <Tooltip text="Fit the whole graph (or double-click the background)">
-              <button style={ZOOM_BTN} onClick={onFit} aria-label="Fit graph to view">
+              <button
+                style={ZOOM_BTN}
+                onClick={onFit}
+                aria-label="Fit graph to view"
+              >
                 <FitIcon size={20} />
               </button>
             </Tooltip>
@@ -198,7 +205,11 @@ export function GraphCanvas({
           </Tooltip>
         </div>
       )}
-      <NodeTooltip tooltip={tooltip} actions={tooltipActions} />
+      <NodeTooltip
+        tooltip={tooltip}
+        actions={tooltipActions}
+        roundEnds={roundEnds}
+      />
       {overlay}
     </div>
   );

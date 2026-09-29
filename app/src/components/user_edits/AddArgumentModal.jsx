@@ -101,7 +101,7 @@ export function AddArgumentModal({
   return (
     <ModalShell
       title="Add argument"
-      subtitle={`Will be added in Round ${currentRound + 1}`}
+      subtitle={`Will be added as step ${currentRound + 1}`}
       onCancel={onCancel}
       onSave={() => onSave({ premises, conclusion, negated, explanation })}
       onClear={clear}

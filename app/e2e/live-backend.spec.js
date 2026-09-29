@@ -84,7 +84,7 @@ test.describe("Against the real backend", () => {
     const scored = page.waitForResponse(route("score_per_round"), {
       timeout: 120_000,
     });
-    await page.getByRole("button", { name: "Calculate Z-scores per round" }).click();
+    await page.getByRole("button", { name: "Calculate Z-scores" }).click();
     const res = await scored;
     // A refusal says why: this is how a 422 over an empty round-0 projection
     // — History scoring what it was showing rather than the whole process —
@@ -98,7 +98,7 @@ test.describe("Against the real backend", () => {
 
     // The button gives way to the chart it draws from the answer.
     await expect(
-      page.getByRole("button", { name: "Calculate Z-scores per round" }),
+      page.getByRole("button", { name: "Calculate Z-scores" }),
     ).toHaveCount(0, { timeout: 60_000 });
   });
 });

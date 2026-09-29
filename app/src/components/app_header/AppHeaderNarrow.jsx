@@ -43,6 +43,9 @@ const MENU_TOP_ALLOWANCE = 96;
 
 export function AppHeaderNarrow({
   round,
+  step,
+  onCloseRound,
+  canCloseRound,
   topic,
   tab,
   setTab,
@@ -153,7 +156,7 @@ export function AppHeaderNarrow({
               margin: 0,
             }}
           >
-            Round {round}
+            Round {round} · Step {step}
           </h1>
           <TopicLabel
             topic={topic}
@@ -351,6 +354,15 @@ export function AppHeaderNarrow({
               <button onClick={close(onResetLayout)} style={menuBtn()}>
                 <span style={menuIconStyle}>⟲</span>
                 {MENU_LABELS.resetLayout}
+              </button>
+            )}
+            {/* The wide header's Close round, which has no room beside the
+                heading here; offered while the round has anything in it, as
+                Reset layout is while anything is pinned. */}
+            {onCloseRound && canCloseRound && (
+              <button onClick={close(onCloseRound)} style={menuBtn()}>
+                <span style={menuIconStyle}>⏹</span>
+                {MENU_LABELS.closeRound} {round}
               </button>
             )}
             {BACKEND_ENABLED && (

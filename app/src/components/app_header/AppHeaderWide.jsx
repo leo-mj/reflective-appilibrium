@@ -31,6 +31,7 @@ import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
 import { useLLMSettings, useLLMSettingsRequested } from "../../utils/llmKey.js";
 import { useMenuEscape } from "../../hooks/useMenuEscape.js";
+import { CloseRoundButton } from "./CloseRoundButton.jsx";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { PrivacyModal } from "./PrivacyModal.jsx";
 import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
@@ -44,6 +45,9 @@ import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
  */
 export function AppHeaderWide({
   round,
+  step,
+  onCloseRound,
+  canCloseRound,
   topic,
   tab,
   setTab,
@@ -174,19 +178,30 @@ export function AppHeaderWide({
           </a>
           {/* Decorative: the app is already named in the heading beside it. */}
           <img src="favicon.svg" alt="" style={{ height: 36 }} />
-          <div>
-            <h1
-              style={{
-                fontSize: 16,
-                fontWeight: "bold",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                margin: 0,
-              }}
-            >
-              Reflective Equilibrium — Round {round}
-            </h1>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h1
+                style={{
+                  fontSize: 16,
+                  fontWeight: "bold",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  margin: 0,
+                }}
+              >
+                {/* Round first: it is the unit of the method. The step counts
+                    changes, and is what History and the cards are stamped in. */}
+                Reflective Equilibrium — Round {round} · Step {step}
+              </h1>
+              {onCloseRound && (
+                <CloseRoundButton
+                  round={round}
+                  enabled={canCloseRound}
+                  onClose={onCloseRound}
+                />
+              )}
+            </div>
             {/* Ringed by the tour when it introduces the question. */}
             <div data-tutorial="topic">
               <TopicLabel

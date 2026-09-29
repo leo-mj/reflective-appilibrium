@@ -30,9 +30,9 @@ the run with "Closing rpc while onUserConsoleLog was pending".
 
 The exception is Playwright's `live-backend` project, which starts the real
 FastAPI server and runs the SPA against it — see `e2e/README.md`. **History's
-"Calculate Z-scores per round" scores the whole process** (`wholeProcess`, from
+"Calculate Z-scores" scores the whole process** (`wholeProcess`, from
 `REState`), not the text panel's `state`, which on the History tab is the
-projection at the round being played: on arrival that is round 0 with nothing in
+projection at the step being played: on arrival that is step 0 with nothing in
 it, which the server refuses, and later it held only the rounds played so far.
 The chart marks the played round and dims those after it itself. That live
 project is what found it.
@@ -855,7 +855,7 @@ text read-only — so written and existing statements mix freely; a line keeps i
 typed text while pointed at an element. It submits through
 `handleAddNewArgument` (`useRelationActions`), which takes `{ id }` for a picked
 line and adds only the new ones — not a run
-of `onAddElement` calls — one round, one log entry, one undo, and ids numbered
+of `onAddElement` calls — one step, one log entry, one undo, and ids numbered
 against the whole element list, since the bar's `linkableElements` leaves out
 `possible` ones whose ids are still taken. The tab opens on Write, which covers
 both; a ctrl+click chain switches to Pick.

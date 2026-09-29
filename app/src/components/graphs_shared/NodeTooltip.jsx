@@ -12,6 +12,7 @@
 import { createPortal } from "react-dom";
 import { C } from "../../constants/colors.js";
 import { confidenceDetail } from "../../utils/confidenceLabel.js";
+import { stepLabel } from "../../utils/stateUtils.js";
 
 /**
  * @typedef {Object} TooltipState
@@ -34,9 +35,11 @@ import { confidenceDetail } from "../../utils/confidenceLabel.js";
  * @param {React.ReactNode}   [props.actions] - Buttons for a pinned tooltip. Their
  *   presence is what makes the card interactive; a hover tooltip stays
  *   click-through so it never swallows a click meant for the canvas.
+ * @param {number[]}          [props.roundEnds] - For naming the round a step
+ *   was in; absent reads as one round, as it does everywhere.
  * @returns {React.ReactElement|null}
  */
-export function NodeTooltip({ tooltip, actions = null }) {
+export function NodeTooltip({ tooltip, actions = null, roundEnds }) {
   if (!tooltip) return null;
   const { x, y, el } = tooltip;
   // Clamp x so the tooltip (maxWidth 300 → half = 150) stays within the viewport.
@@ -126,7 +129,8 @@ export function NodeTooltip({ tooltip, actions = null }) {
           {/* Already a hover surface, so the exact value goes inline rather than
               behind a title nobody could reach. */}
           Confidence: {confidenceDetail(el.confidence)} · Origin: {el.origin}
-          {el.addedRound && ` · Added: Round ${el.addedRound}`}
+          {el.addedRound &&
+            ` · Added: ${stepLabel({ roundEnds }, el.addedRound)}`}
         </div>
       )}
       {actions && (

@@ -134,7 +134,7 @@ test.describe("Process review", () => {
     expect(markdown).toContain("## Process Reviews");
     // Oldest first, so a later review's back-references land after what they
     // refer to; two headings, one per accepted review.
-    expect(markdown.match(/^### Round \d+ — /gm)).toHaveLength(2);
+    expect(markdown.match(/^### Step \d+ — /gm)).toHaveLength(2);
     expect(markdown).toContain("**How the position moved**");
     // And the machine-readable block, which is what makes it re-importable.
     const state = JSON.parse(markdown.split("```re-state\n")[1].split("\n```")[0]);

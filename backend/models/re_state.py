@@ -375,7 +375,14 @@ class REState(BaseModel):
 
     topic: str = Field(max_length=500, default="")
     phase: int = Field(default=2, ge=1)
+    # A *step*, one per change, despite the name: every saved file uses it. The
+    # rounds a reader sees are runs of steps, and ``round_ends`` lists the last
+    # step of each closed one — "Steps and rounds" in app/src/utils/stateUtils.js.
+    # Absent from states written before rounds and steps were told apart.
     round: int = Field(ge=1)
+    round_ends: list[int] = Field(
+        default_factory=list, alias="roundEnds", max_length=1_000
+    )
     model: Optional[Literal["questionnaire"]] = None
     elements: list[REElement] = Field(default_factory=list, max_length=1_000)
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)

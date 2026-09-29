@@ -273,7 +273,7 @@ export function buildArgdown(state) {
   const frontmatter = [
     "===",
     `title: ${JSON.stringify(state.topic ?? "")}`,
-    `subTitle: ${JSON.stringify(`Reflective equilibrium, round ${state.round}, ${date}`)}`,
+    `subTitle: ${JSON.stringify(`Reflective equilibrium, step ${state.round}, ${date}`)}`,
     "===",
   ].join("\n");
 
@@ -302,7 +302,7 @@ export function buildArgdown(state) {
 export function downloadArgdown(state) {
   const argdown = buildArgdown(state);
   const slug = state.topic.slice(0, 30).replace(/\s+/g, "-").toLowerCase();
-  const filename = `re-${slug}-round${state.round}.argdown`;
+  const filename = `re-${slug}-step${state.round}.argdown`;
 
   const blob = new Blob([argdown], { type: "text/plain" });
   const url = URL.createObjectURL(blob);

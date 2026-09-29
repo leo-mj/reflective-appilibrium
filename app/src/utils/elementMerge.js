@@ -125,7 +125,7 @@ export function samplePairs(state, processes) {
 }
 
 /**
- * Merges `removeId` into `keepId` as one round.
+ * Merges `removeId` into `keepId` as one step.
  *
  * The kept element keeps its id, status and history; its wording and confidence
  * become what the reader settled on, and a change of wording is recorded as a

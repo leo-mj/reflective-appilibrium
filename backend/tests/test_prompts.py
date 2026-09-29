@@ -94,7 +94,7 @@ def test_judgments_prompt_marks_empty_log_section():
     # A non-empty log whose entries all lack findings must still render "(none)":
     # the fallback has to test the joined text, not the source list.
     prompt = build_judgments_prompt("t", [el()], [RELogEntry(round=1, findings="")])
-    section = prompt.split("Recent round notes:")[1].split("Task:")[0]
+    section = prompt.split("Recent notes, by step:")[1].split("Task:")[0]
     assert "(none)" in section
 
 
@@ -189,9 +189,9 @@ def test_review_prompt_renders_the_whole_history_trail():
         ],
     )
     prompt = build_review_prompt(REState(round=5, elements=[element]))
-    assert 'R2 withdrawn — "Too broad."' in prompt
-    assert "R3 reinstated" in prompt
-    assert 'R4 withdrawn — "Still too broad."' in prompt
+    assert 'step 2 withdrawn — "Too broad."' in prompt
+    assert "step 3 reinstated" in prompt
+    assert 'step 4 withdrawn — "Still too broad."' in prompt
 
 
 def test_review_prompt_renders_the_wording_a_revision_replaced():
@@ -203,7 +203,7 @@ def test_review_prompt_renders_the_wording_a_revision_replaced():
         ],
     )
     prompt = build_review_prompt(REState(round=3, elements=[element]))
-    assert 'R2 revised — was: "OLD WORDING"' in prompt
+    assert 'step 2 revised — was: "OLD WORDING"' in prompt
 
 
 def test_review_prompt_migrates_the_legacy_scalar_history():
@@ -212,8 +212,8 @@ def test_review_prompt_migrates_the_legacy_scalar_history():
     # migrating, the timeline of an old session shows additions and nothing else.
     element = el("J1", status="withdrawn", withdrawnRound=3, reason="Gave it up.")
     prompt = build_review_prompt(REState(round=4, elements=[element]))
-    assert 'R3 withdrawn — "Gave it up."' in prompt
-    assert "Round 3: withdrawn J1" in prompt
+    assert 'step 3 withdrawn — "Gave it up."' in prompt
+    assert "Step 3: withdrawn J1" in prompt
 
 
 def test_review_prompt_carries_origin_for_the_method_section():
@@ -224,8 +224,8 @@ def test_review_prompt_carries_origin_for_the_method_section():
     assert "origin: claude-fable-5 & user" in prompt
 
 
-def test_review_prompt_timeline_covers_rounds_the_log_is_silent_about():
-    # A round in which only relations moved gets no log entry, but it is still
+def test_review_prompt_timeline_covers_steps_the_log_is_silent_about():
+    # A step in which only relations moved gets no log entry, but it is still
     # part of the process's shape.
     state = REState(
         round=3,
@@ -237,7 +237,30 @@ def test_review_prompt_timeline_covers_rounds_the_log_is_silent_about():
         ],
     )
     prompt = build_review_prompt(state)
-    assert "Round 3: added J1 --supports--> J2" in prompt
+    assert "Step 3: added J1 --supports--> J2" in prompt
+
+
+# Steps are changes; rounds are runs of them the reader closed. A review citing
+# a step as a round names a moment the app shows under a different number.
+def test_review_prompt_groups_the_timeline_by_round():
+    state = REState(
+        round=4,
+        roundEnds=[2],
+        elements=[
+            el(f"J{n}").model_copy(update={"added_round": n}) for n in range(1, 5)
+        ],
+    )
+    timeline = build_review_prompt(state).split("### Timeline, by round and step")[1]
+    timeline = timeline.split("### Earlier reviews")[0]
+    round_one, round_two = timeline.split("Round 1:")[1].split("Round 2:")
+    assert "Step 1: added J1" in round_one and "Step 2: added J2" in round_one
+    assert "Step 3: added J3" in round_two and "Step 4: added J4" in round_two
+
+
+def test_review_prompt_says_what_steps_and_rounds_are():
+    prompt = build_review_prompt(REState(round=5, roundEnds=[2, 4], elements=[el()]))
+    assert "5 steps so far, in 3 rounds" in prompt
+    assert 'cite it as "step N"' in prompt
 
 
 def test_review_prompt_marks_an_empty_earlier_reviews_section():
@@ -274,7 +297,7 @@ def test_review_prompt_asks_for_continuity_only_when_there_is_a_thread():
 def test_review_prompt_states_its_constraints():
     prompt = build_review_prompt(REState(round=2, elements=[el()]))
     assert "must not exceed 500 words" in prompt
-    assert "Do not recap the rounds one by one" in prompt
+    assert "Do not recap the steps or rounds one by one" in prompt
     assert "Do not judge the moral positions" in prompt
 
 

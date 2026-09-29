@@ -262,10 +262,10 @@ describe("saved reviews", () => {
   });
 
   it("says which round a review covers once the process has moved past it", () => {
-    // A review taken at round 2 is not a description of where things stand at
-    // round 4, and the list is the only place that can say so.
+    // A review taken at step 2 is not a description of where things stand at
+    // step 4, and the list is the only place that can say so.
     renderTab({ state: aState({ round: 4, reviews: [savedReview({ round: 2 })] }) });
-    expect(screen.getByText(/Round 2 of 4/)).toBeTruthy();
+    expect(screen.getByText(/Step 2 of 4/)).toBeTruthy();
   });
 
   it("discards by id", () => {

@@ -119,7 +119,8 @@ export const TAB_TOOLTIPS = {
     "Answer a questionnaire based on pre-set questions to conduct a guided RE process.",
   graph:
     "Force-directed graph. Click a node to select; Ctrl+click to start a relation.",
-  history: "Replay your RE process round by round using the history slider.",
+  history:
+    "Replay your RE process step by step, or round by round, with the history slider.",
   clusters:
     "Coherence clusters — the largest possible groups of connected elements with no conflicts.",
   elicitJudgments: "AI helps you surface and refine your moral judgments.",

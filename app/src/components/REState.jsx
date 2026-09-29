@@ -5,7 +5,12 @@ import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useIsWide, useWindowSize } from "../hooks/useWindowSize.js";
 import { useCoarseDims } from "../hooks/useCoarseDims.js";
 import { useSplitRatio } from "../hooks/useSplitRatio.js";
-import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
+import {
+  stateAtRound,
+  linkableElements,
+  currentRound,
+  roundOfStep,
+} from "../utils/stateUtils.js";
 import { pinsOf } from "../utils/pinUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { useAutosaveDraft } from "../hooks/useAutosaveDraft.js";
@@ -78,6 +83,9 @@ export default function REState({
   const [allExpanded, setAllExpanded] = useState(true);
   const [assistSidePanel, setAssistSidePanel] = useState("graph");
   const [historyRound, setHistoryRound] = useState(0);
+  // What History's slider moves by. Held here because the text panel's Z-score
+  // chart beside it follows the same choice.
+  const [historyUnit, setHistoryUnit] = useState("step");
   const [workflowPhase, setWorkflowPhase] = useState(null);
   const [addBarCtrlChain, setAddBarCtrlChain] = useState(null);
   const [workflowLoops, setWorkflowLoops] = useState(0);
@@ -176,6 +184,8 @@ export default function REState({
     canRedo,
     handlePinNodes,
     handleResetLayout,
+    handleCloseRound,
+    canCloseRound,
   } = useREActions(initialState);
 
   // Not the sample: it is a fixed demonstration anyone can reload from the home
@@ -343,8 +353,13 @@ export default function REState({
     // Counted on leaving the iteration's last phase, not on arriving at its
     // first — the review sits between the two, and an iteration the workflow
     // pauses to read must still count as one that happened.
-    if (completesIteration(workflowPhase, hideNonEntailsRels))
+    // It is also where a round closes: a round is an iteration of the method
+    // (stateUtils, "Steps and rounds"), and this is the one place the app knows
+    // an iteration is over.
+    if (completesIteration(workflowPhase, hideNonEntailsRels)) {
       setWorkflowLoops((n) => n + 1);
+      handleCloseRound();
+    }
     setWorkflowPhase(workflowNextPhase);
     setTab(workflowNextPhase);
   };
@@ -442,7 +457,14 @@ export default function REState({
     // Present only while the history slider is driving the panel, so the text
     // makes clear it is a past round rather than the live state.
     historyView:
-      tab === "history" ? { round: historyRound, maxRound: state.round } : null,
+      tab === "history"
+        ? {
+            round: historyRound,
+            maxRound: state.round,
+            inRound: roundOfStep(state, historyRound),
+            unit: historyUnit,
+          }
+        : null,
   };
 
   const graphPanelCommonProps = {
@@ -485,6 +507,8 @@ export default function REState({
       tab === "simulateRethon" ? equilibriumPreviewWithdrawnIds : null,
     onSetEquilibriumPreview: setEquilibriumPreviewWithdrawnIds,
     onRoundChange: setHistoryRound,
+    historyUnit,
+    onHistoryUnitChange: setHistoryUnit,
     focus: graphFocus,
     isWide,
     onCtrlChainSelect: setAddBarCtrlChain,
@@ -665,7 +689,10 @@ export default function REState({
         </div>
       )}
       <AppHeader
-        round={state.round}
+        round={currentRound(state)}
+        step={state.round}
+        onCloseRound={handleCloseRound}
+        canCloseRound={canCloseRound}
         topic={state.topic}
         model={state.model}
         tab={tab}

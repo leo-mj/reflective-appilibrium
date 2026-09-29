@@ -19,7 +19,11 @@ import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
 
 /**
  * @param {Object}   props
- * @param {number}   props.round
+ * @param {number}   props.round - The round open now (stateUtils, "Steps and
+ *   rounds"), which is not `state.round`: that is the step.
+ * @param {number}   props.step
+ * @param {function} [props.onCloseRound] - Closes the open round.
+ * @param {boolean}  [props.canCloseRound] - Whether it has anything in it.
  * @param {string}   props.topic
  * @param {string}   props.tab
  * @param {function} props.setTab
@@ -78,6 +82,9 @@ import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
  */
 export function AppHeader({
   round,
+  step,
+  onCloseRound,
+  canCloseRound = false,
   topic,
   model,
   tab,
@@ -296,6 +303,9 @@ export function AppHeader({
 
   const shared = {
     round,
+    step,
+    onCloseRound,
+    canCloseRound,
     topic,
     tab,
     setTab,

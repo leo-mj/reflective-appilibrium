@@ -15,14 +15,18 @@ export const SCORE_SERIES = [
 ];
 
 /**
- * Compact SVG line chart of equilibrium Z-scores across workflow rounds.
+ * Compact SVG line chart of equilibrium Z-scores across the process.
  * A dashed vertical marker follows the playback slider position.
+ *
+ * `round` on each point is whatever unit the slider counts — steps, or rounds
+ * (stateUtils, "Steps and rounds") — and `unitLabel` names it.
  *
  * @param {Object} props
  * @param {Array<{round: number, scores: Object|null}>} props.roundScores
- * @param {number} props.snappedRound  — current round for the vertical marker
+ * @param {number} props.snappedRound  — where playback is, for the marker
+ * @param {string} [props.unitLabel]   — "Step" or "Round"
  */
-export function RoundScoresChart({ roundScores, snappedRound }) {
+export function RoundScoresChart({ roundScores, snappedRound, unitLabel = "Step" }) {
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [tooltip, setTooltip] = useState(null);
@@ -56,7 +60,7 @@ export function RoundScoresChart({ roundScores, snappedRound }) {
   if (points.length < 2) {
     return (
       <div ref={containerRef} style={{ width: "100%", fontSize: 11, color: C.dim, paddingBottom: 4 }}>
-        Not enough data to chart (need arguments in at least 2 rounds).
+        Not enough data to chart (need arguments in at least 2 {unitLabel.toLowerCase()}s).
       </div>
     );
   }
@@ -223,7 +227,7 @@ export function RoundScoresChart({ roundScores, snappedRound }) {
             zIndex: 10,
           }}
         >
-          <span style={{ color: C.dim }}>Round {tooltip.round} · </span>
+          <span style={{ color: C.dim }}>{unitLabel} {tooltip.round} · </span>
           <span style={{ color: tooltip.color, fontWeight: "bold" }}>{tooltip.label}</span>{" "}
           <span style={{ color: C.text }}>{tooltip.value.toFixed(3)}</span>
         </div>

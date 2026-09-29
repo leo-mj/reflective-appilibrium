@@ -129,16 +129,33 @@ test.describe("Adding elements", () => {
     expect(labels).toContain("P1");
   });
 
-  test("every edit opens a new round", async ({ page }) => {
+  // A step per change; the round stays open until it is closed.
+  test("every edit is a step, within the open round", async ({ page }) => {
     await gotoHome(page);
-    await startFresh(page, "Round counting");
-    await expect(page.locator("h1")).toContainText("Round 1");
+    await startFresh(page, "Step counting");
+    await expect(page.locator("h1")).toContainText("Round 1 · Step 1");
 
     await addElement(page, "judgment", "First judgment in this process.");
-    await expect(page.locator("h1")).toContainText("Round 2");
+    await expect(page.locator("h1")).toContainText("Round 1 · Step 2");
 
     await addElement(page, "judgment", "Second judgment in this process.");
-    await expect(page.locator("h1")).toContainText("Round 3");
+    await expect(page.locator("h1")).toContainText("Round 1 · Step 3");
+  });
+
+  test("Close round starts the next round, and only once there is something in it", async ({ page }) => {
+    await gotoHome(page);
+    await startFresh(page, "Closing rounds");
+    const close = page.getByRole("button", { name: "Close round" });
+    await expect(close).toBeDisabled();
+
+    await addElement(page, "judgment", "A judgment for the first round.");
+    await close.click();
+    await expect(page.locator("h1")).toContainText("Round 2 · Step 2");
+    await expect(close).toBeDisabled();
+
+    await addElement(page, "judgment", "A judgment for the second round.");
+    await expect(page.locator("h1")).toContainText("Round 2 · Step 3");
+    await expect(close).toBeEnabled();
   });
 });
 

@@ -14,6 +14,7 @@ import {
   isWorthResuming,
   loadDraft,
 } from "../utils/draftStorage.js";
+import { currentRound } from "../utils/stateUtils.js";
 import {
   DEFAULT_EXPORT_SECTIONS,
   downloadMarkdown,
@@ -158,7 +159,8 @@ function ResumeCard({ draft, onResume, onDiscard }) {
       <div style={DESC_STYLE}>
         <strong style={{ color: C.text }}>{state.topic || "Untitled"}</strong>
         <br />
-        Round {state.round} · {state.elements.length} element
+        Round {currentRound(state)} · Step {state.round} ·{" "}
+        {state.elements.length} element
         {state.elements.length === 1 ? "" : "s"}
         {when ? ` · saved ${when}` : ""}
         <br />
@@ -216,7 +218,7 @@ function ReplaceDraftDialog({ draft, topic, onReplace, onCancel }) {
       title="Replace the process you left off?"
       subtitle={
         `This browser keeps one unfinished process. Starting “${topic}” ` +
-        `replaces “${state.topic || "Untitled"}” (round ${state.round}, ` +
+        `replaces “${state.topic || "Untitled"}” (round ${currentRound(state)}, step ${state.round}, ` +
         `${count} element${count === 1 ? "" : "s"}).`
       }
       onCancel={onCancel}

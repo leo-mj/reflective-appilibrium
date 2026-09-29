@@ -47,7 +47,7 @@ export function EditModal({ element, currentRound, onSave, onCancel }) {
   return (
     <ModalShell
       title={`Revise ${element.id}`}
-      subtitle={`Saving will mark this element as revised and create Round ${currentRound + 1}`}
+      subtitle={`Saving will mark this element as revised, as step ${currentRound + 1}`}
       onCancel={onCancel}
       onSave={() => onSave(form)}
       saveDisabled={unchanged}

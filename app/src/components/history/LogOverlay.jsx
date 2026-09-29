@@ -68,7 +68,7 @@ export function LogOverlay({ sortedLog, snappedRound, logRef, currentLogRef }) {
                 color: isCurrent ? C.supports : C.dim,
               }}
             >
-              Round {entry.round}:
+              Step {entry.round}:
             </span>{" "}
             {entry.changes}
           </div>

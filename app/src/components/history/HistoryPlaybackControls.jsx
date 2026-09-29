@@ -101,13 +101,61 @@ function PlaybackSlider({
 // ─── PlaybackControls ─────────────────────────────────────────────────────────
 
 /**
- * Toolbar row: Reset, Play/Pause, speed buttons, slider, round display.
+ * Steps or rounds: which the slider moves by. A pair of pressed-or-not buttons
+ * rather than a select, being two choices a reader flips between.
+ */
+function UnitSwitch({ unit, onChange }) {
+  const choice = (value, label) => (
+    <button
+      onClick={() => onChange(value)}
+      aria-pressed={unit === value}
+      style={{
+        background: unit === value ? C.border : "transparent",
+        border: `1px solid ${unit === value ? C.dim : C.border}`,
+        color: unit === value ? C.text : C.dim,
+        fontWeight: unit === value ? "bold" : "normal",
+        borderRadius: 4,
+        padding: "6px 8px",
+        cursor: "pointer",
+        fontSize: 12,
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div
+      role="group"
+      aria-label="Play back by"
+      style={{ display: "flex", gap: 2 }}
+    >
+      {choice("step", "Steps")}
+      {choice("round", "Rounds")}
+    </div>
+  );
+}
+
+/**
+ * Toolbar row: Reset, Play/Pause, speed buttons, unit switch, slider, and a
+ * readout of where playback is — in the unit the slider counts, with the other
+ * unit under it.
  *
  * @param {Object} props
  * @param {ReturnType<import('../../hooks/usePlayback.js').usePlayback>} props.playback
- * @param {number} props.maxRound
+ * @param {number} props.maxRound - The last notch of the slider.
+ * @param {"step"|"round"} [props.unit]
+ * @param {function|null} [props.onUnitChange] - Null leaves the switch out.
+ * @param {number} [props.step]    - The step being played.
+ * @param {number} [props.maxStep] - The process's latest step.
  */
-export function PlaybackControls({ playback, maxRound }) {
+export function PlaybackControls({
+  playback,
+  maxRound,
+  unit = "step",
+  onUnitChange = null,
+  step,
+  maxStep,
+}) {
   const {
     resetPlayback,
     togglePlay,
@@ -188,6 +236,11 @@ export function PlaybackControls({ playback, maxRound }) {
             </button>
           ))}
         </div>
+        {onUnitChange && (
+          <div style={{ marginLeft: "1em" }}>
+            <UnitSwitch unit={unit} onChange={onUnitChange} />
+          </div>
+        )}
       </div>
 
       <div
@@ -226,7 +279,7 @@ export function PlaybackControls({ playback, maxRound }) {
               letterSpacing: 1,
             }}
           >
-            Round
+            {unit === "round" ? "Round" : "Step"}
           </div>
           <div
             style={{
@@ -239,6 +292,13 @@ export function PlaybackControls({ playback, maxRound }) {
             {snappedRound === 0 ? "—" : snappedRound}
           </div>
           <div style={{ fontSize: 9, color: C.dim }}>of {maxRound}</div>
+          {/* In rounds, which step that is: the cards and the log are
+              stamped in steps. */}
+          {unit === "round" && step > 0 && (
+            <div style={{ fontSize: 9, color: C.dim }}>
+              step {step} of {maxStep}
+            </div>
+          )}
         </div>
       </div>
     </div>

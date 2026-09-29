@@ -34,6 +34,32 @@ import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
 import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
 import { EmptyProcessGuide } from "./EmptyProcessGuide.jsx";
+import { roundStops } from "../utils/stateUtils.js";
+
+/**
+ * The per-step scores the server returns, as History's slider counts them: as
+ * they are by step, or one point per round — the score at its last step —
+ * numbered by round (stateUtils, "Steps and rounds").
+ *
+ * @returns {{ roundScores: Array, snappedRound: number, unitLabel: string }}
+ */
+function chartInUnit(stepScores, process, step, unit) {
+  if (unit !== "round")
+    return { roundScores: stepScores, snappedRound: step, unitLabel: "Step" };
+  const stops = roundStops(process);
+  const byStep = new Map(stepScores.map((s) => [s.round, s.scores]));
+  let snapped = 0;
+  stops.forEach((stop, i) => {
+    if (stop <= step) snapped = i;
+  });
+  return {
+    roundScores: stops
+      .slice(1)
+      .map((stop, i) => ({ round: i + 1, scores: byStep.get(stop) ?? null })),
+    snappedRound: snapped,
+    unitLabel: "Round",
+  };
+}
 
 // ─── Module-level constants ───────────────────────────────────────────────────
 /**
@@ -576,8 +602,12 @@ export function TextTab({
           >
             {roundScores ? (
               <RoundScoresChart
-                roundScores={roundScores}
-                snappedRound={state.round}
+                {...chartInUnit(
+                  roundScores,
+                  wholeProcess ?? state,
+                  state.round,
+                  historyView?.unit,
+                )}
               />
             ) : (
               <button
@@ -594,9 +624,7 @@ export function TextTab({
                   width: "100%",
                 }}
               >
-                {roundScoresLoading
-                  ? "Calculating…"
-                  : "Calculate Z-scores per round"}
+                {roundScoresLoading ? "Calculating…" : "Calculate Z-scores"}
               </button>
             )}
           </div>
