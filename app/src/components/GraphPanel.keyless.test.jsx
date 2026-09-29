@@ -121,9 +121,9 @@ function saveKey() {
 }
 
 describe("an assist tab on the demo with no API key saved", () => {
-  it("says the suggestions on screen are samples", async () => {
+  it("says the suggestions on screen are pre-set", async () => {
     await renderPanel({ isSample: true });
-    expect(screen.getByText(/These are sample suggestions/)).toBeTruthy();
+    expect(screen.getByText(/These are pre-set examples/)).toBeTruthy();
   });
 
   it("offers a way to supply one", async () => {
@@ -145,7 +145,7 @@ describe("an assist tab on the demo with no API key saved", () => {
 describe("an assist tab in the reader's own process with no API key", () => {
   it("offers no samples, and says a key is what it needs", async () => {
     await renderPanel();
-    expect(screen.queryByText(/These are sample suggestions/)).toBeNull();
+    expect(screen.queryByText(/These are pre-set examples/)).toBeNull();
     expect(screen.getByText(/Suggestions need your own API key/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Add a key/ })).toBeTruthy();
   });
@@ -170,7 +170,7 @@ describe("once a key is saved", () => {
   it("drops the notice", async () => {
     saveKey();
     await renderPanel();
-    expect(screen.queryByText(/These are sample suggestions/)).toBeNull();
+    expect(screen.queryByText(/These are pre-set examples/)).toBeNull();
   });
 
   it("goes to the network on an auto-fetch", async () => {
@@ -183,10 +183,10 @@ describe("once a key is saved", () => {
   // the store in utils/llmKey.js exists for.
   it("switches a mounted panel from samples to live without remounting", async () => {
     await renderPanel({ isSample: true });
-    expect(screen.getByText(/These are sample suggestions/)).toBeTruthy();
+    expect(screen.getByText(/These are pre-set examples/)).toBeTruthy();
 
     await act(async () => saveKey());
-    expect(screen.queryByText(/These are sample suggestions/)).toBeNull();
+    expect(screen.queryByText(/These are pre-set examples/)).toBeNull();
   });
 });
 
@@ -194,7 +194,7 @@ describe("a build with no LLM at all", () => {
   it("shows no key notice, since there is nothing a key would buy", async () => {
     flags.llm = false;
     await renderPanel({ isSample: true });
-    expect(screen.queryByText(/These are sample suggestions/)).toBeNull();
+    expect(screen.queryByText(/These are pre-set examples/)).toBeNull();
     expect(screen.queryByText(/Suggestions need your own API key/)).toBeNull();
   });
 

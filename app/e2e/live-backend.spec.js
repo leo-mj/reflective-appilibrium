@@ -75,7 +75,7 @@ test.describe("Against the real backend", () => {
     await expect(page.getByText(/Retained · \d+/)).toBeVisible();
   });
 
-  test("scores the process round by round, for History", async ({ page }) => {
+  test("scores the process step by step, for History", async ({ page }) => {
     await gotoHome(page);
     await loadSample(page);
     await page.locator('[data-tutorial="meta-analyze"]').click();
@@ -91,9 +91,16 @@ test.describe("Against the real backend", () => {
     // was found.
     expect(res.status(), JSON.stringify(await res.json()).slice(0, 1500)).toBe(200);
     const body = await res.json();
-    // A score for every round of the process, not only those played so far.
+    // A score for every step of the process, not only those played so far. The
+    // field is still called `round` — every saved file uses the name — but it
+    // counts steps (issue #36), and the chart's Rounds view picks each round's
+    // last step out of these. The sample is eight rounds of many steps.
+    const steps = Number(
+      (await page.locator("h1").textContent()).match(/Step (\d+)/)[1],
+    );
+    expect(steps).toBeGreaterThan(8);
     expect(body.round_scores.map((r) => r.round)).toEqual(
-      Array.from({ length: 8 }, (_, i) => i + 1),
+      Array.from({ length: steps }, (_, i) => i + 1),
     );
 
     // The button gives way to the chart it draws from the answer.

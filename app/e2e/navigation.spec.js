@@ -66,9 +66,11 @@ test.describe("Filtering and search", () => {
     const labels = await page
       .locator("button[aria-label^='Jump to']")
       .evaluateAll((bs) => bs.map((b) => b.textContent.replace(/\s*\(\d+\)$/, "")));
-    // No "R": the app opens showing arguments only, which titles the single
-    // relations section "Arguments" and takes its pill with it.
-    expect(labels).toEqual(["J", "P", "T", "A", "G", "C", "L"]);
+    // No "Relations": the app opens showing arguments only, which titles the
+    // single relations section "Arguments" and takes its pill with it. The
+    // element types keep their letters; the rest are named, a letter alone
+    // having said nothing about what "A", "G", "C" and "L" held.
+    expect(labels).toEqual(["J", "P", "T", "Arguments", "Groups", "Coherence", "Log"]);
   });
 
   test("reads the clusters out under the coherence heading", async ({ page }) => {
@@ -80,7 +82,7 @@ test.describe("Filtering and search", () => {
     await expect(panel).toContainText("Cluster 1");
   });
 
-  for (const chip of ["P", "T", "A", "C", "L"]) {
+  for (const chip of ["P", "T", "Arguments", "Coherence", "Log"]) {
     test(`the ${chip} chip opens its section`, async ({ page }) => {
       const button = page.locator("button").filter({ hasText: new RegExp(`^${chip} \\(\\d+\\)$`) });
       await expect(button).toBeVisible();

@@ -41,7 +41,7 @@ score badges a backend answers for, for instance, which the demo never shows.
 | `discuss.spec.js` | the Discuss panel, against a faked backend — runs only under the `backend` project |
 | `questionnaire.spec.js` | questionnaire mode end to end (skips if no spec present) |
 | `responsive.spec.js` | narrow layout — runs only under the `mobile` project |
-| `live-backend.spec.js` | the SPA against the **real** FastAPI server: withdrawal scores, the simulation, History's round-by-round scores — runs only under the `live-backend` project |
+| `live-backend.spec.js` | the SPA against the **real** FastAPI server: withdrawal scores, the simulation, History's step-by-step scores — runs only under the `live-backend` project |
 | `statement-cards.spec.js` | the Graph tab's card view where only a browser can tell: cards not overlapping, measured text fitting its card, the pointer landing on one, a grown card taking clicks — and, under `mobile`, a tap growing one |
 | `tour.spec.js` | the whole guided tour, section by section, under `chromium` and `mobile`: every control a section names is drawn, ringed, and not covered — by the tour's own sheet or anything else |
 | `dragging.spec.js` | dragging a node moves it and nothing else, and where it was dropped survives the autosave, a reload and an export → import round trip |

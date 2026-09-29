@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useContext, useState, useEffect } from "react";
+import { SampleSuggestionsContext } from "../sampleSuggestions.js";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
@@ -119,6 +120,7 @@ export function SuggestionToolbar({
     needs,
   });
   const { accent, ink, weight, marker, badge } = useHeaderAccent(tab);
+  const sample = useContext(SampleSuggestionsContext);
   return (
     <ToolbarStrip disclosure={disclosure}>
       <div style={{ fontSize: 12, lineHeight: 1.5 }}>
@@ -128,7 +130,18 @@ export function SuggestionToolbar({
         {suggestionCount !== null && (
           <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
         )}
-        {model && <span style={{ color: C.dim }}> · {model}</span>}
+        {/* Recorded suggestions say so here too, beside the model's name, or
+            the name reads as the model being asked now. */}
+        {/* Kept whole: a model name breaks at its hyphens, which stranded
+            "5)" on a line of its own. */}
+        {model && (
+          <>
+            {" "}
+            <span style={{ color: C.dim, whiteSpace: "nowrap" }}>
+              · {sample ? `pre-set (${model})` : model}
+            </span>
+          </>
+        )}
       </div>
       <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
         {/* One tooltip, not two: the button used to carry `why` as a DOM
