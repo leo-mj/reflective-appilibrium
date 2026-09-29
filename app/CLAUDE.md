@@ -385,6 +385,12 @@ palette can't arrive with the wrong one.
 
 The mode lives on `<html>` (`data-theme`, `data-contrast`) — that is the single
 source of truth, and `useTheme` reads it rather than mirroring it.
+**Until the reader picks a theme, the page takes their system's**
+(`prefers-color-scheme`): the boot script in `index.html` sets `data-theme`
+before the first paint, and `useTheme` follows a change while nothing is
+stored. The toggle stores the choice, which then wins. Playwright's browsers
+report light, so `playwright.config.js` pins the suite to dark, the theme it
+was written against; the preference's own tests in `home.spec.js` set theirs.
 
 Two things deliberately do _not_ use `palette.ink`: the graph's `+J/+P/+T`
 buttons and the questionnaire card's button. They are HTML, where axe enforces AA

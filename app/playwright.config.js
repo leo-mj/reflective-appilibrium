@@ -91,6 +91,11 @@ export default defineConfig({
 
   use: {
     baseURL: `http://localhost:${PORT}/`,
+    // The app opens in the system's theme when the reader has not chosen one,
+    // and Playwright's browsers report light unless told otherwise. Pinned to
+    // dark, which is what the suite — the audits among it — was written
+    // against; the tests of the preference itself set their own.
+    colorScheme: "dark",
     // Artefacts only for failures — a green run should leave nothing behind.
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

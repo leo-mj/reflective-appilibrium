@@ -167,7 +167,12 @@ export function ElementFields({
                   // at all under a thumb, where it was crowding the value
                   // it steps out of the field altogether.
                   className={roomy ? "no-spinner" : undefined}
-                  style={{ ...box, width: roomy ? 72 : 55 }}
+                  // Four characters ("0.67") in whatever font the reader has
+                  // picked — `ch` is its own "0" — with the padding, the
+                  // border and, on a mouse, the spinner beside them. At a
+                  // fixed 55px the spinner left room for three, and the last
+                  // digit was cut off.
+                  style={{ ...box, width: "calc(4ch + 34px)" }}
                 />
               </Tooltip>
             </span>

@@ -63,3 +63,41 @@ test.describe("Landing page", () => {
     await expect.poll(() => counter.textContent()).not.toBe(first);
   });
 });
+
+// The config pins the suite to a dark system, so these set their own.
+test.describe("Theme and the system's preference", () => {
+  const theme = (page) =>
+    page.evaluate(
+      () => document.documentElement.getAttribute("data-theme") ?? "dark",
+    );
+
+  test("opens in the system's theme when none has been chosen", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await gotoHome(page);
+    expect(await theme(page)).toBe("light");
+
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.reload();
+    expect(await theme(page)).toBe("dark");
+  });
+
+  test("keeps following it until the reader chooses", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await gotoHome(page);
+    await page.emulateMedia({ colorScheme: "light" });
+    await expect.poll(() => theme(page)).toBe("light");
+
+    // Chosen with the toggle, it no longer moves with the system…
+    await themeToggle(page).click();
+    await expect.poll(() => theme(page)).toBe("dark");
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.emulateMedia({ colorScheme: "light" });
+    expect(await theme(page)).toBe("dark");
+
+    // …and the choice outlasts a reload against the system's preference.
+    await page.reload();
+    expect(await theme(page)).toBe("dark");
+  });
+});

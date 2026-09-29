@@ -87,6 +87,21 @@ function announce() {
   for (const listener of listeners) listener();
 }
 
+// Until the reader picks a theme, the page follows their system's: the boot
+// script in index.html opens it in that one, and this keeps it in step when
+// the system changes — at sunset, say. Once they choose, the choice is stored
+// and this stands down; the toggle's own store is what takes precedence.
+if (hasDom && typeof window.matchMedia === "function") {
+  window
+    .matchMedia("(prefers-color-scheme: light)")
+    .addEventListener?.("change", (e) => {
+      if (readStored(THEME_KEY)) return;
+      if (e.matches) root().setAttribute("data-theme", "light");
+      else root().removeAttribute("data-theme");
+      announce();
+    });
+}
+
 /**
  * @returns {{
  *   isDark: boolean,
