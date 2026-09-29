@@ -84,6 +84,10 @@ async function requestModels(provider, key) {
 /**
  * @param {{ open: boolean, onClose: () => void, returnFocusTo?: { current: HTMLElement|null } }} props
  */
+/** Added to a failed test that was not the key being refused. */
+const NOT_A_CHAT_MODEL =
+  "If the key is right, this model may not be one that chats: the list shows everything the key can use, embeddings and image models included. Try another.";
+
 export function LLMSettingsModal({ open, onClose, returnFocusTo }) {
   // The demo build has no backend to relay a key to, but the modal is still
   // shown so visitors can see what configuring a provider involves. Everything
@@ -207,9 +211,17 @@ export function LLMSettingsModal({ open, onClose, returnFocusTo }) {
         // reader is looking for. backendError's friendlier rewording would be
         // wrong here; only the envelope-unwrapping is wanted.
         const raw = await res.text();
+        const message = unwrapDetail(raw) || `Error ${res.status}`;
+        // A key's model list is the provider's, unfiltered, and includes
+        // models that cannot chat — embeddings, images, audio — whose refusal
+        // does not always say so. Unless the key itself was refused (the
+        // provider's 401 or 403, which the backend puts first), say that the
+        // model may be one of those.
+        const keyRefused = /^(401|403):/.test(message);
         setTestStatus({
           ok: false,
-          message: unwrapDetail(raw) || `Error ${res.status}`,
+          message,
+          hint: keyRefused ? null : NOT_A_CHAT_MODEL,
         });
       }
     } catch (err) {
@@ -346,9 +358,12 @@ export function LLMSettingsModal({ open, onClose, returnFocusTo }) {
             list="llm-model-suggestions"
             value={model}
             onChange={handleModelChange}
+            // No model is named here. The list is the provider's, newest
+            // first, and the newest is often not a chat model at all; picking
+            // one out as the example recommended it (issue #41).
             placeholder={
               models.length
-                ? `Choose or type, e.g. ${models[0]}`
+                ? "Choose from the list, or type a model id"
                 : "Test connection to list this key's models"
             }
             style={inputStyle}
@@ -449,6 +464,9 @@ export function LLMSettingsModal({ open, onClose, returnFocusTo }) {
             }}
           >
             {testStatus.message}
+            {testStatus.hint && (
+              <div style={{ color: C.dim, marginTop: 4 }}>{testStatus.hint}</div>
+            )}
           </div>
         )}
 

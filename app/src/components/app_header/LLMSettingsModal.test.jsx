@@ -219,6 +219,63 @@ describe("choosing a model", () => {
     await waitFor(() => expect(suggestions()).toContain("newest-model"));
   });
 
+  // The list is the provider's, newest first, and the newest is often not a
+  // chat model: the hint used to name it as the example (issue #41).
+  it("names no model in the hint, whatever the list holds", async () => {
+    open();
+    fireEvent.change(keyField(), { target: { value: "sk-live" } });
+    fireEvent.click(button("Test connection"));
+    await waitFor(() => expect(suggestions()).toContain("newest-model"));
+    expect(modelField().placeholder).toBe(
+      "Choose from the list, or type a model id",
+    );
+    expect(modelField().placeholder).not.toContain("newest-model");
+  });
+
+  /** A failed completion test, with the provider's status and words. */
+  const refusing = (detail) =>
+    fetchMock.mockImplementation((url) =>
+      String(url).includes("/api/llm/test")
+        ? Promise.resolve({
+            ok: false,
+            status: 400,
+            text: () => Promise.resolve(JSON.stringify({ detail })),
+          })
+        : Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve(
+                String(url).includes("/api/llm/models")
+                  ? { models: ["newest-model", "older-model"] }
+                  : { base_urls: [] },
+              ),
+          }),
+    );
+
+  it("says a model that fails may not be one that chats", async () => {
+    refusing("404: This model does not exist or you do not have access.");
+    open();
+    fireEvent.change(keyField(), { target: { value: "sk-live" } });
+    fireEvent.change(modelField(), { target: { value: "newest-model" } });
+    fireEvent.click(button("Test connection"));
+    await waitFor(() =>
+      expect(document.body.textContent).toContain("404: This model"),
+    );
+    expect(document.body.textContent).toContain("may not be one that chats");
+  });
+
+  it("does not blame the model when the key was refused", async () => {
+    refusing("401: Incorrect API key provided.");
+    open();
+    fireEvent.change(keyField(), { target: { value: "sk-wrong" } });
+    fireEvent.change(modelField(), { target: { value: "older-model" } });
+    fireEvent.click(button("Test connection"));
+    await waitFor(() =>
+      expect(document.body.textContent).toContain("401: Incorrect API key"),
+    );
+    expect(document.body.textContent).not.toContain("may not be one that chats");
+  });
+
   it("keeps the saved key when only the model changes", async () => {
     sessionStorage.setItem(
       "llmSettings",

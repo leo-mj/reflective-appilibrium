@@ -194,6 +194,15 @@ class LLMService:
         timestamp and are sorted on it. Unfiltered: OpenAI's includes models
         that do not chat, such as embeddings, and telling them apart from the id
         would be a guess that goes stale.
+
+        So the modal treats the list as a list and recommends nothing from it
+        (issue #41). The newest model is often not a chat model — providers
+        release image, audio, realtime and embedding models all the time — and
+        the Model field's hint used to name the first entry as the example. It
+        names none now; and a failed connection test that was not the key being
+        refused says the chosen model may be one that cannot chat. Neither
+        filtering nor ranking by id patterns was taken: both are that same
+        stale guess, and a hint that recommends nothing cannot recommend wrong.
         """
         client = self._anthropic if self._anthropic is not None else self._openai
         assert client is not None
