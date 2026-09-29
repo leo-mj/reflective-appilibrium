@@ -42,7 +42,7 @@ from .rethon_schemas import (
 )
 from ..config import Settings, get_settings
 from ..process_pool import ComputationStopped, run_in_pool
-from ..services.rethon_caps import enforce_element_cap
+from ..services.rethon_caps import enforce_depth_cap, enforce_element_cap
 from ..services.rethon_simulation import (
     SimulationFinished,
     simulate_one_step,
@@ -153,6 +153,7 @@ async def simulate_rethon(
     """
     # In this process: its refusals are HTTPExceptions, which cannot be pickled
     # back out of a worker.
+    enforce_depth_cap(request.neighbourhood_depth, settings.simulation_max_depth)
     built_arguments, lookup_w_negated, n = validate_and_build(
         request.elements,
         request.relations,
@@ -200,6 +201,7 @@ async def simulate_rethon_step(
     stepping session.  Returns 400 if the process has already reached a fixed point.
     """
     # In this process, for the reason given in simulate_rethon.
+    enforce_depth_cap(request.neighbourhood_depth, settings.simulation_max_depth)
     built_arguments, lookup_w_negated, n = validate_and_build(
         request.elements,
         request.relations,

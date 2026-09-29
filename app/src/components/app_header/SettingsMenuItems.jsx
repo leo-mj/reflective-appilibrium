@@ -29,7 +29,19 @@ import { MoonIcon, SearchIcon } from "./menuIcons.jsx";
 import { MergeIcon } from "../Icons.jsx";
 import { MenuToggle } from "./MenuToggle.jsx";
 import { Tooltip } from "../Tooltip.jsx";
-import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
+import {
+  WeightTriangle,
+  WEIGHT_TRIANGLE_WIDTH,
+} from "../workflows/WeightTriangle.jsx";
+
+/** Side padding of the opened weights panel. */
+const WEIGHTS_PAD = 8;
+
+/**
+ * The width the opened weights panel needs, padding included. The wide menu is
+ * at least this wide from the start, so opening the panel does not widen it.
+ */
+export const WEIGHTS_PANEL_WIDTH = WEIGHT_TRIANGLE_WIDTH + 2 * WEIGHTS_PAD;
 
 /**
  * @param {Object}   props
@@ -38,8 +50,8 @@ import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
  * @param {function(): void} props.onOpenLlm
  * @param {function(): void} props.onOpenPrivacy
  * @param {function(): void} props.onOpenFont
- * @param {boolean}  props.weightsOpen - Held by the header, which the wide
- *   layout widens its menu for.
+ * @param {boolean}  props.weightsOpen - Held by the header, so the weights
+ *   stay open across the menu's views.
  * @param {function} props.setWeightsOpen
  * The rest are AppHeader's, passed through unchanged.
  */
@@ -156,25 +168,9 @@ export function SettingsMenuItems({
             style={itemStyle}
           />
         )}
-
-        <div style={menuDividerStyle} />
-        <div style={menuHeadingStyle}>{MENU_HEADINGS.model}</div>
-        <Tooltip text={MENU_TOOLTIPS.llm}>
-          <button
-            data-tutorial="btn-llm"
-            onClick={leaving(onOpenLlm)}
-            style={itemStyle}
-          >
-            <span style={menuIconStyle}>⚙</span>
-            {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
-          </button>
-        </Tooltip>
-        <Tooltip text={MENU_TOOLTIPS.privacy}>
-          <button onClick={leaving(onOpenPrivacy)} style={itemStyle}>
-            <span style={menuIconStyle}>ⓘ</span>
-            {MENU_LABELS.privacy}
-          </button>
-        </Tooltip>
+        {/* Last in Content: they steer what the simulation computes, as the two
+            above steer what the app works with — and, being a panel that
+            opens in place, they sit where opening it moves nothing below. */}
         {BACKEND_ENABLED && (
           <>
             <Tooltip text={MENU_TOOLTIPS.weights}>
@@ -202,7 +198,9 @@ export function SettingsMenuItems({
               </button>
             </Tooltip>
             {weightsOpen && (
-              <div style={{ padding: "4px 8px 8px 8px" }}>
+              <div
+                style={{ padding: `4px ${WEIGHTS_PAD}px 8px ${WEIGHTS_PAD}px` }}
+              >
                 <WeightTriangle
                   weights={weights}
                   onChange={onWeightsChange}
@@ -229,6 +227,25 @@ export function SettingsMenuItems({
             )}
           </>
         )}
+
+        <div style={menuDividerStyle} />
+        <div style={menuHeadingStyle}>{MENU_HEADINGS.model}</div>
+        <Tooltip text={MENU_TOOLTIPS.llm}>
+          <button
+            data-tutorial="btn-llm"
+            onClick={leaving(onOpenLlm)}
+            style={itemStyle}
+          >
+            <span style={menuIconStyle}>⚙</span>
+            {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
+          </button>
+        </Tooltip>
+        <Tooltip text={MENU_TOOLTIPS.privacy}>
+          <button onClick={leaving(onOpenPrivacy)} style={itemStyle}>
+            <span style={menuIconStyle}>ⓘ</span>
+            {MENU_LABELS.privacy}
+          </button>
+        </Tooltip>
 
         <div style={menuDividerStyle} />
         <div style={menuHeadingStyle}>{MENU_HEADINGS.appearance}</div>

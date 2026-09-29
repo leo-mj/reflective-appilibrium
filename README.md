@@ -99,7 +99,7 @@ CORS_ORIGINS=http://localhost:5173
 
 **Bring-your-own-key (BYOK):** users can also enter an API key directly in the LLM settings modal in the browser. It is held in `sessionStorage`, sent as an `x-api-key` header, and never stored server-side. Server-side keys are only served to localhost — remote browsers must supply their own key.
 
-Every other setting is documented in [backend/.env.example](backend/.env.example). The one to know about is `DEPLOYMENT`: leave it at `local` only while uvicorn and the browser are on the same machine. Anything else — a LAN, a tunnel, a container behind a proxy — is `hosted`, which stops lending server-side keys and turns on rate limits, timeouts and a size cap on rethon computations.
+Every other setting is documented in [backend/.env.example](backend/.env.example). The one to know about is `DEPLOYMENT`: leave it at `local` only while uvicorn and the browser are on the same machine. Anything else — a LAN, a tunnel, a container behind a proxy — is `hosted`, which stops lending server-side keys and turns on rate limits, timeouts and limits on how large a rethon computation may be (see [What a hosted instance computes](#what-a-hosted-instance-computes)).
 
 ### 4. Start / stop the backend
 
@@ -151,6 +151,34 @@ See:
 
 Beisbart, Claus; Betz, Gregor & Brun, Georg (2021). Making Reflective Equlibrium Precise: A Formal Model. Ergo: An Open Access Journal of Philosophy 8:441–472.
 Freivogel, Andreas & Cacean, Sebastian (2024). Assessing a Formal Model of Reflective Equilibrium.
+
+#### What a hosted instance computes
+
+A rethon computation's cost grows about 1.6 times with every element that takes
+part in an argument, and faster still with the depth of its search. On a shared
+server one large request holds up every other visitor's, so `DEPLOYMENT=hosted`
+limits what one request may ask for. A local instance limits nothing.
+
+| Limit | Hosted | Setting |
+| --- | --- | --- |
+| Elements that take part in arguments | 20 | `MAX_ARGUED_ELEMENTS` |
+| Elements in all | 50 | `MAX_SIMULATION_ELEMENTS` |
+| Search depth of a simulation | 2 | `MAX_NEIGHBOURHOOD_DEPTH` |
+| Time one computation may run | 60 s | `SIMULATION_TIMEOUT_SECONDS` |
+
+- **Argued elements are what cost.** An element no argument mentions adds almost
+  nothing, so the tight cap counts only those; the demo is 22 elements with 10
+  in arguments. Every argument counts, single-premise and withdrawn ones too:
+  a withdrawn argument stays in the computation, so a withdrawn element can
+  still turn out to make the position more coherent.
+- **The depth is fixed on a hosted instance.** The Simulate tab reads the limit
+  from `/api/health` and always searches at it, showing "Depth 2" in place of a
+  choice: depth 3 costs about ten times depth 2, and took the demo merged with
+  its second process past the time limit. Locally the tab offers depths 1–4.
+- **A request over a limit is refused with a message saying which** (422), and
+  one that runs out of time with a 504. Set any of the settings to `0` to lift
+  that limit on a hosted instance; the measurements behind each number are in
+  [backend/config.py](backend/config.py).
 
 ## Tests
 

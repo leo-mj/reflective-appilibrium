@@ -117,3 +117,21 @@ def enforce_element_cap(
                     "Run the backend locally to lift the cap."
                 ),
             )
+
+
+def enforce_depth_cap(depth: int, max_depth: int) -> None:
+    """Refuse a local search deeper than this deployment allows; 0 = no cap.
+
+    Said rather than quietly lowered: a simulation run at another depth than the
+    one asked for is a different simulation, and its result would be reported
+    as the reader's.
+    """
+    if max_depth and depth > max_depth:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"This instance searches to a depth of at most {max_depth}; "
+                f"the request asks for {depth}. Run the backend locally for "
+                "deeper searches."
+            ),
+        )

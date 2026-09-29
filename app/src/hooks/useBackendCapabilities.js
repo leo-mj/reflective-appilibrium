@@ -20,6 +20,8 @@ import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
  *   0 means no cap, which is also what an older backend is assumed to have.
  * @property {"local"|"hosted"|null} deployment The server's declared posture;
  *   null until known. Hosted, it refuses loopback provider URLs.
+ * @property {number}  maxDepth    Deepest neighbourhood a simulation may search;
+ *   0 means no cap beyond the request's own limit of 4.
  */
 
 /** What we assume before the health check answers, and if it never does. */
@@ -28,6 +30,7 @@ const UNAVAILABLE = {
   reachable: false,
   maxElements: 0,
   deployment: null,
+  maxDepth: 0,
 };
 
 // One check per page load, shared by every caller.
@@ -72,6 +75,7 @@ function load() {
         // hide badges a backend would have answered.
         maxElements: data?.max_simulation_elements ?? 0,
         deployment: data?.deployment ?? null,
+        maxDepth: data?.max_neighbourhood_depth ?? 0,
       }),
     )
     .catch(() => settle({ ...UNAVAILABLE, loaded: true }));

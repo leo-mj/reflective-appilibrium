@@ -41,6 +41,7 @@ Deployment = Literal["local", "hosted"]
 # rethon computation timeout   none              60s
 # rethon cap: elements argued  none              20
 # rethon cap: elements in all  none              50
+# rethon search depth          none (4)          2
 # request body size            none              10 MiB
 #
 # Nothing is written to disk in either mode; the browser keeps the state.
@@ -110,6 +111,22 @@ _SDK_DEFAULT_LLM_TIMEOUT = 600.0
 # long as it runs. The timeout below bounds that worst case.
 _HOSTED_MAX_ARGUED_ELEMENTS = 20
 _HOSTED_MAX_ELEMENTS = 50
+
+# The neighbourhood depth of the local search: how far from the current position
+# each step looks for a better one. The element caps bound how big the structure
+# is; this bounds how much of it one step searches, and it grows faster than
+# either. Measured on a hosted container, one Equilibrate:
+#
+#                          depth 1   depth 2   depth 3   depth 4
+#     demo (22 elements)     2.0s      1.1s     12.9s    over 60s
+#     merged demo (33)       2.1s      6.9s    over 60s  over 60s
+#
+# Depth 3 costs roughly ten times depth 2, which no faster machine closes, and
+# a single Step at depth 3 took 39s — all of it time every other visitor's
+# simulation spends queued behind it on the one worker. So hosted stops at 2.
+# The Simulate tab reads the limit from /api/health and always searches at it,
+# offering no choice: depth 1 finds too little to be worth one.
+_HOSTED_MAX_NEIGHBOURHOOD_DEPTH = 2
 
 # Seconds a single rethon computation may run before its worker is killed and
 # the caller gets a 504. What lets a cap above be wrong without a request running
@@ -222,6 +239,10 @@ class Settings(BaseSettings):
     # Most elements that take part in arguments a rethon computation will
     # accept — the number its cost grows with. 0 disables the cap.
     max_argued_elements: Optional[int] = None
+
+    # Deepest neighbourhood a simulation may search. 0 disables the cap, leaving
+    # the request schema's own limit of 4.
+    max_neighbourhood_depth: Optional[int] = Field(default=None, ge=0)
 
     # Seconds one rethon computation may run; 0 disables the limit.
     simulation_timeout_seconds: Optional[float] = Field(default=None, ge=0)
@@ -422,6 +443,14 @@ class Settings(BaseSettings):
         if self.max_argued_elements is not None:
             return self.max_argued_elements
         return _HOSTED_MAX_ARGUED_ELEMENTS if self.is_hosted else 0
+
+    @property
+    def simulation_max_depth(self) -> int:
+        """Deepest neighbourhood a simulation may search; 0 = no cap beyond the
+        schema's. See ``_HOSTED_MAX_NEIGHBOURHOOD_DEPTH``."""
+        if self.max_neighbourhood_depth is not None:
+            return self.max_neighbourhood_depth
+        return _HOSTED_MAX_NEIGHBOURHOOD_DEPTH if self.is_hosted else 0
 
     @property
     def simulation_element_caps(self) -> "ElementCaps":

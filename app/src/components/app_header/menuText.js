@@ -17,7 +17,9 @@ export const MENU_LABELS = {
   home: "Home",
   llm: "LLM settings",
   privacy: "Privacy",
-  weights: "Model weights",
+  // "Simulation", not "Model": this menu also has the LLM model, and these
+  // weights steer only the rethon simulation.
+  weights: "Simulation weights",
   relations: "All relations",
   checker: "Argument checker",
   processTags: "Process tags",

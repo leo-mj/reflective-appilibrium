@@ -308,3 +308,56 @@ def test_a_process_with_many_commitments_to_revise_reaches_its_fixed_point():
     state = res.json()["translated_re_state"]
     assert state["finished"]
     assert len(state["evolution"]) > 50
+
+
+# ── How deep one step searches ────────────────────────────────────────────────
+
+DEPTH_ENDPOINTS = [
+    "/api/simulate_rethon/simulate",
+    "/api/simulate_rethon/step",
+]
+
+
+def test_hosted_searches_no_deeper_than_2_by_default():
+    """Depth 3 took the merged demo past the 60s limit: roughly ten times the
+    cost of depth 2, which no faster machine closes. See config.py."""
+    assert make_settings(deployment="hosted").simulation_max_depth == 2
+    assert make_settings().simulation_max_depth == 0
+
+
+@pytest.fixture
+def hosted():
+    app.dependency_overrides[get_settings] = lambda: make_settings(deployment="hosted")
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("path", DEPTH_ENDPOINTS)
+def test_a_deeper_search_is_refused_and_says_why(hosted, path):
+    res = hosted.post(path, json=payload(3, round="1", neighbourhood_depth=3))
+    assert res.status_code == 422
+    detail = res.json()["detail"]
+    assert "depth" in detail and "2" in detail and "locally" in detail
+
+
+@pytest.mark.parametrize("path", DEPTH_ENDPOINTS)
+def test_the_limit_itself_is_accepted(hosted, path):
+    res = hosted.post(path, json=payload(3, round="1", neighbourhood_depth=2))
+    assert res.status_code != 422, res.text
+
+
+def test_a_local_install_searches_as_deep_as_it_is_asked():
+    app.dependency_overrides[get_settings] = lambda: make_settings()
+    try:
+        res = TestClient(app).post(
+            "/api/simulate_rethon/simulate",
+            json=payload(3, round="1", neighbourhood_depth=4),
+        )
+    finally:
+        app.dependency_overrides.clear()
+    assert res.status_code == 200, res.text
+
+
+def test_the_health_check_tells_the_app_the_limit(hosted):
+    """So the Simulate tab offers no depth it would only be refused."""
+    assert hosted.get("/api/health").json()["max_neighbourhood_depth"] == 2

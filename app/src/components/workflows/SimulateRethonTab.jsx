@@ -16,6 +16,7 @@ import {
 } from "../../utils/simulateRethonClient.js";
 import { ErrorBanner } from "../SuggestionActions.jsx";
 import { ARGUMENT_RELATION_TYPES } from "../../utils/stateUtils.js";
+import { useBackendCapabilities } from "../../hooks/useBackendCapabilities.js";
 import {
   SectionHead,
   ElementRow,
@@ -62,6 +63,17 @@ function deriveEquilibrium(result) {
  * @param {Function} [props.onApplyRethonEquilibrium]
  * @param {Function} [props.onSetEquilibriumPreview]
  */
+/** The depths the request schema accepts. */
+const DEPTHS = [1, 2, 3, 4];
+
+const DEPTH_LABEL_STYLE = {
+  fontSize: 11,
+  color: C.dim,
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+};
+
 export function SimulateRethonTab({
   state,
   onApplyRethonEquilibrium,
@@ -77,7 +89,13 @@ export function SimulateRethonTab({
   const [error, setError] = useState(null);
   const [evolutionOpen, setEvolutionOpen] = useState(false);
   const [decision, setDecision] = useState(null); // "accepted" | "rejected" | null
-  const [neighbourhoodDepth, setNeighbourhoodDepth] = useState(3);
+  const [chosenDepth, setNeighbourhoodDepth] = useState(3);
+  // A server with a depth limit (/api/health) searches at that limit, and the
+  // tab offers no choice there. Hosted it is 2 — depth 3 took the merged demo
+  // past its 60s limit — and depth 1 finds too little to be worth offering, so
+  // a choice between them would be a choice of nothing.
+  const { maxDepth } = useBackendCapabilities();
+  const neighbourhoodDepth = maxDepth || chosenDepth;
 
   useEffect(
     () => () => onSetEquilibriumPreview?.(null),
@@ -288,36 +306,42 @@ export function SimulateRethonTab({
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <label
-              style={{
-                fontSize: 11,
-                color: C.dim,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              Depth
-              <select
-                value={neighbourhoodDepth}
-                onChange={(e) => setNeighbourhoodDepth(Number(e.target.value))}
-                disabled={loadingMode !== null}
-                style={{
-                  fontSize: 11,
-                  background: "transparent",
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 4,
-                  color: C.text,
-                  padding: "2px 4px",
-                }}
+            {maxDepth ? (
+              // Fixed, but said: the result depends on it, and a reader
+              // comparing it with a local run has to know which depth this was.
+              <Tooltip
+                text={`How far from the current position each step looks. This server always searches to a depth of ${maxDepth}; run the backend locally to choose.`}
               >
-                {[1, 2, 3, 4].map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <span style={DEPTH_LABEL_STYLE}>Depth {maxDepth}</span>
+              </Tooltip>
+            ) : (
+              <Tooltip text="How far from the current position each step looks. Deeper finds more, and takes much longer.">
+                <label style={DEPTH_LABEL_STYLE}>
+                  Depth
+                  <select
+                    value={neighbourhoodDepth}
+                    onChange={(e) =>
+                      setNeighbourhoodDepth(Number(e.target.value))
+                    }
+                    disabled={loadingMode !== null}
+                    style={{
+                      fontSize: 11,
+                      background: "transparent",
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 4,
+                      color: C.text,
+                      padding: "2px 4px",
+                    }}
+                  >
+                    {DEPTHS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </Tooltip>
+            )}
             {/* Simulate button */}
             <button
               onClick={simulate}

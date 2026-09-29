@@ -31,6 +31,8 @@ import { C } from "../../constants/colors.js";
 // ─── Geometry ─────────────────────────────────────────────────────────────────
 
 const W = 220;
+/** How wide the triangle draws itself, for whatever has to make room for it. */
+export const WEIGHT_TRIANGLE_WIDTH = W;
 const H = 200;
 const CX = W / 2;      // horizontal centre
 const CY = 112;        // vertical centre, shifted down to leave room for the top label

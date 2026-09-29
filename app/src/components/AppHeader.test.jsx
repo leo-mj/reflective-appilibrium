@@ -118,7 +118,7 @@ describe("narrow menu tab filtering", () => {
   });
 });
 
-describe("model weights", () => {
+describe("simulation weights", () => {
   // The weights only steer the rethon simulation, which needs the backend. With
   // no backend they are a control that cannot affect anything the user sees.
   const openMenu = openSettings;
@@ -129,14 +129,28 @@ describe("model weights", () => {
     it(`stays out of the ${layout} menu without a backend`, () => {
       render(<AppHeader {...PROPS} isWide={isWide} />);
       openMenu();
-      expect(screen.queryByText(/Model weights/)).toBeNull();
+      expect(screen.queryByText(/Simulation weights/)).toBeNull();
     });
 
     it(`is offered in the ${layout} menu when there is a backend`, () => {
       flags.backend = true;
       render(<AppHeader {...PROPS} isWide={isWide} />);
       openMenu();
-      expect(screen.queryByText(/Model weights/)).not.toBeNull();
+      expect(screen.queryByText(/Simulation weights/)).not.toBeNull();
+    });
+
+    // Last in Content, after the argument checker: they steer the simulation,
+    // as the rows above them steer what the app works with. Model follows.
+    it(`sits at the end of Content in the ${layout} menu`, () => {
+      flags.backend = true;
+      render(<AppHeader {...PROPS} isWide={isWide} />);
+      openMenu();
+      const labels = [...document.querySelectorAll("button")].map((b) =>
+        b.textContent.trim(),
+      );
+      const at = (needle) => labels.findIndex((l) => l.includes(needle));
+      expect(at("Simulation weights")).toBe(at("Argument checker") + 1);
+      expect(at("LLM settings")).toBe(at("Simulation weights") + 1);
     });
 
     // Was: the row set `color: changed ? accent : undefined` over the menu
@@ -148,8 +162,8 @@ describe("model weights", () => {
       render(<AppHeader {...PROPS} isWide={isWide} />);
       openMenu();
       const row = (name) => screen.getByRole("button", { name });
-      expect(row(/Model weights/).style.color).toBe(row(/Privacy/).style.color);
-      expect(row(/Model weights/).style.color).not.toBe("");
+      expect(row(/Simulation weights/).style.color).toBe(row(/Privacy/).style.color);
+      expect(row(/Simulation weights/).style.color).not.toBe("");
     });
   }
 });
@@ -654,7 +668,7 @@ describe("the guided tour", () => {
 });
 
 describe("LLM settings", () => {
-  // Unlike the model weights, this one stays reachable without a backend: the
+  // Unlike the simulation weights, this one stays reachable without a backend: the
   // modal explains what BYOK would involve, with its live controls disabled.
   const openMenu = openSettings;
 

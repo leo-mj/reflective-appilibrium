@@ -200,4 +200,7 @@ async def health(
         "model": settings.default_model,
         "deployment": settings.deployment,
         "max_simulation_elements": settings.simulation_max_elements,
+        # The Simulate tab offers no deeper search than this; 0 means none
+        # beyond the request schema's own 4.
+        "max_neighbourhood_depth": settings.simulation_max_depth,
     }

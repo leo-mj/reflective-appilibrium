@@ -14,7 +14,13 @@ import {
   TAB_TOOLTIPS,
 } from "../../constants/tabConstants.jsx";
 import { btn, metaTabBtn, inlineDividerStyle } from "./appHeaderStyles.js";
-import { SettingsMenuItems } from "./SettingsMenuItems.jsx";
+import {
+  SettingsMenuItems,
+  WEIGHTS_PANEL_WIDTH,
+} from "./SettingsMenuItems.jsx";
+
+/** The ☰ menu card's padding. */
+const MENU_PAD = 6;
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
@@ -340,11 +346,16 @@ export function AppHeaderWide({
                     background: C.panel,
                     border: `1px solid ${C.border}`,
                     borderRadius: 6,
-                    padding: 6,
+                    padding: MENU_PAD,
                     display: "flex",
                     flexDirection: "column",
                     gap: 2,
-                    minWidth: weightsOpen ? 248 : 200,
+                    // Wide enough for the opened weights panel from the start,
+                    // so opening it does not widen the menu under the pointer:
+                    // the panel, the menu's padding and its border. Worked out
+                    // from the triangle's own width rather than written down —
+                    // written down, it came out two pixels short.
+                    minWidth: WEIGHTS_PANEL_WIDTH + 2 * MENU_PAD + 2,
                     boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
                   }}
                 >
