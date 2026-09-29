@@ -1,5 +1,5 @@
 /**
- * @fileoverview Modal dialog for revising a single RE relation, or an argument.
+ * @fileoverview Modal dialog for revising a single RE relation.
  * @module components/EditRelationModal
  */
 
@@ -9,12 +9,7 @@ import { useState } from "react";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
 import { ModalShell, FormField } from "./ModalShell.jsx";
 import { relationTypeOptions } from "./RelationTypeOptions.jsx";
-import {
-  argumentRelationType,
-  makeDiff,
-  RELATION_EDIT_FIELDS,
-  sortElementIds,
-} from "../../utils/stateUtils.js";
+import { makeDiff, RELATION_EDIT_FIELDS } from "../../utils/stateUtils.js";
 
 /**
  * @typedef {Object} EditRelationFormData
@@ -29,18 +24,11 @@ const ARGUMENT_OPTIONS = RELATION_OPTIONS.filter((o) => o.group === "Argument");
  * Modal for revising the type and explanation of an RE relation.
  * The `from` and `to` endpoints are read-only (changing them would alter identity).
  *
- * **An argument is revised whole.** Given `argument`, the relations that make
- * it up, it offers what adding one does: Entails or Precludes, the "jointly"
- * form following from the number of premises. It used to offer every relation
- * type for the one premise row pressed. Supports, Conflicts or Undermines took
- * that step out of the argument, and since the default view shows arguments
- * only, the argument appeared to have been deleted; a different inferential
- * type left one argument with premises disagreeing about what they establish.
+ * **An argument is not revised here** but in `ReviseArgumentModal`, which
+ * takes its premises too; `EditModals` sends it there.
  *
  * @param {Object}      props
  * @param {RERelation}  props.relation
- * @param {RERelation[]|null} [props.argument] - Every relation of the argument
- *   `relation` belongs to, or null for a relation that is not an argument step.
  * @param {boolean}     [props.argumentsOnly] - The view is hiding relations
  *   that are not argument steps. Offering one would save a relation the view
  *   then hides, so only entails and precludes are offered, as the add bar does.
@@ -51,7 +39,6 @@ const ARGUMENT_OPTIONS = RELATION_OPTIONS.filter((o) => o.group === "Argument");
  */
 export function EditRelationModal({
   relation,
-  argument = null,
   argumentsOnly = false,
   currentRound,
   onSave,
@@ -64,49 +51,10 @@ export function EditRelationModal({
 
   const set = (field, value) =>
     setForm((prev) => ({ ...prev, [field]: value }));
-  // Off until something differs: an unchanged save is not a revision, and on
-  // an argument it would have marked every premise revised.
+  // Off until something differs: an unchanged save is not a revision.
   const unchanged = !makeDiff(RELATION_EDIT_FIELDS, relation, form).length;
 
   const nextRound = `record it as step ${currentRound + 1}`;
-
-  if (argument) {
-    const negated = form.type.endsWith("precludes");
-    const premises = argument.map((r) => r.from).sort(sortElementIds);
-    return (
-      <ModalShell
-        title="Revise argument"
-        subtitle={`${premises.join(", ")} → ${relation.to} · Saving will mark this argument as revised and ${nextRound}`}
-        onCancel={onCancel}
-        onSave={() => onSave(form)}
-        saveDisabled={unchanged}
-      >
-        <FormField label="Relation to conclusion">
-          <select
-            value={negated ? "precludes" : "entails"}
-            onChange={(e) =>
-              set(
-                "type",
-                argumentRelationType(argument.length, e.target.value === "precludes"),
-              )
-            }
-            style={INPUT_STYLE}
-          >
-            <option value="entails">Entails</option>
-            <option value="precludes">Precludes</option>
-          </select>
-        </FormField>
-
-        <FormField label="Explanation">
-          <textarea
-            value={form.explanation}
-            onChange={(e) => set("explanation", e.target.value)}
-            style={{ ...INPUT_STYLE, height: 110, resize: "vertical" }}
-          />
-        </FormField>
-      </ModalShell>
-    );
-  }
 
   // The relation's own type stays selectable even where it is not offered — a
   // joint step saved without the argument it belonged to, or a dialectical

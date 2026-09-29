@@ -658,12 +658,15 @@ export function HistoryRoundBanner({ historyView }) {
  *   {@link module:constants/textTabStyles.COMPACT_BTN_STYLE}. The graph's pinned
  *   -node tooltip leaves this off — there the buttons are the only thing in a
  *   small popover, with no chips to sit level with.
+ * @param {string}   [props.label] - The group's name, for a screen reader:
+ *   what the buttons act on.
  */
 export function ActionButtons({
   onRevise,
   onWithdraw,
   onReinstate,
   compact = false,
+  label = "Item actions",
 }) {
   const ghost = compact
     ? { ...GHOST_BTN_STYLE, ...COMPACT_BTN_STYLE }
@@ -676,7 +679,7 @@ export function ActionButtons({
     // — and "Revise" on its own says nothing about what it revises.
     <div
       role="group"
-      aria-label="Item actions"
+      aria-label={label}
       style={{ display: "flex", gap: 4, flexShrink: 0 }}
     >
       <button onClick={onRevise} className="tap-target" style={ghost}>
@@ -691,7 +694,9 @@ export function ActionButtons({
         <button
           onClick={onReinstate}
           className="tap-target"
-          style={{ ...ghost, color: C.supports }}
+          // The text tone of the supports teal: the graph's own fails as type
+          // on the light panel.
+          style={{ ...ghost, color: C.supportsText }}
         >
           Reinstate
         </button>

@@ -16,6 +16,7 @@ import {
   argumentRelationsOf,
   newArgumentId,
   nextElementId,
+  rewordElement,
   withEvent,
   withUserEdit,
 } from "../utils/stateUtils.js";
@@ -90,6 +91,171 @@ export function useRelationActions({
         ),
       ],
     }));
+    setEditingRel(null);
+  };
+
+  /**
+   * Saves the argument dialog: premises swapped, reworded, taken out or added,
+   * the conclusion swapped or reworded, and the argument's type and explanation
+   * — all one step, one log entry and one undo.
+   *
+   * A line written as a new statement becomes an element. A line whose wording
+   * was changed revises that element, everywhere it appears (`rewordElement`).
+   * If the premises and the conclusion are the same elements as before, the
+   * argument is revised in place, as `handleRelEditSave` does. If either
+   * changed, the argument is **replaced**: its links are withdrawn at this step
+   * and marked `supersededBy` a new argument carrying the new statements. That
+   * is what lets History show the argument as it was before the step and as it
+   * is after (stateUtils, isSupersededAt), where editing the links in place
+   * would leave playback showing today's argument at every step.
+   *
+   * @param {{ premises: Array<{ id?: string, type?: string, text: string }>,
+   *   conclusion?: { id?: string, type?: string, text: string },
+   *   negated: boolean, explanation: string }} form
+   */
+  const handleArgumentRevise = ({
+    premises,
+    conclusion,
+    negated,
+    explanation,
+  }) => {
+    const argument = argumentRelationsOf(state.relations, editingRel);
+    if (!argument) return;
+    const first = argument[0];
+    const step = state.round + 1;
+    const byId = new Map(state.elements.map((e) => [e.id, e]));
+    const lines = [...premises, ...(conclusion ? [conclusion] : [])];
+
+    const added = [];
+    const idOf = (p) => {
+      if (p.id) return p.id;
+      const id = nextElementId([...state.elements, ...added], p.type);
+      added.push({
+        id,
+        type: p.type,
+        text: p.text.trim(),
+        confidence: 0.67,
+        status: "active",
+        origin: "user",
+        addedRound: step,
+      });
+      return id;
+    };
+    const premiseIds = premises.map(idOf);
+    const conclusionId = conclusion ? idOf(conclusion) : first.to;
+    const reworded = new Map(
+      lines
+        .filter(
+          (p) =>
+            p.id && p.text.trim() && p.text.trim() !== byId.get(p.id)?.text,
+        )
+        .map((p) => [p.id, p.text.trim()]),
+    );
+    const oldIds = argument.map((r) => r.from);
+    const samePremises =
+      oldIds.length === premiseIds.length &&
+      premiseIds.every((id) => oldIds.includes(id));
+    // Another conclusion is another argument, as other premises are.
+    const sameArgument = samePremises && conclusionId === first.to;
+    const type = argumentRelationType(premiseIds.length, negated);
+    const typeChanged = type !== first.type;
+    const explanationChanged = explanation !== (first.explanation ?? "");
+
+    // Nothing changed, so nothing was revised (as for any other dialog).
+    if (sameArgument && !typeChanged && !explanationChanged && !reworded.size) {
+      setEditingRel(null);
+      return;
+    }
+
+    let relations;
+    if (sameArgument && !typeChanged && !explanationChanged) {
+      // Only wording changed, and that lives on the elements.
+      relations = (prev) => prev;
+    } else if (sameArgument) {
+      const inArgument = new Set(argument);
+      relations = (prev) =>
+        prev.map((r) =>
+          inArgument.has(r) && (typeChanged || explanationChanged)
+            ? {
+                ...r,
+                type,
+                explanation,
+                origin: explanationChanged ? withUserEdit(r.origin) : r.origin,
+                status: "revised",
+                revisedRound: step,
+                history: withEvent(r, {
+                  round: step,
+                  type: "revised",
+                  previousText: r.explanation,
+                }),
+              }
+            : r,
+        );
+    } else {
+      const replacement = newArgumentId();
+      const retired = new Set(argument);
+      const origin = first.origin ? withUserEdit(first.origin) : "user";
+      relations = (prev) => [
+        ...prev.map((r) =>
+          retired.has(r)
+            ? {
+                ...r,
+                status: "withdrawn",
+                supersededBy: replacement,
+                history: withEvent(r, {
+                  round: step,
+                  type: "withdrawn",
+                  reason: "Replaced by a revision of the argument.",
+                }),
+              }
+            : r,
+        ),
+        ...premiseIds.map((from) => ({
+          from,
+          to: conclusionId,
+          type,
+          argumentId: replacement,
+          explanation,
+          origin,
+          addedRound: step,
+        })),
+      ];
+    }
+
+    const changes = [
+      ...(samePremises
+        ? []
+        : [`premises: ${oldIds.join(", ")} → ${premiseIds.join(", ")}`]),
+      ...(conclusionId === first.to
+        ? []
+        : [`conclusion: ${first.to} → ${conclusionId}`]),
+      ...added.map((e) => `${e.id} added`),
+      ...[...reworded.keys()].map((id) => `${id} reworded`),
+      ...(typeChanged ? [`type: ${first.type} → ${type}`] : []),
+      ...(explanationChanged ? ["explanation revised"] : []),
+    ];
+    mutate((prev) => ({
+      ...prev,
+      round: step,
+      elements: [
+        ...prev.elements.map((e) =>
+          reworded.has(e.id) ? rewordElement(e, reworded.get(e.id), step) : e,
+        ),
+        ...added,
+      ],
+      relations: relations(prev.relations),
+      log: [
+        ...prev.log,
+        makeLogEntry(
+          step,
+          `Argument ${oldIds.join(", ")} → ${first.to} was revised by the user.`,
+          "Changes applied",
+          changes.join("; "),
+        ),
+      ],
+    }));
+    // The links a selection may have pointed at can be gone from view now.
+    if (!sameArgument) setSelectedRel(null);
     setEditingRel(null);
   };
 
@@ -328,6 +494,7 @@ export function useRelationActions({
     handleDeleteRelationsByArgId,
     handleAddRelation,
     handleAddNewArgument,
+    handleArgumentRevise,
     handleRejectRelations,
   };
 }

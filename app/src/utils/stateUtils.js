@@ -351,7 +351,11 @@ export function stateAtRound(state, round) {
     relations: state.relations
       .filter(
         (r) =>
-          visIds.has(r.from) && visIds.has(r.to) && (r.addedRound || 1) <= round,
+          visIds.has(r.from) &&
+          visIds.has(r.to) &&
+          (r.addedRound || 1) <= round &&
+          // A premise link a revision had replaced by then is gone by then.
+          !isSupersededAt(r, round),
       )
       .map((r) => asOfRound(r, round)),
     // Only the rounds closed by then, as `processes` shows only those merged.
@@ -485,6 +489,70 @@ export const ARGUMENT_RELATION_TYPES = new Set([
  * @param {RERelation}   rel
  * @returns {RERelation[]|null}
  */
+/**
+ * An element reworded at `step`, with the bookkeeping every rewording records:
+ * the wording it replaced, the step, a user-edited origin, and a `revised`
+ * event. Shared by the two places an element is reworded from inside an
+ * argument — accepting a detected one, and revising one — so a rewording
+ * reached either way reads the same in the history as one made in the editor.
+ *
+ * A withdrawn element is reinstated first: premises may be withdrawn ones, and
+ * a revision that left the withdrawal open would contradict its own status.
+ *
+ * @param {REElement} el
+ * @param {string}    text
+ * @param {number}    step
+ * @returns {REElement}
+ */
+export function rewordElement(el, text, step) {
+  return {
+    ...el,
+    text,
+    origin: withUserEdit(el.origin),
+    status: "revised",
+    previousText: el.text,
+    revisedRound: step,
+    history: withEvent(
+      isWithdrawnNow(el)
+        ? { ...el, history: withEvent(el, { round: step, type: "reinstated" }) }
+        : el,
+      { round: step, type: "revised", previousText: el.text },
+    ),
+  };
+}
+
+/**
+ * Whether a relation had been replaced by a revision of its argument by `step`.
+ *
+ * An argument whose premises change is replaced, not edited: its links are
+ * withdrawn at that step and marked `supersededBy` the argument that took its
+ * place, so History can still show it as it was. From that step on it is no
+ * part of the position, nor anything to reinstate — the present views drop it
+ * (`withoutSuperseded`), and History drops it from the step it was replaced.
+ *
+ * @param {RERelation} rel
+ * @param {number}     step
+ * @returns {boolean}
+ */
+export function isSupersededAt(rel, step) {
+  return Boolean(rel.supersededBy) && isWithdrawnAt(rel, step);
+}
+
+/**
+ * The state as it stands now, without the premise links revisions replaced.
+ * Returns `state` itself when there are none, so memoised readers keep theirs.
+ *
+ * @param {REState} state
+ * @returns {REState}
+ */
+export function withoutSuperseded(state) {
+  if (!state.relations.some((r) => r.supersededBy)) return state;
+  return {
+    ...state,
+    relations: state.relations.filter((r) => !isSupersededAt(r, state.round)),
+  };
+}
+
 export function argumentRelationsOf(relations, rel) {
   if (!rel.argumentId || !ARGUMENT_RELATION_TYPES.has(rel.type)) return null;
   return relations.filter(

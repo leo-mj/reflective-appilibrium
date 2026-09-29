@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   gotoHome,
+  loadSample,
   startFresh,
   addElement,
   withdrawFirst,
@@ -68,6 +69,60 @@ test.describe("Element lifecycle", () => {
     await park(page);
 
     await expectCounts(page, { A: 1 });
+  });
+});
+
+// Revising or withdrawing any premise acts on the whole argument, so a joint
+// argument's card offers those once, in its header.
+test.describe("A joint argument", () => {
+  test("is withdrawn and reinstated from one set of actions", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    // The section opens folded; its pill unfolds it and scrolls to it.
+    await page.getByRole("button", { name: /^Jump to arguments/ }).click();
+    const actions = page.getByRole("group", {
+      name: "Argument actions: J7, P6 to J10",
+    });
+    await expect(actions).toHaveCount(1);
+    // The card: the nearest ancestor that also holds the conclusion's wording.
+    const card = actions.locator("xpath=ancestor::div[.//b[contains(., 'Therefore')]][1]");
+    await expect(card.getByRole("button", { name: "Withdraw", exact: true })).toHaveCount(1);
+    await expect(card.getByRole("button", { name: "Revise", exact: true })).toHaveCount(1);
+
+    await actions.getByRole("button", { name: "Withdraw", exact: true }).click();
+    await park(page);
+    await expect(card.getByRole("button", { name: "Reinstate", exact: true })).toHaveCount(1);
+    await expect(card).toContainText(/withdrawn/i);
+
+    await actions.getByRole("button", { name: "Reinstate", exact: true }).click();
+    await park(page);
+    await expect(card.getByRole("button", { name: "Withdraw", exact: true })).toHaveCount(1);
+  });
+});
+
+test.describe("Revising an argument", () => {
+  test("takes a premise out, leaving no withdrawn copy behind", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    await page.getByRole("button", { name: /^Jump to arguments/ }).click();
+    await page
+      .getByRole("group", { name: "Argument actions: J7, P6 to J10" })
+      .getByRole("button", { name: "Revise", exact: true })
+      .click();
+
+    const dialog = page.getByRole("dialog", { name: "Revise argument" });
+    await expect(dialog.getByRole("textbox", { name: "Premise 2" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Remove premise 2" }).click();
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    // One premise now, so no argument header; and the replaced joint argument
+    // is the record, not something left on the board to reinstate.
+    await expect(
+      page.getByRole("group", { name: "Argument actions: J7, P6 to J10" }),
+    ).toHaveCount(0);
+    // Still four arguments: a replaced one left on the board would be a fifth.
+    await expectCounts(page, { A: 4 });
   });
 });
 

@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 //
-// Revising an argument used to offer every relation type for the one premise
-// row pressed. Supports, Conflicts or Undermines took the step out of the
-// argument, and in the default arguments-only view the argument then seemed to
-// have been deleted. An argument is revised whole now, with the two choices
-// adding one offers.
-import { vi, describe, it, expect, afterEach } from "vitest";
+// Revising a relation that is not an argument step. An argument has a dialog
+// of its own, ReviseArgumentModal, which takes its premises too.
+import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import { EditRelationModal } from "./EditRelationModal.jsx";
@@ -23,76 +20,6 @@ const rel = (over = {}) => ({
 
 const optionValues = () =>
   [...screen.getByRole("combobox").querySelectorAll("option")].map((o) => o.value);
-
-describe("revising an argument", () => {
-  const argument = [
-    rel({ type: "jointly_entails", argumentId: "a1" }),
-    rel({ from: "J2", type: "jointly_entails", argumentId: "a1" }),
-  ];
-
-  it("offers entails and precludes only", () => {
-    render(
-      <EditRelationModal
-        relation={argument[0]}
-        argument={argument}
-        currentRound={1}
-        onSave={() => {}}
-        onCancel={() => {}}
-      />,
-    );
-    expect(screen.getByRole("dialog", { name: "Revise argument" })).toBeTruthy();
-    expect(optionValues()).toEqual(["entails", "precludes"]);
-  });
-
-  it("keeps the joint form for several premises", () => {
-    const onSave = vi.fn();
-    render(
-      <EditRelationModal
-        relation={argument[0]}
-        argument={argument}
-        currentRound={1}
-        onSave={onSave}
-        onCancel={() => {}}
-      />,
-    );
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "precludes" } });
-    fireEvent.click(screen.getByText("Save"));
-    expect(onSave).toHaveBeenCalledWith({ type: "jointly_precludes", explanation: "why" });
-  });
-
-  // A save here revises every premise, so an unchanged one must not be offered.
-  it("offers Save only once the argument has changed", () => {
-    render(
-      <EditRelationModal
-        relation={argument[0]}
-        argument={argument}
-        currentRound={1}
-        onSave={() => {}}
-        onCancel={() => {}}
-      />,
-    );
-    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(true);
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "precludes" } });
-    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(false);
-  });
-
-  it("uses the plain form for one premise", () => {
-    const one = [rel({ type: "entails", argumentId: "a2" })];
-    const onSave = vi.fn();
-    render(
-      <EditRelationModal
-        relation={one[0]}
-        argument={one}
-        currentRound={1}
-        onSave={onSave}
-        onCancel={() => {}}
-      />,
-    );
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "precludes" } });
-    fireEvent.click(screen.getByText("Save"));
-    expect(onSave).toHaveBeenCalledWith({ type: "precludes", explanation: "why" });
-  });
-});
 
 describe("revising a relation", () => {
   it("offers what a two-endpoint form does, and no joint types", () => {

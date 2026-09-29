@@ -590,3 +590,27 @@ def test_arguments_schema_allows_a_formless_premise():
 def test_default_confidence_is_the_middle_of_the_frontend_scale():
     # LEGACY_CONFIDENCE in app/src/utils/importMarkdown.js: low .33/mod .67/high 1.0
     assert DEFAULT_CONFIDENCE == 0.67
+
+
+# A revised argument's replaced links carry ``supersededBy``. The relation model
+# forbids unknown fields, so without it every AI request from a process holding
+# one would be refused.
+def test_a_replaced_argument_link_is_accepted():
+    state = REState(
+        round=3,
+        elements=[el("J1"), el("J2")],
+        relations=[
+            RERelation(
+                **{
+                    "from": "J1",
+                    "to": "J2",
+                    "type": "entails",
+                    "addedRound": 1,
+                    "argumentId": "a1",
+                    "status": "withdrawn",
+                    "supersededBy": "a2",
+                }
+            )
+        ],
+    )
+    assert state.relations[0].superseded_by == "a2"

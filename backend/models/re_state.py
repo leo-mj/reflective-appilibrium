@@ -182,6 +182,10 @@ class RERelation(BaseModel):
     explanation: str = Field(max_length=2_000, default="")
     added_round: int = Field(alias="addedRound", ge=1)
     argument_id: Optional[str] = Field(None, alias="argumentId", max_length=200)
+    # On a premise link of an argument whose premises were revised: the id of
+    # the argument that replaced it. Withdrawn at that step, and kept so History
+    # can show the argument as it was — see "Revising an argument" in CLAUDE.md.
+    superseded_by: Optional[str] = Field(None, alias="supersededBy", max_length=200)
     origin: Optional[str] = Field(None, max_length=200)
 
     status: Optional[Status] = None

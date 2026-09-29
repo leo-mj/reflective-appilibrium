@@ -10,6 +10,7 @@ import {
   linkableElements,
   currentRound,
   roundOfStep,
+  withoutSuperseded,
 } from "../utils/stateUtils.js";
 import { pinsOf } from "../utils/pinUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
@@ -160,6 +161,7 @@ export default function REState({
     handleReviseElementText,
     handleAddRelation,
     handleAddNewArgument,
+    handleArgumentRevise,
     handleQuestionnaireSelectAnswer,
     handleRejectElements,
     handleRejectRelations,
@@ -399,8 +401,13 @@ export default function REState({
   }, [state, showProcessTags]);
   const hasMerged = (state.processes?.length ?? 0) > 0;
 
+  // Without the premise links revisions of arguments replaced: they are the
+  // record, not the position. History keeps them — `viewState` — and hides
+  // each from the step it was replaced (stateUtils, isSupersededAt).
+  const presentState = useMemo(() => withoutSuperseded(viewState), [viewState]);
+
   const textState =
-    tab === "history" ? stateAtRound(viewState, historyRound) : viewState;
+    tab === "history" ? stateAtRound(viewState, historyRound) : presentState;
   // The text panel's search, held here so the graph can show what it finds.
   const [search, setSearch] = useState("");
 
@@ -472,7 +479,9 @@ export default function REState({
     // the panel is there to show the query and clear it. Full screen, a graph
     // still filtered by a search nobody can see is a graph that looks broken.
     search: showingTextPanel ? search : "",
-    state: viewState,
+    state: presentState,
+    // History's own: every link, each shown until the step it was replaced.
+    historyState: viewState,
     // From the state itself: the Merge tab needs the process record whether or
     // not the tags drawn from it are showing.
     processes: state.processes ?? [],
@@ -862,7 +871,9 @@ export default function REState({
         editingRel={editingRel}
         setEditingRel={setEditingRel}
         onRelEditSave={handleRelEditSave}
+        onArgumentSave={handleArgumentRevise}
         relations={state.relations}
+        elements={state.elements}
         argumentsOnly={hideNonEntailsRels}
         round={state.round}
         withdrawingId={withdrawingId}

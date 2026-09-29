@@ -9,7 +9,7 @@ import { render, fireEvent, act, cleanup } from "@testing-library/react";
 
 import { Ctx } from "./TextTabContext.js";
 import { setCardDetails } from "./cardDetails.js";
-import { ElementCard, RelationCard } from "./TextTabCards.jsx";
+import { ArgumentCard, ElementCard, RelationCard } from "./TextTabCards.jsx";
 import { tooltipText } from "../tooltipTestUtils.js";
 
 afterEach(cleanup);
@@ -487,5 +487,67 @@ describe("ElementCard sources", () => {
       <ElementCard e={el({ sources: undefined })} dim={false} />,
     );
     expect(container.textContent).not.toContain("Sources");
+  });
+});
+
+// Revising or withdrawing any premise acts on the whole argument, so a joint
+// argument offers those actions once, in its header — buttons on every premise
+// row read as though one premise could be revised or withdrawn alone.
+describe("ArgumentCard actions", () => {
+  const joint = (over = {}) => [
+    rel({
+      from: "J7",
+      to: "J10",
+      type: "jointly_entails",
+      argumentId: "a1",
+      ...over,
+    }),
+    rel({
+      from: "P6",
+      to: "J10",
+      type: "jointly_entails",
+      argumentId: "a1",
+      ...over,
+    }),
+  ];
+  const named = (container, name) =>
+    [...container.querySelectorAll("button")].filter(
+      (b) => b.textContent.trim() === name,
+    );
+
+  it("gives a joint argument one Revise and one Withdraw, for the whole of it", () => {
+    const onEditRelRequest = vi.fn();
+    const onWithdrawRelRequest = vi.fn();
+    const rels = joint();
+    const { container, getByRole } = renderIn(<ArgumentCard rels={rels} />, {
+      onEditRelRequest,
+      onWithdrawRelRequest,
+    });
+    expect(named(container, "Revise")).toHaveLength(1);
+    expect(named(container, "Withdraw")).toHaveLength(1);
+    expect(
+      getByRole("group", { name: "Argument actions: J7, P6 to J10" }),
+    ).toBeTruthy();
+
+    fireEvent.click(named(container, "Revise")[0]);
+    fireEvent.click(named(container, "Withdraw")[0]);
+    expect(onEditRelRequest).toHaveBeenCalledWith(rels[0]);
+    expect(onWithdrawRelRequest).toHaveBeenCalledWith(rels[0]);
+  });
+
+  it("offers one Reinstate for a withdrawn joint argument", () => {
+    const { container } = renderIn(
+      <ArgumentCard rels={joint({ status: "withdrawn" })} />,
+    );
+    expect(named(container, "Reinstate")).toHaveLength(1);
+    expect(named(container, "Withdraw")).toHaveLength(0);
+  });
+
+  it("keeps a one-premise argument's buttons on its one row", () => {
+    const { container } = renderIn(
+      <ArgumentCard rels={[rel({ type: "entails", argumentId: "a2" })]} />,
+    );
+    expect(named(container, "Revise")).toHaveLength(1);
+    expect(container.textContent).not.toContain("premises");
   });
 });

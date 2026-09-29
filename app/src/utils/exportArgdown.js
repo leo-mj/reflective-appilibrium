@@ -27,7 +27,11 @@
 
 import { citationText } from "./citation.js";
 import { groupsOf } from "./groupUtils.js";
-import { ARGUMENT_RELATION_TYPES, sortElementIds } from "./stateUtils.js";
+import {
+  ARGUMENT_RELATION_TYPES,
+  isSupersededAt,
+  sortElementIds,
+} from "./stateUtils.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -246,8 +250,10 @@ export function buildArgdown(state) {
   const date = new Date().toISOString().slice(0, 10);
   const elements = state.elements.filter((e) => e.status !== "possible");
   const ids = new Set(elements.map((e) => e.id));
+  // Not the premise links a revision replaced: the map is the position, and
+  // those would reappear in it as a withdrawn copy of an argument it still has.
   const relations = state.relations.filter(
-    (r) => ids.has(r.from) && ids.has(r.to),
+    (r) => ids.has(r.from) && ids.has(r.to) && !isSupersededAt(r, state.round),
   );
 
   const dialectical = relations.filter(

@@ -206,6 +206,12 @@ says so: the id badge and the two action buttons on one line, the statement
 under them, a rule, and then the stats. `text_panel/TextTabCards.jsx` builds
 them out of the primitives in `TextTabPrimitives.jsx`.
 
+- **A joint argument carries one set of actions**, in a header row of its own
+  ("Argument · 2 premises"): revising or withdrawing any premise acts on the
+  whole argument, and buttons on every premise row read as though one could be
+  revised alone. A one-premise argument and a relation keep theirs on the row.
+  **Withdraw is outlined, not red**: it is undone by Reinstate and is the
+  method at work, and red is kept for what cannot be taken back.
 - **A stat is a caption over a value** (`StatField`), not a bordered chip. A
   chip has to carry its own name inside it — "Confidence: Moderate" — which
   spends the width twice and leaves a row of pills that all look alike to be

@@ -21,10 +21,18 @@ export const GHOST_BTN_STYLE = {
   // need the room, and taking it there made the panel loud.
 };
 
+/**
+ * Withdraw: outlined, in the panel's own ink. It used to be a filled red, and
+ * red says destructive and final — but a withdrawal is undone by Reinstate, and
+ * withdrawing is the method working, a judgment earning its place by surviving
+ * revision. Red is kept for what cannot be taken back. A step louder than
+ * Revise (text colour and a stronger border against dim), so the two are not
+ * confused at a glance.
+ */
 export const WITHDRAW_BTN_STYLE = {
   ...GHOST_BTN_STYLE,
-  background: C.danger + "80",
-  color: C.onFill,
+  border: `1px solid ${C.dim}`,
+  color: C.text,
 };
 
 /**

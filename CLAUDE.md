@@ -109,6 +109,33 @@ prefer that set over listing them by hand. Each such relation carries an
 together: the graph draws the group as converging lines into a junction dot, and
 withdrawing, reinstating or deleting any one of them applies to the whole argument.
 
+#### Revising an argument
+
+Revise on an argument opens `ReviseArgumentModal`, which works on its premises:
+each can be **swapped** for another element or a new statement, **reworded**
+in place — which revises that element itself, everywhere it appears — or
+**taken out**, and premises can be added. The conclusion can be swapped or
+reworded the same way, but never taken out. Entails/Precludes and the
+explanation are there too. It is all one step, one log entry and one undo
+(`handleArgumentRevise` in `useRelationActions`).
+
+- **The same premises and conclusion** — only type, explanation or wording
+  changed — revise the argument in place, as any relation is revised.
+- **Different premises, or another conclusion, replace the argument.** Its links are withdrawn at that
+  step and marked `supersededBy` the new argument's id; the new one carries the
+  new premises. So everything that groups premises by `argumentId` is
+  untouched, and History shows the argument as it was before the step and as
+  revised after (`isSupersededAt`, `stateAtRound`). Editing the links in place
+  would have shown today's premises at every step.
+- **A superseded link is the record, not the position**: `withoutSuperseded`
+  drops it from what the graph, text panel and clusters see (`presentState` in
+  `REState`), there is nothing to reinstate, and the Argdown export leaves it
+  out. The Markdown export's relation list and the `re-state` block keep it,
+  and the backend model declares the field, since it refuses unknown ones.
+
+A joint argument's card carries one Revise and one Withdraw, in a header row:
+both act on the whole argument.
+
 Which pairs of element types may legally hold which relation is the full matrix in
 `skill/re-relations-reference.md`.
 
@@ -449,7 +476,7 @@ naming the original type is for a human reader; the parser drops comments.
     furtherArguments: Array,
   },
   elements: [{ id, type, status, confidence, origin, text, addedRound, ?history, ?previousText, ?revisedRound, ?reason, ?rejectedRound, ?questionnaireIndex, ?sources }],
-  relations: [{ from, to, type, explanation, addedRound, ?origin, ?status, ?history, ?argumentId, ?revisedRound }],
+  relations: [{ from, to, type, explanation, addedRound, ?origin, ?status, ?history, ?argumentId, ?revisedRound, ?supersededBy }],
   coherence: { tensions: [], orphans: [], clusters: [] },
   ?groups: [{ id, label, members: [elementId], collapsed }],
   ?pins: { [elementId]: { x, y } },  // offsets from the layout's centre

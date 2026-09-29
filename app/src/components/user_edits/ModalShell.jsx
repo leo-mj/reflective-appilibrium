@@ -53,6 +53,9 @@ export function FormField({ label, children }) {
  * @param {function(): void} props.onSave       - Called when the user clicks the save button.
  * @param {string}           [props.saveLabel]  - Label for the save button (default: `"Save"`).
  * @param {boolean}          [props.saveDisabled] - Disables the save button when `true`.
+ * @param {number}           [props.width]      - The panel's width in px (default
+ *   500), for a dialog whose contents need the room. Still held inside the
+ *   window by `maxWidth`.
  * @param {function(): void} [props.onClear]    - When given, a Clear button appears at
  *   the far side of the footer from Save. Kept apart from it deliberately: it
  *   throws away what Save would commit, and the two should not sit together.
@@ -67,6 +70,7 @@ export function ModalShell({
   onClear,
   saveLabel = "Save",
   saveDisabled = false,
+  width = 500,
 }) {
   const titleId = useId();
   const subtitleId = useId();
@@ -105,7 +109,7 @@ export function ModalShell({
           border: `1px solid ${C.border}`,
           borderRadius: 10,
           padding: 28,
-          width: 500,
+          width,
           maxWidth: "92vw",
           maxHeight: "88vh",
           overflowY: "auto",

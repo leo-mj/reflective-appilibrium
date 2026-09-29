@@ -181,6 +181,7 @@ export function GraphPanel({
   emptyGuide = null,
   historyUnit = "step",
   onHistoryUnitChange,
+  historyState = null,
 }) {
   const [useDummyAssist, setUseDummyAssist] = useState(false);
   // The public site's ordinary first state: the build has the LLM features, the
@@ -360,7 +361,7 @@ export function GraphPanel({
           )}
           {tab === "history" && (
             <HistoryTab
-              state={state}
+              state={historyState ?? state}
               positions={positions}
               onRoundChange={onRoundChange}
               unit={historyUnit}

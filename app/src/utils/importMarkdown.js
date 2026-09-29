@@ -369,6 +369,9 @@ function validateRelation(r, i) {
     result.rejectedRound = num(r.rejectedRound, `${ctx}.rejectedRound`);
   if (r.argumentId != null)
     result.argumentId = str(r.argumentId, `${ctx}.argumentId`, 200);
+  // The argument that replaced this premise link (stateUtils, isSupersededAt).
+  if (r.supersededBy != null)
+    result.supersededBy = str(r.supersededBy, `${ctx}.supersededBy`, 200);
 
   return result;
 }

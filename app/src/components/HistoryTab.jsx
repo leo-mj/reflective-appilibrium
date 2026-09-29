@@ -17,6 +17,7 @@ import {
   asOfRound,
   ARGUMENT_RELATION_TYPES,
   roundStops,
+  isSupersededAt,
 } from "../utils/stateUtils.js";
 import {
   CardBackgrounds,
@@ -144,9 +145,13 @@ export function HistoryTab({
     [state.elements, snappedRound],
   );
 
-  const visRels = hideNonEntailsRels
-    ? state.relations.filter((r) => ARGUMENT_RELATION_TYPES.has(r.type))
-    : state.relations;
+  // Less the premise links a revision had replaced by the step being played:
+  // until then they are the argument as it stood, and drawn as such.
+  const visRels = state.relations.filter(
+    (r) =>
+      !isSupersededAt(r, snappedRound) &&
+      (!hideNonEntailsRels || ARGUMENT_RELATION_TYPES.has(r.type)),
+  );
 
   // The statement view, as on the Graph tab and by the same switch: each
   // element a card, carrying the wording it had in the round being played, so

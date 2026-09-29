@@ -7,6 +7,7 @@
 import { useState } from "react";
 import {
   ELEMENT_EDIT_FIELDS,
+  rewordElement,
   nextElementId,
   makeDiff,
   makeLogEntry,
@@ -122,26 +123,7 @@ export function useElementActions({
       ...prev,
       round: newRound,
       elements: prev.elements.map((e) =>
-        e.id === elementId
-          ? {
-              ...e,
-              text: newText,
-              origin: withUserEdit(e.origin),
-              status: "revised",
-              previousText: e.text,
-              revisedRound: newRound,
-              // Withdrawn premises are selectable when reconstructing an
-              // argument, so this can land on one. Bring it back first, exactly
-              // as handleEditSave does, or the withdrawal stays open in history
-              // while the status says otherwise.
-              history: withEvent(
-                isWithdrawnNow(e)
-                  ? { ...e, history: withEvent(e, { round: newRound, type: "reinstated" }) }
-                  : e,
-                { round: newRound, type: "revised", previousText: e.text },
-              ),
-            }
-          : e,
+        e.id === elementId ? rewordElement(e, newText, newRound) : e,
       ),
       log: [
         ...prev.log,

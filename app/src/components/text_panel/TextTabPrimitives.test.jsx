@@ -110,14 +110,16 @@ describe("ActionButtons", () => {
       });
     });
 
-    it("keeps withdraw looking like the destructive one", () => {
-      // The compact override is size only: it must not flatten the fill that
-      // separates Withdraw from the ghost buttons beside it.
-      const withdraw = buttons(render3(true)).find(
-        (b) => b.textContent.trim() === "Withdraw",
-      );
-      expect(withdraw.style.background).not.toBe("");
-      expect(withdraw.style.background).not.toBe("none");
+    it("keeps withdraw apart from revise, without dressing it as destructive", () => {
+      // The compact override is size only: it must not flatten what separates
+      // Withdraw from Revise beside it. And that is ink and border, not a red
+      // fill — a withdrawal is undone by Reinstate, and red says final.
+      const all = buttons(render3(true));
+      const withdraw = all.find((b) => b.textContent.trim() === "Withdraw");
+      const revise = all.find((b) => b.textContent.trim() === "Revise");
+      expect(withdraw.style.color).not.toBe(revise.style.color);
+      expect(withdraw.style.border).not.toBe(revise.style.border);
+      expect(withdraw.style.background).toBe("none");
     });
   });
 });

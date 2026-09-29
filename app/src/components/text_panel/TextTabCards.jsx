@@ -346,9 +346,49 @@ export function ArgumentCard({ rels, dim }) {
   const isSel = rels.some((r) => r === selectedRel);
   const conclusionId = rels[0].to;
   const allNodeIds = [...new Set([...rels.map((r) => r.from), conclusionId])];
+  // Revising or withdrawing any premise of an argument acts on all of them
+  // (useRelationActions), so a joint argument carries one set of actions, in a
+  // header of its own; its rows keep only what is theirs. Buttons on every row
+  // read as though one premise could be revised or withdrawn alone. A
+  // one-premise argument has one row, which keeps its buttons as a relation's.
+  const joint = rels.length > 1;
+  const actionsFor = (r) => (
+    <ActionButtons
+      compact={isWide}
+      label={
+        joint
+          ? `Argument actions: ${rels
+              .map((x) => x.from)
+              .sort(sortElementIds)
+              .join(", ")} to ${conclusionId}`
+          : undefined
+      }
+      onRevise={() => onEditRelRequest(r)}
+      onWithdraw={
+        r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null
+      }
+      onReinstate={r.status === "withdrawn" ? () => onReinstateRel(r) : null}
+    />
+  );
 
   return (
     <div style={{ ...CARD_STYLE, opacity: dim ? 0.4 : 1 }}>
+      {joint && (
+        <div style={{ ...cardHeader, marginBottom: 4 }}>
+          <div
+            style={{
+              ...cardIdentity,
+              fontSize: 10,
+              color: C.dim,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+            }}
+          >
+            Argument · {rels.length} premises
+          </div>
+          <div style={cardActions}>{actionsFor(rels[0])}</div>
+        </div>
+      )}
       {rels.map((r) => (
         <div
           key={r.from}
@@ -397,18 +437,11 @@ export function ArgumentCard({ rels, dim }) {
           <div style={cardChips(isWide)}>
             <StatusLabel tag={statusTag(r, state.round)} />
           </div>
-          <div onClick={(e) => e.stopPropagation()} style={cardActions}>
-            <ActionButtons
-              compact={isWide}
-              onRevise={() => onEditRelRequest(r)}
-              onWithdraw={
-                r.status !== "withdrawn" ? () => onWithdrawRelRequest(r) : null
-              }
-              onReinstate={
-                r.status === "withdrawn" ? () => onReinstateRel(r) : null
-              }
-            />
-          </div>
+          {!joint && (
+            <div onClick={(e) => e.stopPropagation()} style={cardActions}>
+              {actionsFor(r)}
+            </div>
+          )}
         </div>
       ))}
       <div
