@@ -76,9 +76,11 @@ import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
  * @param {boolean}  props.hideTabBar  - Set while the wide tour's opening
  *   chapters read against a bare graph. There is no tab bar to hide at narrow
  *   widths, where the same chapters are read against the ☰ menu staying shut.
- * @param {boolean}  props.tourMenuOpen - The tour walks the ☰ menu's own
- *   entries, so it opens and shuts the menu as it goes. Both menus: the wide
- *   header keeps its own, and this one holds the narrow header's.
+ * @param {boolean|"settings"} props.tourMenuOpen - The tour walks the ☰
+ *   menu's own entries, so it opens and shuts the menu as it goes. Both menus:
+ *   the wide header keeps its own, and this one holds the narrow header's.
+ *   `"settings"` opens the narrow menu on its Settings view, where the entries
+ *   the wide ☰ holds are at that width; the wide menu reads it as `true`.
  */
 export function AppHeader({
   round,
@@ -366,6 +368,13 @@ export function AppHeader({
           setMenuOpen={setMenuOpen}
           visibleSubTabs={visibleSubTabs}
           tourActive={tourActive}
+          tourMenuView={
+            tourMenuOpen
+              ? tourMenuOpen === "settings"
+                ? "settings"
+                : "main"
+              : null
+          }
         />
         {sampleNotice}
       </>

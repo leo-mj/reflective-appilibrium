@@ -7,6 +7,7 @@ import {
   NetworkIcon,
   HistoryIcon,
   ClusterIcon,
+  DuplicatesIcon,
   SuggestIcon,
   PrincipleIcon,
   JudgmentIcon,
@@ -95,7 +96,7 @@ export const TAB_ICONS = {
   detectArguments: <SimulateIcon />,
   suggestTheories: <TheoryIcon />,
   processReview: <ReviewIcon />,
-  mergeElements: <ClusterIcon />,
+  mergeElements: <DuplicatesIcon />,
   simulateRethon: <SimulateIcon />,
 };
 

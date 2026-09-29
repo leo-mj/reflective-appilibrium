@@ -96,7 +96,12 @@ export function HistoryIcon({ size = "2em" }) {
   );
 }
 
-export function ClusterIcon({ size = "2em" }) {
+/**
+ * Two circles run together, with the dots of both inside: two processes made
+ * one. It was the Clusters icon, and reads better as a merge than as a set
+ * that holds no conflict.
+ */
+export function MergeIcon({ size = "2em" }) {
   return (
     <svg
       width={size}
@@ -114,6 +119,79 @@ export function ClusterIcon({ size = "2em" }) {
         <circle cx="382" cy="210" r="26" />
         <circle cx="382" cy="302" r="26" />
         <circle cx="256" cy="256" r="26" />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Two groups of connected nodes, apart from each other: a position falling
+ * into coherent clusters, which is what the tab finds. No rings round them —
+ * two rings side by side read as the Merge icon's two circles.
+ */
+export function ClusterIcon({ size = "2em" }) {
+  // Offset vertically and a clear gap apart, so they read as two groups and
+  // not as one chain.
+  const left = [
+    [108, 146],
+    [40, 274],
+    [176, 274],
+  ];
+  const right = [
+    [336, 238],
+    [472, 238],
+    [404, 366],
+  ];
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <g
+        stroke="currentColor"
+        strokeWidth="24"
+        strokeLinejoin="round"
+        fill="none"
+      >
+        <polygon points={left.map((p) => p.join(",")).join(" ")} />
+        <polygon points={right.map((p) => p.join(",")).join(" ")} />
+      </g>
+      <g fill="currentColor">
+        {[...left, ...right].map(([cx, cy]) => (
+          <circle key={`${cx},${cy}`} cx={cx} cy={cy} r="38" />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Two cards, one laid over the other, the front one carrying "=": two elements
+ * making the same claim in different words, which is what the Merge Elements
+ * tab pairs up. Only the back card's uncovered edges are drawn, so the icon
+ * needs no fill of its own and sits on any background.
+ */
+export function DuplicatesIcon({ size = "2em" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      style={{ display: "block" }}
+    >
+      <g
+        stroke="currentColor"
+        strokeWidth="22"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      >
+        <path d="M160 352 H112 a40 40 0 0 1 -40 -40 V112 a40 40 0 0 1 40 -40 H312 a40 40 0 0 1 40 40 V160" />
+        <rect x="160" y="160" width="280" height="280" rx="40" />
+        <line x1="236" y1="272" x2="364" y2="272" />
+        <line x1="236" y1="328" x2="364" y2="328" />
       </g>
     </svg>
   );

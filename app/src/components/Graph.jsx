@@ -23,12 +23,14 @@ import { useStatementView } from "../hooks/useStatementView.js";
 import { useCardGrowth } from "../hooks/useCardGrowth.js";
 import { useShownRelation } from "../hooks/useShownRelation.js";
 import { usePanGlide } from "../hooks/useViewGlide.js";
+import { useIsWide } from "../hooks/useWindowSize.js";
 import { pageFontFamily } from "../utils/textWidth.js";
 import { drawnOnGraph, graphHighlights } from "../utils/graphView.js";
 import {
   elementRadius,
   fitView,
   focusFraming,
+  NARROW_FIT_MIN_ZOOM,
   parallelEdgeOffsets,
   groupJointArguments,
 } from "../utils/graphHelpers.js";
@@ -310,8 +312,16 @@ export function Graph({
 
   // The raw positions, not the projected ones: a collapsed group's members keep
   // theirs, so framing still covers the ground the group is standing on — and
-  // the tour, below, can frame an element that is currently inside one.
-  useAutoFit({ positions, dims, resetView, enabled: ready });
+  // the tour, below, can frame an element that is currently inside one. On a
+  // phone the ids stay legible and the rest is panned to (NARROW_FIT_MIN_ZOOM).
+  const isWide = useIsWide();
+  useAutoFit({
+    positions,
+    dims,
+    resetView,
+    enabled: ready,
+    minZoom: isWide ? undefined : NARROW_FIT_MIN_ZOOM,
+  });
 
   const focusKey = focus?.key;
 

@@ -32,6 +32,7 @@ import { useShownRelation } from "../hooks/useShownRelation.js";
 import { widestCard } from "../utils/statementCards.js";
 import {
   fitView,
+  NARROW_FIT_MIN_ZOOM,
   parallelEdgeOffsets,
   groupJointArguments,
   relationAt,
@@ -216,9 +217,11 @@ export function HistoryTab({
     dims,
     resetView,
     refitKey: state.elements.length,
+    // Legible ids on a phone, as on the Graph tab.
+    minZoom: isWide ? undefined : NARROW_FIT_MIN_ZOOM,
   });
 
-  /** Frames the whole graph again, as it opened — the Graph tab's fit button. */
+  /** Frames the whole graph again — the Graph tab's fit button, unfloored. */
   const fitHistory = () => {
     const view = fitView(viewPositions, null, dims, {
       padding: 96,

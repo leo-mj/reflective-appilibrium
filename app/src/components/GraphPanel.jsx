@@ -236,6 +236,7 @@ export function GraphPanel({
                 setHiddenLegendKeys={setHiddenLegendKeys}
                 hideNonEntailsRels={hideNonEntailsRels}
                 processes={processesOf(state)}
+                collapsible={!isWide}
               />
             </div>
             {onToggleFullscreen && (

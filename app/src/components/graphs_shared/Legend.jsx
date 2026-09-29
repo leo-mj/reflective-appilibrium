@@ -3,6 +3,7 @@
  * @module components/Legend
  */
 
+import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import { usePalette } from "../../hooks/useTheme.js";
 import { Tooltip } from "../Tooltip.jsx";
@@ -24,13 +25,18 @@ const PROCESS_PILL = {
  * @param {Object} props
  * @param {{ id: string, label: string }[]} [props.processes] - Set only after a
  *   merge; its key says which letter on the nodes is which process.
+ * @param {boolean} [props.collapsible] - Folded behind a "Legend" button until
+ *   opened. For a phone, where the full legend wraps to three lines and took
+ *   about a sixth of the screen from the graph it explains.
  */
 export function Legend({
   hiddenLegendKeys,
   setHiddenLegendKeys,
   hideNonEntailsRels,
   processes = [],
+  collapsible = false,
 }) {
+  const [open, setOpen] = useState(false);
   // The element swatches come from the palette in force, not from the fixed
   // accent tones: a legend that keeps showing the default blue while the graph
   // is drawn in the high-contrast one is worse than no legend.
@@ -76,7 +82,7 @@ export function Legend({
     userSelect: "none",
   });
 
-  return (
+  const legend = (
     <div
       style={{
         display: "flex",
@@ -189,4 +195,38 @@ export function Legend({
       ))}
     </div>
   );
+  if (!collapsible) return legend;
+
+  // Folded, the legend still filters: what it hides stays hidden. So the
+  // button says so, or a graph missing its withdrawn elements would look
+  // broken with nothing on screen to explain it.
+  const hiddenCount = hiddenLegendKeys?.size ?? 0;
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        style={TOGGLE_STYLE}
+      >
+        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        Legend
+        {hiddenCount > 0 && ` · ${hiddenCount} hidden`}
+      </button>
+      {open && legend}
+    </div>
+  );
 }
+
+const TOGGLE_STYLE = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  minHeight: 32,
+  padding: "0 10px",
+  background: "transparent",
+  border: `1px solid ${C.border}`,
+  borderRadius: 4,
+  color: C.dim,
+  fontSize: 11,
+  cursor: "pointer",
+};

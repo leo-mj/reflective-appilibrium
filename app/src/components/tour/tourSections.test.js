@@ -191,11 +191,14 @@ describe("the same tour at either width", () => {
       "text-panel",
       "statement-toggle",
     ];
+    // What the wide ☰ holds is one level down here, behind Settings, so a
+    // section ringing one of those has to open the menu on that view.
+    const UNDER_SETTINGS = /^(menu-files|menu-settings|btn-llm|btn-home)$/;
     narrow()
       .filter((s) => s.target && !ALWAYS_DRAWN.includes(s.target))
       .forEach((s) => {
-        expect(s.menu, `${s.id} rings ${s.target} with the menu shut`).toBe(
-          true,
+        expect(s.menu, `${s.id} rings ${s.target} in the wrong view`).toBe(
+          UNDER_SETTINGS.test(s.target) ? "settings" : true,
         );
       });
   });

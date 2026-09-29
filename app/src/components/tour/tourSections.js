@@ -63,8 +63,9 @@ const byLayout = (wide, narrow) => ({ wide, narrow });
  * @property {boolean}  [text]   - True where the text panel belongs on screen.
  * @property {boolean}  [addBar] - Brings the add bar back before the chapters
  *   that would otherwise have earned it.
- * @property {boolean}  [menu]   - Opens the header's ☰ menu, for the sections
- *   that ring something inside it.
+ * @property {boolean|"settings"} [menu] - Opens the header's ☰ menu, for the
+ *   sections that ring something inside it. `"settings"`, at narrow widths,
+ *   opens it on its Settings view, where the wide ☰'s own entries are.
  */
 
 /**
@@ -212,7 +213,7 @@ function graphSections() {
       only: "narrow",
       title: "Everything else is behind ☰",
       body: [
-        "There is no room for a tab bar on a screen this narrow, so everything that is not the graph lives behind the ☰ button: the other views, the settings, import and export, and undo.",
+        "There is no room for a tab bar on a screen this narrow, so everything that is not the graph lives behind the ☰ button: the other views and undo, and — under its Settings entry — the options, import and export.",
         "The rest of the tour opens it as it goes, and rings whatever it is describing. Nothing here is doing anything until you tap it.",
       ],
       target: "btn-menu",
@@ -257,10 +258,14 @@ function graphSections() {
       title: "Saving your progress",
       body: [
         "Nothing you do here is stored on a server, so closing the tab is the end of the process. Export writes it out as a Markdown file instead, with the sections you pick — elements and relations, the log, step by step and round by round, the graph, an Argdown map — and Import reads one back, yours or one someone sent you, as long as it carries the full history.",
-        "Both are in the ☰ menu, open beside this card, along with the settings. Hover any entry to find out what it does.",
+        byLayout(
+          "Both are in the ☰ menu, open beside this card, along with the settings. Hover any entry to find out what it does.",
+          "Both are under ☰ → Settings, open beside this card, along with the other options. Long-press any entry to find out what it does.",
+        ),
       ],
       target: "menu-files",
       menu: true,
+      narrow: { menu: "settings" },
     },
   ];
 }
@@ -333,7 +338,10 @@ function assistSections(cycle, llmEnabled) {
       id: "llm-settings",
       title: "Bringing your own AI model",
       body: [
-        "The app comes with no AI model of its own. Whoever runs it points the app at a model via the ☰ menu — LLM settings.",
+        byLayout(
+          "The app comes with no AI model of its own. Whoever runs it points the app at a model via the ☰ menu — LLM settings.",
+          "The app comes with no AI model of its own. Whoever runs it points the app at a model via ☰ → Settings → LLM settings.",
+        ),
         "It asks for three things: a provider, a model on it, and a key to authenticate with — and will test the three against the provider before you commit them.",
         llmEnabled
           ? "This build can reach a backend, so a provider you configure here is the one the Assist tabs will call."
@@ -345,6 +353,7 @@ function assistSections(cycle, llmEnabled) {
       tab: "elicitJudgments",
       chrome: true,
       menu: true,
+      narrow: { menu: "settings" },
     },
   ];
 }

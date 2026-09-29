@@ -21,6 +21,87 @@ test.describe("Narrow layout", () => {
     await expect(page.locator('button[aria-label="Menu"]')).toBeVisible();
   });
 
+  // The rows standing directly in the menu's column were squeezed to about
+  // 18px by its capped height. Now the views are tiles and the wide ☰'s rows
+  // are one level down: every target is a finger's size, and the navigation
+  // fits on the screen without scrolling.
+  test("the ☰ menu fits the screen, with targets a finger can hit", async ({
+    page,
+  }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    await page.locator('button[aria-label="Menu"]').click();
+
+    // The menu box, found from something only one of its views holds.
+    const menuFrom = (id) =>
+      page.locator(`[data-tutorial="${id}"]`).locator("xpath=..");
+    const menu = menuFrom("menu-assist");
+    const sizes = (box = menu) =>
+      box.locator("button").evaluateAll((buttons) =>
+        buttons.map((b) => ({
+          target: b.textContent.trim(),
+          height: Math.round(b.getBoundingClientRect().height),
+        })),
+      );
+
+    const views = await sizes();
+    expect(views.length).toBeGreaterThan(10);
+    expect(views.filter((t) => t.height < 44)).toEqual([]);
+    const { scrollHeight, clientHeight } = await menu.evaluate((m) => ({
+      scrollHeight: m.scrollHeight,
+      clientHeight: m.clientHeight,
+    }));
+    expect(scrollHeight).toBeLessThanOrEqual(clientHeight + 1);
+
+    // The tiles grow with the screen's height; on a shorter phone they shrink
+    // back rather than making the menu scroll.
+    await page.setViewportSize({ width: 375, height: 667 });
+    const short = await menu.evaluate((m) => ({
+      scrollHeight: m.scrollHeight,
+      clientHeight: m.clientHeight,
+    }));
+    expect(short.scrollHeight).toBeLessThanOrEqual(short.clientHeight + 1);
+
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    const settings = await sizes(menuFrom("btn-home"));
+    expect(settings.length).toBeGreaterThan(8);
+    expect(settings.filter((r) => r.height !== 44)).toEqual([]);
+  });
+
+  // Fitted whole to a phone, the sample's ids were drawn at 6–7px. The graph
+  // now opens no smaller than a 10px id, and the legend, which wrapped to
+  // three lines above it, opens folded.
+  test("the graph opens with its ids legible, under a folded legend", async ({
+    page,
+  }) => {
+    await gotoHome(page);
+    await loadSample(page);
+
+    // Each id's size on screen: its font size times the canvas's zoom.
+    const smallestId = () =>
+      page.$$eval("svg text", (texts) =>
+        Math.min(
+          ...texts
+            .filter((t) => /^[JPT]\d+$/.test(t.textContent))
+            .map(
+              (t) =>
+                parseFloat(t.getAttribute("font-size")) * t.getScreenCTM().a,
+            ),
+        ),
+      );
+    // The view opens at zoom 1, where the smallest id is 13px; wait for the
+    // fit to have come down from that before judging it.
+    await expect.poll(smallestId).toBeLessThan(12.5);
+    expect(await smallestId()).toBeGreaterThanOrEqual(9.9);
+
+    const legend = page.getByRole("button", { name: /^Legend/ });
+    await expect(legend).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByText("Jointly Entails", { exact: true })).toHaveCount(0);
+    await legend.click();
+    await expect(page.getByText("Jointly Entails", { exact: true })).toBeVisible();
+    await expectNoHorizontalScroll(page);
+  });
+
   // An argument's premises are the widest row in the app and the only one that
   // grows while you work: each new one is another picker beside the last. Held
   // in a row that could not wrap, a third premise pushed the panel past the

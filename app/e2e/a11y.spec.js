@@ -388,15 +388,25 @@ test.describe("Accessibility", () => {
       const burger = page.getByRole("button", { name: menuName, exact: true });
       // Named with its icon: "ⓘ Privacy".
       const privacy = page.getByRole("button", { name: /Privacy$/ });
+      // On a phone the wide ☰'s rows are one level down, behind Settings.
+      const intoSettings = async () => {
+        if (layout !== "narrow") return;
+        await page.getByRole("button", { name: /Settings$/ }).focus();
+        await page.keyboard.press("Enter");
+        // Focus moves to the row that leads back out.
+        await expect(page.getByRole("button", { name: /Back$/ })).toBeFocused();
+      };
 
       await burger.focus();
       await page.keyboard.press("Enter");
+      await intoSettings();
       await expect(privacy).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(privacy).toBeHidden();
       await expect(burger).toBeFocused();
 
       await page.keyboard.press("Enter");
+      await intoSettings();
       await privacy.focus();
       await page.keyboard.press("Enter");
       await expect(page.getByRole("dialog")).toBeVisible();

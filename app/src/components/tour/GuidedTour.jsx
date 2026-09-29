@@ -203,7 +203,7 @@ export function GuidedTour({
     onSetChrome({
       chrome: !!section.chrome,
       text: !!section.text,
-      menu: !!section.menu,
+      menu: section.menu ?? false,
       addBar: !!section.addBar,
     });
 

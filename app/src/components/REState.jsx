@@ -757,7 +757,7 @@ export default function REState({
         tourActive={tourActive}
         onStartTour={requestTour}
         hideTabBar={tourHidesChrome}
-        tourMenuOpen={tourActive && !!tourChrome.menu}
+        tourMenuOpen={tourActive ? (tourChrome.menu ?? false) : false}
       />
 
       <section

@@ -6,35 +6,23 @@
 import { useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { TOUR_Z } from "../tour/tourZ.js";
-import { useTheme } from "../../hooks/useTheme.js";
-import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
+import { BACKEND_ENABLED } from "../../config.js";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import {
   TAB_ICONS,
   TAB_LABELS,
   TAB_TOOLTIPS,
 } from "../../constants/tabConstants.jsx";
-import {
-  btn,
-  metaTabBtn,
-  menuIconStyle,
-  menuDividerStyle,
-  inlineDividerStyle,
-  menuGroupStyle,
-  menuHeadingStyle,
-} from "./appHeaderStyles.js";
-import { MENU_HEADINGS, MENU_LABELS, MENU_TOOLTIPS } from "./menuText.js";
-import { MoonIcon, SearchIcon } from "./menuIcons.jsx";
-import { MenuToggle } from "./MenuToggle.jsx";
+import { btn, metaTabBtn, inlineDividerStyle } from "./appHeaderStyles.js";
+import { SettingsMenuItems } from "./SettingsMenuItems.jsx";
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
-import { useLLMSettings, useLLMSettingsRequested } from "../../utils/llmKey.js";
+import { useLLMSettingsRequested } from "../../utils/llmKey.js";
 import { useMenuEscape } from "../../hooks/useMenuEscape.js";
 import { CloseRoundButton } from "./CloseRoundButton.jsx";
 import { FontSettingsModal } from "./FontSettingsModal.jsx";
 import { PrivacyModal } from "./PrivacyModal.jsx";
-import { WeightTriangle } from "../workflows/WeightTriangle.jsx";
 
 /**
  * Two-row desktop header: title row + tab bar. Props mirror AppHeader.
@@ -101,12 +89,6 @@ export function AppHeaderWide({
   const [fontOpen, setFontOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
-  const {
-    isDark,
-    accessible,
-    toggle: toggleTheme,
-    toggleAccessible,
-  } = useTheme();
 
   // The tour walks the menu, so it opens and shuts it as it goes. It drives the
   // header's own state rather than overriding it, so a reader who closes the
@@ -119,12 +101,6 @@ export function AppHeaderWide({
     setTourWantedMenu(!!tourMenuOpen);
     setMenuOpen(!!tourMenuOpen);
   }
-
-  // The BYOK_ENABLED test stays here rather than in the store: whether to name
-  // the model in the menu is a display question, and llmKey.js does not know
-  // which build it is in.
-  const settings = useLLMSettings();
-  const llmSaved = BYOK_ENABLED && settings?.apiKey ? settings : null;
 
   // A tab that needs a key asks for this modal rather than having `llmOpen`
   // lifted out through ten components. Adjusted during render, as the tour's
@@ -146,9 +122,28 @@ export function AppHeaderWide({
     borderRadius: 4,
     border: "none",
   };
-  const close = (fn) => () => {
-    fn();
-    setMenuOpen(false);
+  // Everything the ☰ holds, which the narrow header offers under Settings.
+  const settingsProps = {
+    onHome,
+    hideNonEntailsRels,
+    setHideNonEntailsRels,
+    showProcessTags,
+    setShowProcessTags,
+    onResetLayout,
+    verifyArguments,
+    setVerifyArguments,
+    weights,
+    weightsChanged,
+    onWeightsChange,
+    onResetWeights,
+    showTabNav,
+    setShowTabNav,
+    allExpanded,
+    onExpandAll,
+    handleImportClick,
+    handleMergeClick,
+    handleMergeSampleClick,
+    onDownload,
   };
 
   return (
@@ -353,276 +348,16 @@ export function AppHeaderWide({
                     boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
                   }}
                 >
-                  <Tooltip text={MENU_TOOLTIPS.home}>
-                    <button
-                      data-tutorial="btn-home"
-                      onClick={close(onHome)}
-                      style={menuItem}
-                    >
-                      <span style={menuIconStyle}>←</span>
-                      {MENU_LABELS.home}
-                    </button>
-                  </Tooltip>
-
-                  <div style={menuDividerStyle} />
-
-                  {/* Content first: these two decide what the app works with —
-                      which relations exist at all, and whether an argument has
-                      to pass the checker to become one. The rows that dress a
-                      single panel are three blocks further down. */}
-                  <div style={menuGroupStyle}>
-                    <div style={menuHeadingStyle}>{MENU_HEADINGS.content}</div>
-                    {/* The tour used to stop and explain this one. It says so
-                        itself now, so the tour can stay short. */}
-                    <MenuToggle
-                      icon="→"
-                      label={MENU_LABELS.relations}
-                      tooltip={MENU_TOOLTIPS.relations}
-                      on={!hideNonEntailsRels}
-                      onToggle={() => setHideNonEntailsRels((s) => !s)}
-                      style={menuItem}
-                    />
-                    {/* Only once there has been a merge: before one, there
-                        is nothing it could show. */}
-                    {showProcessTags != null && (
-                      <MenuToggle
-                        icon="⊕"
-                        label={MENU_LABELS.processTags}
-                        tooltip={MENU_TOOLTIPS.processTags}
-                        on={showProcessTags}
-                        onToggle={() => setShowProcessTags((s) => !s)}
-                        style={menuItem}
-                      />
-                    )}
-                    {/* Only once something is pinned: before that there is
-                        no placement of the reader's to let go of. */}
-                    {onResetLayout && (
-                      <Tooltip text={MENU_TOOLTIPS.resetLayout}>
-                        <button onClick={close(onResetLayout)} style={menuItem}>
-                          <span style={menuIconStyle}>⟲</span>
-                          {MENU_LABELS.resetLayout}
-                        </button>
-                      </Tooltip>
-                    )}
-                    {BACKEND_ENABLED && (
-                      <MenuToggle
-                        icon="⊨"
-                        label={MENU_LABELS.checker}
-                        tooltip={MENU_TOOLTIPS.checker}
-                        on={verifyArguments}
-                        onToggle={() => setVerifyArguments((s) => !s)}
-                        style={menuItem}
-                      />
-                    )}
-                  </div>
-
-                  <div style={menuDividerStyle} />
-
-                  <div style={menuGroupStyle}>
-                    <div style={menuHeadingStyle}>{MENU_HEADINGS.model}</div>
-                    <Tooltip text={MENU_TOOLTIPS.llm}>
-                      <button
-                        data-tutorial="btn-llm"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setLlmOpen(true);
-                        }}
-                        style={menuItem}
-                      >
-                        <span style={menuIconStyle}>⚙</span>
-                        {llmSaved ? `LLM: ${llmSaved.model}` : MENU_LABELS.llm}
-                      </button>
-                    </Tooltip>
-                    <Tooltip text={MENU_TOOLTIPS.privacy}>
-                      <button
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setPrivacyOpen(true);
-                        }}
-                        style={menuItem}
-                      >
-                        <span style={menuIconStyle}>ⓘ</span>
-                        {MENU_LABELS.privacy}
-                      </button>
-                    </Tooltip>
-
-                    {BACKEND_ENABLED && (
-                      <>
-                        <Tooltip text={MENU_TOOLTIPS.weights}>
-                          <button
-                            onClick={() => setWeightsOpen((o) => !o)}
-                            aria-expanded={weightsOpen}
-                            // The override is spread in rather than written as
-                            // `color: changed ? accent : undefined`: that form
-                            // overwrites `menuItem`'s own colour with
-                            // `undefined`, React then sets no colour at all,
-                            // and the row falls back to the browser's default
-                            // button ink — which is how this one row came to be
-                            // brighter than every other item in the menu.
-                            style={
-                              weightsChanged
-                                ? { ...menuItem, color: C.principle.accent }
-                                : menuItem
-                            }
-                          >
-                            <span style={menuIconStyle}>⚖</span>
-                            {MENU_LABELS.weights}
-                            {weightsChanged ? " *" : ""}
-                            <span
-                              style={{
-                                marginLeft: "auto",
-                                fontSize: 9,
-                                color: C.dim,
-                              }}
-                            >
-                              {weightsOpen ? "▲" : "▼"}
-                            </span>
-                          </button>
-                        </Tooltip>
-                        {weightsOpen && (
-                          <div style={{ padding: "4px 8px 8px 8px" }}>
-                            <WeightTriangle
-                              weights={weights}
-                              onChange={onWeightsChange}
-                              weightsChanged={weightsChanged}
-                            />
-                            {weightsChanged && (
-                              <button
-                                onClick={onResetWeights}
-                                style={{
-                                  marginTop: 4,
-                                  background: "transparent",
-                                  border: `1px solid ${C.border}`,
-                                  color: C.dim,
-                                  borderRadius: 4,
-                                  padding: "2px 8px",
-                                  fontSize: 11,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Reset
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  <div style={menuDividerStyle} />
-
-                  <div style={menuGroupStyle}>
-                    <div style={menuHeadingStyle}>
-                      {MENU_HEADINGS.appearance}
-                    </div>
-                    <MenuToggle
-                      icon={<MoonIcon />}
-                      label={MENU_LABELS.theme}
-                      tooltip={MENU_TOOLTIPS.theme}
-                      on={isDark}
-                      onToggle={toggleTheme}
-                      style={menuItem}
-                    />
-                    <MenuToggle
-                      icon="◐"
-                      label={MENU_LABELS.contrast}
-                      tooltip={MENU_TOOLTIPS.contrast}
-                      on={accessible}
-                      onToggle={toggleAccessible}
-                      style={menuItem}
-                    />
-                    <Tooltip text={MENU_TOOLTIPS.font}>
-                      <button
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setFontOpen(true);
-                        }}
-                        style={menuItem}
-                      >
-                        <span style={menuIconStyle}>Aa</span>
-                        {MENU_LABELS.font}
-                      </button>
-                    </Tooltip>
-                  </div>
-
-                  <div style={menuDividerStyle} />
-
-                  {/* Both of these reach one panel and nothing else, which is
-                      why they sit below everything that reaches the whole app. */}
-                  <div style={menuGroupStyle}>
-                    <div style={menuHeadingStyle}>{MENU_HEADINGS.text}</div>
-                    <MenuToggle
-                      icon={<SearchIcon />}
-                      label={MENU_LABELS.navBar}
-                      tooltip={MENU_TOOLTIPS.navBar}
-                      on={showTabNav}
-                      onToggle={() => setShowTabNav((s) => !s)}
-                      style={menuItem}
-                    />
-                    <MenuToggle
-                      icon="⇅"
-                      label={MENU_LABELS.cards}
-                      tooltip={MENU_TOOLTIPS.cards}
-                      on={allExpanded}
-                      onToggle={onExpandAll}
-                      style={menuItem}
-                    />
-                  </div>
-
-                  <div style={menuDividerStyle} />
-
-                  <div style={menuGroupStyle} data-tutorial="menu-files">
-                    <div style={menuHeadingStyle}>{MENU_HEADINGS.session}</div>
-                    <Tooltip text={MENU_TOOLTIPS.import}>
-                      <button
-                        onClick={() => {
-                          handleImportClick();
-                          setMenuOpen(false);
-                        }}
-                        style={menuItem}
-                      >
-                        <span style={menuIconStyle}>↑</span>
-                        {MENU_LABELS.import}
-                      </button>
-                    </Tooltip>
-                    {handleMergeClick && (
-                      <Tooltip text={MENU_TOOLTIPS.merge}>
-                        <button
-                          onClick={() => {
-                            handleMergeClick();
-                            setMenuOpen(false);
-                          }}
-                          style={menuItem}
-                        >
-                          <span style={menuIconStyle}>⊕</span>
-                          {MENU_LABELS.merge}
-                        </button>
-                      </Tooltip>
-                    )}
-                    {handleMergeSampleClick && (
-                      <Tooltip text={MENU_TOOLTIPS.mergeSample}>
-                        <button
-                          onClick={() => {
-                            handleMergeSampleClick();
-                            setMenuOpen(false);
-                          }}
-                          style={menuItem}
-                        >
-                          <span style={menuIconStyle}>⊕</span>
-                          {MENU_LABELS.mergeSample}
-                        </button>
-                      </Tooltip>
-                    )}
-                    <Tooltip text={MENU_TOOLTIPS.export}>
-                      <button
-                        onClick={close(onDownload)}
-                        style={{ ...menuItem, color: C.theory.text }}
-                      >
-                        <span style={menuIconStyle}>↓</span>
-                        {MENU_LABELS.export}
-                      </button>
-                    </Tooltip>
-                  </div>
+                  <SettingsMenuItems
+                    {...settingsProps}
+                    itemStyle={menuItem}
+                    closeMenu={() => setMenuOpen(false)}
+                    onOpenLlm={() => setLlmOpen(true)}
+                    onOpenPrivacy={() => setPrivacyOpen(true)}
+                    onOpenFont={() => setFontOpen(true)}
+                    weightsOpen={weightsOpen}
+                    setWeightsOpen={setWeightsOpen}
+                  />
                 </div>
               </>
             )}

@@ -32,6 +32,8 @@ export const MENU_LABELS = {
   merge: "Merge",
   mergeSample: "Merge (demo)",
   export: "Export",
+  settings: "Settings",
+  back: "Back",
 };
 
 /** One line each, keyed as above. */
@@ -54,6 +56,7 @@ export const MENU_TOOLTIPS = {
   merge: "Add another exported process or Argdown map to this one, as one step.",
   mergeSample: "Merge a second sample process into this one, to try the feature.",
   export: "Write the process out to a file, choosing what goes in.",
+  settings: "Home, display options, the model, import and export.",
 };
 
 /** Headings over the menu's blocks, in the order they appear. */

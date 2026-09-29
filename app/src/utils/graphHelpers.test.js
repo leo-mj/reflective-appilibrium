@@ -10,6 +10,8 @@ import {
   groupJointArguments,
   hitRadius,
   hitsElement,
+  NARROW_FIT_MIN_ZOOM,
+  nodeLabelSize,
   nodeRadius,
   parallelEdgeOffsets,
 } from "./graphHelpers.js";
@@ -354,6 +356,22 @@ describe("fitView", () => {
   it("returns nothing to fit against a container with no size", () => {
     expect(fitView(POSITIONS, null, { w: 0, h: 0 })).toBeNull();
     expect(fitView(null, null, STRIP)).toBeNull();
+  });
+
+  it("opens a phone's graph with every id at 10px or more", () => {
+    // A sample-sized graph, far wider than a phone: fitted whole, its ids
+    // were drawn at 6–7px. Floored, the smallest is 10 and the rest is panned to.
+    const wide = { A: { x: 0, y: 0 }, B: { x: 900, y: 700 } };
+    const phone = { w: 390, h: 520 };
+    const loose = fitView(wide, null, phone);
+    const floored = fitView(wide, null, phone, {
+      minZoom: NARROW_FIT_MIN_ZOOM,
+    });
+    expect(nodeLabelSize("judgment") * loose.zoom).toBeLessThan(10);
+    expect(nodeLabelSize("judgment") * floored.zoom).toBeCloseTo(10, 5);
+    expect(nodeLabelSize("theory") * floored.zoom).toBeGreaterThanOrEqual(
+      10 - 1e-9,
+    );
   });
 });
 

@@ -70,6 +70,17 @@ export function nodeLabelSize(type) {
   return type === "principle" ? 16 : 13;
 }
 
+/**
+ * How far a phone's graph may zoom out as it opens: far enough that the
+ * smallest id, a judgment's or a theory's, is still drawn at 10px.
+ *
+ * Fitting the whole sample to a phone put its ids at 6–7px, which nobody reads
+ * without zooming first. Past this floor the opening view stops shrinking and
+ * the rest of the graph is panned to. The fit button still frames the whole
+ * graph at whatever size that takes: there the reader has asked to see it all.
+ */
+export const NARROW_FIT_MIN_ZOOM = 10 / nodeLabelSize("judgment");
+
 /** How far past its outline a node stays clickable. */
 const HIT_PADDING = 8;
 /** Floor on a touch target, whatever the node's own size. */
