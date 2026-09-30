@@ -138,6 +138,13 @@ def build_prompt(
 
     Existing arguments (from ``relations``) are injected so the model does not
     reproduce them.
+
+    **Empirical premises are typed as background theories**, and the prompt
+    says so outright. The simulation's theory is made of principles and
+    theories only (``services.rethon_theory``), and rethon's account asks what
+    the theory alone implies — so an argument resting on a premise typed as a
+    judgment can never let the theory account for its conclusion. Wide RE
+    counts empirical claims among its background theories anyway.
     """
     element_lines = "\n".join(f"  {n} [{e.type}]: {e.text}" for n, e in lookup.items())
     next_index = max(lookup) + 1 if lookup else 1
@@ -181,7 +188,10 @@ Since substantive premises are atoms like the pool sentences, every argument nee
 
 For each added premise, supply:
 - "index": an unused integer. Number added premises consecutively upward starting at {next_index} (the sentence indices up to {next_index - 1} are taken; never reuse them).
-- "type": "judgment", "principle", or "theory" (a background theory).
+- "type": what kind of claim the premise is:
+    - "judgment" — a moral verdict, on a case or a kind of case.
+    - "principle" — a general moral rule.
+    - "theory" — a background theory: a claim that is not itself moral. EVERY empirical premise is a "theory" — about causes, consequences, what an act brings about, what people will be or do — and so is a metaphysical, scientific or meta-ethical one. Never type an empirical claim as a "judgment", however particular it is.
 - "text": the premise in natural language.
 - "role": "premise" or "postulate", as above.
 - "form": REQUIRED for a "postulate", OMITTED for a "premise". The postulate's logical content as a propositional formula over the OTHER indices — pool sentences and the substantive premises of the same argument — using ~ (not), & (and), | (or), -> (if-then). Example: "({s1} & {next_index}) -> {s2}". The form must never mention the postulate's own index.
@@ -318,8 +328,10 @@ DUMMY_ADDED_PREMISES: List[Dict] = [
         "text": "Beings who possess or will possess the capacity for well-being and who will be affected by our decisions are owed obligations of justice.",
     },
     {
+        # Empirical, so a background theory, as the prompt now asks for; it
+        # was typed a judgment, which the simulation's theory cannot use.
         "index": 24,
-        "type": "judgment",
+        "type": "theory",
         "role": "premise",
         "text": "People living in 2100 and beyond will be causally affected by climate policies adopted today.",
     },

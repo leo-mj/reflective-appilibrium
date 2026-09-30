@@ -20,9 +20,19 @@ best near the empty position, locally; the best anywhere, globally). Seeding it
 continues the user's process rather than restarting its theory: the
 commitments are already carried over as they stand now, so a fresh theory was
 the one part of the simulation that ignored where the user had got to. Where
-the held theory is not a theory rethon can take — empty, or made inconsistent
-by the arguments — the start falls back to rethon's own choice, restricted as
-everything else is.
+the arguments make the held theory inconsistent — a position with open
+conflicts, which is most positions worth simulating — the start is **the
+largest consistent part of it**, taking the most confident principles first.
+Falling back to rethon's own start instead, as it first did, began the demo
+from a single principle and withdrew most of the position. Only where nothing
+is held does the start fall back to rethon's choice, restricted as everything
+else is.
+
+**Ties are broken reproducibly.** rethon picks at random among equally good
+candidates, so the same request gave a different result each run — which
+elements an equilibrium withdrew changed between presses. These processes pick
+with a generator seeded from the request's own inputs, so a position, its
+arguments and the settings always give the same result.
 
 Every other part of the model is rethon's own: commitments still range over the
 whole pool, the achievement function and the stopping rule are untouched.
@@ -32,7 +42,9 @@ unseeded model, which is what published rethon simulations use; the routes
 never pass it.
 """
 
-from typing import FrozenSet, Iterable, Optional, Set
+import hashlib
+import random
+from typing import FrozenSet, Iterable, Optional, Set, Tuple
 
 from theodias import DialecticalStructure, Position, StandardPosition
 from rethon import (
@@ -57,44 +69,95 @@ def theory_sentences(lookup: dict) -> FrozenSet[int]:
     )
 
 
-def held_theory(lookup: dict) -> FrozenSet[int]:
+def held_theory(lookup: dict) -> Tuple[int, ...]:
     """Indices of the principles and background theories the user holds now —
     active or revised — which is the theory position the scoring evaluates
     (``_build_type_positions`` in ``rethon_scoring``) and the simulation's
-    first theory."""
-    return frozenset(
-        index
-        for index in theory_sentences(lookup)
-        if lookup[index].status in ("active", "revised")
+    first theory.
+
+    In the order the start takes them when not all can be held together: most
+    confident first, ties by position in the pool."""
+    return tuple(
+        sorted(
+            (
+                index
+                for index in theory_sentences(lookup)
+                if lookup[index].status in ("active", "revised")
+            ),
+            key=lambda index: (-(lookup[index].confidence or 0), index),
+        )
     )
+
+
+def _position_key(position: Position) -> Tuple[int, ...]:
+    """A candidate's place in a fixed order, so a seeded pick is the same pick."""
+    return tuple(sorted(position.as_set()))
 
 
 class _TheoryRestriction:
     """What the two restricted processes share: which positions may be a
-    theory, and which one the process starts from."""
+    theory, which one the process starts from, and how ties are broken."""
 
     _theory_sentences: FrozenSet[int] = frozenset()
-    _held_theory: FrozenSet[int] = frozenset()
+    _held_theory: Tuple[int, ...] = ()
+    _rng: random.Random = random.Random(0)
+
+    def _restrict(
+        self,
+        theory_sentences: Iterable[int],
+        held_theory: Iterable[int],
+        initial_commitments: Position,
+    ) -> None:
+        self._theory_sentences = frozenset(theory_sentences)
+        self._held_theory = tuple(held_theory)
+        # Seeded by what the process is given, not by the clock: the same
+        # position and theory always break their ties the same way.
+        digest = hashlib.sha256(
+            repr(
+                (
+                    sorted(initial_commitments.as_set()),
+                    sorted(self._theory_sentences),
+                    self._held_theory,
+                )
+            ).encode()
+        ).hexdigest()
+        self._rng = random.Random(int(digest[:16], 16))
 
     def may_be_theory(self, position: Position) -> bool:
         # Negated sentences appear as negative indices, so they fail this too.
         return position.as_set() <= self._theory_sentences
 
     def seeded_theory(self) -> Optional[Position]:
-        """The held theory as the first theory, or None where rethon cannot
-        take it: nothing held, or held principles the arguments make
-        inconsistent together."""
-        if not self._held_theory:
+        """The first theory: the held theory where the arguments allow holding
+        it all, its largest consistent part otherwise — principles taken most
+        confident first, each kept if it is consistent with those kept before.
+        None where nothing is held, or nothing held is consistent."""
+        ds = self.dialectical_structure()
+        n = ds.sentence_pool().size()
+        held = [i for i in self._held_theory if i in self._theory_sentences]
+        if not held:
             return None
-        seed = StandardPosition.from_set(
-            set(self._held_theory),
-            self.dialectical_structure().sentence_pool().size(),
-        )
-        if self.may_be_theory(seed) and self.dialectical_structure().is_consistent(
-            seed
-        ):
-            return seed
-        return None
+        whole = StandardPosition.from_set(set(held), n)
+        if ds.is_consistent(whole):
+            return whole
+        kept: Set[int] = set()
+        for index in held:
+            if ds.is_consistent(StandardPosition.from_set(kept | {index}, n)):
+                kept.add(index)
+        return StandardPosition.from_set(kept, n) if kept else None
+
+    def pick_theory_candidate(self, theory_candidates, **kwargs) -> Position:
+        """As rethon's, but reproducible: a seeded pick among equals."""
+        return self._pick(theory_candidates)
+
+    def pick_commitment_candidate(self, commitments_candidates, **kwargs) -> Position:
+        """As rethon's, but reproducible: a seeded pick among equals."""
+        return self._pick(commitments_candidates)
+
+    def _pick(self, candidates) -> Position:
+        if len(candidates) == 1:
+            return next(iter(candidates))
+        return self._rng.choice(sorted(candidates, key=_position_key))
 
 
 class TheoryRestrictedLocalRE(_TheoryRestriction, StandardLocalReflectiveEquilibrium):
@@ -114,8 +177,7 @@ class TheoryRestrictedLocalRE(_TheoryRestriction, StandardLocalReflectiveEquilib
         theory_sentences: Iterable[int],
         held_theory: Iterable[int] = (),
     ):
-        self._theory_sentences = frozenset(theory_sentences)
-        self._held_theory = frozenset(held_theory)
+        self._restrict(theory_sentences, held_theory, initial_commitments)
         super().__init__(
             dialectical_structure=dialectical_structure,
             initial_commitments=initial_commitments,
@@ -192,8 +254,7 @@ class TheoryRestrictedGlobalRE(_TheoryRestriction, StandardGlobalReflectiveEquil
         theory_sentences: Iterable[int],
         held_theory: Iterable[int] = (),
     ):
-        self._theory_sentences = frozenset(theory_sentences)
-        self._held_theory = frozenset(held_theory)
+        self._restrict(theory_sentences, held_theory, initial_commitments)
         super().__init__(
             dialectical_structure=dialectical_structure,
             initial_commitments=initial_commitments,

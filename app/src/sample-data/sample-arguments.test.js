@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getSampleArguments } from "./sample-arguments.js";
-import { ELICITABLE_ARGUMENT_PREMISES } from "./sample-judgments.js";
+import { ARGUMENT_PREMISES } from "./sample-argument-texts.js";
 import { argumentPostulateExplanation } from "../utils/stateUtils.js";
 
 // Sample-state element order: J1–J13 = 1–13, P1–P6 = 14–19, T1 = 20, T2 = 21,
@@ -47,14 +47,15 @@ describe("getSampleArguments", () => {
     }
   });
 
-  it("reuses an accepted Elicit-Judgments premise instead of re-proposing it", () => {
-    // Simulate the user having accepted the "2100 affected" judgment in Elicit
-    // Judgments: it is now an element appended after the base state (position 23).
+  it("reuses an accepted Theories-tab premise instead of re-proposing it", () => {
+    // Simulate the user having accepted the "2100 affected" theory in the
+    // Theories tab: it is now an element appended after the base state
+    // (position 23). Empirical, so a theory — it was a Judgments-tab option.
     const accepted = {
-      id: "J15",
-      type: "judgment",
+      id: "T3",
+      type: "theory",
       status: "active",
-      text: ELICITABLE_ARGUMENT_PREMISES.affected2100,
+      text: ARGUMENT_PREMISES.affected2100,
     };
     const grown = [...elements, accepted];
     const res = getSampleArguments(grown, "8");
@@ -64,15 +65,17 @@ describe("getSampleArguments", () => {
     // No injected premise carries that text — it was reused from the pool.
     const injected = Object.values(res.lookup).filter((e) => !grown.includes(e));
     expect(injected.map((e) => e.text)).not.toContain(
-      ELICITABLE_ARGUMENT_PREMISES.affected2100,
+      ARGUMENT_PREMISES.affected2100,
     );
   });
 
-  it("proposes the elicitable premise as new when it is not yet in the pool", () => {
-    // Without acceptance, P5 + premise → J2 injects the premise at index 24.
+  it("proposes the shared premise as new, typed as a theory, when it is not yet in the pool", () => {
+    // Without acceptance, P5 + premise → J2 injects the premise at index 24 —
+    // as a background theory, being empirical, so that the theory can use it.
     const res = getSampleArguments(elements, "8");
     expect(res.num_arguments).toContainEqual([18, 24, 2]);
-    expect(res.lookup[24].text).toBe(ELICITABLE_ARGUMENT_PREMISES.affected2100);
+    expect(res.lookup[24].text).toBe(ARGUMENT_PREMISES.affected2100);
+    expect(res.lookup[24].type).toBe("theory");
   });
 
   it("composes a 'Valid given: …' explanation from each argument's postulates", () => {

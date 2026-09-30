@@ -72,7 +72,16 @@ test.describe("Against the real backend", () => {
     await expect(page.getByText(/Equilibrium (reached|not reached yet)/)).toBeVisible({
       timeout: 60_000,
     });
-    await expect(page.getByText(/Retained · \d+/)).toBeVisible();
+    // The result as the tab now gives it: a decision on what accepting would
+    // change (or that nothing would), and a row for every step of the
+    // evolution the server returned. It used to list "Retained · n" and
+    // "Withdrawn · n" in full, which this test waited for.
+    const decision = page.getByRole("region", { name: "Decide on the result" });
+    await expect(decision).toBeVisible();
+    await expect(decision).toContainText(/Accepting would|Nothing to accept/);
+    await expect(
+      page.getByRole("list", { name: "Steps" }).getByRole("listitem"),
+    ).toHaveCount(state.evolution.length);
   });
 
   test("scores the process step by step, for History", async ({ page }) => {

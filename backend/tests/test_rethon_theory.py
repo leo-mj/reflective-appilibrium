@@ -147,12 +147,19 @@ def test_an_unseeded_local_start_can_settle_short_of_the_held_theory():
 
 
 @pytest.mark.parametrize("local", [True, False])
-def test_a_held_theory_rethon_cannot_take_falls_back_to_its_own_start(local):
+def test_an_inconsistent_held_theory_starts_from_its_largest_consistent_part(local):
     # P1 → ¬P2 makes the two held principles inconsistent together, and a
-    # theory must be consistent. Nothing held at all is the other such case.
-    inconsistent = _seeded_run(local, HELD, SEEDED_ARGUMENTS + [[4, -5]])
-    assert inconsistent.evolution[1].as_set() != HELD
-    assert inconsistent.evolution[1].as_set() <= {4, 5}
+    # theory must be consistent. The start keeps what it can, in the order
+    # held_theory gives — most confident first — rather than dropping to
+    # rethon's own start, which began the demo from one principle.
+    first = _seeded_run(local, (4, 5), SEEDED_ARGUMENTS + [[4, -5]]).evolution[1]
+    assert first.as_set() == {4}
+    first = _seeded_run(local, (5, 4), SEEDED_ARGUMENTS + [[4, -5]]).evolution[1]
+    assert first.as_set() == {5}
+
+
+@pytest.mark.parametrize("local", [True, False])
+def test_nothing_held_falls_back_to_rethons_start(local):
     assert _seeded_run(local, ()).evolution[1].as_set() <= {4, 5}
 
 
@@ -166,5 +173,40 @@ def test_the_held_theory_is_what_the_scoring_takes_as_the_theory():
         4: _element("T1", "theory", "revised"),
         5: _element("P3", "principle", "rejected"),
     }
-    assert held_theory(lookup) == {2, 4}
+    assert set(held_theory(lookup)) == {2, 4}
     assert theory_sentences(lookup) == {2, 3, 4, 5}
+
+
+def test_the_held_theory_comes_most_confident_first():
+    # The order the start keeps principles in when not all can be held.
+    lookup = {
+        1: _element("P1", "principle").model_copy(update={"confidence": 0.3}),
+        2: _element("P2", "principle").model_copy(update={"confidence": 1.0}),
+        3: _element("P3", "principle").model_copy(update={"confidence": 0.3}),
+    }
+    assert held_theory(lookup) == (2, 1, 3)
+
+
+# ── Reproducible ties ─────────────────────────────────────────────────────────
+#
+# rethon picks at random among equally good candidates; the same request used
+# to withdraw different elements on each press.
+
+
+@pytest.mark.parametrize("local", [True, False])
+def test_the_same_request_gives_the_same_process(local):
+    # Four judgments, one principle accounting for two of them: plenty of
+    # candidates that tie on achievement.
+    arguments = [[5, 1], [5, 2]]
+    runs = []
+    for _ in range(4):
+        ds = BDDDialecticalStructure.from_arguments(
+            arguments=arguments, n_unnegated_sentence_pool=5
+        )
+        re = make_re(
+            ds, StandardPosition.from_set({1, 2, 3, 4, 5}, 5), local, {5}, (5,)
+        )
+        re.set_model_parameters(neighbourhood_depth=2)
+        re.re_process()
+        runs.append([p.as_set() for p in re.state().evolution])
+    assert all(run == runs[0] for run in runs)

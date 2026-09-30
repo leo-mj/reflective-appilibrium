@@ -57,8 +57,9 @@ see `app/e2e/README.md`); the backend is pytest from the repo root.
 
 - **Judgments (J)** — Moral verdicts, any generality. Circles.
 - **Principles (P)** — General moral rules. Rounded rectangles.
-- **Background Theories (T)** — Meta-ethical commitments. Diamonds. Suggested in
-  every round, as the workflow's third step.
+- **Background Theories (T)** — Meta-ethical commitments and other background
+  knowledge, empirical claims included. Diamonds. Suggested in every round, as
+  the workflow's third step.
 
 Every element carries a `confidence` in [0, 1] and a `status`: `active`, `revised`,
 `withdrawn`, `rejected`, or `possible` (an option offered but not yet affirmed —
@@ -129,10 +130,25 @@ first theory for the commitments (near the empty position, locally). The
 commitments already start from the user's current statuses, so a fresh theory
 was the one part that restarted the process instead of continuing it; and a
 local search started near the empty position can settle on less than the user
-holds (`test_rethon_theory.py` has such a case). A held theory rethon cannot
-take — none, or one the arguments make inconsistent — falls back to rethon's
-start. Whether seeded and unseeded runs reach different equilibria is a result
-worth recording, not a reason to go back. `make_re(…, None)` is the standard
+holds (`test_rethon_theory.py` has such a case). **A held theory the arguments
+make inconsistent starts from its largest consistent part**, principles taken
+most confident first — most positions worth simulating have open conflicts,
+and falling back to rethon's start instead began the demo from one principle
+and withdrew most of it. Only a process holding no principle or theory falls
+back to rethon's start. Whether seeded and unseeded runs reach different
+equilibria is a result worth recording, not a reason to go back.
+
+**Ties are broken reproducibly**: rethon picks at random among equally good
+candidates, so the same request withdrew different elements on each press.
+The restricted processes pick with a generator seeded from their own inputs.
+
+**A judgment premise never helps the theory account for anything**, since
+rethon's account asks what the theory alone implies and a judgment cannot be in
+it: P + J → J' leaves J' unaccounted for. An empirical premise is a background
+theory — wide RE draws on other domains of inquiry — and typing it so is what
+lets such an argument count. The Arguments tab's prompt says so outright
+(`build_prompt` in `backend/services/arguments.py`): every empirical premise it
+adds is a theory. The demo's T3 was J14 until that showed. `make_re(…, None)` is the standard
 model, unrestricted and unseeded, for comparison with published rethon runs;
 no route uses it.
 

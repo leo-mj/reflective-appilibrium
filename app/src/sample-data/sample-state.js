@@ -1,8 +1,28 @@
 // Sample RE state for visualization development
 // Topic: obligations to future generations
-// 8 rounds, 13 judgments, 6 principles, 2 theories, mix of statuses
+// 8 rounds, 13 judgments, 10 principles, 3 theories, mix of statuses
 
 import { sampleLog } from "./sampleLog.js";
+import {
+  ARGUMENT_PREMISES,
+  PROMOTED_POSTULATES,
+} from "./sample-argument-texts.js";
+import { argumentPostulateExplanation } from "../utils/stateUtils.js";
+
+/**
+ * An argument's relations as Detect Arguments writes them on accepting it:
+ * one per premise, sharing an id and a step, explained by the postulate.
+ */
+const argument = (argumentId, premises, to, type, step, postulate) =>
+  premises.map((from) => ({
+    from,
+    to,
+    type,
+    argumentId,
+    explanation: argumentPostulateExplanation([postulate]),
+    addedRound: step,
+    origin: "claude-fable-5",
+  }));
 
 // No `reviews` here on purpose. A review is something the user accepts, so the
 // sample must not open with one already banked — see the note in
@@ -11,7 +31,7 @@ import { sampleLog } from "./sampleLog.js";
 const SAMPLE = {
   topic: "Do we have moral obligations to people who do not yet exist?",
   phase: 3,
-  round: 61,
+  round: 71,
   // Eight rounds, each change its own step, as the app records them: `round`
   // is the last step, `roundEnds` the last step of rounds 1–7, the eighth being
   // the one open now. Within a round, elements came in first, then relations —
@@ -231,19 +251,63 @@ const SAMPLE = {
       addedRound: 49,
     },
 
-    // A judgment the user accepted earlier that is not yet tied into any
-    // argument (deliberately left unconnected). Detect Arguments reconstructs
-    // P1 + J14 → J1 from it, demonstrating argument detection over existing
-    // elements rather than newly proposed premises. Kept last so it occupies
-    // positional index 22 in the argument fixture (sample-arguments.js).
+    // An empirical claim, and so a background theory: wide RE draws on other
+    // domains of inquiry, the natural sciences among them. It was J14, a
+    // judgment — and a judgment cannot be part of the simulation's theory, so
+    // P1 + J14 → J1 could never let the theory account for J1, and
+    // Equilibrate withdrew the demo's anchor judgment in most runs. Tied in by
+    // P1 + T3 → J1, found by Detect Arguments over existing elements in round
+    // 8. Kept at position 22 of this list, which the argument fixture's indices
+    // rely on (sample-arguments.js).
     {
-      id: "J14",
-      type: "judgment",
+      id: "T3",
+      type: "theory",
       status: "active",
       confidence: 1.0,
       origin: "user",
       text: "Burying large quantities of radioactive waste without containment bequeaths the next generation land and groundwater burdened with an uncontained long-term hazard, leaving them worse off than we found things.",
       addedRound: 5,
+    },
+
+    // ── Premises Detect Arguments added in round 8 ──
+    // Each closes the gap in one of the arguments detected then (below, with
+    // the relations). After T3, so the fixture's positions 1–22 hold; the
+    // Arguments tab finds these by their wording (sample-argument-texts.js).
+    {
+      id: "P7",
+      type: "principle",
+      status: "active",
+      confidence: 0.67,
+      origin: "claude-fable-5",
+      text: ARGUMENT_PREMISES.wellBeingJustice,
+      addedRound: 61,
+    },
+    {
+      id: "P8",
+      type: "principle",
+      status: "active",
+      confidence: 0.67,
+      origin: "claude-fable-5",
+      text: ARGUMENT_PREMISES.representation,
+      addedRound: 62,
+    },
+    {
+      id: "P9",
+      type: "principle",
+      status: "active",
+      confidence: 0.67,
+      origin: "claude-fable-5",
+      text: ARGUMENT_PREMISES.deDicto,
+      addedRound: 63,
+    },
+    {
+      id: "P10",
+      type: "principle",
+      status: "active",
+      confidence: 0.67,
+      origin: "claude-fable-5",
+      text: ARGUMENT_PREMISES.fullWeight,
+      addedRound: 64,
     },
   ],
   relations: [
@@ -424,7 +488,7 @@ const SAMPLE = {
       type: "conflicts",
       explanation:
         "P6 counts temporal proximity among the factors that modulate obligation strength; P3 denies that mere temporal distance does. As stated, both cannot be true.",
-      addedRound: 61,
+      addedRound: 71,
       origin: "claude-fable-5",
     },
 
@@ -582,26 +646,22 @@ const SAMPLE = {
       addedRound: 57,
       origin: "claude-fable-5",
     },
+
+    // Round 8: six arguments accepted from Detect Arguments, as the tab writes
+    // them — premises sharing a step, the meaning postulate as the explanation.
+    // They tie in J1, J9, J12, T3 and P5, which sat in no argument, so that
+    // rethon (which reads arguments alone) could not account for them.
+    ...argument("arg-sample-6", ["P1", "T3"], "J1", "jointly_entails", 65, PROMOTED_POSTULATES.sufficiencyWrong),
+    ...argument("arg-sample-7", ["P3"], "J10", "entails", 66, PROMOTED_POSTULATES.temporalDiscounting),
+    ...argument("arg-sample-8", ["P5", "P8"], "J12", "jointly_entails", 67, PROMOTED_POSTULATES.representation),
+    ...argument("arg-sample-9", ["T1", "P7"], "P5", "jointly_entails", 68, PROMOTED_POSTULATES.wellBeingJustice),
+    ...argument("arg-sample-10", ["T2", "P9"], "J9", "jointly_entails", 69, PROMOTED_POSTULATES.deDicto),
+    ...argument("arg-sample-11", ["P5", "P10"], "J5", "jointly_precludes", 70, PROMOTED_POSTULATES.fullWeight),
   ],
-  coherence: {
-    tensions: [
-      "J5 undermines J10: uncertainty-based discounting is permitted while temporal discounting is not, yet existence-uncertainty grows with temporal distance, so J5's discounting threatens to reintroduce temporal discounting in practice. P3 draws the line; whether it can be held is open.",
-      "P6 undermines P5: if proximity modulates obligation strength, P5's claim that justice is owed equally to all affected, whenever they exist, is weakened.",
-      "J9 undermines P5: the non-identity problem complicates extending justice to specific future individuals.",
-      "P6 conflicts with P3: P6 counts temporal proximity among the factors that modulate obligation strength, while P3 denies that mere temporal distance does. Restricting P6 to social and relational proximity would resolve the conflict.",
-      "P6 and J7 jointly preclude J10: if proximity modulates obligation strength and parental duties outrank duties to distant strangers, temporal neutrality fails. J10 is now both supported (P3, P5) and precluded — the structure's central instability.",
-      "J13 undermines J8: if failing to create people wrongs no one, the wrongness of allowing extinction cannot rest on future people's claims. J8 may need regrounding in duties to present people or in impersonal value.",
-    ],
-    orphans: [
-      "J12 is covered by P5 but has no direct theoretical grounding — it's a political-institutional judgment that may need its own principle about institutional design.",
-      "J13 has no principled grounding — no active principle explains the procreation asymmetry, and none of P1–P6 entails or precludes it.",
-    ],
-    clusters: [
-      "Core cluster: J1, J2, J3, J4 unified under P1 (sufficientarian threshold).",
-      "Existence cluster: J5, J8, J9 unified under P2 (probabilistic obligation), grounded in T1 and T2.",
-      "Temporal-neutrality cluster: J10, J12 unified under P5 (justice owed to all affected), grounded in T1. In tension with P6.",
-    ],
-  },
+  // Empty on purpose. These were hand-written notes on the tensions, orphans
+  // and clusters, which the text panel computes from the relations anyway and
+  // which went stale whenever the demo changed. The export still wrote them.
+  coherence: { tensions: [], orphans: [], clusters: [] },
 };
 
 // One entry per step, as the app writes them: see sampleLog.js.

@@ -5,7 +5,9 @@
 // Stored in the tab's *final* shape, verification states included, because
 // `makeLLMClient` serves `dummyData` without running `transformResponse` — and
 // because the demo build has no backend, so nothing would ever check these.
-// Between the three suggestions they cover every state the card can be in:
+import { ARGUMENT_PREMISES } from "./sample-argument-texts.js";
+
+// Between the first three suggestions they cover every state the card can be in:
 //
 //   - a `matched` reference, carrying the DOI Crossref returned;
 //   - a `not_found` one, which is emphatically not a claim of fabrication —
@@ -63,6 +65,15 @@ const sampleTheories = {
     },
     {
       text: "Persons persist through time in virtue of psychological continuity rather than any further fact, so that the boundary between one's own future and a stranger's is a matter of degree.",
+      confidence: 0.67,
+      sources: [],
+    },
+    // Empirical rather than metaphysical: a background theory from the natural
+    // sciences, which wide RE draws on as it does philosophy. Shared with the
+    // Arguments tab, which reuses it once accepted (sample-argument-texts.js).
+    // No references: a fixture must not invent them, and none is required.
+    {
+      text: ARGUMENT_PREMISES.affected2100,
       confidence: 0.67,
       sources: [],
     },

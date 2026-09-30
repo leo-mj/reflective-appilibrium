@@ -149,11 +149,14 @@ def test_hosted_caps_the_pool_by_default():
 
 
 def test_hosted_takes_the_demo_and_its_merge():
-    """The sample is 22 elements, 10 of them in arguments; merged with the second
-    sample process, 33 and 13. The old cap of 20 on all elements refused it."""
+    """The sample is 26 elements, 19 of them in arguments; merged with the second
+    sample process, 37 and 22. The old cap of 20 on all elements refused it.
+    The sample gained six arguments so that Equilibrate on it had something to
+    reason over; app/src/sample-data/sample-state.test.js holds it under the
+    argued cap from that side."""
     hosted = make_settings(deployment="hosted")
-    assert hosted.simulation_max_elements >= 33
-    assert hosted.simulation_max_argued_elements >= 13
+    assert hosted.simulation_max_elements >= 37
+    assert hosted.simulation_max_argued_elements >= 22
 
 
 def test_local_does_not():

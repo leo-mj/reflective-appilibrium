@@ -102,8 +102,9 @@ def test_step_rejects_invalid_depth(client, depth):
 def _make_mock_element(status="active"):
     el = MagicMock(spec=REElement)
     el.status = status
-    # Read to find the theory sentences (rethon_theory).
+    # Read to find the theory sentences and order the held theory (rethon_theory).
     el.type = "principle"
+    el.confidence = 0.5
     return el
 
 

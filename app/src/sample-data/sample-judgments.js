@@ -2,14 +2,16 @@
 // Topic: obligations to future generations (matches sample-state.js).
 // Used automatically in PROD, or in DEV when the "Use sample data" toggle is on.
 
-// Two judgment texts that double as suppressed premises in sample-arguments.js.
-// If the user accepts one of these here, Detect Arguments finds it already in the
-// pool (matched by text) and reconstructs the argument from it, instead of
+// A judgment text that doubles as a suppressed premise in sample-arguments.js.
+// If the user accepts it here, Detect Arguments finds it already in the pool
+// (matched by text) and reconstructs the argument from it, instead of
 // re-proposing it as a freshly added premise. Defined in one place so the elicit
 // option and the argument premise can never drift apart.
+//
+// There were two. The other — that people in 2100 will be causally affected by
+// today's climate policy — is empirical, so a background theory, and is offered
+// by the Theories tab now (sample-argument-texts.js); its question left with it.
 export const ELICITABLE_ARGUMENT_PREMISES = {
-  affected2100:
-    "People living in 2100 and beyond will be causally affected by climate policies adopted today.",
   extinctionNonCreation:
     "A society's failure to prevent its own distant extinction wrongs no one now alive and, with respect to future people, merely fails to bring them into existence.",
 };
@@ -77,20 +79,6 @@ const sampleJudgments = {
         },
         {
           text: "Future generations' interests should inform policy but should not override democratically expressed preferences of living citizens.",
-          confidence: 0.67,
-        },
-      ],
-    },
-    {
-      question:
-        "Is it actually true that the decisions we make now will causally reach people in 2100 and beyond, or is the far future too unpredictable for present acts to determinately affect it?",
-      judgments: [
-        {
-          text: ELICITABLE_ARGUMENT_PREMISES.affected2100,
-          confidence: 0.67,
-        },
-        {
-          text: "Beyond a few decades causal chains become too diffuse to say present policy determinately affects any particular future outcome.",
           confidence: 0.67,
         },
       ],
