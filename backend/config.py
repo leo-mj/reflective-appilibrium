@@ -97,7 +97,26 @@ _SDK_DEFAULT_LLM_TIMEOUT = 600.0
 # So the cap that matters counts elements that take part in an argument, and it
 # is set where the worst case, a dense chain, stays about five seconds. It was a
 # cap of 20 on all elements, which refused the demo itself: 22 elements, ten
-# of them in arguments. "Argued" counts what rethon is given — the elements of
+# of them in arguments.
+#
+# **Raised from 20 to 24 when the theory was restricted** to principles and
+# background theories and seeded with the ones held (services/rethon_theory.py).
+# Most of standard rethon's time went on scoring every theory candidate in the
+# neighbourhood; restricted, most are never scored. Measured on one development
+# machine, the same dense chain at depth 2, before and after, the worst of chains
+# with every element, one in two and one in three a principle:
+#
+#     argued    before     after
+#       20      20.8s      1.95s
+#       22      72.6s      4.25s
+#       24        —        15.3s
+#       26        —        28.0s
+#
+# 24 keeps the worst case under what 20 allowed before on the same machine; past
+# it the growth — still about x1.6 an element — takes it over the timeout soon.
+# The restriction also filters nothing where every element is a principle, and
+# that chain was no worse (3.99s at 22): starting from the held theory is what
+# carries it there. "Argued" counts what rethon is given — the elements of
 # its arguments (``RETHON_ARGUMENT_TYPES``) — since nothing else reaches it.
 # The total gets a looser cap of its own, since an unargued element is cheap
 # but not free — History's per-step scoring runs a simulation
@@ -109,7 +128,7 @@ _SDK_DEFAULT_LLM_TIMEOUT = 600.0
 # rethon computations run in single-worker pools (process_pool), so one large
 # request holds up every other visitor's computation of the same kind for as
 # long as it runs. The timeout below bounds that worst case.
-_HOSTED_MAX_ARGUED_ELEMENTS = 20
+_HOSTED_MAX_ARGUED_ELEMENTS = 24
 _HOSTED_MAX_ELEMENTS = 50
 
 # The neighbourhood depth of the local search: how far from the current position

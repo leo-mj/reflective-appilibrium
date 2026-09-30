@@ -151,7 +151,7 @@ export function GraphPanel({
   onSaveReview,
   onDiscardReview,
   onApplyRethonEquilibrium,
-  equilibriumPreviewWithdrawnIds,
+  equilibriumPreview,
   onSetEquilibriumPreview,
   onRoundChange,
   isWide,
@@ -172,6 +172,7 @@ export function GraphPanel({
   isSample,
   recentlyAdded,
   weights,
+  weightControl,
   verifyArguments,
   isFullscreen,
   onToggleFullscreen,
@@ -332,7 +333,7 @@ export function GraphPanel({
               ready={ready}
               recentlyAdded={recentlyAdded}
               hideNonEntailsRels={hideNonEntailsRels}
-              equilibriumPreviewWithdrawnIds={equilibriumPreviewWithdrawnIds}
+              equilibriumPreview={equilibriumPreview}
               focus={focus}
               search={search}
             />
@@ -490,6 +491,7 @@ export function GraphPanel({
                 onApplyRethonEquilibrium={onApplyRethonEquilibrium}
                 onSetEquilibriumPreview={onSetEquilibriumPreview}
                 weights={weights}
+                weightControl={weightControl}
               />
             </Suspense>
           )}

@@ -33,6 +33,16 @@ const stateWith = (elements) => ({
   log: [],
 });
 
+const j1 = {
+  id: "J1",
+  type: "judgment",
+  status: "active",
+  confidence: 0.8,
+  origin: "user",
+  text: "Lying is wrong.",
+  addedRound: 1,
+};
+
 describe("withdrawal scores", () => {
   it("are not asked for when there are no elements", () => {
     render(<TextTab state={stateWith([])} />);
@@ -40,16 +50,25 @@ describe("withdrawal scores", () => {
   });
 
   it("are asked for once there is an element", () => {
-    const j1 = {
-      id: "J1",
-      type: "judgment",
-      status: "active",
-      confidence: 0.8,
-      origin: "user",
-      text: "Lying is wrong.",
-      addedRound: 1,
-    };
     render(<TextTab state={stateWith([j1])} />);
     expect(client.scoreChanges).toHaveBeenCalledOnce();
+  });
+
+  it("say once, above the cards, which way is good news", async () => {
+    // Orange for a positive change reads as a merit unless the panel says
+    // otherwise: positive means the position would score higher without it.
+    client.scoreChanges.mockResolvedValueOnce({
+      withdrawal_deltas: [
+        { element_id: "J1", delta_account: -0.02, delta_systematicity: 0 },
+      ],
+    });
+    const { findByText, queryByText } = render(
+      <TextTab state={stateWith([j1])} />,
+    );
+    expect(await findByText(/earning its place/)).toBeTruthy();
+    cleanup();
+    // Nothing scored, nothing to explain.
+    render(<TextTab state={stateWith([])} />);
+    expect(queryByText(/earning its place/)).toBeNull();
   });
 });

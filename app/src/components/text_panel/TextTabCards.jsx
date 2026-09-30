@@ -239,6 +239,13 @@ export function ElementCard({ e, dim }) {
             // The bar has no visible axis, so the scale is named here rather
             // than left to be inferred from a length.
             const axis = `bar drawn to ±${scale}`;
+            // Which way is good news, which the colour alone does not say.
+            const meaning = (v) =>
+              v > 0.001
+                ? "the position would score higher without it"
+                : v < -0.001
+                  ? "it is earning its place"
+                  : "little difference either way";
             return (
               <StatSection label="If withdrawn">
                 <DeltaBar
@@ -248,7 +255,7 @@ export function ElementCard({ e, dim }) {
                   scale={scale}
                   color={col(dA)}
                   textColor={ink(dA)}
-                  title={`Account change if withdrawn (${axis})`}
+                  title={`Account change if withdrawn: ${meaning(dA)} (${axis})`}
                 />
                 {dS !== 0 && (
                   <DeltaBar
@@ -258,7 +265,7 @@ export function ElementCard({ e, dim }) {
                     scale={scale}
                     color={col(dS)}
                     textColor={ink(dS)}
-                    title={`Systematicity change if withdrawn (${axis})`}
+                    title={`Systematicity change if withdrawn: ${meaning(dS)} (${axis})`}
                   />
                 )}
               </StatSection>

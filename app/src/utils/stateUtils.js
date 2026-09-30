@@ -302,6 +302,20 @@ export function makeDiff(fields, oldObj, newObj) {
 }
 
 /**
+ * The `changes` of a logged edit, led by what was edited: "J4 — text: … → …".
+ * The diffs alone left History's log box, and the export's log, saying a
+ * wording had changed without saying whose — the name was only in `findings`,
+ * which the box does not show. A withdrawal's entry already reads that way
+ * ("J6: status → withdrawn").
+ *
+ * @param {string}   what  - The item: an element id, "Relation A → B", "Argument A, B → C".
+ * @param {string[]} diffs
+ */
+export function editChanges(what, diffs) {
+  return `${what} — ${diffs.join("; ")}`;
+}
+
+/**
  * What the Revise dialogs let a reader change, for an element and for a
  * relation. A revision is a change to one of these: the dialogs keep Save off
  * until one differs, and the save handlers record nothing when none does —

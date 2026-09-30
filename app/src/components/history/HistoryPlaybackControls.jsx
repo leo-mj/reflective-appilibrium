@@ -4,7 +4,7 @@
  */
 
 import { C } from "../../constants/colors.js";
-import { SPEEDS } from "../../hooks/usePlayback.js";
+import { SpeedButtons } from "../SpeedButtons.jsx";
 
 // ─── PlaybackSlider ───────────────────────────────────────────────────────────
 
@@ -209,32 +209,8 @@ export function PlaybackControls({
         >
           {playing ? "Pause" : "Play"}
         </button>
-        <div
-          style={{
-            display: "flex",
-            gap: 2,
-            alignItems: "center",
-            marginLeft: "1em",
-          }}
-        >
-          {SPEEDS.map((s) => (
-            <button
-              key={s}
-              onClick={() => setSpeed(s)}
-              style={{
-                background: speed === s ? C.border : "transparent",
-                border: `1px solid ${speed === s ? C.dim : C.border}`,
-                color: speed === s ? C.text : C.dim,
-                borderRadius: 4,
-                padding: "6px 8px",
-                cursor: "pointer",
-                fontSize: 12,
-                minWidth: "2.5em",
-              }}
-            >
-              {s}×
-            </button>
-          ))}
+        <div style={{ marginLeft: "1em" }}>
+          <SpeedButtons speed={speed} setSpeed={setSpeed} />
         </div>
         {onUnitChange && (
           <div style={{ marginLeft: "1em" }}>

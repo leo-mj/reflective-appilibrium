@@ -499,6 +499,26 @@ export function TextTab({
               </div>
             )}
 
+            {/* The bars' colours say which way a score moves, not whether that
+                is good news, and a positive change reads as a merit unless
+                told otherwise. Once for the panel; each bar's hover text says
+                it again for a reader far down the list. */}
+            {withdrawalDeltas &&
+              Object.values(withdrawalDeltas).some(Boolean) && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    lineHeight: 1.4,
+                    color: C.dim,
+                    padding: "6px 4px 2px",
+                  }}
+                >
+                  If withdrawn: + (orange) means the position would score
+                  higher without that element; − (teal) means it is earning
+                  its place.
+                </div>
+              )}
+
             {highlightedIds && (
               <HighlightedSection
                 selectedRel={selectedRel}
@@ -650,7 +670,7 @@ export function TextTab({
                   width: "100%",
                 }}
               >
-                {roundScoresLoading ? "Calculating…" : "Calculate Z-scores"}
+                {roundScoresLoading ? "Calculating…" : "Calculate achievement (Z)"}
               </button>
             )}
           </div>

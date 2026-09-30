@@ -403,6 +403,19 @@ describe("handleEditSave", () => {
     expect(el.status).toBe("revised");
   });
 
+  it("logs whose wording changed, not only how", () => {
+    // History's log box shows `changes` alone, which used to read
+    // "text: … → …" with no element in it.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleEditRequest("J1"));
+    act(() => {
+      result.current.handleEditSave({ text: "New text", confidence: 1.0, type: "judgment", origin: "user" });
+    });
+    expect(result.current.state.log.at(-1).changes).toBe(
+      "J1 — text: Original text → New text",
+    );
+  });
+
   it("stores original text in previousText and sets revisedRound", () => {
     const { result } = renderHook(() => useREActions(baseState()));
     act(() => result.current.handleEditRequest("J1"));
@@ -490,7 +503,7 @@ describe("handleEditSave", () => {
       result.current.handleEditSave({ text: "New text", confidence: 1.0, type: "judgment", origin: "user" });
     });
     // The dialog has no status field; comparing one logged "status: active → undefined".
-    expect(result.current.state.log[0].changes).toBe("text: Original text → New text");
+    expect(result.current.state.log[0].changes).toBe("J1 — text: Original text → New text");
   });
 
   it("clears editingEl after save", () => {
@@ -759,9 +772,18 @@ describe("handleApplyRethonEquilibrium", () => {
   const byId = (result, id) =>
     result.current.state.elements.find((e) => e.id === id);
 
-  it("withdraws everything outside the commitment set", () => {
+  const changes = (overrides = {}) => ({
+    withdraw: [],
+    takeUp: [],
+    reject: [],
+    ...overrides,
+  });
+
+  it("withdraws what it is told to, and nothing else", () => {
     const { result } = renderHook(() => useREActions(state()));
-    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(changes({ withdraw: ["J2"] })),
+    );
     expect(byId(result, "J1").status).toBe("active");
     expect(byId(result, "J2").status).toBe("withdrawn");
     expect(byId(result, "J2").reason).toMatch(/rethon/i);
@@ -769,25 +791,79 @@ describe("handleApplyRethonEquilibrium", () => {
 
   it("records the withdrawal as an event", () => {
     const { result } = renderHook(() => useREActions(state()));
-    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(changes({ withdraw: ["J2"] })),
+    );
     expect(byId(result, "J2").history).toEqual([
       { round: 2, type: "withdrawn", reason: expect.stringMatching(/rethon/i) },
     ]);
   });
 
-  it("leaves already-withdrawn and rejected elements untouched", () => {
-    const before = state();
-    const { result } = renderHook(() => useREActions(before));
-    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
-    expect(byId(result, "J3")).toEqual(before.elements[2]);
-    expect(byId(result, "J4")).toEqual(before.elements[3]);
+  it("takes up again what the equilibrium holds, from withdrawn or rejected", () => {
+    // It used to skip both: an element the equilibrium held was listed as
+    // retained and stayed withdrawn.
+    const { result } = renderHook(() => useREActions(state()));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(
+        changes({ takeUp: ["J3", "J4"] }),
+      ),
+    );
+    for (const id of ["J3", "J4"]) {
+      expect(byId(result, id).status).toBe("active");
+      expect(byId(result, id).history.at(-1)).toEqual({
+        round: 2,
+        type: "reinstated",
+      });
+    }
   });
 
-  it("bumps the round and logs what was retained", () => {
+  it("rejects what the equilibrium holds the negation of", () => {
     const { result } = renderHook(() => useREActions(state()));
-    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(changes({ reject: ["J1"] })),
+    );
+    expect(byId(result, "J1").status).toBe("rejected");
+    expect(byId(result, "J1").history.at(-1).type).toBe("rejected");
+  });
+
+  it("is one step, logged with what changed", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(
+        changes({ withdraw: ["J2"], takeUp: ["J3"] }),
+      ),
+    );
     expect(result.current.state.round).toBe(2);
-    expect(result.current.state.log.at(-1).changes).toContain("J1");
+    const { changes: logged } = result.current.state.log.at(-1);
+    expect(logged).toContain("Withdrawn: J2");
+    expect(logged).toContain("Taken up again: J3");
+  });
+
+  it("records the run, so it can be reproduced from the log", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(
+        changes({
+          withdraw: ["J2"],
+          run: {
+            depth: 2,
+            weights: { account: 0.35, systematicity: 0.55, faithfulness: 0.1 },
+            from: 0.683,
+            to: 0.954,
+          },
+        }),
+      ),
+    );
+    expect(result.current.state.log.at(-1).findings).toBe(
+      "Rethon simulation applied (depth 2; weights: account 0.35, systematicity 0.55, faithfulness 0.10; achievement 0.683 → 0.954).",
+    );
+  });
+
+  it("takes no step when nothing would change", () => {
+    const before = state();
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleApplyRethonEquilibrium(changes()));
+    expect(result.current.state.round).toBe(before.round);
   });
 });
 

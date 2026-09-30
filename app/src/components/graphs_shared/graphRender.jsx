@@ -175,19 +175,27 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
  * @param {string|null}                selected   - ID of the selected element, or null.
  * @param {string|null}                [ctrlFirst] - ID of the ctrl-click first node, or null.
  * @param {string|null}                [recentlyAdded]
- * @param {Set<string>|null}           [previewWithdrawnIds] - IDs that would be withdrawn by the simulated equilibrium.
+ * @param {{withdrawn?: Set<string>, takenUp?: Set<string>}|null} [preview] -
+ *   What the simulated position would withdraw and take up again: an orange
+ *   dashed ring on the one, a teal one on the other, the colours the text
+ *   panel's withdrawal bars use for "costs" and "earns".
  * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, fade: number, transition: string, children: React.ReactNode }}
  *   For a statement card, `opacity` carries only the dimming a selection
  *   elsewhere applies, and `fade` the withdrawn or rejected state, which the
  *   card applies to its badge and outline and not to its wording.
  */
-export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, recentlyAdded, previewWithdrawnIds) {
+export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, recentlyAdded, preview) {
   const isWithdrawn = wIds.has(element.id);
-  const isRejected = element.status === "rejected";
+  const isPreviewTakenUp = preview?.takenUp?.has(element.id) ?? false;
+  // Taken up from rejected too, so the rejected fade goes with it.
+  const isRejected = element.status === "rejected" && !isPreviewTakenUp;
   const isSelected = element.id === selected;
   const isCtrlFirst = element.id === ctrlFirst;
   const isRecentlyAdded = element.id === recentlyAdded;
-  const isPreviewWithdrawn = previewWithdrawnIds?.has(element.id) ?? false;
+  const isPreviewWithdrawn = preview?.withdrawn?.has(element.id) ?? false;
+  // In the theory at the step being played: a ring of its own, since a theory
+  // step mostly moves elements already held, which the other rings miss.
+  const isPreviewTheory = preview?.theory?.has(element.id) ?? false;
   const isDimmed = dimNode(element.id);
   // Opacity is now only ever about *state* — dimmed by a selection elsewhere,
   // withdrawn, rejected. Confidence used to fade the node too, which washed the
@@ -206,7 +214,26 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
     opacity: isDimmed ? 0.12 : element.card ? 1 : fade,
     fade: element.card ? fade : 1,
     transition: TRANSITION,
-    children: isSelected ? (
+    children: (
+      <>
+        {nodeRing()}
+        {isPreviewTheory && (
+          <NodeRing
+            element={element}
+            r={r}
+            pad={3}
+            stroke={C.principle.accent}
+            strokeWidth={2}
+            opacity={0.9}
+          />
+        )}
+      </>
+    ),
+  };
+
+  /** The one outer ring a node wears: selection first, then the preview's. */
+  function nodeRing() {
+    return isSelected ? (
       <NodeRing
         element={element}
         r={r}
@@ -226,10 +253,20 @@ export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, re
         strokeDasharray="4 3"
         opacity={0.7}
       />
+    ) : isPreviewTakenUp ? (
+      <NodeRing
+        element={element}
+        r={r}
+        pad={6}
+        stroke={C.supports}
+        strokeWidth={1.5}
+        strokeDasharray="4 3"
+        opacity={0.8}
+      />
     ) : isCtrlFirst || isRecentlyAdded ? (
       <PulseRing type={element.type} radius={r} card={element.card} />
-    ) : null,
-  };
+    ) : null;
+  }
 }
 
 // ─── Shared render functions ──────────────────────────────────────────────────

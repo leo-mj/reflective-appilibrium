@@ -56,6 +56,7 @@ import {
 } from "./graphs_shared/graphRender.jsx";
 import { ActionButtons } from "./text_panel/TextTabPrimitives.jsx";
 import { AddButtonsOverlay } from "./graph/AddButtonsOverlay.jsx";
+import { LogOverlay } from "./history/LogOverlay.jsx";
 import { CtrlSelectionBar } from "./graph/CtrlSelectionBar.jsx";
 import { GraphModals } from "./graph/GraphModals.jsx";
 
@@ -177,7 +178,7 @@ export function Graph({
   ready,
   recentlyAdded,
   hideNonEntailsRels,
-  equilibriumPreviewWithdrawnIds,
+  equilibriumPreview,
   focus,
   search = "",
 }) {
@@ -211,7 +212,7 @@ export function Graph({
   const { visibleEls, visRels, wIds } = drawnOnGraph(
     state,
     hiddenLegendKeys,
-    equilibriumPreviewWithdrawnIds,
+    equilibriumPreview,
   );
   // After a merge, which process each node came from. Empty otherwise.
   const processTags = useMemo(() => processTagMap(processesOf(state)), [state]);
@@ -325,6 +326,19 @@ export function Graph({
   // the tour, below, can frame an element that is currently inside one. On a
   // phone the ids stay legible and the rest is panned to (NARROW_FIT_MIN_ZOOM).
   const isWide = useIsWide();
+
+  // The Simulate tab's log box: History's, over this canvas while a
+  // simulation result is being played, kept scrolled to the step on screen.
+  const simLogRef = useRef(null);
+  const simCurrentLogRef = useRef(null);
+  const simStep = equilibriumPreview?.step;
+  useEffect(() => {
+    simCurrentLogRef.current?.scrollIntoView?.({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [simStep]);
+
   useAutoFit({
     positions,
     dims,
@@ -581,7 +595,7 @@ export function Graph({
         selected,
         undefined,
         recentlyAdded,
-        equilibriumPreviewWithdrawnIds,
+        equilibriumPreview,
       ),
     ]),
   );
@@ -679,6 +693,15 @@ export function Graph({
         containerStyle={{ width: "100%", height: "100%" }}
         overlay={
           <>
+            {/* Wide only, as on History: a phone's canvas has no room for it. */}
+            {isWide && equilibriumPreview?.log && (
+              <LogOverlay
+                sortedLog={equilibriumPreview.log}
+                snappedRound={equilibriumPreview.step}
+                logRef={simLogRef}
+                currentLogRef={simCurrentLogRef}
+              />
+            )}
             <AddButtonsOverlay
               onAddEl={setAddingElType}
               onAddRel={() => {

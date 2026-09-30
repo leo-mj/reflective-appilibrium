@@ -9,6 +9,7 @@
 import { useState } from "react";
 import {
   makeDiff,
+  editChanges,
   makeLogEntry,
   ARGUMENT_RELATION_TYPES,
   RELATION_EDIT_FIELDS,
@@ -87,7 +88,7 @@ export function useRelationActions({
           newRound,
           `${what} was edited by the user.`,
           "Changes applied",
-          diffs.join("; "),
+          editChanges(what, diffs),
         ),
       ],
     }));
@@ -250,7 +251,7 @@ export function useRelationActions({
           step,
           `Argument ${oldIds.join(", ")} → ${first.to} was revised by the user.`,
           "Changes applied",
-          changes.join("; "),
+          editChanges(`Argument ${oldIds.join(", ")} → ${first.to}`, changes),
         ),
       ],
     }));

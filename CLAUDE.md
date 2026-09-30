@@ -114,6 +114,28 @@ stood: every element with the status its history gives it at that step
 (`elements_at_step`, folding events as `foldHistory` does), withdrawn ones kept
 in the pool uncommitted, as the full simulation keeps them.
 
+**The simulation's theory is made of principles and background theories
+only** (`backend/services/rethon_theory.py`) — unnegated, of any status. That
+is what the scoring already takes as the theory, so account and systematicity
+mean one thing on the Simulate tab, in History and on the text cards. rethon's
+standard model lets any consistent position be the theory, a judgment
+included; this departs from it deliberately, since an element's type is the
+user saying which elements are general rules. A process with no principle or
+theory is refused, there being no theory to find.
+
+**And it starts from the theory the user holds** — the active and revised
+principles and theories, the scoring's theory — where rethon would choose a
+first theory for the commitments (near the empty position, locally). The
+commitments already start from the user's current statuses, so a fresh theory
+was the one part that restarted the process instead of continuing it; and a
+local search started near the empty position can settle on less than the user
+holds (`test_rethon_theory.py` has such a case). A held theory rethon cannot
+take — none, or one the arguments make inconsistent — falls back to rethon's
+start. Whether seeded and unseeded runs reach different equilibria is a result
+worth recording, not a reason to go back. `make_re(…, None)` is the standard
+model, unrestricted and unseeded, for comparison with published rethon runs;
+no route uses it.
+
 #### Revising an argument
 
 Revise on an argument opens `ReviseArgumentModal`, which works on its premises:
@@ -175,8 +197,11 @@ round and step and asks for steps to be cited as steps.
 The sample process is eight rounds of many steps, numbered as the app would
 have recorded them: every change a step, an argument's premises sharing one, and
 within a round elements before relations before revisions and withdrawals. Its
-log keeps one entry per round, at the round's last step, and its review speaks
-of rounds. `rounds.test.js` holds it to that shape. Cards and node tooltips say
+log has one entry per step, as the app writes them, generated from its own
+elements and relations (`sample-data/sampleLog.js`, in the handlers' wording),
+so it cannot drift from the process it records; its review speaks of rounds.
+`rounds.test.js` holds it to that shape. It used to keep one narrative entry
+per round, which left History's log box on the demo behind the step playing. Cards and node tooltips say
 when something was added as "Round 2 · Step 14" (`stepLabel`). A merge keeps the current process's rounds and drops
 the incoming one's, whose steps are not this process's.
 

@@ -119,6 +119,66 @@ describe("the tour's shape", () => {
     }
   });
 
+  it("names the red arrows after the relation they are, not after conflicts", () => {
+    // `conflicts` is a type of its own, orange, and hidden in the default
+    // view. The arrows this section shows are the legend's Jointly Precludes.
+    const tension = build().find((s) => s.id === "tension");
+    expect(tension.title).not.toMatch(/conflict/i);
+    expect(textOf(tension)).toMatch(/precludes/i);
+  });
+
+  it("says the dialectical relations exist, and where to switch them on", () => {
+    const sections = build();
+    const types = sections.find((s) => s.id === "relation-types");
+    ["supports", "conflicts", "undermines"].forEach((t) =>
+      expect(textOf(types)).toContain(t),
+    );
+    expect(types.target).toBe("menu-relations");
+    expect(types.menu).toBe(true);
+    // Once the reader has met arguments, whose absence of company it explains.
+    expect(ids(sections).indexOf("relation-types")).toBeGreaterThan(
+      ids(sections).indexOf("tension"),
+    );
+  });
+
+  it("names every add button the graph shows, groups included", () => {
+    const adding = textOf(build().find((s) => s.id === "adding"));
+    ["+ J", "+ P", "+ T", "+ Arg", "+ Grp"].forEach((b) =>
+      expect(adding).toContain(b),
+    );
+  });
+
+  it("points the demo at its merge, and says what a merge leaves behind", () => {
+    const sections = build();
+    const merge = sections.find((s) => s.id === "merge");
+    expect(merge.target).toBe("menu-merge");
+    expect(merge.menu).toBe(true);
+    expect(textOf(merge)).toMatch(/A\+B/);
+    expect(textOf(merge)).toMatch(/Merge Elements/);
+    // The button exists on the sample alone.
+    expect(ids(build({ isSample: false }))).not.toContain("merge");
+  });
+
+  it("shows the simulation only where a backend can run it", () => {
+    expect(ids(build())).not.toContain("simulate");
+    const sections = build({ backendEnabled: true });
+    const simulate = sections.find((s) => s.id === "simulate");
+    expect(simulate.target).toBe("tab-simulateRethon");
+    expect(simulate.tab).toBe("simulateRethon");
+    // It has to say what its scores are, since nothing else in the tour does,
+    // and call Z what the app now calls it.
+    const text = textOf(simulate);
+    ["account", "systematicity", "faithfulness", "achievement (Z)"].forEach(
+      (m) => expect(text).toContain(m),
+    );
+    expect(text).toMatch(/If withdrawn/);
+    expect(text).not.toMatch(/z-score/i);
+    // After History, whose Calculate button it names.
+    expect(ids(sections).indexOf("simulate")).toBeGreaterThan(
+      ids(sections).indexOf("history"),
+    );
+  });
+
   it("drops the demo-graph chapter on someone's own process", () => {
     // Those sections name the demo's elements by ID. On another state the IDs
     // mean something else, or nothing.
@@ -193,8 +253,9 @@ describe("the same tour at either width", () => {
     ];
     // What the wide ☰ holds is one level down here, behind Settings, so a
     // section ringing one of those has to open the menu on that view.
-    const UNDER_SETTINGS = /^(menu-files|menu-settings|btn-llm|btn-home)$/;
-    narrow()
+    const UNDER_SETTINGS =
+      /^(menu-files|menu-settings|menu-relations|btn-llm|btn-home)$/;
+    narrow({ backendEnabled: true })
       .filter((s) => s.target && !ALWAYS_DRAWN.includes(s.target))
       .forEach((s) => {
         expect(s.menu, `${s.id} rings ${s.target} in the wrong view`).toBe(
@@ -228,9 +289,49 @@ describe("what the tour claims", () => {
   });
 
   it("does not say that where a model is connected", () => {
-    const assist = build({ llmEnabled: true }).find((s) => s.id === "assist");
+    const assist = build({ llmEnabled: true, hasKey: true }).find(
+      (s) => s.id === "assist",
+    );
     expect(textOf(assist)).not.toMatch(/no model connected/i);
     expect(textOf(assist)).toMatch(/live/i);
+  });
+
+  it("does not promise live suggestions to a visitor who has no key yet", () => {
+    // The backend build's first visit: the features are on, but what the
+    // Assist tabs show until a key is saved are the demo's pre-set ones.
+    const keyless = build({ llmEnabled: true, hasKey: false });
+    const assist = textOf(keyless.find((s) => s.id === "assist"));
+    const settings = textOf(keyless.find((s) => s.id === "llm-settings"));
+    expect(assist).toMatch(/pre-set/i);
+    expect(assist).not.toMatch(/generated live/i);
+    expect(settings).toMatch(/no key is saved/i);
+  });
+
+  it("says where a visitor's key goes, wherever one can be entered", () => {
+    const settings = (opts) =>
+      textOf(build(opts).find((s) => s.id === "llm-settings"));
+    [
+      { llmEnabled: true, hasKey: false },
+      { llmEnabled: true, hasKey: true },
+    ].forEach((opts) => {
+      expect(settings(opts)).toMatch(/server/i);
+      expect(settings(opts)).toMatch(/Privacy/);
+    });
+    // And the demo, which sends nothing anywhere, does not suggest it might.
+    expect(settings({ llmEnabled: false })).not.toMatch(/Privacy/);
+  });
+
+  it("describes the person who brings the model as the visitor", () => {
+    const settings = textOf(build().find((s) => s.id === "llm-settings"));
+    expect(settings).not.toMatch(/whoever runs it/i);
+  });
+
+  it("proposes theories for bearing on the position, not for being presupposed by it", () => {
+    // "Theories both rest on" is the presupposition criterion the root
+    // CLAUDE.md rules out: narrow RE with a third node shape.
+    const cycle = textOf(build().find((s) => s.id === "cycle"));
+    expect(cycle).not.toMatch(/rest on/i);
+    expect(cycle).toMatch(/bear on both/i);
   });
 
   it("says the model proposes and the user disposes", () => {

@@ -89,10 +89,6 @@ export function AppHeaderNarrow({
   onResetLayout,
   verifyArguments,
   setVerifyArguments,
-  weights,
-  weightsChanged,
-  onWeightsChange,
-  onResetWeights,
   onStartStepper,
   tourActive,
   tourMenuView = null,
@@ -100,7 +96,6 @@ export function AppHeaderNarrow({
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [weightsOpen, setWeightsOpen] = useState(false);
 
   // As in the wide header: Escape and the menu's dialogs hand the focus back to ☰.
   const menuButtonRef = useRef(null);
@@ -262,6 +257,9 @@ export function AppHeaderNarrow({
   const mergeTile = mergeAction && (
     <Tooltip key="merge" text={mergeAction.tooltip}>
       {tile({
+        // The id the wide ☰'s Merge (demo) row carries, so the tour rings
+        // whichever this width draws.
+        ...(handleMergeSampleClick && { "data-tutorial": "menu-merge" }),
         icon: <MergeIcon size={TILE_ICON} />,
         label: mergeAction.label,
         current: false,
@@ -433,8 +431,6 @@ export function AppHeaderNarrow({
                 onOpenLlm={() => setLlmOpen(true)}
                 onOpenPrivacy={() => setPrivacyOpen(true)}
                 onOpenFont={() => setFontOpen(true)}
-                weightsOpen={weightsOpen}
-                setWeightsOpen={setWeightsOpen}
                 onHome={onHome}
                 hideNonEntailsRels={hideNonEntailsRels}
                 setHideNonEntailsRels={setHideNonEntailsRels}
@@ -443,10 +439,6 @@ export function AppHeaderNarrow({
                 onResetLayout={onResetLayout}
                 verifyArguments={verifyArguments}
                 setVerifyArguments={setVerifyArguments}
-                weights={weights}
-                weightsChanged={weightsChanged}
-                onWeightsChange={onWeightsChange}
-                onResetWeights={onResetWeights}
                 showTabNav={showTabNav}
                 setShowTabNav={setShowTabNav}
                 allExpanded={allExpanded}

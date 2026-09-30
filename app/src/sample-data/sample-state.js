@@ -2,11 +2,13 @@
 // Topic: obligations to future generations
 // 8 rounds, 13 judgments, 6 principles, 2 theories, mix of statuses
 
+import { sampleLog } from "./sampleLog.js";
+
 // No `reviews` here on purpose. A review is something the user accepts, so the
 // sample must not open with one already banked — see the note in
 // sample-data/sample-review.js, which demonstrates the series through the
 // visitor's own two runs instead.
-export default {
+const SAMPLE = {
   topic: "Do we have moral obligations to people who do not yet exist?",
   phase: 3,
   round: 61,
@@ -14,8 +16,9 @@ export default {
   // is the last step, `roundEnds` the last step of rounds 1–7, the eighth being
   // the one open now. Within a round, elements came in first, then relations —
   // an argument's premises together, as one step — then revisions and
-  // withdrawals. The log keeps one entry per round, at its last step. The
-  // sample review speaks of rounds, which these are.
+  // withdrawals. The log has one entry per step, as the app writes them,
+  // built from these elements and relations (sampleLog.js). The sample review
+  // speaks of rounds, which these are.
   roundEnds: [6, 16, 24, 32, 46, 57, 60],
   elements: [
     // ── Judgments ──
@@ -488,6 +491,8 @@ export default {
       type: "supports",
       explanation:
         "Future people as a class are determinate enough for probabilistic obligation.",
+      previousText:
+        "Future people as a class are determinate enough to be owed something.",
       addedRound: 54,
       revisedRound: 60,
       origin: "user",
@@ -589,68 +594,7 @@ export default {
       "Temporal-neutrality cluster: J10, J12 unified under P5 (justice owed to all affected), grounded in T1. In tension with P6.",
     ],
   },
-  log: [
-    {
-      round: 6,
-      findings: "Initial harvest.",
-      options: "—",
-      decision: "—",
-      changes: "Added J1, J2, J3, J6.",
-    },
-    {
-      round: 16,
-      findings: "J6 has no principle support. P1 covers J1–J3.",
-      options: "Add P1, also consider P4.",
-      decision: "Adopted P1 and P4 tentatively.",
-      changes: "Added J4, J5, P1, P4. Argument P1 → J3 recorded.",
-    },
-    {
-      round: 24,
-      findings: "P4 conflicts with J1, J2. J6 conflicts with emerging P2.",
-      options: "Withdraw P4 and J6, or revise P1.",
-      decision: "Withdrew P4 and J6, adopted P2.",
-      changes: "P4, J6 withdrawn. P2, J7 added. J11 added tentatively.",
-    },
-    {
-      round: 32,
-      findings: "J8 and J9 strengthen P2. J11 sits poorly with J1 and J2.",
-      options: "—",
-      decision: "Adopted J8, J9, P3. Withdrew J11.",
-      changes: "J8, J9, P3 added. J11 withdrawn. Argument P2 + P3 → J5 recorded.",
-    },
-    {
-      round: 46,
-      findings:
-        "Review round. J4 revised (sufficientarian, not egalitarian). P3 revised (uncertainty not temporal). Introduced T1, P5.",
-      options: "Revise J4 and P3, adopt T1 and P5.",
-      decision: "All adopted.",
-      changes: "J4, P3 revised. J10, T1, P5 added.",
-    },
-    {
-      round: 57,
-      findings:
-        "J12 and P6 introduced. P6 creates tension with P5 and, together with J7, precludes J10.",
-      options: "Revise P5, withdraw P6, or accept tension.",
-      decision: "Accepted P6 tentatively, flagged tensions.",
-      changes:
-        "J12, P6, T2 added. Arguments T1 + T2 → P2 and P6 + J7 → ¬J10 recorded.",
-    },
-    {
-      round: 60,
-      findings:
-        "User raised the procreation asymmetry: no one is wronged by not being created. It puts pressure on J8.",
-      options: "Adopt J13, or set it aside as out of scope.",
-      decision: "Adopted J13 tentatively.",
-      changes: "J13 added. Refined relation between T2 and P2.",
-    },
-    {
-      round: 61,
-      findings:
-        "Review round. Coherence check surfaced a direct conflict between P3 and P6 over temporal distance; J13 puts pressure on J8; J10 is both supported and precluded. J12 and J13 lack principled grounding.",
-      options:
-        "Restrict P6 to social/relational proximity, revise P3, reground J8, or accept the conflicts pending a later round.",
-      decision: "—",
-      changes: "P6 – P3 conflict relation recorded.",
-    },
-  ],
 };
+
+// One entry per step, as the app writes them: see sampleLog.js.
+export default { ...SAMPLE, log: sampleLog(SAMPLE) };

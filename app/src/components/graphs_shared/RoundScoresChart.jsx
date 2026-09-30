@@ -1,21 +1,23 @@
 /**
- * @fileoverview Z-score line chart shared by HistoryTab and TextTab.
+ * @fileoverview Achievement (Z) line chart shared by HistoryTab and TextTab.
  * @module components/graphs_shared/RoundScoresChart
  */
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { scaleLinear, line as d3Line, curveMonotoneX } from "d3";
 import { C } from "../../constants/colors.js";
+import { SCORE_MEASURES } from "../../constants/scoreMeasures.js";
+import { Tooltip } from "../Tooltip.jsx";
 
 export const SCORE_SERIES = [
-  { key: "z", label: "Z-score", color: C.supports, width: 1 },
-  { key: "account", label: "Account", color: C.judgment.accent, width: 0.5 },
-  { key: "systematicity", label: "Systematicity", color: C.principle.accent, width: 0.5 },
-  { key: "faithfulness", label: "Faithfulness", color: C.theory.accent, width: 0.5 },
-];
+  { key: "z", color: C.supports, width: 1 },
+  { key: "account", color: C.judgment.accent, width: 0.5 },
+  { key: "systematicity", color: C.principle.accent, width: 0.5 },
+  { key: "faithfulness", color: C.theory.accent, width: 0.5 },
+].map((s) => ({ ...s, ...SCORE_MEASURES[s.key] }));
 
 /**
- * Compact SVG line chart of equilibrium Z-scores across the process.
+ * Compact SVG line chart of rethon's achievement (Z) across the process.
  * A dashed vertical marker follows the playback slider position.
  *
  * `round` on each point is whatever unit the slider counts — steps, or rounds
@@ -234,26 +236,27 @@ export function RoundScoresChart({ roundScores, snappedRound, unitLabel = "Step"
       )}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: C.dim }}>
-        {SCORE_SERIES.map(({ key, label, color, width }) => {
+        {SCORE_SERIES.map(({ key, label, tooltip, color, width }) => {
           const hidden = hiddenSeries.has(key);
           return (
-            <span
-              key={key}
-              onClick={() => toggleSeries(key)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                opacity: hidden ? 0.4 : 1,
-                cursor: "pointer",
-                userSelect: "none",
-              }}
-            >
-              <svg width={14} height={4} style={{ flexShrink: 0 }}>
-                <line x1={0} y1={2} x2={14} y2={2} stroke={color} strokeWidth={width * 2} />
-              </svg>
-              {label}
-            </span>
+            <Tooltip key={key} text={tooltip}>
+              <span
+                onClick={() => toggleSeries(key)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  opacity: hidden ? 0.4 : 1,
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <svg width={14} height={4} style={{ flexShrink: 0 }}>
+                  <line x1={0} y1={2} x2={14} y2={2} stroke={color} strokeWidth={width * 2} />
+                </svg>
+                {label}
+              </span>
+            </Tooltip>
           );
         })}
       </div>

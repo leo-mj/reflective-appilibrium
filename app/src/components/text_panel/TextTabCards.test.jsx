@@ -381,7 +381,7 @@ describe("the withdrawal scores", () => {
     expect(widths(container)).toEqual(["96%", "100%"]);
   });
 
-  it("names the scale on hover, the bar having no visible axis", () => {
+  it("names the scale on hover, and which way is good news", () => {
     // Through the app's own Tooltip, not the DOM's `title`, so it has to be
     // hovered and waited out like any other.
     vi.useFakeTimers();
@@ -398,7 +398,10 @@ describe("the withdrawal scores", () => {
       [...document.body.querySelectorAll("div")].some(
         (d) =>
           d.style.position === "fixed" &&
-          d.textContent === "Account change if withdrawn (bar drawn to ±0.2)",
+          // A negative account change: withdrawing it would cost the
+          // position, which the colour alone does not say.
+          d.textContent ===
+            "Account change if withdrawn: it is earning its place (bar drawn to ±0.2)",
       ),
     ).toBe(true);
     vi.useRealTimers();

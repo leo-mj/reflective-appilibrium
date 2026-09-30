@@ -29,19 +29,6 @@ import { MoonIcon, SearchIcon } from "./menuIcons.jsx";
 import { MergeIcon } from "../Icons.jsx";
 import { MenuToggle } from "./MenuToggle.jsx";
 import { Tooltip } from "../Tooltip.jsx";
-import {
-  WeightTriangle,
-  WEIGHT_TRIANGLE_WIDTH,
-} from "../workflows/WeightTriangle.jsx";
-
-/** Side padding of the opened weights panel. */
-const WEIGHTS_PAD = 8;
-
-/**
- * The width the opened weights panel needs, padding included. The wide menu is
- * at least this wide from the start, so opening the panel does not widen it.
- */
-export const WEIGHTS_PANEL_WIDTH = WEIGHT_TRIANGLE_WIDTH + 2 * WEIGHTS_PAD;
 
 /**
  * @param {Object}   props
@@ -50,9 +37,6 @@ export const WEIGHTS_PANEL_WIDTH = WEIGHT_TRIANGLE_WIDTH + 2 * WEIGHTS_PAD;
  * @param {function(): void} props.onOpenLlm
  * @param {function(): void} props.onOpenPrivacy
  * @param {function(): void} props.onOpenFont
- * @param {boolean}  props.weightsOpen - Held by the header, so the weights
- *   stay open across the menu's views.
- * @param {function} props.setWeightsOpen
  * The rest are AppHeader's, passed through unchanged.
  */
 export function SettingsMenuItems({
@@ -61,8 +45,6 @@ export function SettingsMenuItems({
   onOpenLlm,
   onOpenPrivacy,
   onOpenFont,
-  weightsOpen,
-  setWeightsOpen,
   onHome,
   hideNonEntailsRels,
   setHideNonEntailsRels,
@@ -71,10 +53,6 @@ export function SettingsMenuItems({
   onResetLayout,
   verifyArguments,
   setVerifyArguments,
-  weights,
-  weightsChanged,
-  onWeightsChange,
-  onResetWeights,
   showTabNav,
   setShowTabNav,
   allExpanded,
@@ -126,9 +104,11 @@ export function SettingsMenuItems({
           switch is the only evidence it fired. */}
       <div data-tutorial="menu-settings" style={menuGroupStyle}>
         <div style={menuHeadingStyle}>{MENU_HEADINGS.content}</div>
-        {/* The tour used to stop and explain this one. It says so itself now,
-            so the tour can stay short. */}
+        {/* Ringed by the tour, which says what the three hidden types are:
+            the graph opens on arguments alone, and nothing on it hints that
+            anything else exists. */}
         <MenuToggle
+          data-tutorial="menu-relations"
           icon="→"
           label={MENU_LABELS.relations}
           tooltip={MENU_TOOLTIPS.relations}
@@ -168,65 +148,8 @@ export function SettingsMenuItems({
             style={itemStyle}
           />
         )}
-        {/* Last in Content: they steer what the simulation computes, as the two
-            above steer what the app works with — and, being a panel that
-            opens in place, they sit where opening it moves nothing below. */}
-        {BACKEND_ENABLED && (
-          <>
-            <Tooltip text={MENU_TOOLTIPS.weights}>
-              <button
-                onClick={() => setWeightsOpen((o) => !o)}
-                aria-expanded={weightsOpen}
-                // The override is spread in rather than written as
-                // `color: changed ? accent : undefined`: that form overwrites
-                // the row's own colour with `undefined`, React then sets no
-                // colour at all, and the row falls back to the browser's
-                // default button ink — which is how this one row came to be
-                // brighter than every other item in the menu.
-                style={
-                  weightsChanged
-                    ? { ...itemStyle, color: C.principle.accent }
-                    : itemStyle
-                }
-              >
-                <span style={menuIconStyle}>⚖</span>
-                {MENU_LABELS.weights}
-                {weightsChanged ? " *" : ""}
-                <span style={{ marginLeft: "auto", fontSize: 9, color: C.dim }}>
-                  {weightsOpen ? "▲" : "▼"}
-                </span>
-              </button>
-            </Tooltip>
-            {weightsOpen && (
-              <div
-                style={{ padding: `4px ${WEIGHTS_PAD}px 8px ${WEIGHTS_PAD}px` }}
-              >
-                <WeightTriangle
-                  weights={weights}
-                  onChange={onWeightsChange}
-                  weightsChanged={weightsChanged}
-                />
-                {weightsChanged && (
-                  <button
-                    onClick={onResetWeights}
-                    style={{
-                      marginTop: 4,
-                      background: "transparent",
-                      border: `1px solid ${C.border}`,
-                      color: C.dim,
-                      borderRadius: 4,
-                      padding: "2px 8px",
-                      fontSize: 11,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Reset
-                  </button>
-                )}
-              </div>
-            )}
-          </>
-        )}
+        {/* The simulation weights used to sit here. They steer the Simulate
+            tab alone, and are set there now, beside the result they shape. */}
 
         <div style={menuDividerStyle} />
         <div style={menuHeadingStyle}>{MENU_HEADINGS.model}</div>
@@ -316,7 +239,12 @@ export function SettingsMenuItems({
         )}
         {handleMergeSampleClick && (
           <Tooltip text={MENU_TOOLTIPS.mergeSample}>
-            <button onClick={leaving(handleMergeSampleClick)} style={itemStyle}>
+            <button
+              // Ringed by the tour; the narrow menu's Merge tile carries it too.
+              data-tutorial="menu-merge"
+              onClick={leaving(handleMergeSampleClick)}
+              style={itemStyle}
+            >
               <span style={menuIconStyle}>
                 <MergeIcon size={18} />
               </span>

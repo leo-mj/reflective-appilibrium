@@ -1,22 +1,32 @@
 /**
- * @fileoverview SVG line chart of Z, account, systematicity, and faithfulness
- * over RE evolution steps. Used by SimulateRethonTab.
+ * @fileoverview SVG line chart of achievement (Z), account, systematicity, and
+ * faithfulness over RE evolution steps. Used by SimulateRethonTab.
  * @module components/SimulateScoresChart
  */
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { scaleLinear, line as d3Line, curveMonotoneX } from "d3";
 import { C } from "../../constants/colors.js";
+import { SCORE_MEASURES } from "../../constants/scoreMeasures.js";
+import { Tooltip } from "../Tooltip.jsx";
 
 export const SCORE_SERIES = [
-  { key: "z", label: "Z-score", color: C.supports, width: 1 },
-  { key: "account", label: "Account", color: C.judgment.accent, width: 0.5 },
-  { key: "systematicity", label: "Systematicity", color: C.principle.accent, width: 0.5 },
-  { key: "faithfulness", label: "Faithfulness", color: C.theory.accent, width: 0.5 },
-];
+  { key: "z", color: C.supports, width: 1 },
+  { key: "account", color: C.judgment.accent, width: 0.5 },
+  { key: "systematicity", color: C.principle.accent, width: 0.5 },
+  { key: "faithfulness", color: C.theory.accent, width: 0.5 },
+].map((s) => ({ ...s, ...SCORE_MEASURES[s.key] }));
 
-/** SVG line chart of Z, account, systematicity, and faithfulness over evolution steps. */
-export function SimulateScoresChart({ scores }) {
+/**
+ * SVG line chart of achievement (Z), account, systematicity, and faithfulness
+ * over evolution steps.
+ *
+ * `current` is the step the graph is showing: a dashed line marks it and the
+ * steps after it are dimmed, as History's chart marks the step being played.
+ *
+ * @param {{ scores: Array<Object|null>, current?: number }} props
+ */
+export function SimulateScoresChart({ scores, current }) {
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [tooltip, setTooltip] = useState(null);
@@ -85,6 +95,11 @@ export function SimulateScoresChart({ scores }) {
   const labelEvery = allSteps.length <= 10 ? 1 : Math.ceil(allSteps.length / 10);
   const yTicks = scaleLinear().domain([yMin, yMax]).ticks(4);
   const fmtY = (v) => String(+v.toFixed(2));
+  // Step 0 has no scores and so no place on the axis; the marker waits for
+  // step 1, and until then every point counts as still to come.
+  const marked = current ?? xMax;
+  const markerX = marked >= xMin && marked <= xMax ? xScale(marked) : null;
+  const ahead = (step) => step > marked;
 
   // Find the nearest data point by Euclidean distance in SVG user units.
   const THRESHOLD = 8;
@@ -152,6 +167,18 @@ export function SimulateScoresChart({ scores }) {
             </g>
           ))}
 
+          {/* The step the graph is showing */}
+          {current != null && markerX != null && (
+            <line
+              x1={markerX} x2={markerX}
+              y1={0} y2={iH}
+              stroke={C.supports}
+              strokeWidth={1}
+              strokeDasharray="3,2"
+              opacity={0.7}
+            />
+          )}
+
           {/* Lines */}
           {SCORE_SERIES.map(({ key, color, width }) =>
             hiddenSeries.has(key) ? null : (
@@ -177,7 +204,8 @@ export function SimulateScoresChart({ scores }) {
                     cx={xScale(d.step)}
                     cy={yScale(d[key])}
                     r={0.5}
-                    fill={color}
+                    fill={ahead(d.step) ? C.dim : color}
+                    opacity={ahead(d.step) ? 0.35 : 1}
                   />
                 )),
           )}
@@ -188,7 +216,10 @@ export function SimulateScoresChart({ scores }) {
               <text
                 key={s}
                 x={xScale(s)} y={iH + 13}
-                textAnchor="middle" fill={C.dim} fontSize={labelSize}
+                textAnchor="middle"
+                fill={s === current ? C.supportsText : C.dim}
+                fontWeight={s === current ? "bold" : "normal"}
+                fontSize={labelSize}
               >
                 {s}
               </text>
@@ -221,26 +252,27 @@ export function SimulateScoresChart({ scores }) {
 
       {/* Legend */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: C.dim }}>
-        {SCORE_SERIES.map(({ key, label, color, width }) => {
+        {SCORE_SERIES.map(({ key, label, tooltip, color, width }) => {
           const hidden = hiddenSeries.has(key);
           return (
-            <span
-              key={key}
-              onClick={() => toggleSeries(key)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                opacity: hidden ? 0.4 : 1,
-                cursor: "pointer",
-                userSelect: "none",
-              }}
-            >
-              <svg width={14} height={4} style={{ flexShrink: 0 }}>
-                <line x1={0} y1={2} x2={14} y2={2} stroke={color} strokeWidth={width * 2} />
-              </svg>
-              {label}
-            </span>
+            <Tooltip key={key} text={tooltip}>
+              <span
+                onClick={() => toggleSeries(key)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  opacity: hidden ? 0.4 : 1,
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <svg width={14} height={4} style={{ flexShrink: 0 }}>
+                  <line x1={0} y1={2} x2={14} y2={2} stroke={color} strokeWidth={width * 2} />
+                </svg>
+                {label}
+              </span>
+            </Tooltip>
           );
         })}
       </div>

@@ -163,7 +163,7 @@ limits what one request may ask for. A local instance limits nothing.
 
 | Limit | Hosted | Setting |
 | --- | --- | --- |
-| Elements that take part in arguments | 20 | `MAX_ARGUED_ELEMENTS` |
+| Elements that take part in arguments | 24 | `MAX_ARGUED_ELEMENTS` |
 | Elements in all | 50 | `MAX_SIMULATION_ELEMENTS` |
 | Search depth of a simulation | 2 | `MAX_NEIGHBOURHOOD_DEPTH` |
 | Time one computation may run | 60 s | `SIMULATION_TIMEOUT_SECONDS` |

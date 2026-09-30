@@ -78,10 +78,10 @@ def compute_score_changes(
 ) -> ScoreChangesResponse:
     """Batch-compute withdrawal Z-score deltas for all active/revised elements.
 
-    Uses an analytical approach: judgment elements form the commitment position
-    (C) and principle/theory elements form the theory position (T).  Z is
-    computed directly from ``re_obj.achievement(C, T, C₀)`` — no full RE
-    simulation is run.
+    Uses an analytical approach: every committed element forms the commitment
+    position (C) and principle/theory elements form the theory position (T), as
+    in ``_build_type_positions`` — the same vocabulary the simulation's theory
+    is restricted to (``rethon_theory``).  No full RE simulation is run.
 
     "Analytical" is not "cheap": the BDD below is built over the whole sentence
     pool and then queried once per element, so this is the most size-sensitive

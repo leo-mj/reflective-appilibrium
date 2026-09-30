@@ -125,10 +125,6 @@ export function AppHeader({
   hasMerged = false,
   verifyArguments,
   setVerifyArguments,
-  weights,
-  weightsChanged,
-  onWeightsChange,
-  onResetWeights,
   tourActive,
   onStartTour,
   hideTabBar,
@@ -338,10 +334,6 @@ export function AppHeader({
     onResetLayout,
     verifyArguments,
     setVerifyArguments,
-    weights,
-    weightsChanged,
-    onWeightsChange,
-    onResetWeights,
     onStartStepper: onStartTour,
   };
 

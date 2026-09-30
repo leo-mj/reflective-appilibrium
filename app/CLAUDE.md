@@ -35,7 +35,7 @@ the run with "Closing rpc while onUserConsoleLog was pending".
 
 The exception is Playwright's `live-backend` project, which starts the real
 FastAPI server and runs the SPA against it — see `e2e/README.md`. **History's
-"Calculate Z-scores" scores the whole process** (`wholeProcess`, from
+"Calculate achievement (Z)" scores the whole process** (`wholeProcess`, from
 `REState`), not the text panel's `state`, which on the History tab is the
 projection at the step being played: on arrival that is step 0 with nothing in
 it, which the server refuses, and later it held only the rounds played so far.
@@ -194,6 +194,63 @@ matters on this side:
   else. Saved reviews are delete-only: editing happens before acceptance, which
   is what keeps `origin` honest.
 
+## Simulate tab
+
+`SimulateRethonTab` — backend build only. What matters on this side:
+
+- **Changes, not positions** (`utils/simulationDiff.js`). A result is an
+  evolution of full positions; the tab says what accepting would withdraw,
+  take up again and reject, and each step as what it brought in and dropped.
+  The graph's preview (`{ withdrawn, takenUp }`, an orange or teal dashed
+  ring) and `handleApplyRethonEquilibrium` read the same record, so what is
+  listed, previewed and applied cannot disagree. Accept used to only withdraw,
+  so an element the equilibrium held stayed withdrawn.
+- **Played, not jumped to.** A result opens at step 0 and plays to the end,
+  the preview following; the slider and the step rows move it by hand, and
+  `prefers-reduced-motion` opens at the end. It is History's `usePlayback`
+  and `SpeedButtons` — with `ease: false`, a simulation's steps being
+  discrete positions that a glide only delayed.
+- **One pace for both tabs**: `BASE_INTERVAL_MS` (1s a step at 1×) times
+  `SPEEDS`, from the same `DEFAULT_SPEED`. The hook takes no pace option, so a
+  speed means the same on each; History used to take 3.2s a step and Simulate
+  set its own, down to 250ms. `usePlayback.test.js` pins it.
+- **The graph carries History's log box while a result plays**
+  (`LogOverlay`, wide only): one entry a step, from `stepLog`, handed over
+  with the preview as `{ withdrawn, takenUp, log, step }`.
+- **The decision is a bar pinned under the panel** (`DecisionBar`): what
+  accepting would do in one line, Accept filled as the add bar's submit is
+  (`ACCENT_MARKER`), and Reject — Dismiss where nothing would change. Inside
+  the list, it scrolled away with the steps.
+- **A result goes stale** when anything it was computed from changes —
+  types, statuses, argument relations, weights, depth (`simulationInputKey`;
+  wording is left out, rethon never reads it). The bar then says so and
+  offers Run again in Accept's place: the lists would otherwise be the new
+  position read against the old one's equilibrium.
+- **The theory in force has a ring of its own** (solid, principle violet,
+  `preview.theory`). A theory step mostly moves elements already held as
+  commitments, so the withdraw and take-up rings left it invisible on the
+  graph. `RingKey` under the playback row names all three rings.
+- **Before and after**: the bar gives achievement at step 1 — the held
+  position, when the run could start from the held theory — and at the end.
+- **The weights live in the toolbar, and only there** (`weightControl` from
+  REState; defaults in `constants/simulationWeights.js`). They steer this tab
+  alone and a result is read against them, so the ☰ menu's "Simulation
+  weights" row was removed rather than kept as a second way to the same
+  state. `AppHeader.test.jsx` holds the menu to having none.
+- **The description links to rethon's homepage** (its package metadata's
+  Home-page, `RETHON_HOMEPAGE`).
+- **The log records the run**: depth, weights and achievement before and
+  after go in the applied entry's `findings`, enough to run it again.
+- **Accept or Reject ends the result.** Both clear it, leaving a one-line
+  note of what happened. Kept, its steps offered a Play that moved nothing on
+  the graph, and after Accept its changes were read against a position that
+  had already taken them.
+- **No Step button.** It computed the same steps one request at a time, and
+  its Accept and Reject only paced them: a rejected step recomputed to the
+  same one, and nothing reached the position before the last. A choice between
+  the alternatives rethon ties on would be a real one; the backend already
+  returns them, and nothing shows them yet.
+
 ## Questionnaire mode
 
 A guided RE mode where all elements and argument relations are pre-populated from a spec file; the user answers questions to activate their chosen path through the argument graph.
@@ -269,6 +326,14 @@ them out of the primitives in `TextTabPrimitives.jsx`.
   leaves one element at full width, which reads as a verdict; floored at 0.05 so
   a panel whose largest score moves by 0.002 shows empty tracks rather than full
   ones. The scale is named in each bar's `title`, there being no visible axis.
+- **Which way is good news is said in words**: a delta is the score *without*
+  the element minus the score now, so orange (+) means the position would
+  score higher without it and teal (−) that it earns its place. One caption at
+  the top of the panel says so, and each bar's hover text says it again.
+- **Z is "Achievement (Z)", never "Z-score"** — rethon's weighted sum of
+  account, systematicity and faithfulness, not a statistical z-score.
+  `constants/scoreMeasures.js` holds the four names and hover texts that the
+  Simulate row, both score charts and History's button share.
 - **`data-stat` and `data-card="element"` are structural hooks, and the tests
   depend on them.** The e2e helpers used to find a card by climbing from a
   "Revise" button while the ancestor held one "Confidence:" label; the fold can
@@ -522,7 +587,7 @@ Selection follows the user's pointer only: clicking a node or a text card. Actio
 taken on an element (revising, withdrawing) deliberately leave it alone, since
 selection dims the rest of the graph.
 
-Tabs: Graph (D3 force-directed), Text, History (slider, 3.2s/round). Node positions stable via shared force simulation on all elements including withdrawn.
+Tabs: Graph (D3 force-directed), Text, History (slider, 1s a step at 1×, shared with Simulate). Node positions stable via shared force simulation on all elements including withdrawn.
 
 **A resize moves the layout; it does not redo it.** `useStablePositions` shifts
 every node by the move of the centre and re-aims the centring forces, without
@@ -1035,6 +1100,15 @@ gets a section of its own, being the one a reader misreads without one: it is
 not a phase of the iteration at all. It rings `tab-processReview`, which is why
 the narrow menu's Assist entries carry the same `data-tutorial` ids the wide tab
 bar gives them.
+
+**The AI chapter has three wordings, not two**: the demo, the backend build
+with no key yet, and with one (`llm` in `buildTourSections`, from
+`useHasLLMKey`). A first visit to the backend build has the features on and
+still sees the pre-set suggestions, so "generated live" was untrue exactly
+there. Wherever a key can be entered the settings section also says where it
+goes and points at ☰ → Privacy. **Simulate is backend-only** (`backendEnabled`)
+and so is never walked by `e2e/tour.spec.js`, which runs the demo; the Merge
+section is sample-only, its button being the demo merge.
 
 Theories had a section here too and it was dropped deliberately. The two things
 a reader has to know about a suggestion — that a theory is proposed for reasons

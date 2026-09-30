@@ -14,13 +14,16 @@ import {
   TAB_TOOLTIPS,
 } from "../../constants/tabConstants.jsx";
 import { btn, metaTabBtn, inlineDividerStyle } from "./appHeaderStyles.js";
-import {
-  SettingsMenuItems,
-  WEIGHTS_PANEL_WIDTH,
-} from "./SettingsMenuItems.jsx";
+import { SettingsMenuItems } from "./SettingsMenuItems.jsx";
 
 /** The ☰ menu card's padding. */
 const MENU_PAD = 6;
+/**
+ * The ☰ menu's least width. It used to be worked out from the simulation
+ * weights' triangle, which opened inside it; the weights are in the Simulate
+ * tab now, and the menu keeps the width readers know rather than narrowing.
+ */
+const MENU_MIN_WIDTH = 250;
 import { Tooltip } from "../Tooltip.jsx";
 import { TopicLabel } from "./TopicLabel.jsx";
 import { LLMSettingsModal } from "./LLMSettingsModal.jsx";
@@ -74,10 +77,6 @@ export function AppHeaderWide({
   onResetLayout,
   verifyArguments,
   setVerifyArguments,
-  weights,
-  weightsChanged,
-  onWeightsChange,
-  onResetWeights,
   hideTabBar,
   tourMenuOpen,
 }) {
@@ -94,7 +93,6 @@ export function AppHeaderWide({
   const [llmOpen, setLlmOpen] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [weightsOpen, setWeightsOpen] = useState(false);
 
   // The tour walks the menu, so it opens and shuts it as it goes. It drives the
   // header's own state rather than overriding it, so a reader who closes the
@@ -138,10 +136,6 @@ export function AppHeaderWide({
     onResetLayout,
     verifyArguments,
     setVerifyArguments,
-    weights,
-    weightsChanged,
-    onWeightsChange,
-    onResetWeights,
     showTabNav,
     setShowTabNav,
     allExpanded,
@@ -350,12 +344,7 @@ export function AppHeaderWide({
                     display: "flex",
                     flexDirection: "column",
                     gap: 2,
-                    // Wide enough for the opened weights panel from the start,
-                    // so opening it does not widen the menu under the pointer:
-                    // the panel, the menu's padding and its border. Worked out
-                    // from the triangle's own width rather than written down —
-                    // written down, it came out two pixels short.
-                    minWidth: WEIGHTS_PANEL_WIDTH + 2 * MENU_PAD + 2,
+                    minWidth: MENU_MIN_WIDTH,
                     boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
                   }}
                 >
@@ -366,8 +355,6 @@ export function AppHeaderWide({
                     onOpenLlm={() => setLlmOpen(true)}
                     onOpenPrivacy={() => setPrivacyOpen(true)}
                     onOpenFont={() => setFontOpen(true)}
-                    weightsOpen={weightsOpen}
-                    setWeightsOpen={setWeightsOpen}
                   />
                 </div>
               </>

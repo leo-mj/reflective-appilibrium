@@ -141,9 +141,11 @@ def test_a_local_install_accepts_a_pool_that_hosted_would_refuse():
 
 def test_hosted_caps_the_pool_by_default():
     hosted = make_settings(deployment="hosted")
-    # Loose on the total, tight on what drives the cost; see config.py.
+    # Loose on the total, tight on what drives the cost; see config.py. The
+    # argued cap was 20 until the theory was restricted to principles and
+    # theories, which made the worst case some ten times cheaper.
     assert hosted.simulation_max_elements == 50
-    assert hosted.simulation_max_argued_elements == 20
+    assert hosted.simulation_max_argued_elements == 24
 
 
 def test_hosted_takes_the_demo_and_its_merge():

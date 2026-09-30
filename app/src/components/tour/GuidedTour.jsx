@@ -30,7 +30,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
-import { LLM_ENABLED } from "../../config.js";
+import { BACKEND_ENABLED, LLM_ENABLED } from "../../config.js";
+import { useHasLLMKey } from "../../utils/llmKey.js";
 import { buildTourSections } from "./tourSections.js";
 import { TOUR_Z, sheetHeight } from "./tourZ.js";
 import { useTourWidth } from "./tourWidth.js";
@@ -105,6 +106,9 @@ export function GuidedTour({
   // store rather than held here: the app pads itself by the same number, and a
   // tour wider than the room made for it covers what it is pointing at.
   const width = useTourWidth();
+  // A backend build with no key yet serves the pre-set suggestions, so the
+  // script has to know which of the two it is describing.
+  const hasKey = useHasLLMKey();
   const sections = useMemo(
     () =>
       applicableSections(
@@ -112,6 +116,8 @@ export function GuidedTour({
           isSample,
           hideNonEntailsRels,
           llmEnabled: LLM_ENABLED,
+          hasKey,
+          backendEnabled: BACKEND_ENABLED,
           topic: state.topic,
           narrow: sheet,
         }),
@@ -120,7 +126,14 @@ export function GuidedTour({
     // The script depends on the shape of the state, not on every edit to it:
     // rebuilding on each keystroke would reset nothing but would churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isSample, hideNonEntailsRels, state.topic, state.elements.length, sheet],
+    [
+      isSample,
+      hideNonEntailsRels,
+      hasKey,
+      state.topic,
+      state.elements.length,
+      sheet,
+    ],
   );
 
   const [idx, setIdx] = useState(0);

@@ -63,9 +63,19 @@ describe("drawnOnGraph", () => {
   });
 
   it("leaves out the edges of what the equilibrium preview would withdraw", () => {
-    const { visibleEls, visRels } = drawnOnGraph(state, null, new Set(["P1"]));
+    const { visibleEls, visRels } = drawnOnGraph(state, null, {
+      withdrawn: new Set(["P1"]),
+    });
     expect(ids(visibleEls)).toContain("P1");
     expect(visRels.some((r) => r.from === "P1" || r.to === "P1")).toBe(false);
+  });
+
+  it("draws what the preview would take up again as held, legend or not", () => {
+    const { visibleEls, wIds } = drawnOnGraph(state, new Set(["withdrawn"]), {
+      takenUp: new Set(["J2"]),
+    });
+    expect(ids(visibleEls)).toContain("J2");
+    expect(wIds.has("J2")).toBe(false);
   });
 });
 

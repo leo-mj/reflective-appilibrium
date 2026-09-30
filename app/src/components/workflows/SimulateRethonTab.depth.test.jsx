@@ -10,7 +10,6 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 
 vi.mock("../../utils/simulateRethonClient.js", () => ({
   simulateRethon: vi.fn(() => new Promise(() => {})),
-  simulateRethonStep: vi.fn(() => new Promise(() => {})),
 }));
 vi.mock("../graphs_shared/SimulateScoresChart.jsx", () => ({
   SimulateScoresChart: () => null,
@@ -27,10 +26,7 @@ vi.mock("../../hooks/useBackendCapabilities.js", () => ({
 }));
 
 import { SimulateRethonTab } from "./SimulateRethonTab.jsx";
-import {
-  simulateRethon,
-  simulateRethonStep,
-} from "../../utils/simulateRethonClient.js";
+import { simulateRethon } from "../../utils/simulateRethonClient.js";
 
 afterEach(() => {
   cleanup();
@@ -91,15 +87,10 @@ describe("on a server that searches to a depth of 2", () => {
     expect(screen.getByText("Depth 2")).toBeTruthy();
   });
 
-  it("asks for no deeper search than that, from either button", () => {
+  it("asks for no deeper search than that", () => {
     capabilities.maxDepth = 2;
     render(<SimulateRethonTab state={aState()} />);
     fireEvent.click(screen.getByRole("button", { name: /equilibrate/i }));
     expect(depthSent(simulateRethon)).toBe(2);
-    cleanup();
-
-    render(<SimulateRethonTab state={aState()} />);
-    fireEvent.click(screen.getByRole("button", { name: /\bstep\b/i }));
-    expect(depthSent(simulateRethonStep)).toBe(2);
   });
 });

@@ -153,10 +153,22 @@ describe("the sample process", async () => {
       expect([...changes], `step ${step}`).toHaveLength(1);
   });
 
-  it("keeps one log entry per round, at the round's last step", () => {
-    expect(SAMPLE_STATE.log.map((l) => l.round)).toEqual([
-      ...roundEndsOf(SAMPLE_STATE),
-      SAMPLE_STATE.round,
-    ]);
+  it("logs every step once, as the app does", () => {
+    // It used to keep one entry per round, at the round's last step, so
+    // History's log box on the demo sat on a summary of the round before
+    // while the next one played, and read as broken.
+    expect(SAMPLE_STATE.log.map((l) => l.round)).toEqual(
+      Array.from({ length: SAMPLE_STATE.round }, (_, i) => i + 1),
+    );
+  });
+
+  it("logs in the app's own words", () => {
+    const at = (step) => SAMPLE_STATE.log.find((l) => l.round === step);
+    expect(at(1).findings).toBe("J1 was added by the user.");
+    expect(at(23).changes).toBe("J6: status → withdrawn");
+    expect(at(31).changes).toBe("P2, P3 → J5 (jointly_entails) added");
+    // An edit says whose wording changed, not only how.
+    expect(at(45).changes).toMatch(/^J4 — text: /);
+    expect(at(60).changes).toMatch(/^Relation T2 → P2 — explanation: /);
   });
 });

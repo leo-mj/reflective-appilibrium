@@ -17,9 +17,6 @@ export const MENU_LABELS = {
   home: "Home",
   llm: "LLM settings",
   privacy: "Privacy",
-  // "Simulation", not "Model": this menu also has the LLM model, and these
-  // weights steer only the rethon simulation.
-  weights: "Simulation weights",
   relations: "All relations",
   checker: "Argument checker",
   processTags: "Process tags",
@@ -43,7 +40,6 @@ export const MENU_TOOLTIPS = {
   home: "Back to the start screen. Unsaved work is lost.",
   llm: "Your provider, model and API key.",
   privacy: "What leaves your browser, and what is kept.",
-  weights: "What the rethon simulation optimises for.",
   relations: "Adds supports, conflicts and undermines.",
   checker: "Detected arguments are tested for validity first.",
   processTags: "Letters marking which merged process each element came from.",

@@ -23,17 +23,23 @@ import { matchesSearchRel, searchFinds } from "./textTabHelpers.js";
  * @param {REState} state
  * @param {Set<string>|null|undefined} hiddenLegendKeys - What the legend hides:
  *   `J`, `P`, `T`, `withdrawn`, `rejected`, and relation types.
- * @param {Set<string>|null|undefined} previewWithdrawnIds - The equilibrium
- *   preview's withdrawals, whose edges are left out.
+ * @param {{withdrawn?: Set<string>, takenUp?: Set<string>}|null|undefined} preview
+ *   The simulation's preview of a position: what it would withdraw (edges
+ *   left out) and what it would take up again (drawn as held, whatever the
+ *   legend hides of the withdrawn).
  * @returns {{ visibleEls: REElement[], visRels: RERelation[], wIds: Set<string> }}
- *   `wIds` holds every element withdrawn at the state's round, drawn or not.
+ *   `wIds` holds every element withdrawn at the state's round, drawn or not,
+ *   less those the preview takes up.
  */
-export function drawnOnGraph(state, hiddenLegendKeys, previewWithdrawnIds) {
+export function drawnOnGraph(state, hiddenLegendKeys, preview) {
   const hidden = (key) => hiddenLegendKeys?.has(key) ?? false;
+  const previewWithdrawn = preview?.withdrawn;
+  const takenUp = preview?.takenUp;
   const { active, withdrawn } = elementsAtRound(state.elements, state.round);
   const rejected = state.elements.filter((e) => e.status === "rejected");
   const isVisible = (el) => {
     if (el.status === "possible") return false;
+    if (takenUp?.has(el.id)) return true;
     if (el.status === "withdrawn") return !hidden("withdrawn");
     if (el.status === "rejected") return !hidden("rejected");
     if (el.type === "judgment") return !hidden("J");
@@ -57,12 +63,14 @@ export function drawnOnGraph(state, hiddenLegendKeys, previewWithdrawnIds) {
       !hidden(r.type) &&
       !(hidden("withdrawn") && r.status === "withdrawn") &&
       !(hidden("rejected") && r.status === "rejected") &&
-      !(previewWithdrawnIds?.has(r.from) || previewWithdrawnIds?.has(r.to)),
+      !(previewWithdrawn?.has(r.from) || previewWithdrawn?.has(r.to)),
   );
   return {
     visibleEls,
     visRels,
-    wIds: new Set(withdrawn.map((e) => e.id)),
+    wIds: new Set(
+      withdrawn.map((e) => e.id).filter((id) => !takenUp?.has(id)),
+    ),
   };
 }
 

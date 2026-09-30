@@ -1,7 +1,7 @@
 """Core RE simulation service — builds dialectical structures, runs RE processes, and translates results."""
 
 from fastapi import HTTPException
-from typing import List, Dict, Optional, Union
+from typing import Iterable, List, Dict, Optional, Union
 import logging
 import time
 
@@ -20,6 +20,7 @@ from .rethon_caps import (  # noqa: F401 — enforce_element_cap re-exported for
     enforce_element_cap,
     rethon_arguments,
 )
+from .rethon_theory import held_theory, make_re, theory_sentences
 from ..routers.arguments_schemas import DetectArgumentsResponse, translate_from_lookup
 from ..routers.rethon_schemas import (
     ModelWeights,
@@ -98,10 +99,10 @@ def get_rethon_final_state(
 ) -> REProcess:
     """Build a BDD dialectical structure, set initial commitments from the lookup, and run the full RE process to a fixed point.
 
-    Uses ``StandardLocalReflectiveEquilibrium`` when ``local=True`` (considers
-    only positions close to the current one) or
-    ``StandardGlobalReflectiveEquilibrium`` otherwise (considers all positions;
-    slow for sentence pools larger than ~10 elements).
+    Searches locally when ``local=True`` (only positions close to the current
+    one) or globally otherwise (all positions; slow for sentence pools larger
+    than ~10 elements), with the theory restricted to the lookup's principles
+    and background theories — see ``rethon_theory``.
     """
     logger.info("Beginning rethon simulation.")
     start = time.time()
@@ -119,16 +120,13 @@ def get_rethon_final_state(
         position=initial_position,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
     )
-    if local:
-        # Consider positions close to current positions
-        re = StandardLocalReflectiveEquilibrium(
-            dialectical_structure=bdd_ds, initial_commitments=init_coms
-        )
-    else:
-        # Consider all positions; slow for n_unnegated_sentence_pool > 10
-        re = StandardGlobalReflectiveEquilibrium(
-            dialectical_structure=bdd_ds, initial_commitments=init_coms
-        )
+    # Local considers positions close to the current ones; global considers
+    # all of them, and is slow for n_unnegated_sentence_pool > 10. Either way
+    # the theory is made of the pool's principles and background theories, and
+    # starts from those the user holds.
+    re = make_re(
+        bdd_ds, init_coms, local, theory_sentences(lookup), held_theory(lookup)
+    )
     if weights is not None:
         re.set_model_parameters({"weights": weights.model_dump()})
     re.set_model_parameters(neighbourhood_depth=neighbourhood_depth)
@@ -145,20 +143,21 @@ def build_re(
     local: bool = True,
     weights: Optional[ModelWeights] = None,
     neighbourhood_depth: Optional[int] = 1,
+    *,
+    theory_sentences: Optional[Iterable[int]],
+    held_theory: Iterable[int],
 ) -> REProcess:
-    """Build and initialise a rethon RE object without running any steps."""
+    """Build and initialise a rethon RE object without running any steps.
+
+    Neither theory argument has a default: ``None`` is rethon's unrestricted
+    model and an empty held theory is rethon's own start, and a caller should
+    have to say so rather than get either by omission.
+    """
     bdd_ds = BDDDialecticalStructure.from_arguments(
         arguments=numerical_arguments,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
     )
-    if local:
-        re: REProcess = StandardLocalReflectiveEquilibrium(
-            dialectical_structure=bdd_ds, initial_commitments=init_coms
-        )
-    else:
-        re = StandardGlobalReflectiveEquilibrium(
-            dialectical_structure=bdd_ds, initial_commitments=init_coms
-        )
+    re: REProcess = make_re(bdd_ds, init_coms, local, theory_sentences, held_theory)
     if weights is not None:
         re.set_model_parameters({"weights": weights.model_dump()})
 
@@ -349,6 +348,13 @@ def validate_and_build(
     built_arguments = build_numerical_arguments(
         elements=elements, relations=arg_relations
     )
+    # The theory is made of these (see rethon_theory), so without one there is
+    # no theory to find — rethon would fail with no candidates at all.
+    if not theory_sentences(built_arguments.lookup):
+        raise HTTPException(
+            status_code=422,
+            detail="Add a principle or background theory first: the simulation builds its theory from them.",
+        )
     lookup_w_negated = _add_negated_to_lookup(lookup=built_arguments.lookup)
     return built_arguments, lookup_w_negated, n
 
@@ -406,6 +412,8 @@ def simulate_to_fixed_point(
             local,
             weights,
             neighbourhood_depth,
+            theory_sentences=theory_sentences(built_arguments.lookup),
+            held_theory=held_theory(built_arguments.lookup),
         )
         re.set_state(reconstructed)
         re.re_process(max_steps=max_steps_for(n))
@@ -460,6 +468,8 @@ def simulate_one_step(
         local=local,
         weights=weights,
         neighbourhood_depth=neighbourhood_depth,
+        theory_sentences=theory_sentences(built_arguments.lookup),
+        held_theory=held_theory(built_arguments.lookup),
     )
     if evolution:
         re.set_state(reconstructed)

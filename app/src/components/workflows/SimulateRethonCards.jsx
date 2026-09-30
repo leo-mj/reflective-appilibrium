@@ -6,6 +6,7 @@
 
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
+import { SCORE_MEASURES } from "../../constants/scoreMeasures.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,34 +40,41 @@ export function SectionHead({ title, count }) {
   );
 }
 
-// ─── ElementRow ───────────────────────────────────────────────────────────────
+// ─── ChangeList ───────────────────────────────────────────────────────────────
 
-export function ElementRow({ element, faded = false }) {
-  const color = elementColor(element.type);
+/**
+ * One kind of change accepting would make — withdrawn, taken up, rejected —
+ * with each element's wording, since these few are what the reader decides
+ * on. Nothing at all when the list is empty: an empty heading is noise.
+ *
+ * @param {{ title: string, hint?: string, elements: Object[], color: string }} props
+ */
+export function ChangeList({ title, hint, elements, color }) {
+  if (!elements.length) return null;
   return (
-    <div
-      style={{
-        borderLeft: `3px solid ${faded ? C.border : color}`,
-        padding: "6px 10px",
-        marginBottom: 6,
-        background: C.panel,
-        borderRadius: "0 4px 4px 0",
-        opacity: faded ? 0.5 : 1,
-      }}
-    >
-      <span
-        style={{
-          color: faded ? C.dim : color,
-          fontWeight: "bold",
-          fontSize: 11,
-          marginRight: 6,
-        }}
-      >
-        {element.id}
-      </span>
-      <span style={{ color: C.text, fontSize: 11, lineHeight: 1.5 }}>
-        {element.text}
-      </span>
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: "bold", color, marginBottom: 4 }}>
+        {title} · {elements.length}
+        {hint && (
+          <span style={{ fontWeight: "normal", color: C.dim }}> — {hint}</span>
+        )}
+      </div>
+      {elements.map((e) => (
+        <div
+          key={e.id}
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: 6,
+            fontSize: 11,
+            lineHeight: 1.5,
+            marginBottom: 3,
+          }}
+        >
+          <IdBadge element={e} />
+          <span style={{ color: C.text }}>{e.text}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -146,7 +154,7 @@ export function ArgumentCard({ argument }) {
 // ─── ScoreRow ─────────────────────────────────────────────────────────────────
 
 /**
- * Display Z + component scores in a compact inline row.
+ * Display achievement (Z) + component scores in a compact inline row.
  * When `stepType` is provided only the scores that changed at that step are shown:
  *   - theory step      → Z, Account, Systematicity
  *   - commitments step → Z, Account, Faithfulness
@@ -157,31 +165,19 @@ export function ScoreRow({ scores, highlight = false, stepType = null }) {
   const fmt = (v) => v.toFixed(3);
   const ACCENT = C.principle.accent;
   const allEntries = [
-    {
-      key: "z",
-      label: "Z-Score",
-      value: scores.z,
-      color: highlight ? ACCENT : C.dim,
-    },
-    {
-      key: "account",
-      label: "Account",
-      value: scores.account,
-      color: C.judgment.accent,
-    },
+    { key: "z", value: scores.z, color: highlight ? ACCENT : C.dim },
+    { key: "account", value: scores.account, color: C.judgment.accent },
     {
       key: "systematicity",
-      label: "Systematicity",
       value: scores.systematicity,
       color: C.principle.accent,
     },
     {
       key: "faithfulness",
-      label: "Faithfulness",
       value: scores.faithfulness,
       color: C.theory.accent,
     },
-  ];
+  ].map((e) => ({ ...e, ...SCORE_MEASURES[e.key] }));
   const entries = allEntries.filter(({ key }) => {
     if (!stepType) return true;
     if (key === "systematicity" && stepType === "commitments") return false;
@@ -198,9 +194,13 @@ export function ScoreRow({ scores, highlight = false, stepType = null }) {
         flexWrap: "wrap",
       }}
     >
-      {entries.map(({ label, value, color }) => (
+      {entries.map(({ label, tooltip, value, color }) => (
         <span key={label}>
-          <span style={{ color, fontWeight: "bold" }}>{label}</span>{" "}
+          {/* The four names mean nothing to a reader who has not met rethon,
+              and this row is where they are first seen. */}
+          <Tooltip text={tooltip}>
+            <span style={{ color, fontWeight: "bold" }}>{label}</span>
+          </Tooltip>{" "}
           <span style={{ color: highlight ? C.text : C.dim }}>
             {fmt(value)}
           </span>
@@ -210,72 +210,127 @@ export function ScoreRow({ scores, highlight = false, stepType = null }) {
   );
 }
 
-// ─── EvolutionStep ────────────────────────────────────────────────────────────
+// ─── StepRow ──────────────────────────────────────────────────────────────────
 
-export function EvolutionStep({ step, stepType, position, scores }) {
-  const isCommitments = stepType === "commitments";
-  const typeColor = isCommitments ? C.judgment.accent : C.principle.accent;
-  // The badge draws its border in the fill tone and its letter in the text
-  // tone: at 10px bold the fill tone does not clear AA on the panel.
-  const typeTextColor = isCommitments ? C.judgment.text : C.principle.text;
-  const typeLabel = isCommitments ? "C" : "T";
+/** One side of a step: an element that came in or went out, its wording on hover. */
+function StepChange({ element, sign, color }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
-        marginBottom: 6,
-        fontSize: 11,
-      }}
-    >
-      <span
+    <Tooltip text={elementLabel(element)}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+        <span style={{ color, fontWeight: "bold" }}>{sign}</span>
+        <IdBadge element={element} />
+      </span>
+    </Tooltip>
+  );
+}
+
+/**
+ * A step of the simulation as what it changed — `stepChanges` in
+ * utils/simulationDiff.js — rather than the whole position it arrived at,
+ * which repeated nearly all of the one before. Pressing it shows that step on
+ * the graph.
+ *
+ * @param {Object}   props
+ * @param {{ index: number, kind: string, joined: Object[], left: Object[] }} props.step
+ * @param {Object|null} props.score   - The scores at this step; none at step 0.
+ * @param {boolean}  props.current    - Whether the graph is showing this step.
+ * @param {() => void} props.onSelect
+ */
+export function StepRow({ step, score, current, onSelect }) {
+  const isCommitments = step.kind === "commitments";
+  // The tag draws its border in the fill tone and its word in the text tone:
+  // at 10px bold the fill tone does not clear AA on the panel.
+  const tagColor = isCommitments ? C.judgment.accent : C.principle.accent;
+  const tagText = isCommitments ? C.judgment.text : C.principle.text;
+  const unchanged = !step.joined.length && !step.left.length;
+  const quiet =
+    step.index === 0
+      ? "Your current commitments"
+      : step.index === 1 && unchanged
+        ? "The theory you hold"
+        : unchanged
+          ? "No change"
+          : null;
+  return (
+    <div role="listitem">
+      <button
+        onClick={onSelect}
+        aria-pressed={current}
+        aria-label={`Show step ${step.index} on the graph`}
         style={{
-          color: C.dim,
-          minWidth: 16,
-          textAlign: "right",
-          paddingTop: 2,
-          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          width: "100%",
+          textAlign: "left",
+          fontSize: 11,
+          padding: "4px 6px",
+          marginBottom: 2,
+          borderRadius: 4,
+          border: `1px solid ${current ? C.border : "transparent"}`,
+          background: current ? C.panel : "transparent",
+          color: C.text,
+          cursor: "pointer",
         }}
       >
-        {step}
-      </span>
-      <Tooltip
-        text={isCommitments ? "Commitments position" : "Theory position"}
-      >
+        <span
+          style={{ color: C.dim, minWidth: 18, textAlign: "right", flexShrink: 0 }}
+        >
+          {step.index}
+        </span>
         <span
           style={{
-            color: typeTextColor,
-            border: `1px solid ${typeColor}`,
+            color: tagText,
+            border: `1px solid ${tagColor}`,
             borderRadius: 3,
             padding: "0 4px",
             fontSize: 10,
             fontWeight: "bold",
-            lineHeight: "17px",
             flexShrink: 0,
-            opacity: 0.75,
+            minWidth: 72,
+            textAlign: "center",
           }}
         >
-          {typeLabel}
+          {isCommitments ? "Commitments" : "Theory"}
         </span>
-      </Tooltip>
-      <div style={{ flex: 1 }}>
-        <div
+        <span
           style={{
+            flex: 1,
             display: "flex",
             flexWrap: "wrap",
-            gap: 4,
-            marginBottom: scores ? 4 : 0,
+            gap: 6,
+            color: C.dim,
           }}
         >
-          {position.length === 0 ? (
-            <span style={{ color: C.dim }}>∅</span>
-          ) : (
-            position.map((e, i) => <IdBadge key={i} element={e} />)
+          {quiet ?? (
+            <>
+              {step.joined.map((e) => (
+                <StepChange
+                  key={`+${e.negated ? "¬" : ""}${e.id}`}
+                  element={e}
+                  sign="+"
+                  color={C.supportsText}
+                />
+              ))}
+              {step.left.map((e) => (
+                <StepChange
+                  key={`-${e.negated ? "¬" : ""}${e.id}`}
+                  element={e}
+                  sign="−"
+                  color={C.conflicts}
+                />
+              ))}
+            </>
           )}
-        </div>
-        <ScoreRow scores={scores} stepType={stepType} />
-      </div>
+        </span>
+        {score && (
+          <Tooltip text={SCORE_MEASURES.z.tooltip}>
+            <span style={{ color: C.dim, flexShrink: 0 }}>
+              Z {score.z.toFixed(3)}
+            </span>
+          </Tooltip>
+        )}
+      </button>
     </div>
   );
 }

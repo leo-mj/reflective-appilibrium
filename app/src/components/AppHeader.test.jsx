@@ -119,51 +119,18 @@ describe("narrow menu tab filtering", () => {
 });
 
 describe("simulation weights", () => {
-  // The weights only steer the rethon simulation, which needs the backend. With
-  // no backend they are a control that cannot affect anything the user sees.
+  // They steer the Simulate tab alone and are set there, beside the result
+  // they shape. The ☰ menu held a second way to the same state.
   const openMenu = openSettings;
 
   for (const isWide of [true, false]) {
     const layout = isWide ? "wide" : "narrow";
 
-    it(`stays out of the ${layout} menu without a backend`, () => {
-      render(<AppHeader {...PROPS} isWide={isWide} />);
-      openMenu();
-      expect(screen.queryByText(/Simulation weights/)).toBeNull();
-    });
-
-    it(`is offered in the ${layout} menu when there is a backend`, () => {
+    it(`are not in the ${layout} menu, even with a backend`, () => {
       flags.backend = true;
       render(<AppHeader {...PROPS} isWide={isWide} />);
       openMenu();
-      expect(screen.queryByText(/Simulation weights/)).not.toBeNull();
-    });
-
-    // Last in Content, after the argument checker: they steer the simulation,
-    // as the rows above them steer what the app works with. Model follows.
-    it(`sits at the end of Content in the ${layout} menu`, () => {
-      flags.backend = true;
-      render(<AppHeader {...PROPS} isWide={isWide} />);
-      openMenu();
-      const labels = [...document.querySelectorAll("button")].map((b) =>
-        b.textContent.trim(),
-      );
-      const at = (needle) => labels.findIndex((l) => l.includes(needle));
-      expect(at("Simulation weights")).toBe(at("Argument checker") + 1);
-      expect(at("LLM settings")).toBe(at("Simulation weights") + 1);
-    });
-
-    // Was: the row set `color: changed ? accent : undefined` over the menu
-    // row's own style, which overwrites the colour with `undefined`. React then
-    // sets none, and the row inherits the browser's default button ink — one
-    // row brighter than the rest of the menu, in dark mode most visibly.
-    it(`is written in the same ink as the rest of the ${layout} menu`, () => {
-      flags.backend = true;
-      render(<AppHeader {...PROPS} isWide={isWide} />);
-      openMenu();
-      const row = (name) => screen.getByRole("button", { name });
-      expect(row(/Simulation weights/).style.color).toBe(row(/Privacy/).style.color);
-      expect(row(/Simulation weights/).style.color).not.toBe("");
+      expect(screen.queryByText(/weights/i)).toBeNull();
     });
   }
 });

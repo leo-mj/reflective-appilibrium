@@ -41,6 +41,7 @@ import { EditModals } from "./user_edits/EditModals.jsx";
 import { GroupModal } from "./user_edits/GroupModal.jsx";
 import { AddBar } from "./user_edits/AddBar.jsx";
 import { ModalShell } from "./user_edits/ModalShell.jsx";
+import { DEFAULT_WEIGHTS } from "../constants/simulationWeights.js";
 
 /**
  * What becomes of the process on screen when the tour leaves it for the demo,
@@ -119,13 +120,9 @@ export default function REState({
     focusSeq.current += 1;
     setGraphFocus({ key: focusSeq.current, ids });
   }, []);
-  const [equilibriumPreviewWithdrawnIds, setEquilibriumPreviewWithdrawnIds] =
-    useState(null);
-  const DEFAULT_WEIGHTS = {
-    account: 0.35,
-    systematicity: 0.55,
-    faithfulness: 0.1,
-  };
+  // The Simulate tab's preview of the position at the step being played:
+  // `{ withdrawn, takenUp }` sets of ids, or null.
+  const [equilibriumPreview, setEquilibriumPreview] = useState(null);
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const weightsChanged =
     weights.account !== DEFAULT_WEIGHTS.account ||
@@ -512,9 +509,16 @@ export default function REState({
     onDiscardReview: handleDiscardReview,
     onApplyRethonEquilibrium: handleApplyRethonEquilibrium,
     weights: effectiveWeights,
-    equilibriumPreviewWithdrawnIds:
-      tab === "simulateRethon" ? equilibriumPreviewWithdrawnIds : null,
-    onSetEquilibriumPreview: setEquilibriumPreviewWithdrawnIds,
+    // Set in the Simulate tab alone, beside the result they steer. They used
+    // to be in the ☰ menu too, as a second way to the same state.
+    weightControl: {
+      weights,
+      weightsChanged,
+      onWeightsChange: setWeights,
+      onResetWeights: () => setWeights(DEFAULT_WEIGHTS),
+    },
+    equilibriumPreview: tab === "simulateRethon" ? equilibriumPreview : null,
+    onSetEquilibriumPreview: setEquilibriumPreview,
     onRoundChange: setHistoryRound,
     historyUnit,
     onHistoryUnitChange: setHistoryUnit,
@@ -750,10 +754,6 @@ export default function REState({
         hasMerged={hasMerged}
         verifyArguments={verifyArguments}
         setVerifyArguments={setVerifyArguments}
-        weights={weights}
-        weightsChanged={weightsChanged}
-        onWeightsChange={setWeights}
-        onResetWeights={() => setWeights(DEFAULT_WEIGHTS)}
         tourActive={tourActive}
         onStartTour={requestTour}
         hideTabBar={tourHidesChrome}

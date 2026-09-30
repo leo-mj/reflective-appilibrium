@@ -1,5 +1,8 @@
 /**
- * @fileoverview Log overlay for the History tab graph canvas.
+ * @fileoverview Log overlay for a graph being played: the History tab's, over
+ * the process's own log, and the Graph tab's while the Simulate tab plays a
+ * result, over one entry per simulation step (`stepLog` in
+ * utils/simulationDiff.js).
  * @module components/history/LogOverlay
  */
 
@@ -39,13 +42,16 @@ export function LogOverlay({ sortedLog, snappedRound, logRef, currentLogRef }) {
         gap: 4,
       }}
     >
-      {sortedLog.map((entry) => {
+      {sortedLog.map((entry, i) => {
         const isCurrent = entry.round === snappedRound;
         const isFuture = entry.round > snappedRound;
         return (
           <div
-            key={entry.round}
-            ref={isCurrent ? currentLogRef : null}
+            // By position, not step: rejecting suggestions logs an entry
+            // without taking a step, so two entries can share one.
+            key={i}
+            // The first of the step's entries is the one scrolled to.
+            ref={isCurrent && sortedLog[i - 1]?.round !== entry.round ? currentLogRef : null}
             style={{
               flexShrink: 0,
               fontSize: 11,
