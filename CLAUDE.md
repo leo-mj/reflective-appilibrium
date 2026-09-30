@@ -203,7 +203,7 @@ Two units, decided in issue #36 (its third alternative):
 The reader sees both: the header reads "Round 3 · Step 23"; cards, the log, the
 history events and the export are stamped in steps; the export's log is grouped
 under round headings; History's slider moves by step or, switched to Rounds,
-stops at the end of each round, and the Z-score chart follows it. Read the rounds
+stops at the end of each round, and the achievement (Z) chart follows it. Read the rounds
 through the helpers in `utils/stateUtils.js` — `roundEndsOf`, `roundOfStep`,
 `currentRound`, `roundStops` — since `roundEnds` is absent from every state
 written before it existed, which then reads as one open round. The backend model
