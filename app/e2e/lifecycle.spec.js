@@ -12,6 +12,15 @@ import {
   park,
   pick,
 } from "./helpers.js";
+import SAMPLE_STATE from "../src/sample-data/sample-state.js";
+import { ARGUMENT_RELATION_TYPES } from "../src/utils/stateUtils.js";
+
+/** How many arguments the demo opens with: distinct argument ids. */
+const SAMPLE_ARGUMENTS = new Set(
+  SAMPLE_STATE.relations
+    .filter((r) => ARGUMENT_RELATION_TYPES.has(r.type) && !r.supersededBy)
+    .map((r) => r.argumentId),
+).size;
 
 test.describe("Element lifecycle", () => {
   test("withdraw records a reason, then reinstate brings it back", async ({ page }) => {
@@ -121,8 +130,11 @@ test.describe("Revising an argument", () => {
     await expect(
       page.getByRole("group", { name: "Argument actions: J7, P6 to J10" }),
     ).toHaveCount(0);
-    // Still four arguments: a replaced one left on the board would be a fifth.
-    await expectCounts(page, { A: 4 });
+    // As many arguments as the demo started with: a replaced one left on the
+    // board would be one more. Counted off the fixture, since the demo's
+    // arguments change — it held four until six Detect Arguments suggestions
+    // were moved into it.
+    await expectCounts(page, { A: SAMPLE_ARGUMENTS });
   });
 });
 
