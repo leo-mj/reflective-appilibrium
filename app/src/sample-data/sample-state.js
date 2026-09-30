@@ -491,11 +491,19 @@ const SAMPLE = {
       type: "supports",
       explanation:
         "Future people as a class are determinate enough for probabilistic obligation.",
-      previousText:
-        "Future people as a class are determinate enough to be owed something.",
       addedRound: 54,
       revisedRound: 60,
       origin: "user",
+      // A relation keeps its earlier wording only in the event, as the app
+      // writes it: the backend's relation model has no `previousText`.
+      history: [
+        {
+          round: 60,
+          type: "revised",
+          previousText:
+            "Future people as a class are determinate enough to be owed something.",
+        },
+      ],
     },
     {
       from: "T2",
