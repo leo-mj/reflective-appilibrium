@@ -61,6 +61,7 @@ vi.mock("../../utils/theoriesClient.js", () => {
 
 import { TheorySuggestTab } from "./TheorySuggestTab.jsx";
 import { fetchTheorySuggestions } from "../../utils/theoriesClient.js";
+import { tooltipText } from "../tooltipTestUtils.js";
 
 afterEach(() => {
   cleanup();
@@ -115,7 +116,7 @@ describe("gating", () => {
     renderTab({ state: aState({ elements: [] }) });
     const button = screen.getByRole("button", { name: /Suggest/ });
     expect(button.disabled).toBe(true);
-    expect(button.title).toMatch(/at least one principle/i);
+    expect(tooltipText(button)).toMatch(/at least one principle/i);
   });
 
   it("does not count a withdrawn principle", () => {
@@ -210,7 +211,7 @@ describe("the suggestion card", () => {
     renderTab();
     await suggest();
     const label = screen.getByText(/not found in Crossref/);
-    expect(label.getAttribute("title")).toMatch(/does not index every book/i);
+    expect(tooltipText(label)).toMatch(/does not index every book/i);
     expect(label.textContent).not.toMatch(/suspect|invented|fabricat/i);
   });
 

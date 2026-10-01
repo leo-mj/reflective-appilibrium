@@ -7,7 +7,16 @@
 
 import { useState, useReducer } from "react";
 import { importStateFromFile } from "../utils/importMarkdown.js";
+import { importArgdownFromFile, isArgdownFile } from "../utils/importArgdown.js";
+import {
+  assertMergeable,
+  mergeStates,
+  previewMerge,
+} from "../utils/mergeStates.js";
+import { mergeElementPair } from "../utils/elementMerge.js";
+import { canCloseRound, roundEndsOf } from "../utils/stateUtils.js";
 import { useElementActions } from "./useElementActions.js";
+import { carryPins, pinsOf, withPins, withoutPins } from "../utils/pinUtils.js";
 import { useGroupActions } from "./useGroupActions.js";
 import { useRelationActions } from "./useRelationActions.js";
 import { useReviewActions } from "./useReviewActions.js";
@@ -35,7 +44,7 @@ const MAX_UNDO = 20;
 
 /**
  * @param {REHistory} hist
- * @param {{type: 'mutate', updater: Function} | {type: 'undo'} | {type: 'redo'} | {type: 'replace', state: Object}} action
+ * @param {{type: 'mutate', updater: Function} | {type: 'undo'} | {type: 'redo'} | {type: 'replace', state: Object} | {type: 'pins', pins: Object}} action
  * @returns {REHistory}
  */
 function historyReducer(hist, action) {
@@ -48,22 +57,32 @@ function historyReducer(hist, action) {
         past: [hist.present, ...hist.past].slice(0, MAX_UNDO),
         future: [],
       };
+    // Both carry the present's pins across: a drag is not an undo step, so
+    // undoing an edit must not also undo the drags made since it.
     case "undo": {
       const [prev, ...rest] = hist.past;
       return prev
-        ? { present: prev, past: rest, future: [hist.present, ...hist.future] }
+        ? {
+            present: carryPins(prev, hist.present),
+            past: rest,
+            future: [hist.present, ...hist.future],
+          }
         : hist;
     }
     case "redo": {
       const [next, ...rest] = hist.future;
       return next
         ? {
-            present: next,
+            present: carryPins(next, hist.present),
             past: [hist.present, ...hist.past].slice(0, MAX_UNDO),
             future: rest,
           }
         : hist;
     }
+    // Pinning a node where it was dropped: a change to the present that leaves
+    // nothing for undo to return to. See utils/pinUtils.js.
+    case "pins":
+      return { ...hist, present: withPins(hist.present, action.pins) };
     // A freshly imported state is a new process, not a step in this one, so
     // neither undo nor redo may reach back across it.
     case "replace":
@@ -93,6 +112,36 @@ export function useREActions(initialState) {
    * The updater must be free of side effects — see {@link REHistory}.
    */
   const mutate = (updater) => dispatch({ type: "mutate", updater });
+
+  /**
+   * Pins elements where the reader dropped them on the graph — offsets from
+   * the layout's centre, keyed by id. Not an undo step; see utils/pinUtils.js.
+   *
+   * @param {Record<string, {x: number, y: number}>} pins
+   */
+  const handlePinNodes = (pins) => dispatch({ type: "pins", pins });
+
+  /**
+   * Lets go of every pin, handing the whole graph back to the layout. Unlike
+   * a drag this *is* an undo step: it throws away every placement at once,
+   * and undo is how that is taken back. See `carryPins`.
+   */
+  const handleResetLayout = () =>
+    mutate((prev) => withoutPins(prev, Object.keys(pinsOf(prev))));
+
+  /**
+   * Closes the open round at the latest step — by hand, or as a workflow
+   * iteration completes. An undo step, so a mistaken close can be taken back;
+   * but not a step of its own and not a log entry, since it records how the
+   * changes are grouped rather than a change. A round with nothing in it is
+   * not closed.
+   */
+  const handleCloseRound = () => {
+    // Checked here as well as in the updater: an empty undo step is a press of
+    // Undo that does nothing.
+    if (!canCloseRound(state)) return;
+    mutate((prev) => ({ ...prev, roundEnds: [...roundEndsOf(prev), prev.round] }));
+  };
 
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
@@ -165,11 +214,56 @@ export function useREActions(initialState) {
     setRecentlyAdded,
   });
 
+  /** An exported process, or an Argdown map read into a fresh one. */
+  const readStateFile = (file) =>
+    isArgdownFile(file) ? importArgdownFromFile(file) : importStateFromFile(file);
+
   const handleImportFile = async (file) => {
-    const newState = await importStateFromFile(file);
+    const newState = await readStateFile(file);
     dispatch({ type: "replace", state: newState });
     setSelected(null);
     setSelectedRel(null);
+  };
+
+  /**
+   * Reads a second exported process and says what merging it would do, without
+   * doing it. Throws, with a message for the reader, if it cannot be merged.
+   *
+   * @param {File} file
+   * @returns {Promise<{ incoming: Object, label: string, preview: ReturnType<typeof previewMerge> }>}
+   */
+  const handlePrepareMerge = async (file) => {
+    const incoming = await readStateFile(file);
+    assertMergeable(state, incoming);
+    const label = file.name.replace(/\.(md|argdown|ad)$/i, "");
+    return { incoming, label, preview: previewMerge(state, incoming, { label }) };
+  };
+
+  /**
+   * Merges a prepared process into this one, as one round. Unlike an import
+   * this is a step *in* the current process, so it is undoable.
+   *
+   * @param {{ incoming: Object, label: string }} prepared - From `handlePrepareMerge`.
+   */
+  const handleConfirmMerge = ({ incoming, label }) => {
+    mutate((prev) => mergeStates(prev, incoming, { label }));
+  };
+
+  /**
+   * Merges two elements of a merged process into one, removing `removeId`.
+   * A selection on the removed element, or on one of its relations — which are
+   * replaced by re-pointed copies — would point at nothing, so it is let go.
+   *
+   * @param {{ keepId: string, removeId: string, text: string, confidence: number, reason?: string }} choice
+   */
+  const handleMergeElements = (choice) => {
+    mutate((prev) => mergeElementPair(prev, choice));
+    if (selected === choice.removeId) setSelected(null);
+    if (
+      selectedRel &&
+      (selectedRel.from === choice.removeId || selectedRel.to === choice.removeId)
+    )
+      setSelectedRel(null);
   };
 
   /**
@@ -239,11 +333,18 @@ export function useREActions(initialState) {
     canUndo,
     handleRedo,
     canRedo,
+    handlePinNodes,
+    handleResetLayout,
+    handleCloseRound,
+    canCloseRound: canCloseRound(state),
     ...elementActions,
     ...relationActions,
     ...groupActions,
     ...reviewActions,
     handleImportFile,
+    handlePrepareMerge,
+    handleConfirmMerge,
+    handleMergeElements,
     handleQuestionnaireSelectAnswer,
   };
 }

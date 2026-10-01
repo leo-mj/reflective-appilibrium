@@ -102,18 +102,21 @@ def test_step_rejects_invalid_depth(client, depth):
 def _make_mock_element(status="active"):
     el = MagicMock(spec=REElement)
     el.status = status
+    # Read to find the theory sentences and order the held theory (rethon_theory).
+    el.type = "principle"
+    el.confidence = 0.5
     return el
 
 
 @pytest.fixture
 def mock_rethon():
-    """Patch BDDDialecticalStructure and both RE classes so no real rethon runs."""
+    """Patch BDDDialecticalStructure and the RE factory so no real rethon runs."""
     mock_re = MagicMock()
     mock_ds = MagicMock()
     with (
         patch("backend.services.rethon_simulation.BDDDialecticalStructure") as mock_bdd,
         patch(
-            "backend.services.rethon_simulation.StandardLocalReflectiveEquilibrium",
+            "backend.services.rethon_simulation.make_re",
             return_value=mock_re,
         ),
         patch("backend.services.rethon_simulation.StandardPosition") as mock_pos,
@@ -150,6 +153,8 @@ def test_build_re_passes_depth(mock_rethon):
         numerical_arguments=[[1]],
         n_unnegated_sentence_pool=1,
         init_coms=init_coms,
+        theory_sentences={1},
+        held_theory={1},
         neighbourhood_depth=4,
     )
     mock_rethon.set_model_parameters.assert_any_call(neighbourhood_depth=4)
@@ -161,5 +166,7 @@ def test_build_re_default_depth_is_one(mock_rethon):
         numerical_arguments=[[1]],
         n_unnegated_sentence_pool=1,
         init_coms=init_coms,
+        theory_sentences={1},
+        held_theory={1},
     )
     mock_rethon.set_model_parameters.assert_any_call(neighbourhood_depth=1)

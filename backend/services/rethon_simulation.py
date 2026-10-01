@@ -1,8 +1,7 @@
 """Core RE simulation service — builds dialectical structures, runs RE processes, and translates results."""
 
 from fastapi import HTTPException
-from typing import List, Dict, Optional, Union
-from collections import defaultdict
+from typing import Iterable, List, Dict, Optional, Union
 import logging
 import time
 
@@ -13,8 +12,22 @@ from rethon import (
     REState,
 )
 from ..models.re_state import REElement, RERelation
+from .rethon_caps import (  # noqa: F401 — enforce_element_cap re-exported for the routers
+    NEGATING_TYPES,
+    NO_CAPS,
+    RETHON_ARGUMENT_TYPES,
+    ElementCaps,
+    enforce_element_cap,
+    rethon_arguments,
+)
+from .rethon_theory import held_theory, make_re, theory_sentences
 from ..routers.arguments_schemas import DetectArgumentsResponse, translate_from_lookup
-from ..routers.rethon_schemas import ModelWeights, ZScores, SimulatedRethonState
+from ..routers.rethon_schemas import (
+    ModelWeights,
+    ZScores,
+    SimulatedRethonResponse,
+    SimulatedRethonState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,19 +44,14 @@ def build_numerical_arguments(
     lookup: Dict[int, REElement] = {i + 1: el for i, el in enumerate(elements)}
     id_to_index: Dict[str, int] = {el.id: i + 1 for i, el in enumerate(elements)}
 
-    args_by_id: Dict[str, List[RERelation]] = defaultdict(list)
-    for rel in relations:
-        if rel.type in ("jointly_entails", "jointly_precludes") and rel.argument_id:
-            args_by_id[rel.argument_id].append(rel)
-
     numerical_arguments: List[List[int]] = []
-    for arg_rels in args_by_id.values():
+    for arg_rels in rethon_arguments(relations):
         conclusion_idx = id_to_index.get(arg_rels[0].to_id)
         premise_indices = [id_to_index.get(rel.from_id) for rel in arg_rels]
         if conclusion_idx is None or any(idx is None for idx in premise_indices):
             logger.warning("Skipping argument with unknown element IDs.")
             continue
-        if arg_rels[0].type == "jointly_precludes":
+        if arg_rels[0].type in NEGATING_TYPES:
             conclusion_idx = -conclusion_idx
         numerical_arguments.append(
             [idx for idx in premise_indices if idx is not None] + [conclusion_idx]
@@ -67,6 +75,20 @@ def _add_negated_to_lookup(lookup: Dict) -> Dict:
     }
 
 
+def max_steps_for(n: int) -> int:
+    """How many steps a process over ``n`` elements may take to reach a fixed point.
+
+    rethon stops at 50 by default and raises ``MaxLoopsWarning``, which reached
+    the reader as a 500. Local search changes a commitment or two per step and a
+    theory step comes between every two of those, so a process with many
+    commitments to revise needs more than 50 — the demo side by side with a copy
+    of itself, 44 elements, ran out while still withdrawing one at a time. Room
+    for every element to change once, twice over, with the old floor kept. The
+    computation's timeout, not this, is what bounds how long it may take.
+    """
+    return max(50, 4 * n)
+
+
 def get_rethon_final_state(
     numerical_arguments: List[List[int]],
     n_unnegated_sentence_pool: int,
@@ -77,10 +99,10 @@ def get_rethon_final_state(
 ) -> REProcess:
     """Build a BDD dialectical structure, set initial commitments from the lookup, and run the full RE process to a fixed point.
 
-    Uses ``StandardLocalReflectiveEquilibrium`` when ``local=True`` (considers
-    only positions close to the current one) or
-    ``StandardGlobalReflectiveEquilibrium`` otherwise (considers all positions;
-    slow for sentence pools larger than ~10 elements).
+    Searches locally when ``local=True`` (only positions close to the current
+    one) or globally otherwise (all positions; slow for sentence pools larger
+    than ~10 elements), with the theory restricted to the lookup's principles
+    and background theories — see ``rethon_theory``.
     """
     logger.info("Beginning rethon simulation.")
     start = time.time()
@@ -98,20 +120,17 @@ def get_rethon_final_state(
         position=initial_position,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
     )
-    if local:
-        # Consider positions close to current positions
-        re = StandardLocalReflectiveEquilibrium(
-            dialectical_structure=bdd_ds, initial_commitments=init_coms
-        )
-    else:
-        # Consider all positions; slow for n_unnegated_sentence_pool > 10
-        re = StandardGlobalReflectiveEquilibrium(
-            dialectical_structure=bdd_ds, initial_commitments=init_coms
-        )
+    # Local considers positions close to the current ones; global considers
+    # all of them, and is slow for n_unnegated_sentence_pool > 10. Either way
+    # the theory is made of the pool's principles and background theories, and
+    # starts from those the user holds.
+    re = make_re(
+        bdd_ds, init_coms, local, theory_sentences(lookup), held_theory(lookup)
+    )
     if weights is not None:
         re.set_model_parameters({"weights": weights.model_dump()})
     re.set_model_parameters(neighbourhood_depth=neighbourhood_depth)
-    re.re_process()
+    re.re_process(max_steps=max_steps_for(n_unnegated_sentence_pool))
     end = time.time()
     logger.info(f"Completed rethon simulation in {end - start:.2f} seconds'")
     return re
@@ -124,20 +143,21 @@ def build_re(
     local: bool = True,
     weights: Optional[ModelWeights] = None,
     neighbourhood_depth: Optional[int] = 1,
+    *,
+    theory_sentences: Optional[Iterable[int]],
+    held_theory: Iterable[int],
 ) -> REProcess:
-    """Build and initialise a rethon RE object without running any steps."""
+    """Build and initialise a rethon RE object without running any steps.
+
+    Neither theory argument has a default: ``None`` is rethon's unrestricted
+    model and an empty held theory is rethon's own start, and a caller should
+    have to say so rather than get either by omission.
+    """
     bdd_ds = BDDDialecticalStructure.from_arguments(
         arguments=numerical_arguments,
         n_unnegated_sentence_pool=n_unnegated_sentence_pool,
     )
-    if local:
-        re: REProcess = StandardLocalReflectiveEquilibrium(
-            dialectical_structure=bdd_ds, initial_commitments=init_coms
-        )
-    else:
-        re = StandardGlobalReflectiveEquilibrium(
-            dialectical_structure=bdd_ds, initial_commitments=init_coms
-        )
+    re: REProcess = make_re(bdd_ds, init_coms, local, theory_sentences, held_theory)
     if weights is not None:
         re.set_model_parameters({"weights": weights.model_dump()})
 
@@ -301,21 +321,25 @@ def validate_and_build(
     elements: List[REElement],
     relations: List[RERelation],
     sentence_pool_minimum: int = 3,
+    caps: ElementCaps = NO_CAPS,
 ) -> tuple[DetectArgumentsResponse, Dict[int, REElement], int]:
     """Validate the request payload and build the numerical argument structures.
 
     Raises HTTPException on invalid input.  Returns the built arguments, the
     negated lookup, and the sentence pool size.
+
+    ``caps`` is passed in rather than read from settings so this stays a
+    pure function of its arguments — which is what lets it be called from a
+    worker process without carrying configuration across the pipe.
     """
     n = len(elements)
+    enforce_element_cap(elements, relations, caps)
     if n < sentence_pool_minimum:
         raise HTTPException(
             status_code=422,
             detail=f"There are fewer than {sentence_pool_minimum} elements forming the sentence pool.",
         )
-    arg_relations = [
-        r for r in relations if r.type in ("jointly_entails", "jointly_precludes")
-    ]
+    arg_relations = [r for r in relations if r.type in RETHON_ARGUMENT_TYPES]
     if not arg_relations:
         raise HTTPException(
             status_code=422,
@@ -324,5 +348,132 @@ def validate_and_build(
     built_arguments = build_numerical_arguments(
         elements=elements, relations=arg_relations
     )
+    # The theory is made of these (see rethon_theory), so without one there is
+    # no theory to find — rethon would fail with no candidates at all.
+    if not theory_sentences(built_arguments.lookup):
+        raise HTTPException(
+            status_code=422,
+            detail="Add a principle or background theory first: the simulation builds its theory from them.",
+        )
     lookup_w_negated = _add_negated_to_lookup(lookup=built_arguments.lookup)
     return built_arguments, lookup_w_negated, n
+
+
+# ── Worker entry points ───────────────────────────────────────────────────────
+#
+# /simulate and /step run these in the simulation pool (see process_pool.py).
+# Each takes what validate_and_build returned in the parent, so no check that
+# can refuse a request runs here, and each returns the finished response rather
+# than the REProcess: that object does pickle, but it carries the whole BDD
+# manager, which would be serialised across the pipe only to be thrown away.
+
+
+class SimulationFinished(Exception):
+    """A step was asked of a process that has already reached its fixed point.
+
+    Raised in a worker in place of an ``HTTPException``, which cannot be
+    unpickled; the router turns it back into a 400.
+    """
+
+
+def _index_by_id(elements: List[REElement]) -> Dict[str, int]:
+    return {el.id: i + 1 for i, el in enumerate(elements)}
+
+
+def _respond(
+    re: REProcess,
+    built_arguments: DetectArgumentsResponse,
+    lookup_w_negated: Dict[int, REElement],
+) -> SimulatedRethonResponse:
+    scores = compute_evolution_scores(re)
+    return SimulatedRethonResponse(
+        translated_arguments=built_arguments.translated_arguments,
+        translated_re_state=translate_re_state(re.state(), lookup_w_negated, scores),
+    )
+
+
+def simulate_to_fixed_point(
+    built_arguments: DetectArgumentsResponse,
+    lookup_w_negated: Dict[int, REElement],
+    n: int,
+    elements: List[REElement],
+    evolution: Optional[List[List[REElement]]],
+    local: bool = True,
+    weights: Optional[ModelWeights] = None,
+    neighbourhood_depth: int = 1,
+) -> SimulatedRethonResponse:
+    """Run the RE process to a fixed point, resuming from ``evolution`` if given."""
+    if evolution:
+        reconstructed = reconstruct_re_state(evolution, _index_by_id(elements), n)
+        re = build_re(
+            built_arguments.num_arguments,
+            n,
+            reconstructed.initial_commitments(),
+            local,
+            weights,
+            neighbourhood_depth,
+            theory_sentences=theory_sentences(built_arguments.lookup),
+            held_theory=held_theory(built_arguments.lookup),
+        )
+        re.set_state(reconstructed)
+        re.re_process(max_steps=max_steps_for(n))
+    else:
+        re = get_rethon_final_state(
+            numerical_arguments=built_arguments.num_arguments,
+            n_unnegated_sentence_pool=n,
+            lookup=built_arguments.lookup,
+            local=local,
+            weights=weights,
+            neighbourhood_depth=neighbourhood_depth,
+        )
+    return _respond(re, built_arguments, lookup_w_negated)
+
+
+def simulate_one_step(
+    built_arguments: DetectArgumentsResponse,
+    lookup_w_negated: Dict[int, REElement],
+    n: int,
+    elements: List[REElement],
+    evolution: Optional[List[List[REElement]]],
+    local: bool = True,
+    weights: Optional[ModelWeights] = None,
+    neighbourhood_depth: int = 1,
+) -> SimulatedRethonResponse:
+    """Advance the RE process by one step from ``evolution``, or from the element
+    statuses when there is none.
+
+    Raises ``SimulationFinished`` if the process is already at a fixed point.
+    """
+    id_to_index = _index_by_id(elements)
+    if evolution:
+        reconstructed = reconstruct_re_state(evolution, id_to_index, n)
+        init_coms = reconstructed.initial_commitments()
+    else:
+        init_coms = StandardPosition.from_set(
+            position={
+                (
+                    id_to_index[el.id]
+                    if el.status in ("active", "revised")
+                    else -id_to_index[el.id]
+                )
+                for el in elements
+                if el.status in ("active", "revised", "rejected")
+            },
+            n_unnegated_sentence_pool=n,
+        )
+    re = build_re(
+        numerical_arguments=built_arguments.num_arguments,
+        n_unnegated_sentence_pool=n,
+        init_coms=init_coms,
+        local=local,
+        weights=weights,
+        neighbourhood_depth=neighbourhood_depth,
+        theory_sentences=theory_sentences(built_arguments.lookup),
+        held_theory=held_theory(built_arguments.lookup),
+    )
+    if evolution:
+        re.set_state(reconstructed)
+    if re.state().finished:
+        raise SimulationFinished("The RE process has already reached a fixed point.")
+    re.next_step()
+    return _respond(re, built_arguments, lookup_w_negated)

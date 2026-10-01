@@ -12,10 +12,9 @@ import {
 } from "./glosses.js";
 
 describe("the gloss maps", () => {
-  it("covers the dialectical four and the single-premise pair", () => {
+  it("covers the dialectical three and the single-premise pair", () => {
     expect(Object.keys(RELATION_GLOSS).sort()).toEqual([
       "conflicts",
-      "depends",
       "entails",
       "precludes",
       "supports",

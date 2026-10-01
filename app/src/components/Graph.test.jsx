@@ -5,10 +5,14 @@
 // the hand-off between what the canvas lets you click and what the follow-up
 // modal is willing to accept.
 import { useState } from "react";
-import { vi, describe, it, expect, beforeAll, afterEach } from "vitest";
-import { render, fireEvent, cleanup } from "@testing-library/react";
+import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { render, fireEvent, cleanup, act } from "@testing-library/react";
 
 import { Graph } from "./Graph.jsx";
+import { expandedCard, statementCard } from "../utils/statementCards.js";
+import { elementRadius, fitView } from "../utils/graphHelpers.js";
+import { setStatementViewOn } from "../utils/statementViewSetting.js";
+import { C } from "../constants/colors.js";
 import {
   choose,
   openPicker,
@@ -94,6 +98,7 @@ function Harness({
   onToggleGroup = () => {},
   onUngroup = () => {},
   onEditGroupRequest = () => {},
+  search = "",
 }) {
   const [selected, setSelected] = useState(null);
   const [selectedRel, setSelectedRel] = useState(null);
@@ -132,6 +137,7 @@ function Harness({
       onToggleGroup={onToggleGroup}
       onUngroup={onUngroup}
       onEditGroupRequest={onEditGroupRequest}
+      search={search}
     />
   );
 }
@@ -356,7 +362,6 @@ describe("ctrl+click relation building", () => {
       "Supports",
       "Conflicts",
       "Undermines",
-      "Depends on",
       "Entails",
       "Precludes",
     ]);
@@ -436,6 +441,12 @@ describe("clicking a node pins its tooltip", () => {
     expect(
       [...pinned.querySelectorAll("button")].map((b) => b.textContent),
     ).toEqual(["Revise", "Withdraw"]);
+  });
+
+  it("shows the statement for a node", () => {
+    const { svg } = setup();
+    clickNode(svg, "J1");
+    expect(card().textContent).toContain("J1.");
   });
 
   it("offers reinstate instead for an element out of play", () => {
@@ -757,5 +768,810 @@ describe("groups", () => {
     clickGroupNode(container);
     expect(container.querySelector('[aria-label="Expand group Duties"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Collapse group Duties"]')).toBeNull();
+  });
+});
+
+describe("statement view", () => {
+  // The switch is a module-level store, so it outlives a test's unmount.
+  afterEach(() => setStatementViewOn(false));
+  // These tests look at where things end up, so they ask for the jump the
+  // reduced-motion setting gives; "gliding between views" drives the glide.
+  const reduceMotion = (on) =>
+    vi.stubGlobal("matchMedia", (query) => ({
+      matches: on && query.includes("prefers-reduced-motion: reduce"),
+    }));
+  beforeEach(() => reduceMotion(true));
+  afterEach(() => vi.unstubAllGlobals());
+
+  const cards = (container) =>
+    container.querySelectorAll('[data-testid="statement-card"]');
+  /** The wording on each card, without the id on its badge. */
+  const wordings = (container) =>
+    [...cards(container)].map((c) => c.querySelector(":scope > text").textContent);
+  const toggle = (container) =>
+    container.querySelector('[aria-label="Show element text"]');
+
+  it("draws each element as a card carrying its wording while switched on", () => {
+    const { container } = setup();
+    expect(cards(container)).toHaveLength(0);
+    expect(toggle(container).getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(toggle(container));
+    expect(toggle(container).getAttribute("aria-pressed")).toBe("true");
+    expect(wordings(container).sort()).toEqual(["J1.", "J2.", "P1.", "P2."]);
+
+    fireEvent.click(toggle(container));
+    expect(cards(container)).toHaveLength(0);
+  });
+
+  it("carries the id the guided tour rings it by", () => {
+    const { container } = setup();
+    expect(toggle(container).getAttribute("data-tutorial")).toBe(
+      "statement-toggle",
+    );
+  });
+
+  it("is remembered across mounts", () => {
+    const first = setup();
+    fireEvent.click(toggle(first.container));
+    first.unmount();
+
+    const { container } = setup();
+    expect(cards(container)).toHaveLength(4);
+    expect(localStorage.getItem("graphStatements")).toBe("true");
+  });
+
+  it("spreads the nodes apart rather than moving the layout", () => {
+    const { container } = setup();
+    const nodeX = () =>
+      [...container.querySelectorAll("g[transform^='translate(']")]
+        .map((g) => g.getAttribute("transform"))
+        .filter((t) => !t.includes("scale"));
+    const before = nodeX();
+    fireEvent.click(toggle(container));
+    // Centroid of POSITIONS is x = 400: J1 at 100 lands at 400 - 300 × 1.5,
+    // and no card is close enough to push it further.
+    expect(nodeX()).toContain("translate(-50,100)");
+    expect(nodeX()).not.toEqual(before);
+  });
+
+  it("draws the card backgrounds under the edges and the cards over them", () => {
+    const state = {
+      ...STATE,
+      relations: [
+        { from: "J1", to: "P1", type: "supports", explanation: "", addedRound: 1 },
+      ],
+    };
+    const { container } = setup({ state });
+    fireEvent.click(toggle(container));
+    const drawn = [...container.querySelectorAll("svg g[transform] > *")];
+    const edge = drawn.findIndex((n) => n.querySelector?.("path"));
+    const firstCard = drawn.findIndex(
+      (n) => n.querySelector?.('[data-testid="statement-card"]'),
+    );
+    // Backgrounds are the canvas's own rects, one per card, before the edge.
+    const backgrounds = drawn.slice(0, edge).filter((n) => n.tagName === "rect");
+    expect(edge).toBeGreaterThan(-1);
+    expect(backgrounds).toHaveLength(4);
+    expect(firstCard).toBeGreaterThan(edge);
+  });
+
+  it("puts the node inside the card, at its usual size, instead of beside it", () => {
+    const { container, svg } = setup();
+    // The canvas's own: the toggle's icon draws a circle too.
+    const circles = () => [...svg.querySelectorAll("circle")];
+    const j1Radius = () =>
+      circles()
+        .find((c) => c.parentElement.textContent.startsWith("J1"))
+        .getAttribute("r");
+    const before = j1Radius();
+    const count = circles().length;
+
+    fireEvent.click(toggle(container));
+    // The same judgments, the same size, and no second shape each.
+    expect(circles()).toHaveLength(count);
+    expect(j1Radius()).toBe(before);
+    for (const c of circles())
+      expect(c.closest('[data-testid="statement-card"]')).not.toBeNull();
+  });
+
+  describe("hovering a card", () => {
+    const LONG =
+      "It is wrong to break a promise merely because keeping it has become inconvenient, even when nobody would ever find out that it had been broken.";
+    const longState = {
+      ...STATE,
+      elements: STATE.elements.map((e) =>
+        e.id === "J1" ? { ...e, text: LONG } : e,
+      ),
+    };
+
+    /** The canvas's pan and zoom, off the transform it draws with. */
+    const view = (svg) => {
+      const [, px, py, z] = svg
+        .querySelector(":scope > g")
+        .getAttribute("transform")
+        .match(/translate\(([^,]+),([^)]+)\) scale\(([^)]+)\)/);
+      return { px: +px, py: +py, z: +z };
+    };
+    /** Clicks the canvas at a point in simulation coordinates. */
+    const clickAt = (svg, x, y) => {
+      const { px, py, z } = view(svg);
+      const common = {
+        clientX: x * z + px,
+        clientY: y * z + py,
+        pointerId: 1,
+        pointerType: "mouse",
+      };
+      fireEvent.pointerDown(svg, common);
+      fireEvent.pointerUp(svg, common);
+    };
+    /** Every card drawn for an element, grown or not. */
+    const cardsOf = (container, id) =>
+      [
+        ...container.querySelectorAll(
+          '[data-testid="statement-card"], [data-testid="statement-card-expanded"]',
+        ),
+      ].filter((c) => c.textContent.startsWith(id));
+    /** The node group a card is drawn in: hover target, position, opacity. */
+    const nodeOf = (container, id) =>
+      cardsOf(container, id)[0].closest("g[transform^='translate(']");
+    const at = (g) => {
+      const [, x, y] = g
+        .getAttribute("transform")
+        .match(/translate\(([^,]+),([^)]+)\)/);
+      return { x: +x, y: +y };
+    };
+    const grownOf = (container) =>
+      container.querySelector('[data-testid="statement-card-expanded"]');
+
+    it("grows the card itself to its whole statement, with no second card", () => {
+      const { container } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      expect(grownOf(container)).toBeNull();
+
+      fireEvent.mouseEnter(nodeOf(container, "J1"));
+      expect(grownOf(container).textContent).toContain("had been broken.");
+      expect(cardsOf(container, "J1")).toHaveLength(1);
+
+      fireEvent.mouseLeave(nodeOf(container, "J1"));
+      expect(grownOf(container)).toBeNull();
+      expect(cardsOf(container, "J1")).toHaveLength(1);
+    });
+
+    it("answers the pointer anywhere on the card, not only on its border", () => {
+      // jsdom does no hit-testing, so this pins the attribute that does it: an
+      // outline with no fill is otherwise hit on its stroke alone.
+      const { container } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      const outline = cardsOf(container, "J1")[0].querySelector(":scope > rect");
+      expect(outline.getAttribute("fill")).toBe("none");
+      expect(outline.getAttribute("pointer-events")).toBe("all");
+    });
+
+    it("answers the pointer with a heavier border, whether or not the card grows", () => {
+      const { container } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      const border = (id) =>
+        cardsOf(container, id)[0]
+          .querySelector(":scope > rect")
+          .getAttribute("stroke-width");
+      expect(border("P1")).toBe("1.5");
+
+      // P1's statement fits: nothing to grow, but it still answers.
+      fireEvent.mouseEnter(nodeOf(container, "P1"));
+      expect(grownOf(container)).toBeNull();
+      expect(border("P1")).toBe("2.5");
+      fireEvent.mouseLeave(nodeOf(container, "P1"));
+      expect(border("P1")).toBe("1.5");
+
+      // J1's does not: it grows, and is outlined the same way.
+      fireEvent.mouseEnter(nodeOf(container, "J1"));
+      expect(border("J1")).toBe("2.5");
+    });
+
+    it("pins details without the statement, which the card already shows", () => {
+      const { container, svg } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      const { x, y } = at(nodeOf(container, "P1"));
+      clickAt(svg, x, y);
+
+      // The pinned box portals to document.body.
+      const pinned = [...document.body.querySelectorAll("div")].find(
+        (d) => d.style.position === "fixed" && d.textContent.includes("Revise"),
+      );
+      expect(pinned).toBeDefined();
+      expect(pinned.textContent).toContain("P1");
+      expect(pinned.textContent).toContain("Confidence");
+      expect(pinned.textContent).not.toContain("P1.");
+    });
+
+    it("grows a tapped card, and ignores the mouse a browser emulates after a tap", () => {
+      const { container, svg } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      const { x, y } = at(nodeOf(container, "J1"));
+      const { px, py, z } = view(svg);
+      const touch = { clientX: x * z + px, clientY: y * z + py, pointerId: 2, pointerType: "touch" };
+      fireEvent.pointerDown(svg, touch);
+      fireEvent.pointerUp(svg, touch);
+      expect(grownOf(container)).not.toBeNull();
+
+      // The emulated mouse leaving: not the reader's pointer.
+      fireEvent.mouseLeave(nodeOf(container, "J1"));
+      expect(grownOf(container)).not.toBeNull();
+
+      // A tap on open canvas lets it go.
+      const away = { ...touch, clientX: -500, clientY: -500 };
+      fireEvent.pointerDown(svg, away);
+      fireEvent.pointerUp(svg, away);
+      expect(grownOf(container)).toBeNull();
+    });
+
+    it("leaves a card that already shows all of its statement as it is", () => {
+      const { container } = setup();
+      fireEvent.click(toggle(container));
+      fireEvent.mouseEnter(nodeOf(container, "J1"));
+      expect(grownOf(container)).toBeNull();
+    });
+
+    it("keeps a withdrawn or rejected card readable: badge faded, wording grey", () => {
+      // STATE's J2 is withdrawn and its P2 rejected.
+      const { container } = setup();
+      fireEvent.click(toggle(container));
+      const parts = (id) => {
+        const card = cardsOf(container, id)[0];
+        return {
+          node: nodeOf(container, id).style.opacity,
+          badge: card.querySelector(":scope > g").getAttribute("opacity"),
+          outline: card.querySelector(":scope > rect").getAttribute("stroke-opacity"),
+          wording: card.querySelector(":scope > text").getAttribute("fill"),
+        };
+      };
+      expect(parts("J2")).toEqual({
+        node: "1",
+        badge: "0.25",
+        outline: "0.25",
+        wording: C.dim,
+      });
+      expect(parts("P2")).toMatchObject({ node: "1", badge: "0.35", wording: C.dim });
+      expect(parts("J1")).toMatchObject({ badge: "1", wording: C.text });
+    });
+
+    it("still dims a whole card, withdrawn or not, for a selection elsewhere", () => {
+      const { container, svg } = setup();
+      fireEvent.click(toggle(container));
+      const { x, y } = at(nodeOf(container, "J1"));
+      clickAt(svg, x, y);
+      expect(nodeOf(container, "J2").style.opacity).toBe("0.12");
+      expect(nodeOf(container, "P1").style.opacity).toBe("0.12");
+    });
+
+    it("does not select anything", () => {
+      const { container } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      fireEvent.mouseEnter(nodeOf(container, "J1"));
+      expect(nodeOf(container, "P1").style.opacity).toBe("1");
+    });
+
+    it("takes a click on the grown part as a click on the card", () => {
+      const { container, svg } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      const before = at(nodeOf(container, "J1"));
+      fireEvent.mouseEnter(nodeOf(container, "J1"));
+
+      // Below the card as it was, inside the card as it now is: a click on
+      // open canvas before it grew, and a selection of J1 now — which dims P1.
+      const el = longState.elements[0];
+      const card = statementCard(el);
+      const grown = expandedCard(el, card);
+      expect(grown.dy).toBeGreaterThan(8);
+      clickAt(svg, before.x, before.y + card.hh + grown.dy);
+      expect(nodeOf(container, "P1").style.opacity).toBe("0.12");
+    });
+  });
+
+  describe("gliding between views", () => {
+    let frames;
+    let now;
+    beforeEach(() => {
+      reduceMotion(false);
+      frames = [];
+      now = 0;
+      vi.stubGlobal("requestAnimationFrame", (cb) => frames.push(cb));
+      vi.stubGlobal("cancelAnimationFrame", () => {});
+      vi.spyOn(performance, "now").mockImplementation(() => now);
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    /** Runs the frames queued so far, at time `t`. */
+    const frameAt = (t) => {
+      now = t;
+      const due = frames;
+      frames = [];
+      act(() => due.forEach((cb) => cb(t)));
+    };
+    /** J1's drawn x, off its node's transform. */
+    const j1X = (container) => {
+      const g = [...container.querySelectorAll("g[transform^='translate(']")].find(
+        (n) => n.textContent.startsWith("J1") && !n.getAttribute("transform").includes("scale"),
+      );
+      return +g.getAttribute("transform").match(/translate\(([^,]+),/)[1];
+    };
+
+    it("moves each element from where it stood to where it is going", () => {
+      const { container } = setup();
+      fireEvent.click(toggle(container));
+      // Cards at once, still where the nodes were.
+      expect(cards(container)).toHaveLength(4);
+      expect(j1X(container)).toBeCloseTo(100);
+
+      frameAt(160);
+      const midway = j1X(container);
+      expect(midway).toBeLessThan(100);
+      expect(midway).toBeGreaterThan(-50);
+
+      frameAt(400);
+      // At rest where the view puts it: 400 − 300 × 1.5.
+      expect(j1X(container)).toBeCloseTo(-50);
+      expect(frames).toHaveLength(0);
+    });
+
+    it("glides the view with them", () => {
+      const { container, svg } = setup();
+      const zoom = () =>
+        +svg
+          .querySelector(":scope > g")
+          .getAttribute("transform")
+          .match(/scale\(([^)]+)\)/)[1];
+      const before = zoom();
+      fireEvent.click(toggle(container));
+      frameAt(400);
+      const after = zoom();
+      expect(after).not.toBeCloseTo(before);
+
+      // And back, starting on the clock where the first glide left it.
+      fireEvent.click(toggle(container));
+      frameAt(560);
+      const midway = zoom();
+      expect((midway - after) * (before - after)).toBeGreaterThan(0);
+      frameAt(800);
+      expect(zoom()).toBeCloseTo(before);
+    });
+
+    it("never runs backwards on a frame stamped before the glide began", () => {
+      const { container } = setup();
+      now = 1000;
+      fireEvent.click(toggle(container));
+      frameAt(990);
+      expect(j1X(container)).toBeCloseTo(100);
+    });
+
+    it("jumps for a reader who asks for less motion", () => {
+      reduceMotion(true);
+      const { container } = setup();
+      fireEvent.click(toggle(container));
+      expect(j1X(container)).toBeCloseTo(-50);
+      expect(frames).toHaveLength(0);
+    });
+  });
+
+  describe("zoomed far out", () => {
+    const LONG =
+      "It is wrong to break a promise merely because keeping it has become inconvenient, even when nobody would ever find out that it had been broken.";
+    const longState = {
+      ...STATE,
+      elements: STATE.elements.map((e) =>
+        e.id === "J1" ? { ...e, text: LONG } : e,
+      ),
+    };
+    const zoomOf = (svg) =>
+      +svg
+        .querySelector(":scope > g")
+        .getAttribute("transform")
+        .match(/scale\(([^)]+)\)/)[1];
+    /** Presses a zoom button until the zoom passes `limit`. */
+    const zoomUntil = (container, svg, label, passed) => {
+      const button = container.querySelector(`[aria-label="${label}"]`);
+      for (let i = 0; i < 40 && !passed(zoomOf(svg)); i++) fireEvent.click(button);
+    };
+    const j1Card = (container) =>
+      [...cards(container)].find((c) => c.textContent.startsWith("J1"));
+    const j1Lines = (container) =>
+      [...j1Card(container).querySelectorAll(":scope > text tspan")].map(
+        (t) => t.textContent,
+      );
+    const j1Place = (container) =>
+      j1Card(container)
+        .closest("g[transform^='translate(']")
+        .getAttribute("transform");
+
+    it("shows one line per card, and every line again on the way back in", () => {
+      const { container, svg } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      expect(j1Lines(container).length).toBeGreaterThan(1);
+      const place = j1Place(container);
+
+      zoomUntil(container, svg, "Zoom out", (z) => z < 0.3);
+      const [line, ...rest] = j1Lines(container);
+      expect(rest).toEqual([]);
+      expect(line).toMatch(/^It is wrong.*…$/);
+      // Drawn smaller, laid out the same: zooming moves nothing.
+      expect(j1Place(container)).toBe(place);
+
+      zoomUntil(container, svg, "Zoom in", (z) => z > 0.36);
+      expect(j1Lines(container).length).toBeGreaterThan(1);
+      expect(j1Place(container)).toBe(place);
+    });
+
+    it("keeps every line at the zoom a graph of a few dozen elements opens at", () => {
+      // Around 45%, where the threshold first sat — and one line a card is what
+      // the graph's opening view showed.
+      const { container, svg } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      // First step under 45%: 41–45%, one 1.1× step being all it can overshoot.
+      zoomUntil(container, svg, "Zoom out", (z) => z < 0.45);
+      expect(zoomOf(svg)).toBeGreaterThan(0.4);
+      expect(j1Lines(container).length).toBeGreaterThan(1);
+    });
+
+    it("does not flicker between the two near the threshold", () => {
+      const { container, svg } = setup({ state: longState });
+      fireEvent.click(toggle(container));
+      zoomUntil(container, svg, "Zoom out", (z) => z < 0.3);
+      // One step back in lands between the thresholds: still one line.
+      fireEvent.click(container.querySelector('[aria-label="Zoom in"]'));
+      expect(zoomOf(svg)).toBeLessThan(0.36);
+      expect(j1Lines(container)).toHaveLength(1);
+    });
+  });
+});
+
+describe("an edge's explanation", () => {
+  const withRelations = (relations) => ({ ...STATE, relations });
+  const EXPLAINED = withRelations([
+    {
+      from: "J1",
+      to: "P1",
+      type: "supports",
+      explanation: "Promises create expectations others rely on.",
+      addedRound: 1,
+    },
+  ]);
+  const label = (container) =>
+    container.querySelector('[data-testid="relation-label"]');
+  /** The box's lines, heading first — a line break is no space in textContent. */
+  const lines = (container) =>
+    [...label(container).querySelectorAll("tspan")].map((t) => t.textContent);
+  // Without auto-fit the canvas is unpanned and unzoomed, so a point in
+  // simulation coordinates is where it lands on screen. J1 and P1 sit at
+  // x 100 and 500, so the edge between them passes through (200, 100) — clear
+  // of J2, which stands on it at 300.
+  const move = (svg, x, y, pointerType = "mouse") =>
+    fireEvent.pointerMove(svg, { clientX: x, clientY: y, pointerId: 1, pointerType });
+
+  it("shows the relation's type and explanation while the pointer is on it", () => {
+    const { container, svg } = setup({ state: EXPLAINED });
+    expect(label(container)).toBeNull();
+    move(svg, 200, 100);
+    const [heading, ...rest] = lines(container);
+    expect(heading).toBe("Supports");
+    expect(rest.join(" ")).toBe("Promises create expectations others rely on.");
+    fireEvent.pointerLeave(svg, { pointerType: "mouse" });
+    expect(label(container)).toBeNull();
+  });
+
+  it("shows nothing over a node, which answers for itself", () => {
+    const { container, svg } = setup({ state: EXPLAINED });
+    move(svg, 100, 100);
+    expect(label(container)).toBeNull();
+  });
+
+  it("names the type alone when no explanation was given", () => {
+    const { container, svg } = setup({
+      state: withRelations([
+        { from: "J1", to: "P1", type: "conflicts", explanation: "", addedRound: 1 },
+      ]),
+    });
+    move(svg, 200, 100);
+    expect(label(container).textContent).toBe("Conflicts");
+  });
+
+  it("shows on a tap, and goes on a tap elsewhere", () => {
+    const { container, svg } = setup({ state: EXPLAINED });
+    const tap = (x, y) => {
+      const at = { clientX: x, clientY: y, pointerId: 2, pointerType: "touch" };
+      fireEvent.pointerDown(svg, at);
+      fireEvent.pointerUp(svg, at);
+    };
+    tap(200, 100);
+    expect(label(container)).not.toBeNull();
+    tap(300, 400);
+    expect(label(container)).toBeNull();
+  });
+
+  it("gathers a joint argument's explanations", () => {
+    const joint = (from, explanation) => ({
+      from,
+      to: "P1",
+      type: "jointly_entails",
+      argumentId: "A1",
+      explanation,
+      addedRound: 1,
+    });
+    const { container, svg } = setup({
+      state: {
+        ...STATE,
+        positions: undefined,
+        relations: [
+          joint("J1", "Together they leave no exception."),
+          joint("J2", "Together they leave no exception."),
+        ],
+      },
+      positions: {
+        J1: { x: 100, y: 100 },
+        J2: { x: 100, y: 300 },
+        P1: { x: 500, y: 200 },
+        P2: { x: 700, y: 100 },
+      },
+    });
+    // On the conclusion's arrow, past the junction.
+    move(svg, 420, 200);
+    const text = label(container).textContent;
+    expect(text).toMatch(/^Jointly Entails/);
+    // Said once, though both premises carry it.
+    expect(text.match(/no exception/g)).toHaveLength(1);
+  });
+});
+
+describe("the text panel's search, on the graph", () => {
+  afterEach(() => setStatementViewOn(false));
+  const RELATED = {
+    ...STATE,
+    relations: [
+      { from: "J1", to: "P1", type: "supports", explanation: "", addedRound: 1 },
+      { from: "P1", to: "P2", type: "conflicts", explanation: "", addedRound: 1 },
+    ],
+  };
+  const nodeOpacity = (svg, id) =>
+    [...svg.querySelectorAll("g[transform^='translate(']")]
+      .find((g) => g.querySelector(":scope > text")?.textContent === id)
+      .style.opacity;
+  const edgeOpacities = (svg) =>
+    [...svg.querySelectorAll("path[stroke-dasharray]")].map(
+      (p) => p.parentElement.getAttribute("opacity"),
+    );
+
+  it("fades what it did not find, as a selection does", () => {
+    const { svg } = setup({ state: RELATED, search: "j1" });
+    expect(nodeOpacity(svg, "J1")).toBe("1");
+    expect(nodeOpacity(svg, "P1")).toBe("0.12");
+  });
+
+  it("lights the edges the panel lists, and only those", () => {
+    // "J1" is in the first relation's end, which the panel's test for a
+    // relation reads, and not in the second's.
+    const { svg } = setup({ state: RELATED, search: "J1" });
+    const [toP1, p1ToP2] = edgeOpacities(svg).map(Number);
+    expect(toP1).toBeCloseTo(0.7);
+    expect(p1ToP2).toBeLessThan(0.1);
+  });
+
+  it("does not light an edge just for a found element at one end", () => {
+    // Found in J1's statement: J1 is listed, the relation from it is not.
+    const { svg } = setup({
+      state: {
+        ...RELATED,
+        elements: RELATED.elements.map((e) =>
+          e.id === "J1" ? { ...e, text: "Promises bind." } : e,
+        ),
+      },
+      search: "promises",
+    });
+    expect(nodeOpacity(svg, "J1")).toBe("1");
+    expect(Number(edgeOpacities(svg)[0])).toBeLessThan(0.1);
+  });
+
+  it("lights an edge whose explanation it finds, as the panel lists it", () => {
+    const { svg } = setup({
+      state: {
+        ...RELATED,
+        relations: [
+          { ...RELATED.relations[0], explanation: "Trust is at stake." },
+          RELATED.relations[1],
+        ],
+      },
+      search: "trust",
+    });
+    const [explained, other] = edgeOpacities(svg).map(Number);
+    expect(explained).toBeCloseTo(0.7);
+    expect(other).toBeLessThan(0.1);
+  });
+
+  it("fades nothing without a query", () => {
+    const { svg } = setup({ state: RELATED, search: "  " });
+    expect(nodeOpacity(svg, "P1")).toBe("1");
+  });
+
+  it("marks what it found in a card's wording", () => {
+    const { container } = setup({
+      state: {
+        ...STATE,
+        elements: STATE.elements.map((e) =>
+          e.id === "J1" ? { ...e, text: "Promises bind." } : e,
+        ),
+      },
+      search: "BIND",
+    });
+    fireEvent.click(container.querySelector('[aria-label="Show element text"]'));
+    const marks = [...container.querySelectorAll('[data-testid="search-mark"]')];
+    expect(marks.map((m) => m.textContent)).toEqual(["bind"]);
+  });
+});
+
+
+// ─── The view: following the selection, fit, double-click ────────────────────
+
+describe("the view follows the selection", () => {
+  // Where things land, not how they get there: the glide jumps under this.
+  beforeEach(() =>
+    vi.stubGlobal("matchMedia", (query) => ({
+      matches: query.includes("prefers-reduced-motion: reduce"),
+    })),
+  );
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setStatementViewOn(false);
+  });
+
+  const el = (id, type = "judgment") => ({
+    id,
+    type,
+    status: "active",
+    confidence: 1,
+    text: `${id}.`,
+    addedRound: 1,
+  });
+  // X1 is far off the right of a 700 × 400 canvas; E1 half off its left edge.
+  const FAR = { J1: { x: 100, y: 100 }, X1: { x: 2000, y: 100 }, E1: { x: 10, y: 200 } };
+  const REL = {
+    from: "J1",
+    to: "X1",
+    type: "entails",
+    explanation: "",
+    addedRound: 1,
+    argumentId: "a1",
+  };
+  const FAR_STATE = {
+    ...STATE,
+    elements: [el("J1"), el("X1"), el("E1")],
+    relations: [REL],
+  };
+
+  /**
+   * The graph with a way to select from outside the canvas, which is what the
+   * text panel does.
+   */
+  function Follow({ onEditRequest = () => {} }) {
+    const [selected, setSelected] = useState(null);
+    const [selectedRel, setSelectedRel] = useState(null);
+    const selectNode = (u) => {
+      setSelectedRel(null);
+      setSelected(u);
+    };
+    const selectRel = (u) => {
+      setSelected(null);
+      setSelectedRel(u);
+    };
+    return (
+      <>
+        <button onClick={() => selectNode(() => "X1")}>pick X1</button>
+        <button onClick={() => selectNode(() => "E1")}>pick E1</button>
+        <button onClick={() => selectRel(() => REL)}>pick relation</button>
+        <Graph
+          state={FAR_STATE}
+          hiddenLegendKeys={new Set()}
+          positions={FAR}
+          selected={selected}
+          onSelect={selectNode}
+          selectedRel={selectedRel}
+          onSelectRel={selectRel}
+          onAddElement={() => {}}
+          onAddRelation={() => {}}
+          onEditRequest={onEditRequest}
+          ready={false}
+          recentlyAdded={null}
+          hideNonEntailsRels={false}
+        />
+      </>
+    );
+  }
+
+  /** The view's pan and zoom, off the transform the canvas draws under. */
+  const view = (container) => {
+    const t = container
+      .querySelector("svg g[transform*='scale']")
+      .getAttribute("transform");
+    const [x, y, z] = t.match(/-?[\d.]+/g).map(Number);
+    return { x, y, zoom: z };
+  };
+  const press = (container, label) =>
+    fireEvent.click(
+      [...container.querySelectorAll("button")].find((b) => b.textContent === label),
+    );
+  const nodeOpacity = (svg, id) =>
+    [...svg.querySelectorAll("g[transform^='translate(']")]
+      .find((g) => g.querySelector(":scope > text")?.textContent === id)
+      .style.opacity;
+
+  // The clear area of a 700 × 400 canvas: 24px in from each edge, and 120px
+  // from the right, where the add and zoom buttons stand.
+  const CLEAR = { left: 24, right: 700 - 120, top: 24, bottom: 400 - 24 };
+  const clearCentre = {
+    x: (CLEAR.left + CLEAR.right) / 2,
+    y: (CLEAR.top + CLEAR.bottom) / 2,
+  };
+
+  it("centres an element selected while nowhere on screen", () => {
+    const { container } = render(<Follow />);
+    press(container, "pick X1");
+    expect(view(container)).toEqual({
+      x: clearCentre.x - 2000,
+      y: clearCentre.y - 100,
+      zoom: 1,
+    });
+  });
+
+  it("moves one only cut off at the edge just far enough to show it whole", () => {
+    const { container } = render(<Follow />);
+    press(container, "pick E1");
+    const r = elementRadius(el("E1"));
+    // Its left edge lands on the margin, and nothing moves up or down.
+    expect(view(container).x + 10 - r).toBeCloseTo(CLEAR.left);
+    expect(view(container).y).toBe(0);
+  });
+
+  it("leaves the view alone for an element already in it", () => {
+    const { container } = render(<Follow />);
+    const svg = container.querySelector("svg");
+    fireEvent.pointerDown(svg, { clientX: 100, clientY: 100, pointerId: 1, pointerType: "mouse" });
+    fireEvent.pointerUp(svg, { clientX: 100, clientY: 100, pointerId: 1, pointerType: "mouse" });
+    expect(view(container)).toEqual({ x: 0, y: 0, zoom: 1 });
+  });
+
+  it("brings in a relation's ends — here too far apart to fit, so its middle", () => {
+    const { container } = render(<Follow />);
+    press(container, "pick relation");
+    expect(view(container).x).toBeCloseTo(clearCentre.x - (100 + 2000) / 2);
+  });
+
+  it("revises a node on a double-click, and keeps it selected", () => {
+    const onEditRequest = vi.fn();
+    const { container } = render(<Follow onEditRequest={onEditRequest} />);
+    const svg = container.querySelector("svg");
+    fireEvent.doubleClick(svg, { clientX: 100, clientY: 100, button: 0 });
+    expect(onEditRequest).toHaveBeenCalledWith("J1");
+    // Selected, so it lights and the rest fades.
+    expect(nodeOpacity(svg, "J1")).toBe("1");
+    expect(Number(nodeOpacity(svg, "E1"))).toBeLessThan(1);
+  });
+
+  it("fits the whole graph from the button, or a double-click on the background", () => {
+    const expected = fitView(FAR, null, { w: 700, h: 400 }, { padding: 96, maxZoom: 1 });
+    for (const act of [
+      (c) => fireEvent.click(c.querySelector('[aria-label="Fit graph to view"]')),
+      (c) =>
+        fireEvent.doubleClick(c.querySelector("svg"), {
+          clientX: 400,
+          clientY: 350,
+          button: 0,
+        }),
+    ]) {
+      const { container, unmount } = render(<Follow />);
+      act(container);
+      const v = view(container);
+      expect(v.zoom).toBeCloseTo(expected.zoom);
+      expect(v.x).toBeCloseTo(expected.pan.x);
+      expect(v.y).toBeCloseTo(expected.pan.y);
+      unmount();
+    }
   });
 });

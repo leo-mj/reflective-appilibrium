@@ -18,7 +18,7 @@ import {
 } from "../../utils/lastOrigin.js";
 import { ADD_BAR_PRESETS } from "../../constants/tabConstants.jsx";
 import { AddElementModal } from "./AddElementModal.jsx";
-import { AddBar } from "./TextTabAddPanel.jsx";
+import { AddBar } from "./AddBar.jsx";
 
 const ELEMENTS = [
   { id: "J1", type: "judgment", status: "active" },

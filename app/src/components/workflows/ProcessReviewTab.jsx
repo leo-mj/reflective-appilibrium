@@ -33,6 +33,7 @@ import {
   CancelButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { SuggestionToolbar } from "./workflowComponents.jsx";
@@ -253,8 +254,8 @@ function SavedReview({ review, isOpen, onToggle, onDiscard, currentRound }) {
           </span>
           <span>
             <span style={{ color: C.dim }}>
-              Round {review.round}
-              {/* A review taken at round 5 still reads as covering rounds 1–5
+              Step {review.round}
+              {/* A review taken at step 5 still reads as covering steps 1–5
                   once the process has moved on; saying so is what stops it
                   looking like a description of where things stand now. */}
               {stale && ` of ${currentRound}`} ·{" "}
@@ -405,7 +406,7 @@ export function ProcessReviewTab({
           nextPhaseIsEnabled={nextPhaseIsEnabled}
           needs={
             state.log.length < 2
-              ? "Work through at least two rounds first."
+              ? "Make at least two changes first."
               : undefined
           }
           disclosure={
@@ -417,12 +418,13 @@ export function ProcessReviewTab({
             )
           }
         />
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {state.log.length < 2 && (
           <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.7 }}>
-            A review reports how your position moved across the rounds, so there
-            has to be a process to read. Work through a couple of rounds first.
+            A review reports how your position moved across the process, so
+            there has to be a process to read. Make a couple of changes first.
           </div>
         )}
 

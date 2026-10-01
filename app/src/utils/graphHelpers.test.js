@@ -1,15 +1,61 @@
 import { describe, it, expect } from "vitest";
 import {
+  boundaryDistance,
   computeJunction,
   distToQuadBezier,
   distToSegment,
+  elementRadius,
   fitView,
   focusFraming,
   groupJointArguments,
   hitRadius,
+  hitsElement,
+  NARROW_FIT_MIN_ZOOM,
+  nodeLabelSize,
   nodeRadius,
   parallelEdgeOffsets,
 } from "./graphHelpers.js";
+
+// ─── Where an edge meets a node ───────────────────────────────────────────────
+
+describe("boundaryDistance", () => {
+  const node = { type: "judgment", confidence: 1 };
+  const card = { ...node, card: { hw: 100, hh: 30 } };
+
+  it("is the radius in every direction for a node", () => {
+    expect(boundaryDistance(node, 1, 0)).toBe(elementRadius(node));
+    expect(boundaryDistance(node, 3, -4)).toBe(elementRadius(node));
+  });
+
+  it("is the side of a card's box that the direction leaves through", () => {
+    expect(boundaryDistance(card, 1, 0)).toBe(100);
+    expect(boundaryDistance(card, 0, -1)).toBe(30);
+    // Steeper than the diagonal: out through the top, at 30 / sin.
+    expect(boundaryDistance(card, 1, 1)).toBeCloseTo(30 * Math.SQRT2);
+    // Shallow: out through the side.
+    expect(boundaryDistance(card, 10, 1)).toBeCloseTo(Math.hypot(100, 10));
+  });
+
+  it("gives an answer for no direction at all", () => {
+    expect(boundaryDistance(card, 0, 0)).toBe(30);
+  });
+});
+
+describe("hitsElement", () => {
+  const pos = { x: 0, y: 0 };
+
+  it("takes a card's whole box, not a circle at its centre", () => {
+    const card = { type: "judgment", confidence: 1, card: { hw: 100, hh: 30 } };
+    expect(hitsElement(card, pos, 95, 0)).toBe(true);
+    expect(hitsElement(card, pos, 0, 45)).toBe(false);
+  });
+
+  it("keeps the hit radius for a node", () => {
+    const node = { type: "judgment", confidence: 1 };
+    expect(hitsElement(node, pos, elementRadius(node) + 2, 0)).toBe(true);
+    expect(hitsElement(node, pos, 95, 0)).toBe(false);
+  });
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -310,6 +356,22 @@ describe("fitView", () => {
   it("returns nothing to fit against a container with no size", () => {
     expect(fitView(POSITIONS, null, { w: 0, h: 0 })).toBeNull();
     expect(fitView(null, null, STRIP)).toBeNull();
+  });
+
+  it("opens a phone's graph with every id at 10px or more", () => {
+    // A sample-sized graph, far wider than a phone: fitted whole, its ids
+    // were drawn at 6–7px. Floored, the smallest is 10 and the rest is panned to.
+    const wide = { A: { x: 0, y: 0 }, B: { x: 900, y: 700 } };
+    const phone = { w: 390, h: 520 };
+    const loose = fitView(wide, null, phone);
+    const floored = fitView(wide, null, phone, {
+      minZoom: NARROW_FIT_MIN_ZOOM,
+    });
+    expect(nodeLabelSize("judgment") * loose.zoom).toBeLessThan(10);
+    expect(nodeLabelSize("judgment") * floored.zoom).toBeCloseTo(10, 5);
+    expect(nodeLabelSize("theory") * floored.zoom).toBeGreaterThanOrEqual(
+      10 - 1e-9,
+    );
   });
 });
 

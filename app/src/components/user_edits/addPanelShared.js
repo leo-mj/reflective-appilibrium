@@ -189,6 +189,34 @@ export const complaintStyle = (size) => ({
   color: C.conflicts,
 });
 
+/**
+ * Every style the add bar's controls wear, worked out once for the layout it
+ * is drawn in rather than switched on `roomy` wherever a control is drawn.
+ *
+ * The element tab's trimmings stay small; the link tabs' pickers are the
+ * content and are drawn as such. The phone sizes everything alike, having room
+ * for one size only.
+ *
+ * @param {boolean} roomy - The phone sheet's layout.
+ */
+export function barLook(roomy) {
+  const size = roomy ? "roomy" : "compact";
+  const linkSize = roomy ? "roomy" : "prominent";
+  return {
+    roomy,
+    /** A link tab's buttons: + premise, ×, and the phone's Details. */
+    ghost: ghostBtn(linkSize),
+    /** The bar's own buttons — Clear, minimise — and a written argument's. */
+    ghostSmall: ghostBtn(size),
+    arrow: arrowStyle(linkSize),
+    sel: selectStyle(size),
+    linkSel: selectStyle(linkSize),
+    /** For the fields that are not selects, and so must not wear its chevron. */
+    box: fieldStyle(size),
+    complaint: complaintStyle(linkSize),
+  };
+}
+
 /** The longest option an element picker holds, counting the status suffixes. */
 export const idOptionChars = (elements) =>
   Math.max(
@@ -227,4 +255,98 @@ export function makeArgumentDefaults(elements) {
     negated: false,
     explanation: "",
   };
+}
+
+/**
+ * A written argument as it starts, and as Clear and a successful add leave it:
+ * one premise and the conclusion, each a statement still to be written. Both
+ * open as judgments, and either can be changed.
+ */
+export const WRITTEN_ARGUMENT_DEFAULTS = Object.freeze({
+  premises: [{ type: "judgment", text: "" }],
+  conclusion: { type: "judgment", text: "" },
+});
+
+/**
+ * One line of a written argument: a new statement of `type`, or — when `id` is
+ * set — an element already on the board. The text stays on a line that has
+ * been pointed at an element, so pointing it back at "New" gives it back.
+ *
+ * @typedef {{type: string, text: string, id?: string}} ArgumentSlot
+ */
+
+/** What a line's source picker holds: the element's id, or `new:<type>`. */
+export const slotSource = (slot) => slot.id ?? `new:${slot.type}`;
+
+/**
+ * A link needs two ends. Until the board has two elements the pickers stand
+ * empty and Add is dead, and a disabled button gives no reason — so the space
+ * the other complaints use says what is missing instead of staying blank.
+ */
+const TOO_FEW = "Add two elements first";
+
+/**
+ * Whether a relation can be added, and if not, what to say about it.
+ *
+ * @param {{from: string, to: string}} form
+ * @param {number} elementCount - How many elements the pickers offer.
+ * @returns {{valid: boolean, complaint: string|null}}
+ */
+export function checkRelation({ from, to }, elementCount) {
+  const valid = !!from && !!to && from !== to;
+  if (elementCount < 2) return { valid, complaint: TOO_FEW };
+  return { valid, complaint: from === to ? "From ≠ To" : null };
+}
+
+/**
+ * Whether an argument picked from the board can be added, and if not, what to
+ * say about it.
+ *
+ * @param {{premises: string[], conclusion: string}} form
+ * @param {number} elementCount - How many elements the pickers offer.
+ * @returns {{valid: boolean, complaint: string|null}}
+ */
+export function checkPickedArgument({ premises, conclusion }, elementCount) {
+  const premiseSet = new Set(premises);
+  const duplicate = premiseSet.size < premises.length;
+  const circular = premiseSet.has(conclusion);
+  const valid =
+    premises.length > 0 &&
+    premises.every(Boolean) &&
+    !!conclusion &&
+    !duplicate &&
+    !circular;
+  const complaint =
+    elementCount < 2
+      ? TOO_FEW
+      : duplicate
+        ? "Premises must differ"
+        : circular
+          ? "Premise ≠ conclusion"
+          : null;
+  return { valid, complaint };
+}
+
+/**
+ * Whether a written argument can be added, and if not, whether that is worth
+ * saying. An empty statement is not — the element tab does not complain about
+ * its empty field either, and a form that opens complaining reads as broken.
+ * The same element twice is, since nothing on screen shows why Add is dead.
+ *
+ * @param {{premises: ArgumentSlot[], conclusion: ArgumentSlot}} form
+ * @param {Set<string>} available - Ids that can still be picked; a line left
+ *   pointing at an element that has since gone is not a line.
+ * @returns {{valid: boolean, complaint: string|null}}
+ */
+export function checkWrittenArgument(form, available) {
+  const { premises, conclusion } = form;
+  const premiseIds = premises.map((p) => p.id).filter(Boolean);
+  if (new Set(premiseIds).size < premiseIds.length)
+    return { valid: false, complaint: "Premises must differ" };
+  if (conclusion.id && premiseIds.includes(conclusion.id))
+    return { valid: false, complaint: "Premise ≠ conclusion" };
+  const filled = [...premises, conclusion].every((s) =>
+    s.id ? available.has(s.id) : s.text.trim().length > 0,
+  );
+  return { valid: filled, complaint: null };
 }

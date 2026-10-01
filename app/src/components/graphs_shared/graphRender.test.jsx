@@ -1,8 +1,16 @@
+// @vitest-environment jsdom
+//
 // Edge and node styling for history playback. `historyEdgeVisuals` decides
 // whether an edge reads as present, gone, or not yet existing at a given round —
 // the only place relation withdrawal reaches the History tab.
 import { describe, it, expect } from "vitest";
-import { historyEdgeVisuals, historyNodeVisuals } from "./graphRender.jsx";
+import { render } from "@testing-library/react";
+import { C } from "../../constants/colors.js";
+import {
+  graphNodeVisuals,
+  historyEdgeVisuals,
+  historyNodeVisuals,
+} from "./graphRender.jsx";
 
 const rel = (overrides = {}) => ({
   from: "J1",
@@ -89,5 +97,37 @@ describe("historyNodeVisuals", () => {
     expect(
       historyNodeVisuals(el, new Set(["J1"]), new Set(["J1"]), 2).children,
     ).toBeNull();
+  });
+});
+
+describe("graphNodeVisuals, while a simulation plays", () => {
+  const principle = {
+    id: "P2",
+    type: "principle",
+    status: "withdrawn",
+    confidence: 0.7,
+    text: "A principle",
+  };
+  const rings = (preview) => {
+    const { container } = render(
+      <svg>{graphNodeVisuals(principle, new Set(), () => false, null, null, null, preview).children}</svg>,
+    );
+    return [...container.querySelectorAll("[stroke]")].map((n) => ({
+      stroke: n.getAttribute("stroke"),
+      dashed: n.hasAttribute("stroke-dasharray"),
+    }));
+  };
+
+  it("marks a member of the theory in force, beside the preview's own ring", () => {
+    // A theory step mostly moves elements already held, so without a ring of
+    // its own it showed nothing on the graph.
+    const drawn = rings({ takenUp: new Set(["P2"]), theory: new Set(["P2"]) });
+    expect(drawn).toContainEqual({ stroke: C.principle.accent, dashed: false });
+    expect(drawn).toContainEqual({ stroke: C.supports, dashed: true });
+  });
+
+  it("draws no theory ring outside the theory", () => {
+    const drawn = rings({ theory: new Set(["P1"]) });
+    expect(drawn.some((r) => r.stroke === C.principle.accent)).toBe(false);
   });
 });

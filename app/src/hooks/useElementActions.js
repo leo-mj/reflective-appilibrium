@@ -6,8 +6,11 @@
 
 import { useState } from "react";
 import {
+  ELEMENT_EDIT_FIELDS,
+  rewordElement,
   nextElementId,
   makeDiff,
+  editChanges,
   makeLogEntry,
   historyOf,
   isWithdrawnNow,
@@ -19,6 +22,22 @@ import {
  * @param {{ state, mutate, selected, setSelected, setSelectedRel, setRecentlyAdded, setRecentlyAddedRel }} deps
  */
 const RETHON_REASON = "Withdrawn by rethon equilibrium simulation.";
+const RETHON_REJECT_REASON =
+  "Rejected by rethon equilibrium simulation: the equilibrium holds its negation.";
+
+/** A simulation run as the log records it: enough to run it again. */
+function describeRun({ depth, weights, from, to }) {
+  const w = (x) => x.toFixed(2);
+  return [
+    `depth ${depth}`,
+    `weights: account ${w(weights.account)}, systematicity ${w(weights.systematicity)}, faithfulness ${w(weights.faithfulness)}`,
+    from != null && to != null
+      ? `achievement ${from.toFixed(3)} → ${to.toFixed(3)}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
 
 export function useElementActions({
   state,
@@ -47,8 +66,13 @@ export function useElementActions({
   };
 
   const handleEditSave = (formData) => {
-    const newRound = state.round + 1;
     const oldEl = editingEl;
+    // Nothing changed, so nothing was revised: no round, no status, no log.
+    if (!makeDiff(ELEMENT_EDIT_FIELDS, oldEl, formData).length) {
+      setEditingEl(null);
+      return;
+    }
+    const newRound = state.round + 1;
     /* eslint-disable-next-line no-unused-vars */
     const { withdrawnRound, reinstatedRound, withdrawals, reason, ...oldElBase } =
       oldEl;
@@ -77,11 +101,7 @@ export function useElementActions({
       revisedRound: newRound,
       history,
     };
-    const diffs = makeDiff(
-      ["type", "confidence", "status", "origin", "text"],
-      oldEl,
-      { ...formData, origin },
-    );
+    const diffs = makeDiff(ELEMENT_EDIT_FIELDS, oldEl, { ...formData, origin });
     mutate((prev) => ({
       ...prev,
       round: newRound,
@@ -92,7 +112,7 @@ export function useElementActions({
           newRound,
           `${oldEl.id} was edited by the user.`,
           "Changes applied",
-          diffs.length ? diffs.join("; ") : "No fields changed",
+          editChanges(oldEl.id, diffs),
         ),
       ],
     }));
@@ -120,26 +140,7 @@ export function useElementActions({
       ...prev,
       round: newRound,
       elements: prev.elements.map((e) =>
-        e.id === elementId
-          ? {
-              ...e,
-              text: newText,
-              origin: withUserEdit(e.origin),
-              status: "revised",
-              previousText: e.text,
-              revisedRound: newRound,
-              // Withdrawn premises are selectable when reconstructing an
-              // argument, so this can land on one. Bring it back first, exactly
-              // as handleEditSave does, or the withdrawal stays open in history
-              // while the status says otherwise.
-              history: withEvent(
-                isWithdrawnNow(e)
-                  ? { ...e, history: withEvent(e, { round: newRound, type: "reinstated" }) }
-                  : e,
-                { round: newRound, type: "revised", previousText: e.text },
-              ),
-            }
-          : e,
+        e.id === elementId ? rewordElement(e, newText, newRound) : e,
       ),
       log: [
         ...prev.log,
@@ -147,7 +148,7 @@ export function useElementActions({
           newRound,
           `${elementId} was reworded by the user while accepting an argument.`,
           "Changes applied",
-          makeDiff(["text"], oldEl, { text: newText }).join("; "),
+          editChanges(elementId, makeDiff(["text"], oldEl, { text: newText })),
         ),
       ],
     }));
@@ -282,28 +283,65 @@ export function useElementActions({
     });
   };
 
-  const handleApplyRethonEquilibrium = (equilibriumIds) => {
+  /**
+   * Takes up a simulated position, as one step: withdraws, takes up again and
+   * rejects what `positionChanges` (utils/simulationDiff.js) says it would.
+   * The Simulate tab hands over that same record, so what is applied is what
+   * the tab listed and the graph previewed.
+   *
+   * The entry's sentence records the run — depth, weights, and achievement
+   * before and after — so that a result taken up can be reproduced from the
+   * log alone; the export carries it.
+   *
+   * @param {{ withdraw: string[], takeUp: string[], reject: string[],
+   *   run?: { depth: number, weights: {account: number, systematicity: number, faithfulness: number}, from?: number, to?: number } }} changes
+   */
+  const handleApplyRethonEquilibrium = ({ withdraw, takeUp, reject, run }) => {
+    if (withdraw.length + takeUp.length + reject.length === 0) return;
     const newRound = state.round + 1;
+    const withdrawing = new Set(withdraw);
+    const takingUp = new Set(takeUp);
+    const rejecting = new Set(reject);
     mutate((prev) => ({
       ...prev,
       round: newRound,
       elements: prev.elements.map((e) => {
-        if (e.status === "withdrawn" || e.status === "rejected") return e;
-        if (equilibriumIds.has(e.id)) return e;
-        return {
-          ...e,
-          status: "withdrawn",
-          history: withEvent(e, { round: newRound, type: "withdrawn", reason: RETHON_REASON }),
-          reason: RETHON_REASON,
-        };
+        if (withdrawing.has(e.id))
+          return {
+            ...e,
+            status: "withdrawn",
+            history: withEvent(e, { round: newRound, type: "withdrawn", reason: RETHON_REASON }),
+            reason: RETHON_REASON,
+          };
+        if (takingUp.has(e.id))
+          return {
+            ...e,
+            status: "active",
+            reason: undefined,
+            history: withEvent(e, { round: newRound, type: "reinstated" }),
+          };
+        if (rejecting.has(e.id))
+          return {
+            ...e,
+            status: "rejected",
+            history: withEvent(e, { round: newRound, type: "rejected", reason: RETHON_REJECT_REASON }),
+            reason: RETHON_REJECT_REASON,
+          };
+        return e;
       }),
       log: [
         ...prev.log,
         makeLogEntry(
           newRound,
-          "Rethon simulation applied: elements outside the equilibrium commitment set withdrawn.",
+          run ? `Rethon simulation applied (${describeRun(run)}).` : "Rethon simulation applied.",
           "Applied rethon equilibrium",
-          `Retained: ${[...equilibriumIds].join(", ")}`,
+          [
+            withdraw.length && `Withdrawn: ${withdraw.join(", ")}`,
+            takeUp.length && `Taken up again: ${takeUp.join(", ")}`,
+            reject.length && `Rejected: ${reject.join(", ")}`,
+          ]
+            .filter(Boolean)
+            .join(". "),
         ),
       ],
     }));

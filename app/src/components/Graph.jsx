@@ -13,31 +13,38 @@ import React, {
   useCallback,
 } from "react";
 
-import { C, typeTokens, inkOn } from "../constants/colors.js";
+import { C } from "../constants/colors.js";
 import { usePalette } from "../hooks/useTheme.js";
 import { useContainerDims } from "../hooks/useContainerDims.js";
 import { usePan } from "../hooks/usePan.js";
 import { useAutoFit } from "../hooks/useAutoFit.js";
 import { useGraphClick } from "../hooks/useGraphClick.js";
+import { useStatementView } from "../hooks/useStatementView.js";
+import { useCardGrowth } from "../hooks/useCardGrowth.js";
+import { useShownRelation } from "../hooks/useShownRelation.js";
+import { usePanGlide } from "../hooks/useViewGlide.js";
+import { useIsWide } from "../hooks/useWindowSize.js";
+import { pageFontFamily } from "../utils/textWidth.js";
+import { drawnOnGraph, graphHighlights } from "../utils/graphView.js";
 import {
   elementRadius,
   fitView,
   focusFraming,
-  getNeighbours,
+  NARROW_FIT_MIN_ZOOM,
   parallelEdgeOffsets,
   groupJointArguments,
 } from "../utils/graphHelpers.js";
-import { groupsOf, projectGroups, selectionIds } from "../utils/groupUtils.js";
-import {
-  elementsAtRound,
-  argumentRelationType,
-  linkableElements,
-  newArgumentId,
-} from "../utils/stateUtils.js";
+import { groupsOf, projectGroups } from "../utils/groupUtils.js";
+import { processesOf, processTagMap } from "../utils/mergeStates.js";
+import { linkableElements } from "../utils/stateUtils.js";
+import { STATEMENT_SPREAD } from "../utils/statementCards.js";
 import {
   GraphCanvas,
   GroupHull,
+  CardBackgrounds,
+  RelationLabel,
   OffscreenIndicators,
+  StatementToggle,
 } from "./graphs_shared/GraphElements.jsx";
 import { GroupChips } from "./graphs_shared/GroupChips.jsx";
 import {
@@ -47,337 +54,54 @@ import {
   graphEdgeVisuals,
   graphNodeVisuals,
 } from "./graphs_shared/graphRender.jsx";
-import { Tooltip } from "./Tooltip.jsx";
 import { ActionButtons } from "./text_panel/TextTabPrimitives.jsx";
-import { AddElementModal } from "./user_edits/AddElementModal.jsx";
-import { AddRelationModal } from "./user_edits/AddRelationModal.jsx";
-import { AddArgumentModal } from "./user_edits/AddArgumentModal.jsx";
+import { AddButtonsOverlay } from "./graph/AddButtonsOverlay.jsx";
+import { LogOverlay } from "./history/LogOverlay.jsx";
+import { CtrlSelectionBar } from "./graph/CtrlSelectionBar.jsx";
+import { GraphModals } from "./graph/GraphModals.jsx";
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 
-/** Withdrawn and rejected elements offer Reinstate where others offer Withdraw. */
-const isInPlay = (el) => el.status !== "withdrawn" && el.status !== "rejected";
-
-function AddButtonsOverlay({
-  onAddEl,
-  onAddRel,
-  onAddArg,
-  onAddGroup,
-  hideNonEntailsRels,
-}) {
-  const palette = usePalette();
-  return (
-    <div
-      // Ringed by the tour when it gets to making your own position.
-      data-tutorial="graph-add"
-      style={{
-        position: "absolute",
-        top: 12,
-        right: 12,
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-      }}
-    >
-      {[
-        ["judgment", "J"],
-        ["principle", "P"],
-        ["theory", "T"],
-      ].map(([type, label]) => (
-        <button
-          key={type}
-          onClick={() => onAddEl(type)}
-          aria-label={`Add ${type}`}
-          title={`Add ${type}`}
-          style={{
-            // Fill matches the nodes it adds, in whichever mode is on. The ink
-            // does not: this is an HTML control, where AA is enforced and the
-            // node palette's black lands at 3.7:1 on the saturated violet. The
-            // nodes themselves are a deliberate exception to that; a button is
-            // not.
-            background: typeTokens(type, palette).high,
-            border: "none",
-            color: inkOn(typeTokens(type, palette).high),
-            borderRadius: 6,
-            padding: "8px 12px",
-            fontSize: 13,
-            cursor: "pointer",
-          }}
-        >
-          + {label}
-        </button>
-      ))}
-      {!hideNonEntailsRels && (
-        <button
-          onClick={onAddRel}
-          aria-label="Add relation"
-          title="Add relation"
-          style={{
-            background: C.border,
-            border: "none",
-            color: C.text,
-            borderRadius: 6,
-            padding: "8px 12px",
-            fontSize: 13,
-            cursor: "pointer",
-          }}
-        >
-          + Rel
-        </button>
-      )}
-      <button
-        onClick={onAddArg}
-        aria-label="Add argument"
-        title="Add argument"
-        style={{
-          background: C.jointly_entails + "33",
-          border: `1px solid ${C.jointly_entails}`,
-          color: C.jointly_entails,
-          borderRadius: 6,
-          padding: "8px 12px",
-          fontSize: 13,
-          cursor: "pointer",
-        }}
-      >
-        + Arg
-      </button>
-      {/* The one affordance that says grouping exists at all. Ctrl-clicking
-          nodes and choosing Group is the quicker way and the tooltip says so,
-          but nobody discovers a modifier key by looking at a canvas. Chrome
-          colours, not a relation's: a group asserts nothing. */}
-      <Tooltip text="Bracket elements into a group, which can then collapse into one node. Ctrl/⌘-click nodes on the graph to group them there instead.">
-        <button
-          onClick={onAddGroup}
-          aria-label="New group"
-          style={{
-            background: "transparent",
-            border: `1px solid ${C.border}`,
-            color: C.dim,
-            borderRadius: 6,
-            padding: "8px 12px",
-            fontSize: 13,
-            cursor: "pointer",
-            width: "100%",
-          }}
-        >
-          + Grp
-        </button>
-      </Tooltip>
-    </div>
-  );
-}
+/**
+ * How far inside the canvas's edge, in screen px, a selected node's centre has
+ * to be to count as on screen. At the very edge it is half cut off.
+ */
+const ON_SCREEN_MARGIN = 24;
 
 /**
- * Floating bar summarising a ctrl+click selection, with a button to turn it
- * into an argument — or, when `asRelation`, into a single relation whose type
- * is picked in the modal that follows.
+ * How much of the canvas's right edge its controls cover — the add buttons'
+ * column (`AddButtonsOverlay`, about 76px wide at 12px in) with the margin
+ * above beside it. A node under them is not one the reader can see.
  */
-function CtrlSelectionBar({
-  selected,
-  ctrlArgNodes,
-  asRelation,
-  onConfirm,
-  onGroup,
-  onCancel,
-}) {
-  if (!selected || ctrlArgNodes.length === 0) return null;
-  const all = [selected, ...ctrlArgNodes];
-  const premises = all.slice(0, -1);
-  const conclusion = all.at(-1);
-  // A relation's type is not chosen yet, so the bar stays neutral rather than
-  // borrowing the entails colour.
-  const accent = asRelation ? C.border : C.jointly_entails;
-  const label = asRelation ? C.text : C.jointly_entails;
-  return (
-    <div
-      style={{
-        position: "absolute",
-        bottom: 48,
-        left: "50%",
-        transform: "translateX(-50%)",
-        background: C.panel,
-        border: `1px solid ${accent}`,
-        borderRadius: 8,
-        padding: "8px 12px",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        fontSize: 12,
-        color: C.text,
-        whiteSpace: "nowrap",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-        zIndex: 10,
-      }}
-    >
-      <span style={{ color: C.dim }}>
-        {premises.join(", ")}
-        <span
-          style={{
-            color: label,
-            fontWeight: "bold",
-            margin: "0 6px",
-          }}
-        >
-          →
-        </span>
-        {conclusion}
-      </span>
-      <button
-        onClick={onConfirm}
-        style={{
-          background: asRelation ? "transparent" : C.jointly_entails + "22",
-          border: `1px solid ${accent}`,
-          borderRadius: 4,
-          color: label,
-          fontSize: 12,
-          padding: "2px 10px",
-          cursor: "pointer",
-        }}
-      >
-        {asRelation ? "Add relation" : "Add argument"}
-      </button>
-      {/* Same selection, a different thing to do with it. Grouping says nothing
-          about what follows from what, so it sits apart from the inferential
-          action rather than replacing it. */}
-      <button
-        onClick={onGroup}
-        aria-label="Group the selected elements"
-        style={{
-          background: "transparent",
-          border: `1px solid ${C.border}`,
-          borderRadius: 4,
-          color: C.dim,
-          fontSize: 12,
-          padding: "2px 10px",
-          cursor: "pointer",
-        }}
-      >
-        Group
-      </button>
-      <button
-        onClick={onCancel}
-        style={{
-          background: "transparent",
-          border: "none",
-          color: C.dim,
-          fontSize: 14,
-          cursor: "pointer",
-          padding: "0 2px",
-          lineHeight: 1,
-        }}
-      >
-        ×
-      </button>
-    </div>
-  );
-}
+const RIGHT_CONTROLS_WIDTH = 96 + ON_SCREEN_MARGIN;
 
-function GraphModals({
-  addingElType,
-  setAddingElType,
-  addingRel,
-  setAddingRel,
-  addingRelPrefill,
-  addingArg,
-  setAddingArg,
-  addingArgPrefill,
-  linkableEls,
-  round,
-  onAddElement,
-  onAddRelation,
-}) {
-  // Half-written forms, kept for as long as the graph is on screen. The dialogs
-  // themselves unmount when dismissed, so their own state cannot survive it —
-  // and a modal is easy to close by accident. This component is never
-  // unmounted, and it is below the graph, so keeping them here costs a render
-  // of the open dialog per keystroke and nothing above it.
-  const [drafts, setDrafts] = useState({
-    element: null,
-    relation: null,
-    argument: null,
-  });
-  // Stable per kind: the dialogs report their form from an effect keyed on this
-  // callback, and a fresh function each render would set it running in a loop.
-  const keepElement = useCallback(
-    (v) => setDrafts((d) => ({ ...d, element: v })),
-    [],
-  );
-  const keepRelation = useCallback(
-    (v) => setDrafts((d) => ({ ...d, relation: v })),
-    [],
-  );
-  const keepArgument = useCallback(
-    (v) => setDrafts((d) => ({ ...d, argument: v })),
-    [],
-  );
-  // Committed work is not a draft. Without this the next dialog would open on
-  // the form that was just submitted.
-  const forget = (which) => setDrafts((d) => ({ ...d, [which]: null }));
+/**
+ * The canvas height both control stacks need down its right edge: the add
+ * buttons' column from the top (six buttons, about 246px) and the zoom column
+ * from the bottom (four, about 193px), with room between. Below it the add
+ * buttons go along the top edge instead (`AddButtonsOverlay`'s `row`), or the
+ * two overlap — which is what a phone's canvas under the tour's sheet did,
+ * hiding the statement toggle the tour was pointing at.
+ */
+const STACKED_CONTROLS_HEIGHT = 460;
 
-  return (
-    <>
-      {addingElType && (
-        <AddElementModal
-          initialType={addingElType}
-          currentRound={round}
-          draft={drafts.element}
-          onDraftChange={keepElement}
-          onSave={(formData) => {
-            onAddElement(formData);
-            forget("element");
-            setAddingElType(null);
-          }}
-          onCancel={() => setAddingElType(null)}
-        />
-      )}
-      {addingRel && (
-        <AddRelationModal
-          elements={linkableEls}
-          currentRound={round}
-          initialFrom={addingRelPrefill?.from}
-          initialTo={addingRelPrefill?.to}
-          draft={drafts.relation}
-          onDraftChange={keepRelation}
-          onSave={(formData) => {
-            onAddRelation(formData);
-            forget("relation");
-            setAddingRel(false);
-          }}
-          onCancel={() => setAddingRel(false)}
-        />
-      )}
-      {addingArg && (
-        <AddArgumentModal
-          elements={linkableEls}
-          currentRound={round}
-          initialPremises={addingArgPrefill?.premises}
-          initialConclusion={addingArgPrefill?.conclusion}
-          draft={drafts.argument}
-          onDraftChange={keepArgument}
-          onSave={({ premises, conclusion, negated, explanation }) => {
-            const argumentId = newArgumentId();
-            const type = argumentRelationType(premises.length, negated);
-            premises.forEach((premise, i) => {
-              onAddRelation(
-                {
-                  from: premise,
-                  to: conclusion,
-                  type,
-                  argumentId,
-                  explanation,
-                },
-                { select: false, pinRecent: i === premises.length - 1 },
-              );
-            });
-            forget("argument");
-            setAddingArg(false);
-          }}
-          onCancel={() => setAddingArg(false)}
-        />
-      )}
-    </>
-  );
-}
+/**
+ * The elements a relation joins: its two ends, or for one step of a joint
+ * argument, every premise of that argument and its conclusion.
+ *
+ * @param {import('../types.js').RERelation} rel
+ * @param {import('../types.js').RERelation[]} relations
+ * @returns {string[]}
+ */
+const relationEnds = (rel, relations) => {
+  const rels = rel.argumentId
+    ? relations.filter((r) => r.argumentId === rel.argumentId)
+    : [rel];
+  return [...new Set(rels.flatMap((r) => [r.from, r.to]))];
+};
+
+/** Withdrawn and rejected elements offer Reinstate where others offer Withdraw. */
+const isInPlay = (el) => el.status !== "withdrawn" && el.status !== "rejected";
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -390,7 +114,10 @@ function GraphModals({
  * The graph itself does not run any simulation.
  *
  * ### Interaction
- * - **Pan** — drag anywhere on the SVG via {@link module:hooks/usePan}.
+ * - **Pan** — drag the background via {@link module:hooks/usePan}.
+ * - **Move a node** — drag it with a mouse (`nodeDrag`, from
+ *   {@link module:hooks/useStablePositions}). It stays where it is dropped,
+ *   for as long as the page is open. A finger on a node still pans.
  * - **Click to highlight** — click a node to highlight it and its immediate
  *   neighbours; all other nodes and edges dim to low opacity.  Click the same
  *   node again, or click the background, to deselect.
@@ -432,7 +159,8 @@ function GraphModals({
 export function Graph({
   state,
   hiddenLegendKeys,
-  positions,
+  positions: layoutPositions,
+  nodeDrag,
   selected,
   onSelect,
   selectedRel,
@@ -450,8 +178,9 @@ export function Graph({
   ready,
   recentlyAdded,
   hideNonEntailsRels,
-  equilibriumPreviewWithdrawnIds,
+  equilibriumPreview,
   focus,
+  search = "",
 }) {
   const containerRef = useRef();
   const dims = useContainerDims(containerRef);
@@ -462,6 +191,11 @@ export function Graph({
   // Clicking a node pins its tooltip open with the same actions the text tab
   // offers. It takes precedence over the hover tooltip until dismissed.
   const [pinned, setPinned] = useState(null);
+  // It is opened by a click that selects, and goes when the selection does —
+  // Escape included, which clears the selection from outside the canvas.
+  if (pinned && !selected) setPinned(null);
+  // The edge under the pointer, or last tapped, whose explanation shows.
+  const [shownRel, showRel] = useShownRelation();
   const [addingElType, setAddingElType] = useState(null);
   const [addingRel, setAddingRel] = useState(false);
   const [addingArg, setAddingArg] = useState(false);
@@ -474,115 +208,22 @@ export function Graph({
 
   // ── Derived visibility and highlight sets ─────────────────────────────────
 
-  const { active, withdrawn } = elementsAtRound(state.elements, state.round);
-  const wIds = new Set(withdrawn.map((e) => e.id));
-  const rejectedEls = state.elements.filter((e) => e.status === "rejected");
-  const isElVisible = (el) => {
-    if (el.status === "possible") return false;
-    if (el.status === "withdrawn") return !hiddenLegendKeys?.has("withdrawn");
-    if (el.status === "rejected") return !hiddenLegendKeys?.has("rejected");
-    if (el.type === "judgment") return !hiddenLegendKeys?.has("J");
-    if (el.type === "principle") return !hiddenLegendKeys?.has("P");
-    if (el.type === "theory") return !hiddenLegendKeys?.has("T");
-    return true;
-  };
-  const visibleEls = [
-    // `elementsAtRound` splits purely on round and withdrawal, so a rejected
-    // element comes back in `active` too; dropping it here stops it from being
-    // drawn twice.
-    ...active.filter((e) => e.status !== "rejected"),
-    ...withdrawn,
-    ...rejectedEls,
-  ].filter(isElVisible);
+  // What is drawn: see `utils/graphView.js`.
+  const { visibleEls, visRels, wIds } = drawnOnGraph(
+    state,
+    hiddenLegendKeys,
+    equilibriumPreview,
+  );
+  // After a merge, which process each node came from. Empty otherwise.
+  const processTags = useMemo(() => processTagMap(processesOf(state)), [state]);
   // What the add modals may reference. Deliberately not narrowed by the legend:
   // hiding withdrawn nodes to declutter the canvas should not also remove them
   // from the pickers.
   const linkableEls = linkableElements(state.elements);
-  const visIds = new Set(visibleEls.map((e) => e.id));
-  const visRels = state.relations.filter(
-    (r) =>
-      visIds.has(r.from) &&
-      visIds.has(r.to) &&
-      !hiddenLegendKeys?.has(r.type) &&
-      !(hiddenLegendKeys?.has("withdrawn") && r.status === "withdrawn") &&
-      !(hiddenLegendKeys?.has("rejected") && r.status === "rejected") &&
-      !(
-        equilibriumPreviewWithdrawnIds?.has(r.from) ||
-        equilibriumPreviewWithdrawnIds?.has(r.to)
-      ),
-  );
 
-  // ── Groups ────────────────────────────────────────────────────────────────
-  // Everything below this point works on the *projected* graph: a collapsed
-  // group is one node, its internal edges are gone, and every edge that crossed
-  // its boundary now runs to the group. Projecting after the visibility filter
-  // rather than before it is what keeps the two consistent — a group whose
-  // members the legend has hidden has nothing left to stand for.
-  const {
-    elements: displayEls,
-    relations: displayRels,
-    relSource,
-    positions: displayPositions,
-    hulls,
-    groupNodes,
-  } = projectGroups({
-    elements: visibleEls,
-    relations: visRels,
-    groups: groupsOf(state),
-    positions,
-    radiusOf: elementRadius,
-  });
-  /** The relation as held in state — see `relSource` in utils/groupUtils. */
-  const toSourceRel = (r) => relSource.get(r) ?? r;
-  const groupIds = new Set(groupNodes.map((g) => g.id));
-
-  // What the selection covers, narrowed to what is actually on the canvas: a
-  // selected group is its own node while collapsed and its members once
-  // expanded, and it can be selected in either state.
-  const displayIds = new Set(displayEls.map((e) => e.id));
-  const focusIds = selectionIds(groupsOf(state), selected).filter((id) =>
-    displayIds.has(id),
-  );
-  const focusSet = new Set(focusIds);
-
-  // All relations belonging to the same argument as selectedRel (or just the
-  // edges standing for it, of which a re-pointed one is not the same object).
-  const selectedArgRels = selectedRel?.argumentId
-    ? displayRels.filter((r) => r.argumentId === selectedRel.argumentId)
-    : selectedRel
-      ? displayRels.filter((r) => toSourceRel(r) === selectedRel)
-      : [];
-  const selectedArgRelSet = new Set(selectedArgRels);
-
-  const highlightedIds =
-    ctrlArgNodes.length > 0 && selected
-      ? new Set([selected, ...ctrlArgNodes])
-      : focusIds.length > 0
-        ? new Set(focusIds.flatMap((id) => [...getNeighbours(id, displayRels)]))
-        : selectedArgRels.length > 0
-          ? new Set(selectedArgRels.flatMap((r) => [r.from, r.to]))
-          : null;
-
-  const dimNode = (id) => highlightedIds && !highlightedIds.has(id);
-  const dimEdge = (r) => {
-    if (selectedRel) return !selectedArgRelSet.has(r);
-    if (highlightedIds) return !focusSet.has(r.from) && !focusSet.has(r.to);
-    return false;
-  };
-
-  const stateElementById = useMemo(
-    () => new Map(state.elements.map((e) => [e.id, e])),
-    [state.elements],
-  );
-  // Group nodes belong here too: edge geometry and hit-testing look their
-  // endpoints up in this map, and a collapsed group is now one of them.
-  const elementById = new Map(stateElementById);
-  for (const g of groupNodes) elementById.set(g.id, g);
-
-  const { solo: soloRels, jointGroups } = groupJointArguments(displayRels);
-  const edgeOffsets = parallelEdgeOffsets(soloRels);
-
-  // ── Pan + click ───────────────────────────────────────────────────────────
+  // ── Pan, and the statement view ───────────────────────────────────────────
+  // Ahead of the groups, since the statement view decides what they are drawn
+  // from: display copies carrying a card each, at positions made room for.
 
   const {
     pan,
@@ -591,26 +232,208 @@ export function Graph({
     onPointerDown: panDown,
     onPointerMove,
     onPointerUp: panUp,
-    onPointerCancel,
     applyWheel,
     zoomIn,
     zoomOut,
     resetView,
   } = usePan();
+  // A node being moved by hand. Held apart from `isDragging`, which is the
+  // view's pan, but it silences the same hover responses.
+  const [draggingNode, setDraggingNode] = useState(false);
+  const moving = isDragging || draggingNode;
+  const { statements, toggleStatements, drawnEls, positions, measure } =
+    useStatementView({
+      layoutPositions,
+      visibleEls,
+      visRels,
+      groups: groupsOf(state),
+      dims,
+      resetView,
+      pan,
+      zoom,
+      // Carried across the others while held, rather than shoving each one it
+      // meets aside; the cards settle once it is let go.
+      holding: draggingNode,
+    });
+  const growth = useCardGrowth({ measure, isDragging: moving });
+
+  // ── Groups ────────────────────────────────────────────────────────────────
+  // Everything below this point works on the *projected* graph: a collapsed
+  // group is one node, its internal edges are gone, and every edge that crossed
+  // its boundary now runs to the group. Projecting after the visibility filter
+  // rather than before it is what keeps the two consistent — a group whose
+  // members the legend has hidden has nothing left to stand for.
+  const {
+    elements: projectedEls,
+    relations: displayRels,
+    relSource,
+    positions: projectedPositions,
+    hulls,
+    groupNodes,
+  } = projectGroups({
+    elements: drawnEls,
+    relations: visRels,
+    groups: groupsOf(state),
+    positions,
+    // A hull pads by one number on both axes; a card's half-width covers it
+    // sideways and leaves some room over and under.
+    radiusOf: (e) => e?.card?.hw ?? elementRadius(e),
+  });
+  // The hovered — or, on a phone, tapped — card grown to its whole statement;
+  // see `hooks/useCardGrowth.js`. Everything below draws and hit-tests these.
+  const {
+    elements: displayEls,
+    positions: displayPositions,
+    overlay,
+  } = growth.grow(projectedEls, projectedPositions);
+
+  /** The relation as held in state — see `relSource` in utils/groupUtils. */
+  const toSourceRel = (r) => relSource.get(r) ?? r;
+  const groupIds = new Set(groupNodes.map((g) => g.id));
+
+  const stateElementById = useMemo(
+    () => new Map(state.elements.map((e) => [e.id, e])),
+    [state.elements],
+  );
+
+  // What lights up and what fades: see `utils/graphView.js`.
+  const query = search.trim();
+  const { highlightedIds, selectedArgRelSet, dimNode, dimEdge } = graphHighlights({
+    groups: groupsOf(state),
+    selected,
+    selectedRel,
+    ctrlArgNodes,
+    displayEls,
+    displayRels,
+    toSourceRel,
+    query,
+    elementById: stateElementById,
+  });
+
+  // What is drawn goes over what is held: edge geometry and hit-testing look
+  // their endpoints up in this map, so a collapsed group has to be in it, and
+  // so do the statement view's enlarged copies.
+  const elementById = new Map(stateElementById);
+  for (const e of displayEls) elementById.set(e.id, e);
+
+  const { solo: soloRels, jointGroups } = groupJointArguments(displayRels);
+  const edgeOffsets = parallelEdgeOffsets(soloRels);
+
+  // ── Click ─────────────────────────────────────────────────────────────────
 
   // The raw positions, not the projected ones: a collapsed group's members keep
   // theirs, so framing still covers the ground the group is standing on — and
-  // the tour, below, can frame an element that is currently inside one.
-  useAutoFit({ positions, dims, resetView, enabled: ready });
+  // the tour, below, can frame an element that is currently inside one. On a
+  // phone the ids stay legible and the rest is panned to (NARROW_FIT_MIN_ZOOM).
+  const isWide = useIsWide();
+
+  // The Simulate tab's log box: History's, over this canvas while a
+  // simulation result is being played, kept scrolled to the step on screen.
+  const simLogRef = useRef(null);
+  const simCurrentLogRef = useRef(null);
+  const simStep = equilibriumPreview?.step;
+  useEffect(() => {
+    simCurrentLogRef.current?.scrollIntoView?.({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [simStep]);
+
+  useAutoFit({
+    positions,
+    dims,
+    resetView,
+    enabled: ready,
+    minZoom: isWide ? undefined : NARROW_FIT_MIN_ZOOM,
+  });
+
+  const focusKey = focus?.key;
+
+  // What is selected is brought into view, at the zoom the reader has: an
+  // element, or a relation's ends — every premise and the conclusion, for a
+  // joint argument, since the whole argument is what lights up. Picked in the
+  // text panel, most often; a click on the canvas selects what is already on
+  // it, and moves the view only when that is cut off at the edge.
+  const { glideTo, stop: stopGlide } = usePanGlide({ resetView, pan, zoom });
+  const seenFocus = useRef(focusKey);
+  const seenSelection = useRef({ selected, selectedRel });
+  useEffect(() => {
+    // A change of selection only: on arrival — back from History with
+    // something selected — the opening fit has the view, and this effect
+    // would be reading it from before that fit landed.
+    const seen = seenSelection.current;
+    if (seen.selected === selected && seen.selectedRel === selectedRel) return;
+    seenSelection.current = { selected, selectedRel };
+    // The tour selects and frames together, and its framing is the one that
+    // counts: a selection arriving in the same render as one does not glide.
+    if (focusKey !== seenFocus.current || !dims.w) return;
+    const ids = selected
+      ? [selected]
+      : selectedRel
+        ? relationEnds(selectedRel, state.relations)
+        : [];
+
+    // Every end's whole box on screen, not its centre: a statement card is
+    // wide, and one standing half off the edge had its centre well inside.
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const id of ids) {
+      const pos = displayPositions[id] ?? positions[id];
+      if (!pos) continue;
+      const el = displayEls.find((e) => e.id === id);
+      const rx = (el?.card?.hw ?? (el ? elementRadius(el) : 0)) * zoom;
+      const ry = (el?.card?.hh ?? (el ? elementRadius(el) : 0)) * zoom;
+      const sx = pos.x * zoom + pan.x;
+      const sy = pos.y * zoom + pan.y;
+      minX = Math.min(minX, sx - rx);
+      maxX = Math.max(maxX, sx + rx);
+      minY = Math.min(minY, sy - ry);
+      maxY = Math.max(maxY, sy + ry);
+    }
+    if (minX === Infinity) return;
+
+    // What is clear of the canvas's own controls: the add buttons and the
+    // zoom column run down the right edge, and a node under them is hidden.
+    const left = ON_SCREEN_MARGIN;
+    const top = ON_SCREEN_MARGIN;
+    const right = dims.w - RIGHT_CONTROLS_WIDTH;
+    const bottom = dims.h - ON_SCREEN_MARGIN;
+    const lost = maxX < 0 || minX > dims.w || maxY < 0 || minY > dims.h;
+    const fits = maxX - minX <= right - left && maxY - minY <= bottom - top;
+    let dx;
+    let dy;
+    if (lost || !fits) {
+      // Nowhere to be seen, or too big to show whole: centred on the clear area.
+      dx = (left + right) / 2 - (minX + maxX) / 2;
+      dy = (top + bottom) / 2 - (minY + maxY) / 2;
+    } else {
+      // Only cut off: moved just far enough to be whole, so the rest of the
+      // view — which the reader was looking at — shifts as little as it can.
+      dx = minX < left ? left - minX : maxX > right ? right - maxX : 0;
+      dy = minY < top ? top - minY : maxY > bottom ? bottom - maxY : 0;
+    }
+    if (!dx && !dy) return;
+    // The card a click pins is placed in page coordinates, where the click
+    // was; it moves with the view, or it would be left behind by the node it
+    // is about.
+    glideTo({ x: pan.x + dx, y: pan.y + dy }, (mx, my) =>
+      setPinned((p) => p && { ...p, x: p.x + mx, y: p.y + my }),
+    );
+    // Keyed on the selection alone: the view moving is not a reason to move it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, selectedRel]);
 
   // The tour re-frames the graph on the elements the section being read names.
   // Keyed on `focus.key` rather than on the ids, so the same section framed
   // again — scrolled back to, or reached after the panel resized — still fits.
   // `positions` is deliberately not a dependency: this fires when the tour
   // moves on, not on every tick of the simulation.
-  const focusKey = focus?.key;
   useEffect(() => {
+    seenFocus.current = focusKey;
     if (!focusKey) return;
+    stopGlide();
     const view = fitView(
       positions,
       focus.ids ?? null,
@@ -623,9 +446,46 @@ export function Graph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey, dims.w, dims.h, ready]);
 
-  const { onPointerDown, onPointerUp } = useGraphClick({
+  // What a dragged node moves: a collapsed group's disc stands for its members,
+  // and a node in a ctrl+click selection brings the rest of the selection with
+  // it — the selection holds together and keeps its shape. The chain holds no
+  // groups (`onCtrlNodeClick` refuses them), so it needs no expanding.
+  const dragIdsOf = (el) => {
+    if (el.type === "group")
+      return groupsOf(state).find((g) => g.id === el.id)?.members ?? [];
+    const chain = ctrlArgNodes.length ? [selected, ...ctrlArgNodes] : [];
+    return chain.includes(el.id) ? chain : [el.id];
+  };
+
+  const {
+    onPointerDown,
+    onPointerMove: pointerMove,
+    onPointerUp,
+    onPointerCancel: pointerCancel,
+    nodeAt,
+    relationAt,
+    toSim,
+  } = useGraphClick({
     panDown,
     panUp,
+    panMove: onPointerMove,
+    onNodeDragStart: nodeDrag
+      ? (el) => {
+          setDraggingNode(true);
+          setPinned(null);
+          nodeDrag.grab(dragIdsOf(el));
+        }
+      : undefined,
+    // The statement view draws the layout spread about its centre, so a card
+    // moved some distance on screen is a node moved that much less.
+    onNodeDrag: (_el, dx, dy) => {
+      const k = statements ? STATEMENT_SPREAD : 1;
+      nodeDrag?.moveTo(dx / k, dy / k);
+    },
+    onNodeDragEnd: () => {
+      setDraggingNode(false);
+      nodeDrag?.release();
+    },
     visibleEls: displayEls,
     visRels: displayRels,
     jointGroups,
@@ -638,6 +498,12 @@ export function Graph({
     onSelect,
     onSelectRel,
     toSourceRel,
+    overlay,
+    // A tap grows a card as hover does; see `useCardGrowth`.
+    onTap: (el, rel) => {
+      growth.tap(el);
+      showRel(rel);
+    },
     setTooltip,
     onNodeClick: (el, clientX, clientY) => {
       // A group is a lid, not a claim. Clicking one opens it — and re-asserts
@@ -687,6 +553,26 @@ export function Graph({
     },
   });
 
+  /**
+   * Frames the whole graph, as the view opened — the way back after panning
+   * away, or after dragging nodes out to the edges. The raw positions, as for
+   * the opening fit, so a collapsed group's ground is framed too.
+   */
+  const fitGraph = () => {
+    stopGlide();
+    const view = fitView(positions, null, dims, { padding: 96, maxZoom: 1 });
+    if (view) resetView(view.pan, view.zoom);
+  };
+
+  // A wheel taking the view over mid-glide keeps it, as a pointer does.
+  const wheel = useCallback(
+    (deltaY, mx, my) => {
+      stopGlide();
+      applyWheel(deltaY, mx, my);
+    },
+    [applyWheel, stopGlide],
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   // A relation is binary, so it is only on offer for a two-node selection, and
@@ -697,24 +583,83 @@ export function Graph({
   // A pinned card outlives the click that opened it, so it has to let go when
   // the node underneath stops being drawn — expanding a group from its chip
   // dissolves exactly the node whose members the card is listing.
+  // Once per node: a statement card's background, drawn under the edges, has
+  // to fade exactly as the rest of the card does.
+  const nodeVisuals = new Map(
+    displayEls.map((el) => [
+      el.id,
+      graphNodeVisuals(
+        el,
+        wIds,
+        dimNode,
+        selected,
+        undefined,
+        recentlyAdded,
+        equilibriumPreview,
+      ),
+    ]),
+  );
+
   const pinnedNode =
     pinned && displayEls.some((e) => e.id === pinned.el.id) ? pinned : null;
 
   return (
     <>
       <GraphCanvas
+        roundEnds={state.roundEnds}
         containerRef={containerRef}
         dims={dims}
         pan={pan}
         zoom={zoom}
-        isDragging={isDragging}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
+        isDragging={moving}
+        onPointerDown={(e) => {
+          // A pointer taking the view over mid-glide keeps it.
+          stopGlide();
+          growth.notePointer(e);
+          onPointerDown(e);
+        }}
+        onPointerMove={(e) => {
+          growth.notePointer(e);
+          pointerMove(e);
+          // A mouse over an edge shows what it says; over a node, or panning,
+          // nothing. A finger has `onTap` instead.
+          if (e.pointerType !== "mouse") return;
+          if (moving) return showRel(null);
+          const { sx, sy } = toSim(e);
+          showRel(nodeAt(sx, sy) ? null : relationAt(sx, sy));
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") showRel(null);
+        }}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
-        applyWheel={applyWheel}
+        onPointerCancel={pointerCancel}
+        applyWheel={wheel}
         zoomIn={zoomIn}
         zoomOut={zoomOut}
+        onFit={fitGraph}
+        // On a node, Revise; on the background, fit. An edge takes neither: its
+        // two clicks select it and let it go, which is what they were for.
+        onDoubleClick={(e) => {
+          if (e.button !== 0 || e.ctrlKey || e.metaKey) return;
+          const { sx, sy } = toSim(e);
+          const el = nodeAt(sx, sy);
+          if (el) {
+            // Not a group: its first click has already opened it.
+            if (el.type === "group") return;
+            // The two clicks before this selected the node and let it go
+            // again; it is what the dialog is about, so it is held once more,
+            // and stays held when the dialog closes. The card they pinned is
+            // shut — the dialog stands in for it.
+            setPinned(null);
+            onSelect(() => el.id);
+            onEditRequest?.(el.id);
+            return;
+          }
+          if (!relationAt(sx, sy)) fitGraph();
+        }}
+        viewControls={
+          <StatementToggle on={statements} onToggle={toggleStatements} />
+        }
         tooltip={pinnedNode ?? tooltip}
         tooltipActions={
           // Nothing for a group: revising and withdrawing are things you do to
@@ -748,6 +693,15 @@ export function Graph({
         containerStyle={{ width: "100%", height: "100%" }}
         overlay={
           <>
+            {/* Wide only, as on History: a phone's canvas has no room for it. */}
+            {isWide && equilibriumPreview?.log && (
+              <LogOverlay
+                sortedLog={equilibriumPreview.log}
+                snappedRound={equilibriumPreview.step}
+                logRef={simLogRef}
+                currentLogRef={simCurrentLogRef}
+              />
+            )}
             <AddButtonsOverlay
               onAddEl={setAddingElType}
               onAddRel={() => {
@@ -757,6 +711,7 @@ export function Graph({
               onAddArg={() => setAddingArg(true)}
               onAddGroup={() => onEditGroupRequest?.()}
               hideNonEntailsRels={hideNonEntailsRels}
+              row={dims.h > 0 && dims.h < STACKED_CONTROLS_HEIGHT}
             />
             <GroupChips
               hulls={hulls}
@@ -817,6 +772,15 @@ export function Graph({
           />
         ))}
 
+        {/* ── Card backgrounds ── */}
+        {/* Under the edges, so that one running behind a statement card is
+            still drawn; the card's outline and text go on top with the nodes. */}
+        <CardBackgrounds
+          elements={displayEls}
+          positions={displayPositions}
+          visualsOf={(el) => nodeVisuals.get(el.id)}
+        />
+
         {/* ── Edges ── */}
         {soloRels.map((r) =>
           renderEdge(
@@ -844,18 +808,35 @@ export function Graph({
           renderNode(
             el,
             displayPositions,
-            graphNodeVisuals(
-              el,
-              wIds,
-              dimNode,
-              selected,
-              undefined,
-              recentlyAdded,
-              equilibriumPreviewWithdrawnIds,
-            ),
-            isDragging,
+            {
+              ...nodeVisuals.get(el.id),
+              processTag: processTags.get(el.id),
+              // For the card to mark what the search found in its wording.
+              search: query,
+            },
+            moving,
             setTooltip,
+            // A card's hover grows it rather than opening the hover card over
+            // it: the wording is the card, and a second box repeating it was
+            // the clutter. The details the hover card also carried are on the
+            // one a click pins, beside Revise and Withdraw.
+            growth.hoverFor(el),
           ),
+        )}
+        {/* ── What the edge under the pointer says, over everything ── */}
+        {/* Only while the edge is still drawn: one deleted, or hidden by the
+            legend, under a pointer that has not moved since, says nothing. */}
+        {shownRel && displayRels.includes(shownRel.rel) && (
+          <RelationLabel
+            hit={shownRel}
+            zoom={zoom}
+            color={
+              shownRel.rel.status === "withdrawn"
+                ? C.withdrawn
+                : palette.edges[shownRel.rel.type]
+            }
+            fontFamily={pageFontFamily()}
+          />
         )}
       </GraphCanvas>
 

@@ -44,6 +44,43 @@ export function nodeRadius(type, confidence = 1) {
   return base * (RADIUS_MIN + RADIUS_SPAN * t);
 }
 
+/**
+ * Type size for a node's id.
+ *
+ * Capped by the *smallest* node of that type, not the average one: the id sits
+ * inside the shape, and the shape shrinks to `RADIUS_MIN` (65%) of its base at
+ * zero confidence. The binding case is a three-character id on a judgment
+ * circle, where the room at the glyph's own height is
+ * `2·√(r² − halfHeight²) = 22px` against a width of ~1.65× the font size — which
+ * puts the ceiling at 13. Principles are drawn on a 40px-wide rect and have room
+ * to spare; theories are diamonds, tighter per pixel of radius but never more
+ * than two characters.
+ *
+ * Raising these further means raising {@link RADIUS_MIN},
+ * which costs confidence range. `e2e/palette.spec.js` measures the real glyph
+ * boxes and fails if a label outgrows its shape.
+ *
+ * Shared by the canvas and the SVG export, which draws a statement card's
+ * badge the way the canvas does.
+ *
+ * @param {string} type
+ * @returns {number}
+ */
+export function nodeLabelSize(type) {
+  return type === "principle" ? 16 : 13;
+}
+
+/**
+ * How far a phone's graph may zoom out as it opens: far enough that the
+ * smallest id, a judgment's or a theory's, is still drawn at 10px.
+ *
+ * Fitting the whole sample to a phone put its ids at 6–7px, which nobody reads
+ * without zooming first. Past this floor the opening view stops shrinking and
+ * the rest of the graph is panned to. The fit button still frames the whole
+ * graph at whatever size that takes: there the reader has asked to see it all.
+ */
+export const NARROW_FIT_MIN_ZOOM = 10 / nodeLabelSize("judgment");
+
 /** How far past its outline a node stays clickable. */
 const HIT_PADDING = 8;
 /** Floor on a touch target, whatever the node's own size. */
@@ -86,6 +123,51 @@ export function elementRadius(el) {
 }
 
 /**
+ * How far from a node's centre its border lies, heading towards `(dx, dy)` —
+ * where an edge leaving that way starts, or one arriving from there ends.
+ *
+ * The node's radius in any direction, except for the statement view's cards
+ * (`card` on a display copy, from `statementCard`), which are wide boxes: an
+ * edge drawn to a radius would stop short of one on its sides and run into it
+ * at top and bottom. Ask this rather than {@link elementRadius} wherever an
+ * edge meets a node.
+ *
+ * @param {REElement & { card?: { hw: number, hh: number } }} el
+ * @param {number} dx
+ * @param {number} dy
+ * @returns {number}
+ */
+export function boundaryDistance(el, dx, dy) {
+  if (!el?.card) return elementRadius(el);
+  const { hw, hh } = el.card;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = Math.abs(dx / len);
+  const uy = Math.abs(dy / len);
+  // No direction at all (two nodes on one spot): any border point will do.
+  if (!ux && !uy) return hh;
+  return Math.min(ux ? hw / ux : Infinity, uy ? hh / uy : Infinity);
+}
+
+/**
+ * Whether a point in simulation coordinates lands on a node drawn at `pos`:
+ * within its hit radius, or on a statement card with the same padding.
+ *
+ * @param {REElement & { card?: { hw: number, hh: number } }} el
+ * @param {Position} pos
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean}
+ */
+export function hitsElement(el, pos, x, y) {
+  if (el?.card)
+    return (
+      Math.abs(x - pos.x) <= el.card.hw + HIT_PADDING / 2 &&
+      Math.abs(y - pos.y) <= el.card.hh + HIT_PADDING / 2
+    );
+  return (pos.x - x) ** 2 + (pos.y - y) ** 2 < elementHitRadius(el) ** 2;
+}
+
+/**
  * Hit-test radius for whatever the graph is drawing at that spot.
  * {@link hitRadius} is to {@link nodeRadius} as this is to {@link elementRadius}.
  *
@@ -97,6 +179,21 @@ export function elementHitRadius(el) {
 }
 
 // ─── Edge styling ─────────────────────────────────────────────────────────────
+
+/**
+ * What each relation type is called on screen — the legend's labels, and the
+ * heading of the box an edge's explanation shows in. One map, so the two
+ * cannot name a type differently.
+ */
+export const RELATION_LABELS = {
+  supports: "Supports",
+  conflicts: "Conflicts",
+  undermines: "Undermines",
+  entails: "Entails",
+  jointly_entails: "Jointly Entails",
+  precludes: "Precludes",
+  jointly_precludes: "Jointly Precludes",
+};
 
 /**
  * SVG stroke-dasharray value for a relation type.
@@ -270,7 +367,8 @@ export function focusFraming(dims) {
  * @param {number}   centX        - Premise centroid x.
  * @param {number}   centY        - Premise centroid y.
  * @param {Position} conclusionPos - Conclusion node centre.
- * @param {number}   tr           - Conclusion node radius.
+ * @param {number}   tr           - Conclusion node radius, or its
+ *   {@link boundaryDistance} towards the premises' centroid.
  * @returns {{ jx: number, jy: number }}
  */
 export function computeJunction(centX, centY, conclusionPos, tr) {
@@ -397,4 +495,90 @@ export function distToSegment(px, py, ax, ay, bx, by) {
   if (lenSq === 0) return Math.hypot(px - ax, py - ay);
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// ─── Edge hit-testing ─────────────────────────────────────────────────────────
+
+/**
+ * The relation under a point, if any — with the relations it is drawn with
+ * (a joint argument's, or itself alone) and where along the drawing to
+ * anchor anything said about it: the edge's midpoint, or the junction dot.
+ * Uses the geometry the edges are drawn with, threshold 8px.
+ *
+ * Shared by every canvas that answers a pointer on its edges: `useGraphClick`
+ * for the Graph tab's click, hover and tap, and the History tab's hover and tap.
+ *
+ * @param {{ relations: RERelation[], jointGroups: RERelation[][],
+ *   positions: PositionMap, elementById: Map<string, REElement>,
+ *   edgeOffsets: Map<RERelation, number> }} graph - As drawn.
+ * @param {number} sx
+ * @param {number} sy
+ * @returns {{ rel: object, rels: object[], x: number, y: number }|null} `rel`
+ *   is what a click selects: the edge itself, a premise's own line, or an
+ *   argument's first relation for its junction and conclusion arrow.
+ */
+export function relationAt({ relations, jointGroups, positions, elementById, edgeOffsets }, sx, sy) {
+  for (const r of relations) {
+    const sp = positions[r.from], tp = positions[r.to];
+    if (!sp || !tp) continue;
+    const srcEl = elementById.get(r.from);
+    const tgtEl = elementById.get(r.to);
+    const ddx = tp.x - sp.x, ddy = tp.y - sp.y;
+    const { x1, y1, tipX, tipY, perpX, perpY } = arrowGeometry(
+      sp, tp,
+      boundaryDistance(srcEl, ddx, ddy),
+      boundaryDistance(tgtEl, -ddx, -ddy),
+    );
+    const offset = edgeOffsets.get(r) ?? 0;
+    const cx = (x1 + tipX) / 2 + perpX * offset;
+    const cy = (y1 + tipY) / 2 + perpY * offset;
+    const tdx = tipX - cx, tdy = tipY - cy;
+    const tlen = Math.hypot(tdx, tdy) || 1;
+    const bx = tipX - (tdx / tlen) * 10, by = tipY - (tdy / tlen) * 10;
+    if (distToQuadBezier(sx, sy, x1, y1, cx, cy, bx, by) < 8) {
+      // The curve at its middle: ¼, ½, ¼ of its three points.
+      return {
+        rel: r,
+        rels: [r],
+        x: 0.25 * x1 + 0.5 * cx + 0.25 * bx,
+        y: 0.25 * y1 + 0.5 * cy + 0.25 * by,
+      };
+    }
+  }
+
+  // Joint argument hit-test: premise lines, junction dot, conclusion arrow.
+  for (const rels of jointGroups) {
+    const conclusionEl = elementById.get(rels[0].to);
+    const conclusionPos = positions[rels[0].to];
+    if (!conclusionPos || !conclusionEl) continue;
+    const premises = rels
+      .map((r) => ({ r, el: elementById.get(r.from), pos: positions[r.from] }))
+      .filter((d) => d.el && d.pos);
+    if (!premises.length) continue;
+    const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
+    const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
+    const { jx, jy } = computeJunction(
+      centX, centY, conclusionPos,
+      boundaryDistance(conclusionEl, centX - conclusionPos.x, centY - conclusionPos.y),
+    );
+    const tr = boundaryDistance(conclusionEl, jx - conclusionPos.x, jy - conclusionPos.y);
+    const at = (rel) => ({ rel, rels, x: jx, y: jy });
+    // Junction circle
+    if (Math.hypot(sx - jx, sy - jy) < 10) return at(rels[0]);
+    // Premise lines
+    for (const { r, el, pos } of premises) {
+      const dx = jx - pos.x, dy = jy - pos.y;
+      const sr = boundaryDistance(el, dx, dy);
+      const dist = Math.hypot(dx, dy) || 1;
+      const x1 = pos.x + (dx / dist) * sr, y1 = pos.y + (dy / dist) * sr;
+      if (distToSegment(sx, sy, x1, y1, jx, jy) < 8) return at(r);
+    }
+    // Conclusion arrow
+    const adx = conclusionPos.x - jx, ady = conclusionPos.y - jy;
+    const adist = Math.hypot(adx, ady) || 1;
+    const tipX = conclusionPos.x - (adx / adist) * tr;
+    const tipY = conclusionPos.y - (ady / adist) * tr;
+    if (distToSegment(sx, sy, jx, jy, tipX, tipY) < 8) return at(rels[0]);
+  }
+  return null;
 }

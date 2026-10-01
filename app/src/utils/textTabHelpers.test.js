@@ -3,6 +3,7 @@ import {
   buildPrincipleCovers,
   matchesSearch,
   matchesSearchRel,
+  searchFinds,
 } from "./textTabHelpers.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -65,7 +66,7 @@ describe("buildPrincipleCovers", () => {
 
   it("ignores relation types other than supports", () => {
     const elements = [el("P1", "principle"), el("J1", "judgment")];
-    for (const type of ["conflicts", "undermines", "depends", "entails"]) {
+    for (const type of ["conflicts", "undermines", "entails"]) {
       expect(coversFor(elements, [rel("P1", "J1", type)])).toEqual({ P1: [] });
     }
   });
@@ -180,3 +181,29 @@ describe("matchesSearchRel", () => {
     expect(matchesSearchRel(bare, "autonomy")).toBe(false);
   });
 });
+
+describe("searchFinds", () => {
+  const J1 = { id: "J1", type: "judgment", text: "Promises bind." };
+  const P1 = { id: "P1", type: "principle", text: "Keep your word." };
+  const byId = new Map([J1, P1].map((e) => [e.id, e]));
+
+  it("finds by the panel's own test: id, wording or type", () => {
+    expect(searchFinds([J1, P1], "promises", byId)).toEqual(new Set(["J1"]));
+    expect(searchFinds([J1, P1], "p1", byId)).toEqual(new Set(["P1"]));
+    expect(searchFinds([J1, P1], "principle", byId)).toEqual(new Set(["P1"]));
+  });
+
+  it("finds a collapsed group through its members", () => {
+    const group = { id: "G1", type: "group", label: "Duties", memberIds: ["P1"] };
+    expect(searchFinds([J1, group], "word", byId)).toEqual(new Set(["G1"]));
+  });
+
+  it("says there is nothing to fade, without a query", () => {
+    expect(searchFinds([J1, P1], "", byId)).toBeNull();
+  });
+
+  it("tells finding nothing apart from having no query", () => {
+    expect(searchFinds([J1, P1], "zebra", byId)).toEqual(new Set());
+  });
+});
+

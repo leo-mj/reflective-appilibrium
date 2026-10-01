@@ -21,6 +21,7 @@ vi.mock("../config.js", async (importOriginal) => ({
 import { AppHeader } from "./AppHeader.jsx";
 import { TAB_LABELS } from "../constants/tabConstants.jsx";
 import { TOUR_Z } from "./tour/tourZ.js";
+import { EXPORT_SECTIONS } from "../utils/exportMarkdown.js";
 
 afterEach(() => {
   cleanup();
@@ -38,7 +39,6 @@ const PROPS = {
   assistSidePanel: "graph",
   setAssistSidePanel: noop,
   onDownload: noop,
-  onSave: noop,
   onImportFile: noop,
   hasExistingState: false,
   onHome: noop,
@@ -80,6 +80,16 @@ const wideTabs = (overrides = {}) => {
   return offered();
 };
 
+/**
+ * Opens the ☰ menu on the rows the wide ☰ holds: at narrow widths those are one
+ * level down, behind the menu's Settings row.
+ */
+const openSettings = () => {
+  fireEvent.click(screen.getAllByText("☰")[0]);
+  const settings = screen.queryByText("Settings");
+  if (settings) fireEvent.click(settings);
+};
+
 /** Every rendered button whose text is a known tab label. */
 const offered = () => {
   const known = new Set(Object.values(TAB_LABELS));
@@ -108,35 +118,307 @@ describe("narrow menu tab filtering", () => {
   });
 });
 
-describe("model weights", () => {
-  // The weights only steer the rethon simulation, which needs the backend. With
-  // no backend they are a control that cannot affect anything the user sees.
-  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+describe("simulation weights", () => {
+  // They steer the Simulate tab alone and are set there, beside the result
+  // they shape. The ☰ menu held a second way to the same state.
+  const openMenu = openSettings;
 
   for (const isWide of [true, false]) {
     const layout = isWide ? "wide" : "narrow";
 
-    it(`stays out of the ${layout} menu without a backend`, () => {
-      render(<AppHeader {...PROPS} isWide={isWide} />);
-      openMenu();
-      expect(screen.queryByText(/Model weights/)).toBeNull();
-    });
-
-    it(`is offered in the ${layout} menu when there is a backend`, () => {
+    it(`are not in the ${layout} menu, even with a backend`, () => {
       flags.backend = true;
       render(<AppHeader {...PROPS} isWide={isWide} />);
       openMenu();
-      expect(screen.queryByText(/Model weights/)).not.toBeNull();
+      expect(screen.queryByText(/weights/i)).toBeNull();
     });
   }
+});
+
+describe("export", () => {
+  // Export asks what to write before writing anything.
+  const openMenu = openSettings;
+  const sections = EXPORT_SECTIONS.filter((s) => !s.has);
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+
+    it(`opens the section picker from the ${layout} menu, and downloads on its button`, () => {
+      localStorage.clear();
+      const onDownload = vi.fn();
+      render(
+        <AppHeader
+          {...PROPS}
+          onDownload={onDownload}
+          exportSections={sections}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      fireEvent.click(screen.getByRole("button", { name: /Export/ }));
+      expect(onDownload).not.toHaveBeenCalled();
+      expect(screen.getByRole("group", { name: "Sections to export" })).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Download" }));
+      expect(onDownload).toHaveBeenCalledTimes(1);
+      expect([...onDownload.mock.calls[0][0]]).toContain("history");
+      expect(screen.queryByRole("group", { name: "Sections to export" })).toBeNull();
+    });
+
+    it(`downloads the .argdown file from the same dialog (${layout})`, () => {
+      const onDownload = vi.fn();
+      const onDownloadArgdown = vi.fn();
+      render(
+        <AppHeader
+          {...PROPS}
+          onDownload={onDownload}
+          onDownloadArgdown={onDownloadArgdown}
+          exportSections={sections}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      fireEvent.click(screen.getByRole("button", { name: /Export/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Download .argdown" }));
+      expect(onDownloadArgdown).toHaveBeenCalledTimes(1);
+      expect(onDownload).not.toHaveBeenCalled();
+      expect(screen.queryByRole("group", { name: "Sections to export" })).toBeNull();
+    });
+  }
+});
+
+describe("merge", () => {
+  // Offered only where it can succeed: there has to be a process to merge
+  // into, and a questionnaire has no room for a second one.
+  const openMenu = openSettings;
+  const mergeRow = () => screen.queryByRole("button", { name: /Merge/ });
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+    const withState = { hasExistingState: true, onPrepareMerge: noop };
+
+    it(`is offered in the ${layout} menu when there is a process`, () => {
+      render(<AppHeader {...PROPS} {...withState} isWide={isWide} />);
+      openMenu();
+      expect(mergeRow()).not.toBeNull();
+    });
+
+    it(`stays out of the ${layout} menu with nothing to merge into`, () => {
+      render(<AppHeader {...PROPS} onPrepareMerge={noop} isWide={isWide} />);
+      openMenu();
+      expect(mergeRow()).toBeNull();
+    });
+
+    it(`stays out of the ${layout} menu in questionnaire mode`, () => {
+      render(
+        <AppHeader
+          {...PROPS}
+          {...withState}
+          model="questionnaire"
+          tab="questionnaire"
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      expect(mergeRow()).toBeNull();
+    });
+  }
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+    const tagsRow = () => screen.queryByText("Process tags");
+
+    it(`offers the process-tags toggle in the ${layout} menu only after a merge`, () => {
+      render(<AppHeader {...PROPS} isWide={isWide} />);
+      openMenu();
+      expect(tagsRow()).toBeNull();
+      cleanup();
+
+      const setShowProcessTags = vi.fn();
+      render(
+        <AppHeader
+          {...PROPS}
+          isWide={isWide}
+          showProcessTags={true}
+          setShowProcessTags={setShowProcessTags}
+        />,
+      );
+      openMenu();
+      fireEvent.click(tagsRow());
+      expect(setShowProcessTags).toHaveBeenCalledTimes(1);
+      expect(setShowProcessTags.mock.calls[0][0](true)).toBe(false);
+    });
+  }
+
+  const PREPARED = {
+    incoming: {},
+    label: "other",
+    preview: {
+      label: "Promises",
+      added: 2,
+      relationsAdded: 1,
+      fused: [{ from: "J1", id: "J3", text: "Lying is wrong." }],
+    },
+  };
+  const chooseMergeFile = (props) => {
+    render(<AppHeader {...PROPS} hasExistingState {...props} />);
+    const file = new File(["x"], "other.md");
+    fireEvent.change(screen.getByTestId("merge-input"), {
+      target: { files: [file] },
+    });
+    return file;
+  };
+
+  it("shows what the merge would do, and merges only on confirmation", async () => {
+    const onPrepareMerge = vi.fn().mockResolvedValue(PREPARED);
+    const onConfirmMerge = vi.fn();
+    const file = chooseMergeFile({ onPrepareMerge, onConfirmMerge });
+
+    expect(onPrepareMerge).toHaveBeenCalledWith(file);
+    expect(await screen.findByText("Merge “Promises”?")).not.toBeNull();
+    expect(screen.getByText("Identical elements: 1")).not.toBeNull();
+    expect(screen.queryByText("Replace session?")).toBeNull();
+    expect(onConfirmMerge).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    expect(onConfirmMerge).toHaveBeenCalledWith(PREPARED);
+    expect(screen.queryByText("Merge “Promises”?")).toBeNull();
+  });
+
+  for (const isWide of [true, false]) {
+    const layout = isWide ? "wide" : "narrow";
+    const demoRow = () => screen.queryByText("Merge (demo)");
+
+    it(`offers the demo merge in the ${layout} menu on the sample process only`, () => {
+      render(
+        <AppHeader
+          {...PROPS}
+          hasExistingState
+          onPrepareMerge={noop}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      expect(demoRow()).toBeNull();
+      cleanup();
+
+      render(
+        <AppHeader
+          {...PROPS}
+          hasExistingState
+          isSample
+          onPrepareMerge={noop}
+          isWide={isWide}
+        />,
+      );
+      openMenu();
+      expect(demoRow()).not.toBeNull();
+    });
+  }
+
+  it("prepares the demo merge from the bundled sample process", async () => {
+    const onPrepareMerge = vi.fn().mockResolvedValue(PREPARED);
+    render(
+      <AppHeader
+        {...PROPS}
+        hasExistingState
+        isSample
+        onPrepareMerge={onPrepareMerge}
+      />,
+    );
+    openMenu();
+    fireEvent.click(screen.getByText("Merge (demo)"));
+
+    expect(await screen.findByText("Merge “Promises”?")).not.toBeNull();
+    const file = onPrepareMerge.mock.calls[0][0];
+    expect(file.name).toBe("sample-process-climate-duties.md");
+    expect(await file.text()).toContain("```re-state");
+  });
+
+  // On a phone merging a process in is also a tile among the Analyze views,
+  // offered exactly where the Settings row is.
+  it("offers a Merge tile in the narrow menu where it can merge", () => {
+    const openViews = () => fireEvent.click(screen.getAllByText("☰")[0]);
+    render(
+      <AppHeader
+        {...PROPS}
+        hasExistingState
+        onPrepareMerge={noop}
+        isWide={false}
+      />,
+    );
+    openViews();
+    const tile = screen.getByRole("button", { name: "Merge" });
+    expect(
+      tile.closest('[data-tutorial="menu-analyze"]'),
+      "in the Analyze group",
+    ).not.toBeNull();
+    cleanup();
+
+    render(<AppHeader {...PROPS} onPrepareMerge={noop} isWide={false} />);
+    openViews();
+    expect(screen.queryByRole("button", { name: /Merge/ })).toBeNull();
+  });
+
+  it("runs the demo merge from that tile on the sample process", async () => {
+    const onPrepareMerge = vi.fn().mockResolvedValue(PREPARED);
+    render(
+      <AppHeader
+        {...PROPS}
+        hasExistingState
+        isSample
+        onPrepareMerge={onPrepareMerge}
+        isWide={false}
+      />,
+    );
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Merge" }),
+    );
+    expect(await screen.findByText("Merge “Promises”?")).not.toBeNull();
+    expect(onPrepareMerge.mock.calls[0][0].name).toBe(
+      "sample-process-climate-duties.md",
+    );
+  });
+
+  it("merges nothing when cancelled", async () => {
+    const onConfirmMerge = vi.fn();
+    chooseMergeFile({
+      onPrepareMerge: vi.fn().mockResolvedValue(PREPARED),
+      onConfirmMerge,
+    });
+    await screen.findByText("Merge “Promises”?");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onConfirmMerge).not.toHaveBeenCalled();
+    expect(screen.queryByText("Merge “Promises”?")).toBeNull();
+  });
+
+  it("reports a file it could not merge", async () => {
+    const onPrepareMerge = vi
+      .fn()
+      .mockRejectedValue(new Error("Questionnaire sessions cannot be merged."));
+    render(
+      <AppHeader {...PROPS} hasExistingState onPrepareMerge={onPrepareMerge} />,
+    );
+    fireEvent.change(screen.getByTestId("merge-input"), {
+      target: { files: [new File(["x"], "q.md")] },
+    });
+    expect(
+      await screen.findByText("Questionnaire sessions cannot be merged."),
+    ).not.toBeNull();
+  });
 });
 
 describe("what closes the menu", () => {
   // A setting flips in place, and its switch is the only evidence of it.
   // Closing the menu fired the change and then hid that evidence.
-  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
-  // Select Font lives inside the menu in both layouts and nowhere else.
-  const menuIsOpen = () => screen.queryByText("Select Font") !== null;
+  const openMenu = openSettings;
+  // Home heads the wide ☰ and the narrow one's Settings view; Assist heads the
+  // narrow one's navigation. Neither is drawn anywhere else.
+  const menuIsOpen = () =>
+    document.querySelector(
+      '[data-tutorial="btn-home"], [data-tutorial="menu-assist"]',
+    ) !== null;
 
   // Named the same in both layouts: the labels come from one module.
   const SETTINGS = [
@@ -174,9 +456,28 @@ describe("what closes the menu", () => {
     });
   }
 
+  // The narrow menu is laid over the graph with a backdrop behind it; a tap
+  // there is how a finger puts it away.
+  it("closes on a tap beside the narrow menu", () => {
+    render(<AppHeader {...PROPS} isWide={false} />);
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    expect(menuIsOpen()).toBe(true);
+    fireEvent.click(screen.getByTestId("menu-backdrop"));
+    expect(menuIsOpen()).toBe(false);
+  });
+
+  it("lays no backdrop over the tour, which has its own dim", () => {
+    const { rerender } = render(
+      <AppHeader {...PROPS} tourActive isWide={false} />,
+    );
+    rerender(<AppHeader {...PROPS} tourActive isWide={false} tourMenuOpen />);
+    expect(menuIsOpen()).toBe(true);
+    expect(screen.queryByTestId("menu-backdrop")).toBeNull();
+  });
+
   it("closes when the narrow menu is used to switch tabs", () => {
     render(<AppHeader {...PROPS} isWide={false} />);
-    openMenu();
+    fireEvent.click(screen.getAllByText("☰")[0]);
     fireEvent.click(screen.getByText(TAB_LABELS.history));
     expect(menuIsOpen()).toBe(false);
   });
@@ -187,7 +488,7 @@ describe("how a setting reports its state", () => {
   // row named the state in force or the change on offer — and the two menus did
   // not even agree with each other. The label is fixed now and the state is on
   // aria-pressed, drawn as the switch beside it.
-  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+  const openMenu = openSettings;
 
   /** Label → the props that put the setting on, and those that put it off. */
   const TOGGLES = {
@@ -280,7 +581,7 @@ describe("the guided tour", () => {
     render(<AppHeader {...PROPS} onStartTour={onStartTour} isWide={false} />);
 
     fireEvent.click(screen.getAllByText("☰")[0]);
-    fireEvent.click(screen.getByText("Guided tour"));
+    fireEvent.click(screen.getByRole("button", { name: "Guided tour" }));
     expect(onStartTour).toHaveBeenCalled();
   });
 
@@ -334,9 +635,9 @@ describe("the guided tour", () => {
 });
 
 describe("LLM settings", () => {
-  // Unlike the model weights, this one stays reachable without a backend: the
+  // Unlike the simulation weights, this one stays reachable without a backend: the
   // modal explains what BYOK would involve, with its live controls disabled.
-  const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+  const openMenu = openSettings;
 
   for (const isWide of [true, false]) {
     it(`is offered in the ${isWide ? "wide" : "narrow"} menu without a backend`, () => {
@@ -349,55 +650,150 @@ describe("LLM settings", () => {
 
 describe("narrow menu order", () => {
   // The menu is the only navigation at this width, so moving between views is
-  // what it is mostly opened for. Settings and one-off actions come after.
+  // what it is mostly opened for. What the wide ☰ holds is one level down.
   const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
+  const labels = () =>
+    [...document.querySelectorAll("button")].map((b) => b.textContent.trim());
 
-  it("puts the tab groups under Home, ahead of everything else", () => {
+  it("opens on the views, with the settings behind one row at the top", () => {
     render(<AppHeader {...PROPS} isWide={false} />);
     openMenu();
 
-    const labels = [...document.querySelectorAll("button")].map((b) =>
-      b.textContent.trim(),
-    );
-    const idx = (needle) => labels.findIndex((l) => l.includes(needle));
-
-    expect(idx("Home")).toBeGreaterThan(-1);
+    const idx = (needle) => labels().findIndex((l) => l.includes(needle));
+    // Where the wide header keeps its ☰: first.
+    expect(idx("Settings")).toBe(labels().indexOf("☰") + 1);
     for (const t of ["elicitJudgments", "graph", "clusters"]) {
-      expect(idx(TAB_LABELS[t])).toBeGreaterThan(idx("Home"));
+      expect(idx(TAB_LABELS[t])).toBeGreaterThan(idx("Tour"));
     }
-    for (const later of [
-      "Section nav bar",
-      "Expanded cards",
-      "Select Font",
-      "Import",
-      "Export",
-    ]) {
-      expect(idx(later)).toBeGreaterThan(idx(TAB_LABELS.clusters));
+    // The workflow heads its section, ahead of the views it runs through.
+    expect(idx("Start Workflow")).toBeLessThan(idx(TAB_LABELS.elicitJudgments));
+    for (const later of ["Home", "Select Font", "Import", "Export"]) {
+      expect(labels().some((l) => l.endsWith(later))).toBe(false);
     }
+  });
+
+  it("goes into the settings and back out again", () => {
+    render(<AppHeader {...PROPS} isWide={false} />);
+    openMenu();
+    fireEvent.click(screen.getByText("Settings"));
+    expect(screen.queryByText(TAB_LABELS.graph)).toBeNull();
+    expect(screen.getByText("Home")).toBeTruthy();
+    expect(screen.getByText("Export")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Back"));
+    expect(screen.getByText(TAB_LABELS.graph)).toBeTruthy();
+    expect(screen.queryByText("Home")).toBeNull();
+  });
+
+  it("comes back on the views after closing", () => {
+    render(<AppHeader {...PROPS} isWide={false} />);
+    openMenu();
+    fireEvent.click(screen.getByText("Settings"));
+    openMenu(); // ☰ again closes it
+    openMenu();
+    expect(screen.getByText(TAB_LABELS.graph)).toBeTruthy();
   });
 });
 
-describe("narrow menu alignment", () => {
-  // Rows used to carry their symbol three different ways — a bare glyph and a
-  // space, a 20px box, or a 24px icon — so the labels started at three
-  // different offsets down a single column.
+describe("narrow menu layout", () => {
   const openMenu = () => fireEvent.click(screen.getAllByText("☰")[0]);
 
-  it("opens every row with the same icon box", () => {
+  // The views are tiles, three or four to a line: as rows at a finger's
+  // height the menu ran past the bottom of a phone.
+  it("lays the views out as tiles, the current one marked", () => {
+    render(<AppHeader {...PROPS} isWide={false} tab="history" />);
+    openMenu();
+    const grid = screen.getByText(TAB_LABELS.graph).parentElement;
+    expect(grid.style.display).toBe("grid");
+    expect(
+      screen.getByText(TAB_LABELS.history).getAttribute("aria-current"),
+    ).toBe("page");
+    expect(
+      screen.getByText(TAB_LABELS.graph).getAttribute("aria-current"),
+    ).toBeNull();
+  });
+
+  it("adds the Duplicates view to Assist once there has been a merge", () => {
     render(<AppHeader {...PROPS} isWide={false} />);
     openMenu();
+    expect(screen.queryByText("Duplicates")).toBeNull();
+    cleanup();
 
+    render(<AppHeader {...PROPS} hasMerged isWide={false} />);
+    openMenu();
+    // Its tile, named to fit one line: the tab bar's "Merge Elements" broke.
+    const tile = screen.getByText("Duplicates");
+    expect(tile.closest('[data-tutorial="menu-assist"]')).not.toBeNull();
+  });
+
+  // Rows used to carry their symbol three different ways — a bare glyph and a
+  // space, a 20px box, or a 24px icon — so the labels started at three
+  // different offsets down a single column. The Settings view is still one.
+  it("opens every Settings row with the same icon box", () => {
+    render(<AppHeader {...PROPS} isWide={false} />);
+    openMenu();
+    fireEvent.click(screen.getByText("Settings"));
     const rows = [...document.querySelectorAll("button")].filter(
       (b) => b.textContent.trim() !== "☰",
     );
     expect(rows.length).toBeGreaterThan(8);
-
     for (const row of rows) {
       expect(
         row.firstElementChild?.style.width,
         `"${row.textContent.trim()}" should lead with the shared icon box`,
       ).toBe("20px");
     }
+  });
+});
+
+describe("the narrow Settings view", () => {
+  // It is the wide ☰, row for row: a setting reachable on a desktop and not on
+  // a phone is one the phone's reader never finds.
+  const menuRows = () =>
+    [
+      ...document
+        .querySelector('[data-tutorial="btn-home"]')
+        .parentElement.querySelectorAll("button"),
+    ]
+      .map((b) => b.textContent.trim())
+      .filter((l) => !l.endsWith("Back"));
+
+  for (const backend of [false, true]) {
+    it(`offers every row the wide ☰ does (${backend ? "with" : "without"} a backend)`, () => {
+      flags.backend = backend;
+      const props = {
+        ...PROPS,
+        hasExistingState: true,
+        isSample: true,
+        onPrepareMerge: noop,
+        showProcessTags: true,
+        setShowProcessTags: noop,
+        onResetLayout: noop,
+      };
+      render(<AppHeader {...props} isWide />);
+      fireEvent.click(screen.getByLabelText("Settings menu"));
+      const wide = menuRows();
+      cleanup();
+
+      render(<AppHeader {...props} isWide={false} />);
+      openSettings();
+      expect(menuRows()).toEqual(wide);
+      expect(wide.length).toBeGreaterThan(10);
+    });
+  }
+
+  it("is where the tour opens the menu when it rings what is in it", () => {
+    const at = (menu) => (
+      <AppHeader {...PROPS} tourActive isWide={false} tourMenuOpen={menu} />
+    );
+    const shown = (id) => document.querySelector(`[data-tutorial="${id}"]`);
+    const { rerender } = render(at(false));
+    rerender(at("settings"));
+    expect(shown("btn-llm")).not.toBeNull();
+    expect(shown("menu-assist")).toBeNull();
+    // And back to the views for a section that rings one of those.
+    rerender(at(true));
+    expect(shown("menu-assist")).not.toBeNull();
   });
 });
 

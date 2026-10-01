@@ -7,12 +7,13 @@
  * canvas wide, and the reader switches between the two several times in a
  * round. So the divider is draggable, and where it was left is remembered.
  *
- * **The ratio is measured from the left edge of the row, whichever panel is
- * fixed.** The two layouts put the flexible panel on opposite sides — analyze
- * mode reads text-then-graph, an assist tab anchors its own panel to the left
- * edge and puts the companion to the right of it — and a ratio that meant "the
- * fixed panel's share" would jump when the reader changed tabs, since that is a
- * different panel in each. Read as a position, the line stays where they put it.
+ * **The ratio is measured from the left edge of the row.** Analyze mode reads
+ * text-then-graph, an assist tab anchors its own panel to the left edge and
+ * puts the companion to the right of it; read as a position, the line stays
+ * where the reader put it across both. `REState` fixes the *left* panel in
+ * every mode, so the line is at the same computed place in each: fixing the
+ * right one on an assist tab put it at `100% − (1 − r)`, equal on paper and a
+ * pixel off once drawn.
  *
  * The graph's own width follows it: `graphW` in `REState` feeds the force
  * simulation, and a canvas that has been given half the row again after being
@@ -96,7 +97,11 @@ export function useSplitRatio(fixedSide) {
       alignSelf: "stretch",
       display: "flex",
       alignItems: "stretch",
-      justifyContent: "center",
+      // The line goes on whichever edge of this box is the split itself — the
+      // far edge of the fixed panel. Centred, it sat half a box to one side of
+      // the split in analyze mode and half a box to the other on an assist tab,
+      // so it jumped 12px at every change of mode.
+      justifyContent: fixedSide === "left" ? "flex-start" : "flex-end",
       // Wider than the line it draws: the line is what says where the boundary
       // is, this is what a pointer has to hit. It takes the place of the row's
       // own gap rather than adding to it — see `gap` on the workspace section —

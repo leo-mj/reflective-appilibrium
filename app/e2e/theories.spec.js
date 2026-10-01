@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { test, expect } from "@playwright/test";
-import { gotoHome, loadSample, showView, park, openMenu } from "./helpers.js";
+import { gotoHome, loadSample, showView, park, exportDownload } from "./helpers.js";
 
 /**
  * Demo mode, so the Theories tab serves the pre-set example suggestions rather
@@ -89,10 +89,7 @@ test.describe("Background theories", () => {
     await page.getByRole("button", { name: /Accept/i }).first().click();
     await park(page);
 
-    await openMenu(page);
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Export/ }).click();
-    const download = await downloadPromise;
+    const download = await exportDownload(page);
     const file = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), "re-e2e-")),
       "export.md",

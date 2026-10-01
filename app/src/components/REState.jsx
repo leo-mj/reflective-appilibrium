@@ -1,21 +1,31 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { C } from "../constants/colors.js";
 import { LLM_ENABLED } from "../config.js";
 import { useStablePositions } from "../hooks/useStablePositions.js";
 import { useIsWide, useWindowSize } from "../hooks/useWindowSize.js";
 import { useCoarseDims } from "../hooks/useCoarseDims.js";
 import { useSplitRatio } from "../hooks/useSplitRatio.js";
-import { stateAtRound, linkableElements } from "../utils/stateUtils.js";
+import {
+  stateAtRound,
+  linkableElements,
+  currentRound,
+  roundOfStep,
+  withoutSuperseded,
+} from "../utils/stateUtils.js";
+import { pinsOf } from "../utils/pinUtils.js";
 import { useREActions } from "../hooks/useREActions.js";
 import { useAutosaveDraft } from "../hooks/useAutosaveDraft.js";
-import { useBackendCapabilities } from "../hooks/useBackendCapabilities.js";
 import {
   ADD_BAR_PRESETS,
   ASSIST_TABS,
   SIMULATE_TABS,
 } from "../constants/tabConstants.jsx";
-import { downloadMarkdown } from "../utils/exportMarkdown.js";
-import { saveSession } from "../utils/sessionsClient.js";
+import {
+  downloadMarkdown,
+  exportSectionsFor,
+} from "../utils/exportMarkdown.js";
+import { downloadArgdown } from "../utils/exportArgdown.js";
+import { statementViewOn } from "../utils/statementViewSetting.js";
 import {
   completesIteration,
   nextPhaseEnabled,
@@ -29,8 +39,38 @@ import { sheetHeight } from "./tour/tourZ.js";
 import { useTourResizing, useTourWidth } from "./tour/tourWidth.js";
 import { EditModals } from "./user_edits/EditModals.jsx";
 import { GroupModal } from "./user_edits/GroupModal.jsx";
-import { AddBar } from "./user_edits/TextTabAddPanel.jsx";
-export default function REState({ initialState, isSample, onHome, onReady }) {
+import { AddBar } from "./user_edits/AddBar.jsx";
+import { ModalShell } from "./user_edits/ModalShell.jsx";
+import { DEFAULT_WEIGHTS } from "../constants/simulationWeights.js";
+
+/**
+ * What becomes of the process on screen when the tour leaves it for the demo,
+ * said as it is. A reader's own process is autosaved as it is left, and the
+ * demo that replaces it never is, so it is still offered back on the home page
+ * — only its undo history goes. The demo and a questionnaire are never saved:
+ * what was done in them is lost.
+ */
+function tourLeavesBehind(state, isSample) {
+  if (state.model === "questionnaire") return "Your answers here are not kept.";
+  if (isSample)
+    return "Your changes to the demo are not kept: the tour starts it afresh.";
+  const topic = state.topic || "Untitled";
+  if (!state.elements.length)
+    return `“${topic}” has nothing in it yet, so nothing of is saved.`;
+  return `“${topic}” is kept in this browser: “Continue where you left off” on the home page brings it back, though not its undo history.`;
+}
+/**
+ * @param {Object}   props
+ * @param {Function} [props.onStartDemoTour] - Leaves this process for a fresh
+ *   demo with the tour open, as the home page's "Guided tour" does.
+ */
+export default function REState({
+  initialState,
+  isSample,
+  onHome,
+  onReady,
+  onStartDemoTour,
+}) {
   // Graph, not the Assist panel: assist controls are gated on a backend, so in
   // a demo build the old default landed every visitor on dead buttons.
   const [tab, setTab] = useState(
@@ -45,12 +85,18 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   const [allExpanded, setAllExpanded] = useState(true);
   const [assistSidePanel, setAssistSidePanel] = useState("graph");
   const [historyRound, setHistoryRound] = useState(0);
+  // What History's slider moves by. Held here because the text panel's Z-score
+  // chart beside it follows the same choice.
+  const [historyUnit, setHistoryUnit] = useState("step");
   const [workflowPhase, setWorkflowPhase] = useState(null);
   const [addBarCtrlChain, setAddBarCtrlChain] = useState(null);
   const [workflowLoops, setWorkflowLoops] = useState(0);
   const [hideNonEntailsRels, setHideNonEntailsRels] = useState(true);
   const [verifyArguments, setVerifyArguments] = useState(true);
-  // The home page's "Tutorial" button sets this flag and then loads the demo,
+  // On by default: a merge is asked for, and being able to tell the processes
+  // apart afterwards is the point of the tags.
+  const [showProcessTags, setShowProcessTags] = useState(true);
+  // The home page's "Guided tour" sets this flag and then loads the demo,
   // so the tour opens on the state it describes rather than on the landing page.
   const [tourActive, setTourActive] = useState(() => {
     if (sessionStorage.getItem("startTour") === "1") {
@@ -74,13 +120,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     focusSeq.current += 1;
     setGraphFocus({ key: focusSeq.current, ids });
   }, []);
-  const [equilibriumPreviewWithdrawnIds, setEquilibriumPreviewWithdrawnIds] =
-    useState(null);
-  const DEFAULT_WEIGHTS = {
-    account: 0.35,
-    systematicity: 0.55,
-    faithfulness: 0.1,
-  };
+  // The Simulate tab's preview of the position at the step being played:
+  // `{ withdrawn, takenUp }` sets of ids, or null.
+  const [equilibriumPreview, setEquilibriumPreview] = useState(null);
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
   const weightsChanged =
     weights.account !== DEFAULT_WEIGHTS.account ||
@@ -115,6 +157,8 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleAddElement,
     handleReviseElementText,
     handleAddRelation,
+    handleAddNewArgument,
+    handleArgumentRevise,
     handleQuestionnaireSelectAnswer,
     handleRejectElements,
     handleRejectRelations,
@@ -122,6 +166,9 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     handleDiscardReview,
     handleApplyRethonEquilibrium,
     handleImportFile,
+    handlePrepareMerge,
+    handleConfirmMerge,
+    handleMergeElements,
     handleCreateGroup,
     handleToggleGroup,
     handleUngroup,
@@ -134,20 +181,58 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     canUndo,
     handleRedo,
     canRedo,
+    handlePinNodes,
+    handleResetLayout,
+    handleCloseRound,
+    canCloseRound,
   } = useREActions(initialState);
 
-  // What this backend actually allows, which build-time flags cannot say.
-  const capabilities = useBackendCapabilities();
-
   // Not the sample: it is a fixed demonstration anyone can reload from the home
-  // page, and autosaving it would bury the visitor's own work under it.
+  // page, and autosaving it would bury the visitor's own work under it. It can
+  // still be edited, though, so the first edit brings up a notice that the
+  // edits are not kept. Said once: the next change, or its close button, puts
+  // it away for as long as the sample stays open. The state only changes by an
+  // action, so being a different object is the test for a change. A
+  // questionnaire is loaded as a sample too, and is left out: the notice speaks
+  // of the demo.
   useAutosaveDraft(state, !isSample);
+  // null until the first edit; then the state it appeared on; then "done".
+  const [sampleNotice, setSampleNotice] = useState(null);
+  if (isSample && state.model !== "questionnaire" && sampleNotice !== "done") {
+    if (sampleNotice === null && state !== initialState) setSampleNotice(state);
+    else if (sampleNotice !== null && state !== sampleNotice)
+      setSampleNotice("done");
+  }
+  const showSampleNotice = sampleNotice !== "done" && sampleNotice === state;
+
+  // The tour is written about the demo process and reads it off whatever is
+  // on screen, so opened anywhere else it narrated the reader's own process as
+  // "the demo". It runs in place only on the demo as it opened; from anywhere
+  // else it leaves for a fresh demo, as from the home page — after saying what
+  // becomes of the process left behind.
+  const tourInPlace =
+    isSample && state.model !== "questionnaire" && state === initialState;
+  const [tourLeaving, setTourLeaving] = useState(false);
+  const requestTour = () =>
+    tourInPlace || !onStartDemoTour
+      ? setTourActive(true)
+      : setTourLeaving(true);
 
   useEffect(() => {
     const onKeyDown = (e) => {
       // Never while typing: in a textarea these are the editor's own undo.
       if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT")
         return;
+
+      // Escape lets go of the selection — an element, a relation, a group, and
+      // with it any ctrl+click chain, which is only kept for the selection it
+      // started from. Only an Escape nothing else wanted: a dialog or an open
+      // dropdown stops its own, and the tour closes on it.
+      if (e.key === "Escape" && !e.defaultPrevented && !tourActive) {
+        handleSelectNode(() => null);
+        return;
+      }
+
       if (!(e.ctrlKey || e.metaKey)) return;
 
       // Ctrl/Cmd+Shift+Z, and Ctrl+Y for the Windows habit.
@@ -165,7 +250,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, handleSelectNode, tourActive]);
 
   const dims = useWindowSize();
   // Through the hook rather than a comparison written out here: it is the app's
@@ -202,15 +287,18 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     (usesSidePanel
       ? assistSidePanel !== "none" && assistSidePanel !== "focus"
       : showText);
-  // Where the central divider sits, and how wide that leaves the panel on the
-  // fixed side of it. Which side that is differs by mode, and is the same thing
-  // the section below orders the two panels by.
+  // Where the central divider sits, and how wide that leaves the panel left of
+  // it. The left panel is the fixed one in every mode — the text in analyze
+  // mode, the workflow panel on an assist tab — and whatever is right of the
+  // line takes the rest. Fixing the right one on an assist tab put the line at
+  // `100% − (1 − r)` there and at `r` in analyze mode: the same place on
+  // paper, and a pixel apart once each was rounded and drawn.
   const {
     rowRef,
     ratio: splitRatio,
     panelWidth,
     dividerProps,
-  } = useSplitRatio(usesSidePanel ? "right" : "left");
+  } = useSplitRatio("left");
 
   /** The workspace row, inside the app's own 16px padding. */
   const rowW = dims.w - 32;
@@ -229,7 +317,13 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
   // would otherwise restart the simulation and drift the nodes under a view
   // that stays put. Rotations and panel toggles are far bigger and still land.
   const simDims = useCoarseDims({ w: graphW, h: dims.h * 0.8 });
-  const { positions, ready } = useStablePositions(state, simDims);
+  // Where the reader drops a node is kept on the state, so the export carries
+  // it: see utils/pinUtils.js.
+  const {
+    positions,
+    ready,
+    drag: nodeDrag,
+  } = useStablePositions(state, simDims, handlePinNodes);
   useEffect(() => {
     if (ready) onReady?.();
   }, [ready, onReady]);
@@ -243,7 +337,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     setWorkflowPhase(null);
     setWorkflowLoops(0);
   };
-  const NON_ENTAILS_TYPES = ["supports", "conflicts", "undermines", "depends"];
+  const NON_ENTAILS_TYPES = ["supports", "conflicts", "undermines"];
   const effectiveHiddenKeys = hideNonEntailsRels
     ? new Set([...hiddenLegendKeys, ...NON_ENTAILS_TYPES])
     : hiddenLegendKeys;
@@ -258,8 +352,13 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     // Counted on leaving the iteration's last phase, not on arriving at its
     // first — the review sits between the two, and an iteration the workflow
     // pauses to read must still count as one that happened.
-    if (completesIteration(workflowPhase, hideNonEntailsRels))
+    // It is also where a round closes: a round is an iteration of the method
+    // (stateUtils, "Steps and rounds"), and this is the one place the app knows
+    // an iteration is over.
+    if (completesIteration(workflowPhase, hideNonEntailsRels)) {
       setWorkflowLoops((n) => n + 1);
+      handleCloseRound();
+    }
     setWorkflowPhase(workflowNextPhase);
     setTab(workflowNextPhase);
   };
@@ -288,8 +387,26 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     }
   };
 
+  // What the graphs and the text panel are drawn from. Hiding the merge tags
+  // hides the record they are drawn from — every surface reads it through
+  // `processesOf`, so they all go together — while edits, the autosave and the
+  // export keep working from `state` itself, where the record stays intact.
+  const viewState = useMemo(() => {
+    if (showProcessTags || !state.processes) return state;
+    const { processes: _hidden, ...rest } = state;
+    return rest;
+  }, [state, showProcessTags]);
+  const hasMerged = (state.processes?.length ?? 0) > 0;
+
+  // Without the premise links revisions of arguments replaced: they are the
+  // record, not the position. History keeps them — `viewState` — and hides
+  // each from the step it was replaced (stateUtils, isSupersededAt).
+  const presentState = useMemo(() => withoutSuperseded(viewState), [viewState]);
+
   const textState =
-    tab === "history" ? stateAtRound(state, historyRound) : state;
+    tab === "history" ? stateAtRound(viewState, historyRound) : presentState;
+  // The text panel's search, held here so the graph can show what it finds.
+  const [search, setSearch] = useState("");
 
   // Props shared by both the assist-side and analyze-mode TextPanel instances.
   // While the tour is running it says whether the text panel belongs on screen.
@@ -304,6 +421,11 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         : showText
     : tab === "text";
   const textPanelProps = {
+    search,
+    onSearch: setSearch,
+    // What History's round-by-round scores are worked out over: every round,
+    // whichever one the panel is showing.
+    wholeProcess: viewState,
     isWide,
     clusterSectionRef,
     scrollToRelationsKey,
@@ -323,6 +445,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onReinstateRel: handleReinstateRelation,
     onAddElement: handleAddElement,
     onAddRelation: handleAddRelation,
+    onAddNewArgument: handleAddNewArgument,
     // The panel is where a collapsed group's members are still spelled out, so
     // it gets the same handles the canvas chips have.
     onToggleGroup: handleToggleGroup,
@@ -338,12 +461,30 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     // Present only while the history slider is driving the panel, so the text
     // makes clear it is a past round rather than the live state.
     historyView:
-      tab === "history" ? { round: historyRound, maxRound: state.round } : null,
+      tab === "history"
+        ? {
+            round: historyRound,
+            maxRound: state.round,
+            inRound: roundOfStep(state, historyRound),
+            unit: historyUnit,
+          }
+        : null,
   };
 
   const graphPanelCommonProps = {
-    state,
+    // What the text panel's search finds lights up on the graph — only while
+    // the panel is there to show the query and clear it. Full screen, a graph
+    // still filtered by a search nobody can see is a graph that looks broken.
+    search: showingTextPanel ? search : "",
+    state: presentState,
+    // History's own: every link, each shown until the step it was replaced.
+    historyState: viewState,
+    // From the state itself: the Merge tab needs the process record whether or
+    // not the tags drawn from it are showing.
+    processes: state.processes ?? [],
+    onMergeElements: handleMergeElements,
     positions,
+    nodeDrag,
     hiddenLegendKeys: effectiveHiddenKeys,
     setHiddenLegendKeys,
     selected,
@@ -357,6 +498,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onWithdrawRequest: handleWithdrawRequest,
     onReinstate: handleReinstateElement,
     onAddRelation: handleAddRelation,
+    onAddNewArgument: handleAddNewArgument,
     onDeleteRelationsByArgId: handleDeleteRelationsByArgId,
     onQuestionnaireSelectAnswer: handleQuestionnaireSelectAnswer,
     recentlyAdded,
@@ -367,10 +509,19 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     onDiscardReview: handleDiscardReview,
     onApplyRethonEquilibrium: handleApplyRethonEquilibrium,
     weights: effectiveWeights,
-    equilibriumPreviewWithdrawnIds:
-      tab === "simulateRethon" ? equilibriumPreviewWithdrawnIds : null,
-    onSetEquilibriumPreview: setEquilibriumPreviewWithdrawnIds,
+    // Set in the Simulate tab alone, beside the result they steer. They used
+    // to be in the ☰ menu too, as a second way to the same state.
+    weightControl: {
+      weights,
+      weightsChanged,
+      onWeightsChange: setWeights,
+      onResetWeights: () => setWeights(DEFAULT_WEIGHTS),
+    },
+    equilibriumPreview: tab === "simulateRethon" ? equilibriumPreview : null,
+    onSetEquilibriumPreview: setEquilibriumPreview,
     onRoundChange: setHistoryRound,
+    historyUnit,
+    onHistoryUnitChange: setHistoryUnit,
     focus: graphFocus,
     isWide,
     onCtrlChainSelect: setAddBarCtrlChain,
@@ -382,35 +533,97 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
     isSample,
     hideNonEntailsRels,
     verifyArguments,
+    // What an empty graph says: the whole guide, unless the text panel is
+    // beside it carrying that already — a second copy side by side would only
+    // be the same paragraph twice. See EmptyProcessGuide.
+    emptyGuide: showingTextPanel ? "brief" : "full",
   };
 
   // The panel the tab is about: the graph, history or cluster view in analyze
-  // mode, the workflow panel on an assist or simulate tab. Bound here rather
-  // than written inline because the section below places it on either side of
-  // its companion depending on which of those two it is.
-  const mainPanel = (isWide || tab !== "text") && !sideGraphIsFull && (
-    <GraphPanel
-      {...graphPanelCommonProps}
-      tab={tab}
-      workflowPhase={workflowPhase}
-      workflowNextPhase={workflowNextPhase}
-      onAdvanceWorkflow={advanceWorkflow}
-      nextPhaseIsEnabled={workflowNextPhaseEnabled}
-      isFullscreen={!showingTextPanel}
-      // The assist and simulate tabs hand their own graph the toggle above;
-      // here it is the text panel that folds away. When narrow the text is a
-      // tab of its own, with nothing beside it to reclaim.
-      onToggleFullscreen={
-        isWide && !usesSidePanel ? () => setShowText((s) => !s) : null
-      }
-      fullscreenHides="text panel"
-    />
-  );
+  // mode, the workflow panel on an assist or simulate tab.
+  const mainShown = usesSidePanel ? !sideGraphIsFull : isWide || tab !== "text";
 
   // Only ever between two panels: a boundary with nothing on the far side of it
   // is a line the reader cannot move and should not be looking for.
   const showDivider =
-    isWide && !!mainPanel && (showingSideGraph || showingTextPanel);
+    isWide && mainShown && (showingSideGraph || showingTextPanel);
+
+  // The workflow panel, left of the divider on an assist or simulate tab —
+  // at the divider's width when there is one, the whole row when not.
+  const workflowPanel = usesSidePanel && mainShown && (
+    <div
+      style={{
+        minWidth: 0,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        ...(showDivider ? { width: panelWidth, flexShrink: 0 } : { flex: 1 }),
+      }}
+    >
+      <GraphPanel
+        {...graphPanelCommonProps}
+        tab={tab}
+        workflowPhase={workflowPhase}
+        workflowNextPhase={workflowNextPhase}
+        onAdvanceWorkflow={advanceWorkflow}
+        nextPhaseIsEnabled={workflowNextPhaseEnabled}
+        isFullscreen={!showingTextPanel}
+        onToggleFullscreen={null}
+        fullscreenHides="text panel"
+      />
+    </div>
+  );
+
+  // The graph, right of the divider in both modes: the analyze tab's own view,
+  // or an assist tab's companion. **One element for both**, in one place in
+  // the tree, so that changing between an analyze and an assist tab keeps the
+  // same canvas mounted — pan, zoom, framing and all. Two elements, one per
+  // mode, remounted the graph at every such change, and it flashed as it
+  // re-fitted a view nobody had asked to move. Its box is the same in both,
+  // too — what the divider leaves — so the canvas does not move either.
+  const graphShown = usesSidePanel ? isWide && showingSideGraph : mainShown;
+  const graphPanel = graphShown && (
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {usesSidePanel ? (
+        <GraphPanel
+          {...graphPanelCommonProps}
+          tab="graph"
+          workflowPhase={null}
+          workflowNextPhase={null}
+          onAdvanceWorkflow={null}
+          nextPhaseIsEnabled={false}
+          isFullscreen={sideGraphIsFull}
+          onToggleFullscreen={() =>
+            setAssistSidePanel(sideGraphIsFull ? "graph" : "graphFull")
+          }
+          fullscreenHides={isSimulateTab ? "simulation panel" : "assist panel"}
+        />
+      ) : (
+        <GraphPanel
+          {...graphPanelCommonProps}
+          tab={tab}
+          workflowPhase={workflowPhase}
+          workflowNextPhase={workflowNextPhase}
+          onAdvanceWorkflow={advanceWorkflow}
+          nextPhaseIsEnabled={workflowNextPhaseEnabled}
+          isFullscreen={!showingTextPanel}
+          // Here it is the text panel that folds away. When narrow the text is
+          // a tab of its own, with nothing beside it to reclaim.
+          onToggleFullscreen={isWide ? () => setShowText((s) => !s) : null}
+          fullscreenHides="text panel"
+        />
+      )}
+    </div>
+  );
+
   // It carries the boundary itself, which is why neither panel draws one on the
   // edge they share: two lines twelve pixels apart read as a gutter with
   // something wrong in it. The span inside is the line; the box around it is
@@ -489,17 +702,30 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         </div>
       )}
       <AppHeader
-        round={state.round}
+        round={currentRound(state)}
+        step={state.round}
+        onCloseRound={handleCloseRound}
+        canCloseRound={canCloseRound}
         topic={state.topic}
         model={state.model}
         tab={tab}
         setTab={handleSetTab}
         assistSidePanel={assistSidePanel}
         setAssistSidePanel={setAssistSidePanel}
-        onDownload={() => downloadMarkdown(state, positions)}
-        onSave={() => saveSession(state)}
-        canSaveToServer={capabilities.sessions}
+        onDownload={(sections) =>
+          downloadMarkdown(state, positions, sections, {
+            // The graph section follows the Graph tab's statement view.
+            statements: statementViewOn(),
+          })
+        }
+        exportSections={exportSectionsFor(state)}
+        onDownloadArgdown={() => downloadArgdown(state)}
         onImportFile={handleImportFile}
+        onPrepareMerge={handlePrepareMerge}
+        onConfirmMerge={handleConfirmMerge}
+        isSample={isSample}
+        showSampleNotice={showSampleNotice}
+        onDismissSampleNotice={() => setSampleNotice("done")}
         hasExistingState={state.elements.length > 0}
         onHome={onHome}
         isWide={isWide}
@@ -520,16 +746,18 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         }}
         hideNonEntailsRels={hideNonEntailsRels}
         setHideNonEntailsRels={setHideNonEntailsRels}
+        showProcessTags={hasMerged ? showProcessTags : null}
+        setShowProcessTags={setShowProcessTags}
+        onResetLayout={
+          Object.keys(pinsOf(state)).length ? handleResetLayout : null
+        }
+        hasMerged={hasMerged}
         verifyArguments={verifyArguments}
         setVerifyArguments={setVerifyArguments}
-        weights={weights}
-        weightsChanged={weightsChanged}
-        onWeightsChange={setWeights}
-        onResetWeights={() => setWeights(DEFAULT_WEIGHTS)}
         tourActive={tourActive}
-        onStartTour={() => setTourActive(true)}
+        onStartTour={requestTour}
         hideTabBar={tourHidesChrome}
-        tourMenuOpen={tourActive && !!tourChrome.menu}
+        tourMenuOpen={tourActive ? (tourChrome.menu ?? false) : false}
       />
 
       <section
@@ -547,55 +775,24 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           gap: showDivider ? 0 : 12,
         }}
       >
-        {/* Order matters, and it is the one thing that differs between the two
-            modes. Analyze reads left to right — the text beside the graph. An
-            assist or simulate tab is the thing being worked in, so it is
-            anchored to the left edge and whatever accompanies it, graph or
+        {/* Order matters. Analyze reads left to right — the text beside the
+            graph. An assist or simulate tab is the thing being worked in, so it
+            is anchored to the left edge and whatever accompanies it, graph or
             text, sits to its right; that keeps the tab still while the header's
-            Graph/Text switch changes what is beside it. `usesSidePanel` is the
-            same flag the companion panel itself is chosen by. */}
-        {usesSidePanel && mainPanel}
-        {usesSidePanel && divider}
-        {isWide && showingSideGraph && (
-          <div
-            style={{
-              width: sideGraphIsFull ? "100%" : panelWidth,
-              flexShrink: 0,
-              // No border on the shared edge: the divider beside it is the
-              // boundary, and draws it.
-              ...(sideGraphIsFull ? {} : { paddingLeft: 12 }),
-              minHeight: 0,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <GraphPanel
-              {...graphPanelCommonProps}
-              tab="graph"
-              workflowPhase={null}
-              workflowNextPhase={null}
-              onAdvanceWorkflow={null}
-              nextPhaseIsEnabled={false}
-              onCtrlChainSelect={setAddBarCtrlChain}
-              isFullscreen={sideGraphIsFull}
-              onToggleFullscreen={() =>
-                setAssistSidePanel(sideGraphIsFull ? "graph" : "graphFull")
-              }
-              fullscreenHides={
-                isSimulateTab ? "simulation panel" : "assist panel"
-              }
-            />
-          </div>
+            Graph/Text switch changes what is beside it. The graph is right of
+            the divider either way, which is what lets it be one slot here that
+            both modes share — see `graphPanel`. The text panel takes a slot on
+            each side instead, so the order a keyboard reaches things in is the
+            order they are drawn in. */}
+        {showingTextPanel && !usesSidePanel && (
+          <TextPanel {...textPanelProps} side="left" width={panelWidth} />
         )}
-        {showingTextPanel && (
-          <TextPanel
-            {...textPanelProps}
-            side={usesSidePanel ? "right" : "left"}
-            width={panelWidth}
-          />
+        {workflowPanel}
+        {divider}
+        {graphPanel}
+        {showingTextPanel && usesSidePanel && (
+          <TextPanel {...textPanelProps} side="right" />
         )}
-        {!usesSidePanel && divider}
-        {!usesSidePanel && mainPanel}
       </section>
 
       {/* Under every tab, not only the analyze ones. The assist tabs used to
@@ -611,6 +808,7 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
           elements={linkableElements(state.elements)}
           onAddElement={handleAddElement}
           onAddRelation={handleAddRelation}
+          onAddNewArgument={handleAddNewArgument}
           selected={selected}
           ctrlChain={addBarCtrlChain}
           hideNonEntailsRels={hideNonEntailsRels}
@@ -635,6 +833,27 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         onExpandChange={setTourExpanded}
       />
 
+      {tourLeaving && (
+        <ModalShell
+          title="Open the tour on the demo?"
+          subtitle="The tour walks through the demo process, so it leaves this one."
+          onCancel={() => setTourLeaving(false)}
+          onSave={onStartDemoTour}
+          saveLabel="Open the tour"
+        >
+          <p
+            style={{
+              fontSize: 12,
+              lineHeight: 1.6,
+              color: C.text,
+              margin: "0 0 20px",
+            }}
+          >
+            {tourLeavesBehind(state, isSample)}
+          </p>
+        </ModalShell>
+      )}
+
       {editingGroup && (
         <GroupModal
           group={editingGroup === "new" ? null : editingGroup}
@@ -652,6 +871,10 @@ export default function REState({ initialState, isSample, onHome, onReady }) {
         editingRel={editingRel}
         setEditingRel={setEditingRel}
         onRelEditSave={handleRelEditSave}
+        onArgumentSave={handleArgumentRevise}
+        relations={state.relations}
+        elements={state.elements}
+        argumentsOnly={hideNonEntailsRels}
         round={state.round}
         withdrawingId={withdrawingId}
         onWithdrawConfirm={handleWithdrawConfirm}

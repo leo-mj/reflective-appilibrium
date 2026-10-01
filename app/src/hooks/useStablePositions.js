@@ -5,10 +5,11 @@
 
 /** @import { REState, Dims, PositionMap } from '../types.js' */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import * as d3 from "d3";
 import { nodeRadius } from "../utils/graphHelpers.js";
 import { groupsOf } from "../utils/groupUtils.js";
+import { pinsOf } from "../utils/pinUtils.js";
 
 /**
  * How hard a group pulls its members together, as a fraction of the distance
@@ -26,7 +27,6 @@ import { groupsOf } from "../utils/groupUtils.js";
  */
 const EXPANDED_PULL = 0.09;
 const COLLAPSED_PULL = 0.6;
-
 /**
  * A D3 force pulling the members of each group toward their common centroid.
  *
@@ -90,31 +90,49 @@ function groupingForce(groups) {
  * a guaranteed minimum so the UI doesn't stay invisible indefinitely.
  *
  * ### When does the simulation restart?
- * The `useEffect` dependency array is `[elements.length, relations.length, groupSignature,
- * dims.w, dims.h]`. The simulation restarts only when the number of elements/relations
- * changes, a group is created, collapsed or dissolved, or the panel dimensions change —
- * **not** on every re-render — so performance is not a concern.
+ * Only when the number of elements/relations changes, or a group is created,
+ * collapsed or dissolved — **not** on every re-render, so performance is not a
+ * concern.
+ *
+ * ### A resize moves the layout; it does not redo it
+ * A new panel size changes only where the centre is. The nodes are shifted by
+ * however far it moved and the forces re-aimed at it, without reheating the
+ * simulation — which used to restart at full heat and spend seconds with every
+ * node on the move, for a layout whose shape nothing had asked to change. Going
+ * full screen is the case that shows it; the statement view, whose cards are
+ * pushed apart afresh whenever the layout moves, showed it worst.
  *
  * @param {REState} state - Full RE state; all elements and relations are used for layout.
  * @param {Dims}    dims  - Pixel dimensions of the graph panel. The simulation centre is
  *                          set to `(dims.w / 2, dims.h / 2)` so nodes cluster in the
  *                          visible area rather than the full window.
+ * @param {function(Record<string, {x: number, y: number}>): void} [onPin] - Told
+ *   where dragged nodes were dropped, as offsets from the centre; the state's
+ *   `pins`, which this reads back, is where they are kept.
  *
- * @returns {{ positions: PositionMap, ready: boolean }}
+ * @returns {{ positions: PositionMap, ready: boolean, drag: { grab: function(string[]): void, moveTo: function(number, number): void, release: function(): void } }}
  *   - `positions` — map from element ID to `{x, y}`.  Updated on every simulation tick.
  *   - `ready`     — `false` until the simulation has run long enough; used to fade the
  *                   graph in once layout is stable (avoids a flash of scrambled nodes).
+ *   - `drag`      — moves nodes by hand, for the Graph tab's node dragging.
  *
  * @example
  * const { positions, ready } = useStablePositions(state, { w: 800, h: 600 });
  * // positions["J1"] → { x: 412, y: 290 }
  * // ready           → true (after ~1.5 s)
  */
-export function useStablePositions(state, dims) {
+export function useStablePositions(state, dims, onPin) {
   /** @type {React.RefObject<PositionMap>} Persists positions across simulation restarts. */
   const posRef = useRef({});
   /** @type {React.RefObject<d3.Simulation|null>} Reference to the running simulation so we can stop it before starting a new one. */
   const simRef = useRef(null);
+  /** @type {React.RefObject<{x: number, y: number}|null>} Where the layout is centred. */
+  const centerRef = useRef(null);
+  /** @type {React.RefObject<Map<string, {x: number, y: number}>>} Where each dragged node stood when it was picked up. */
+  const grabbedRef = useRef(new Map());
+  // Latest callback, read at drop time, so that `drag` can stay stable.
+  const onPinRef = useRef(onPin);
+  onPinRef.current = onPin;
   const [positions, setPositions] = useState({});
   const [ready, setReady] = useState(false);
   const halfWidth = dims.w / 2;
@@ -126,8 +144,53 @@ export function useStablePositions(state, dims) {
     .map((g) => `${g.id}:${g.collapsed ? 1 : 0}:${g.members.join(",")}`)
     .join("|");
 
+  const hasDims = dims.w > 0 && dims.h > 0;
+
+  /** Snapshots node positions into the ref (stable) and state (re-renders). */
+  function publish(nodes) {
+    const p = {};
+    nodes.forEach((n) => {
+      p[n.id] = { x: n.x, y: n.y };
+    });
+    posRef.current = p;
+    setPositions({ ...p });
+  }
+
+  // Declared before the simulation's effect, so that on the render that first
+  // has a size the centre is recorded before the simulation reads it.
   useEffect(() => {
-    if (!dims.w || !dims.h) return;
+    const prev = centerRef.current;
+    centerRef.current = { x: halfWidth, y: halfHeight };
+    const sim = simRef.current;
+    if (!prev || !sim) return;
+    const dx = halfWidth - prev.x;
+    const dy = halfHeight - prev.y;
+    if (!dx && !dy) return;
+    const nodes = sim.nodes();
+    for (const n of nodes) {
+      n.x += dx;
+      n.y += dy;
+      // A node the reader has placed moves with the rest, or it would be left
+      // behind by exactly the shift that was meant to change nothing.
+      if (n.fx != null) n.fx += dx;
+      if (n.fy != null) n.fy += dy;
+    }
+    for (const start of grabbedRef.current.values()) {
+      start.x += dx;
+      start.y += dy;
+    }
+    // Re-aimed without touching alpha: a simulation already at rest stays at
+    // rest, and one still settling carries on from where it was.
+    sim
+      .force("center", d3.forceCenter(halfWidth, halfHeight))
+      .force("x", d3.forceX(halfWidth).strength(0.04))
+      .force("y", d3.forceY(halfHeight).strength(0.04));
+    publish(nodes);
+  }, [halfWidth, halfHeight]);
+
+  useEffect(() => {
+    if (!hasDims) return;
+    const { x: cx, y: cy } = centerRef.current;
     const allEls = state.elements;
     const allRels = state.relations;
     const groups = groupsOf(state);
@@ -135,10 +198,17 @@ export function useStablePositions(state, dims) {
       groups.filter((g) => g.collapsed).flatMap((g) => g.members),
     );
 
+    // A node the reader has dropped stays where they put it: a re-run starts
+    // at full heat, and anything left free moves. Pins are offsets from the
+    // centre (utils/pinUtils.js).
+    const pins = pinsOf(state);
+
     // Build D3 node objects, reusing previous positions where available.
     const nodes = allEls.map((e) => {
-      const prev = posRef.current[e.id];
+      const pin = pins[e.id] && { x: cx + pins[e.id].x, y: cy + pins[e.id].y };
+      const prev = pin ?? posRef.current[e.id];
       return {
+        ...(pin && { fx: pin.x, fy: pin.y }),
         id: e.id,
         type: e.type,
         // Node radius used for collision detection. Asked for rather than
@@ -154,8 +224,8 @@ export function useStablePositions(state, dims) {
         // process rather than about how the user has filed it, so a pile of
         // exactly coincident nodes there would be unreadable.
         collapsed: collapsedIds.has(e.id),
-        x: prev?.x ?? halfWidth + ((Math.random() - 0.5) * halfWidth) / 10,
-        y: prev?.y ?? halfHeight + ((Math.random() - 0.5) * halfHeight) / 10,
+        x: prev?.x ?? cx + ((Math.random() - 0.5) * cx) / 10,
+        y: prev?.y ?? cy + ((Math.random() - 0.5) * cy) / 10,
         vx: 0,
         vy: 0,
       };
@@ -163,8 +233,10 @@ export function useStablePositions(state, dims) {
 
     const links = allRels.map((r) => ({ source: r.from, target: r.to }));
 
-    // Stop any previous simulation before creating a new one.
+    // Stop any previous simulation before creating a new one. A drag in
+    // progress was holding nodes of the old one, which are gone.
     if (simRef.current) simRef.current.stop();
+    grabbedRef.current = new Map();
 
     const sim = d3
       .forceSimulation(nodes)
@@ -177,26 +249,18 @@ export function useStablePositions(state, dims) {
           .strength(0.4),
       )
       .force("charge", d3.forceManyBody().strength(-320))
-      .force("center", d3.forceCenter(halfWidth, halfHeight))
+      .force("center", d3.forceCenter(cx, cy))
       .force(
         "collision",
         d3.forceCollide().radius((d) => (d.collapsed ? d.r * 0.4 : d.r + 12)),
       )
       .force("group", groupingForce(groups))
       // Weak restoring forces keep isolated nodes from drifting off-screen.
-      .force("x", d3.forceX(halfWidth).strength(0.04))
-      .force("y", d3.forceY(halfHeight).strength(0.04))
+      .force("x", d3.forceX(cx).strength(0.04))
+      .force("y", d3.forceY(cy).strength(0.04))
       .alphaDecay(0.01);
 
-    // On every tick, snapshot positions into both the ref (stable) and state (triggers re-render).
-    sim.on("tick", () => {
-      const p = {};
-      nodes.forEach((n) => {
-        p[n.id] = { x: n.x, y: n.y };
-      });
-      posRef.current = p;
-      setPositions({ ...p });
-    });
+    sim.on("tick", () => publish(nodes));
 
     // Mark ready when the simulation finishes — or after a guaranteed timeout so
     // the UI never stays invisible indefinitely on slow machines or large graphs.
@@ -213,17 +277,113 @@ export function useStablePositions(state, dims) {
     // Those arrays are rebuilt by every mutation, so depending on them would
     // restart the layout whenever an element's text, confidence, or status
     // changed — scrambling the positions the user is currently reading. Only a
-    // node or edge appearing or disappearing should re-run the simulation.
+    // node or edge appearing or disappearing should re-run the simulation; a
+    // new size is the effect above's business.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    state.elements.length,
-    state.relations.length,
-    groupSignature,
-    dims.w,
-    dims.h,
-    halfWidth,
-    halfHeight,
-  ]);
+  }, [state.elements.length, state.relations.length, groupSignature, hasDims]);
 
-  return { positions, ready };
+  // Pins that change without the layout re-running — an import that happens
+  // to hold as many elements as the process it replaces, a group closing and
+  // letting go of its members — are applied to the running simulation. A drop
+  // lands here too, and changes nothing: the node is already where its pin says.
+  const pinRecord = state.pins;
+  useEffect(() => {
+    const sim = simRef.current;
+    const c = centerRef.current;
+    if (!sim || !c) return;
+    const pins = pinRecord ?? {};
+    let changed = false;
+    for (const n of sim.nodes()) {
+      if (grabbedRef.current.has(n.id)) continue;
+      const p = pins[n.id];
+      const fx = p ? c.x + p.x : null;
+      const fy = p ? c.y + p.y : null;
+      const same =
+        fx === null
+          ? n.fx == null
+          : n.fx != null &&
+            Math.abs(n.fx - fx) < 0.5 &&
+            Math.abs(n.fy - fy) < 0.5;
+      if (same) continue;
+      n.fx = fx;
+      n.fy = fy;
+      changed = true;
+    }
+    if (changed) sim.alpha(Math.max(sim.alpha(), 0.3)).restart();
+  }, [pinRecord]);
+
+  // Stable across renders: everything it touches is a ref.
+  const drag = useMemo(
+    () => ({
+      /**
+       * Holds the named nodes where they stand, and brings the layout to rest
+       * — the opposite of D3's own drag, which warms it — so nothing but the
+       * dragged nodes moves: a node is put somewhere, not tugged there with
+       * its neighbours trailing after it.
+       *
+       * At rest, not merely left alone. A layout looks still long before it
+       * is: two nodes reach the point where their forces balance in a second
+       * or two, while the simulation runs on for ten more, and carrying a node
+       * through it lets its forces shove each neighbour it passes. Stopping it
+       * is also what a reader who has started arranging things by hand wants
+       * of a layout still visibly settling.
+       */
+      grab(ids) {
+        const sim = simRef.current;
+        if (!sim) return;
+        sim.stop();
+        const wanted = new Set(ids);
+        const grabbed = new Map();
+        for (const n of sim.nodes()) {
+          if (!wanted.has(n.id)) continue;
+          n.fx = n.x;
+          n.fy = n.y;
+          grabbed.set(n.id, { x: n.x, y: n.y });
+        }
+        grabbedRef.current = grabbed;
+      },
+      /**
+       * Moves what `grab` holds to where it was picked up, plus `(dx, dy)` in
+       * layout space. Published here rather than by a tick, since a layout at
+       * rest does not tick.
+       */
+      moveTo(dx, dy) {
+        const sim = simRef.current;
+        if (!sim) return;
+        const grabbed = grabbedRef.current;
+        const p = {};
+        for (const n of sim.nodes()) {
+          const start = grabbed.get(n.id);
+          if (start) {
+            n.x = n.fx = start.x + dx;
+            n.y = n.fy = start.y + dy;
+          }
+          p[n.id] = { x: n.x, y: n.y };
+        }
+        posRef.current = p;
+        setPositions({ ...p });
+      },
+      /**
+       * Hands `onPin` where the nodes were dropped, as offsets from the
+       * centre, for the state to keep.
+       */
+      release() {
+        const sim = simRef.current;
+        const c = centerRef.current;
+        const grabbed = grabbedRef.current;
+        grabbedRef.current = new Map();
+        if (!sim || !c) return;
+        const round = (v) => Math.round(v * 10) / 10;
+        const pins = {};
+        for (const n of sim.nodes()) {
+          if (grabbed.has(n.id))
+            pins[n.id] = { x: round(n.fx - c.x), y: round(n.fy - c.y) };
+        }
+        onPinRef.current?.(pins);
+      },
+    }),
+    [],
+  );
+
+  return { positions, ready, drag };
 }

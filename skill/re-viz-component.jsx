@@ -22,7 +22,7 @@ const _inlineState = {
   ],
   relations: [
     // { from: "J1", to: "P1", type: "supports", explanation: "...", addedRound: 1 },
-    // types: "supports", "conflicts", "undermines", "depends"
+    // types: "supports", "conflicts", "undermines"
   ],
   coherence: {
     tensions: [],
@@ -51,7 +51,6 @@ const C = {
   supports: "#06b6d4",
   conflicts: "#f97316",
   undermines: "#eab308",
-  depends: "#6b7280",
   added: "#06b6d4",
   revised: "#eab308",
   withdrawnMark: "#f97316",
@@ -201,13 +200,13 @@ function getColors(e) {
   return { fill: C.theory[e.confidence], stroke: C.theory.high };
 }
 
-// Defines SVG <marker> arrowheads for every relation type (supports/conflicts/undermines/depends)
+// Defines SVG <marker> arrowheads for every relation type (supports/conflicts/undermines)
 // in both normal and withdrawn variants. The prefix keeps IDs unique between the Graph and
 // History SVGs so they don't collide in the same document.
 function ArrowDefs({ prefix }) {
   return (
     <defs>
-      {["supports", "conflicts", "undermines", "depends"].map((t) =>
+      {["supports", "conflicts", "undermines"].map((t) =>
         [false, true].map((w) => (
           <marker
             key={`${prefix}-${t}-${w}`}

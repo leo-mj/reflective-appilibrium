@@ -192,8 +192,7 @@ def _confirms(source: RESource, items: list[dict[str, Any]]) -> Verdict:
         top, second = items[0].get("score"), items[1].get("score")
         if top is not None and top == second:
             logger.info(
-                f"Crossref match inconclusive for {source.title!r}: "
-                f"top two results tie at score {top}."
+                f"Crossref match inconclusive: top two results tie at score {top}."
             )
             return Verdict("not_found")
 
@@ -246,16 +245,16 @@ async def _lookup(
         # "unchecked", not "nothing found". Reading it as the latter would let a
         # broken upstream read as evidence against every reference in the reply.
         if "items" not in (body.get("message") or {}):
-            logger.warning(
-                f"Crossref returned an unrecognised response shape for {source.title!r}."
-            )
+            logger.warning("Crossref returned an unrecognised response shape.")
             return UNCHECKED
         verdict = _confirms(source, body["message"]["items"] or [])
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         # Deliberately broad on the parsing side too: a third party changing its
         # response shape is a reason to say "not checked", never a reason to fail
         # the suggestion request this is decorating.
-        logger.warning(f"Crossref check failed for {source.title!r}: {exc!r}")
+        # No title and no exception text: the title is picked for this person's
+        # position, and an httpx error's text carries the query URL, title in it.
+        logger.warning(f"Crossref check failed: {type(exc).__name__}")
         return UNCHECKED
 
     if len(_cache) < _CACHE_MAX:
@@ -288,7 +287,7 @@ async def verify(sources: list[RESource], settings: Settings) -> list[Verdict]:
                 *(one(client, s) for s in sources), return_exceptions=True
             )
     except Exception as exc:  # pragma: no cover - client construction only
-        logger.warning(f"Crossref unavailable: {exc!r}")
+        logger.warning(f"Crossref unavailable: {type(exc).__name__}")
         return [UNCHECKED] * len(sources)
 
     # gather(return_exceptions=True) keeps one failing lookup from losing the
@@ -296,7 +295,7 @@ async def verify(sources: list[RESource], settings: Settings) -> list[Verdict]:
     out: list[Verdict] = []
     for verdict in verdicts:
         if isinstance(verdict, BaseException):
-            logger.warning(f"Crossref lookup raised: {verdict!r}")
+            logger.warning(f"Crossref lookup raised: {type(verdict).__name__}")
             out.append(UNCHECKED)
         else:
             out.append(verdict)

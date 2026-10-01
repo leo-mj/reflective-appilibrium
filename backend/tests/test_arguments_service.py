@@ -95,6 +95,15 @@ def test_prompt_contains_types_topic_and_roles():
     assert "STRICTLY FORMALLY VALID" in prompt
 
 
+def test_prompt_types_empirical_premises_as_background_theories():
+    # The simulation's theory is principles and theories only, and rethon's
+    # account asks what the theory alone implies: an empirical premise typed as
+    # a judgment would leave every argument resting on it unable to count.
+    prompt = build_prompt(LOOKUP, [])
+    assert 'EVERY empirical premise is a "theory"' in prompt
+    assert 'Never type an empirical claim as a "judgment"' in prompt
+
+
 def test_prompt_added_premise_numbering_follows_pool():
     prompt = build_prompt(LOOKUP, [])
     assert "starting at 5" in prompt and '"index": 5' in prompt
@@ -147,7 +156,9 @@ def _sample_state_elements():
     """Element list matching the sample state's order: J1–J13, P1–P6, T1, T2, J14.
 
     J14 (index 22) is the premise promoted into the state; P1 + J14 → J1 is
-    detected over existing elements rather than via an added premise.
+    detected over existing elements rather than via an added premise. The
+    frontend demo has since retyped it as a background theory, T3; the
+    position, which is all the dummy detection reads, is unchanged.
     """
     specs = (
         [(f"J{i}", "judgment") for i in range(1, 14)]

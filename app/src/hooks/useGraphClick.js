@@ -4,14 +4,7 @@
  */
 
 import { useRef } from "react";
-import {
-  elementHitRadius,
-  elementRadius,
-  arrowGeometry,
-  distToSegment,
-  distToQuadBezier,
-  computeJunction,
-} from "../utils/graphHelpers.js";
+import { hitsElement, relationAt } from "../utils/graphHelpers.js";
 
 /**
  * Wraps `usePan` with click-vs-drag detection and graph hit-testing.
@@ -36,8 +29,53 @@ export function useGraphClick({
   onHullClick,
   hulls = [],
   toSourceRel = (r) => r,
+  overlay = null,
+  onTap,
+  panMove,
+  onNodeDragStart,
+  onNodeDrag,
+  onNodeDragEnd,
 }) {
   const clickOrigin = useRef(null);
+  // A mouse press on a node: `{ el, x, y, moving }`. It moves the node rather
+  // than panning, once it has travelled past the click threshold — before
+  // that it may still be a click.
+  const nodePress = useRef(null);
+
+  /**
+   * The node under a point, if any. `overlay` — the statement view's expanded
+   * card, `{ el, pos }` — is asked first: it is drawn over everything, so a
+   * click on it is a click on it, not on whatever it happens to cover.
+   */
+  const nodeAt = (sx, sy) => {
+    if (overlay && hitsElement(overlay.el, overlay.pos, sx, sy))
+      return overlay.el;
+    return visibleEls.find((el) => {
+      const pos = positions[el.id];
+      return pos && hitsElement(el, pos, sx, sy);
+    });
+  };
+
+  /** The relation under a point, if any: see `relationAt` in graphHelpers. */
+  const relationAtPoint = (sx, sy) =>
+    relationAt(
+      { relations: visRels, jointGroups, positions, elementById, edgeOffsets },
+      sx,
+      sy,
+    );
+
+  /**
+   * Screen → simulation coordinates, accounting for pan and zoom.
+   *
+   * @param {React.PointerEvent} e
+   */
+  const toSim = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      sx: (e.clientX - rect.left - pan.x) / zoom,
+      sy: (e.clientY - rect.top - pan.y) / zoom,
+    };
+  };
 
   /**
    * Selects the relation an edge stands for.
@@ -54,7 +92,23 @@ export function useGraphClick({
 
   /** @param {React.PointerEvent} e */
   const onPointerDown = (e) => {
-    panDown(e);
+    // A mouse only: on a touch screen a finger on a node pans, since a dense
+    // graph leaves little background to start a pan from. Ctrl+click is
+    // building a selection, and stays a click.
+    const { sx, sy } = toSim(e);
+    const el =
+      onNodeDragStart &&
+      e.pointerType === "mouse" &&
+      e.button === 0 &&
+      !(e.ctrlKey || e.metaKey)
+        ? nodeAt(sx, sy)
+        : null;
+    if (el) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      nodePress.current = { el, x: e.clientX, y: e.clientY, moving: false };
+    } else {
+      panDown(e);
+    }
     clickOrigin.current = {
       x: e.clientX,
       y: e.clientY,
@@ -65,7 +119,37 @@ export function useGraphClick({
   };
 
   /** @param {React.PointerEvent} e */
+  const onPointerMove = (e) => {
+    const press = nodePress.current;
+    if (!press) return panMove?.(e);
+    const dx = e.clientX - press.x;
+    const dy = e.clientY - press.y;
+    if (!press.moving) {
+      if (Math.abs(dx) <= 4 && Math.abs(dy) <= 4) return;
+      press.moving = true;
+      onNodeDragStart(press.el);
+    }
+    // In the canvas's own units: the pan and zoom are the view's, not the node's.
+    onNodeDrag?.(press.el, dx / zoom, dy / zoom);
+  };
+
+  /** Lets go of a node being dragged, if one is. */
+  const endNodePress = () => {
+    const press = nodePress.current;
+    nodePress.current = null;
+    if (press?.moving) onNodeDragEnd?.(press.el);
+  };
+
+  /** @param {React.PointerEvent} e */
+  const onPointerCancel = (e) => {
+    endNodePress();
+    clickOrigin.current = null;
+    panUp(e);
+  };
+
+  /** @param {React.PointerEvent} e */
   const onPointerUp = (e) => {
+    endNodePress();
     panUp(e);
     if (!clickOrigin.current) return;
     const { x: ox, y: oy, pointerType } = clickOrigin.current;
@@ -77,24 +161,23 @@ export function useGraphClick({
     )
       return; // drag
 
-    // Convert screen → simulation coordinates (accounting for pan and zoom).
-    const rect = e.currentTarget.getBoundingClientRect();
-    const sx = (e.clientX - rect.left - pan.x) / zoom;
-    const sy = (e.clientY - rect.top - pan.y) / zoom;
+    const { sx, sy } = toSim(e);
 
     if (pointerType === "touch") {
       // Touch: tap shows/dismisses tooltip only — no focus/selection.
-      for (const el of visibleEls) {
-        const pos = positions[el.id];
-        if (!pos) continue;
-        if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < elementHitRadius(el) ** 2) {
-          setTooltip((prev) =>
-            prev?.el?.id === el.id
-              ? null
-              : { x: e.clientX, y: e.clientY - 10, el },
-          );
-          return;
-        }
+      const el = nodeAt(sx, sy);
+      // What a finger has in place of hover: the statement view grows a card
+      // under the pointer, and an edge's explanation shows under it, and a
+      // phone has none. Told of every tap, the background's included, which
+      // is how either is let go of.
+      onTap?.(el ?? null, el ? null : relationAtPoint(sx, sy));
+      if (el) {
+        setTooltip((prev) =>
+          prev?.el?.id === el.id
+            ? null
+            : { x: e.clientX, y: e.clientY - 10, el },
+        );
+        return;
       }
       // Tapped background — clear tooltip.
       setTooltip(null);
@@ -102,91 +185,26 @@ export function useGraphClick({
     }
 
     // Mouse: node hit-test → focus/selection.
-    for (const el of visibleEls) {
-      const pos = positions[el.id];
-      if (!pos) continue;
-      if ((pos.x - sx) ** 2 + (pos.y - sy) ** 2 < elementHitRadius(el) ** 2) {
-        if (e.ctrlKey || e.metaKey) {
-          onCtrlNodeClick(el.id);
-          onNodeClick?.(null);
-        } else {
-          onSelectRel(() => null);
-          onSelect((prev) => (prev === el.id ? null : el.id));
-          onNodeClick?.(el, e.clientX, e.clientY);
-        }
-        return;
+    const el = nodeAt(sx, sy);
+    if (el) {
+      if (e.ctrlKey || e.metaKey) {
+        onCtrlNodeClick(el.id);
+        onNodeClick?.(null);
+      } else {
+        onSelectRel(() => null);
+        onSelect((prev) => (prev === el.id ? null : el.id));
+        onNodeClick?.(el, e.clientX, e.clientY);
       }
+      return;
     }
 
-    // Edge hit-test (threshold 8 px) — uses the same bezier geometry as rendering.
-    for (const r of visRels) {
-      const sp = positions[r.from], tp = positions[r.to];
-      if (!sp || !tp) continue;
-      const srcEl = elementById.get(r.from);
-      const tgtEl = elementById.get(r.to);
-      const { x1, y1, tipX, tipY, perpX, perpY } = arrowGeometry(
-        sp, tp,
-        elementRadius(srcEl),
-        elementRadius(tgtEl),
-      );
-      const offset = edgeOffsets.get(r) ?? 0;
-      const cx = (x1 + tipX) / 2 + perpX * offset;
-      const cy = (y1 + tipY) / 2 + perpY * offset;
-      const tdx = tipX - cx, tdy = tipY - cy;
-      const tlen = Math.hypot(tdx, tdy) || 1;
-      const bx = tipX - (tdx / tlen) * 10, by = tipY - (tdy / tlen) * 10;
-      if (distToQuadBezier(sx, sy, x1, y1, cx, cy, bx, by) < 8) {
-        onNodeClick?.(null);
-        onSelect(() => null);
-        selectRel(r);
-        return;
-      }
-    }
-
-    // Joint argument hit-test: premise lines, junction dot, conclusion arrow.
-    for (const rels of jointGroups) {
-      const conclusionEl = elementById.get(rels[0].to);
-      const conclusionPos = positions[rels[0].to];
-      if (!conclusionPos || !conclusionEl) continue;
-      const premises = rels
-        .map((r) => ({ r, el: elementById.get(r.from), pos: positions[r.from] }))
-        .filter((d) => d.el && d.pos);
-      if (!premises.length) continue;
-      const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
-      const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
-      const tr = elementRadius(conclusionEl);
-      const { jx, jy } = computeJunction(centX, centY, conclusionPos, tr);
-      // Junction circle
-      if (Math.hypot(sx - jx, sy - jy) < 10) {
-        onNodeClick?.(null);
-        onSelect(() => null);
-        selectRel(rels[0]);
-        return;
-      }
-      // Premise lines
-      for (const { r, el, pos } of premises) {
-        const sr = elementRadius(el);
-        const dx = jx - pos.x, dy = jy - pos.y;
-        const dist = Math.hypot(dx, dy) || 1;
-        const x1 = pos.x + (dx / dist) * sr, y1 = pos.y + (dy / dist) * sr;
-        if (distToSegment(sx, sy, x1, y1, jx, jy) < 8) {
-          onNodeClick?.(null);
-          onSelect(() => null);
-          selectRel(r);
-          return;
-        }
-      }
-      // Conclusion arrow
-      const adx = conclusionPos.x - jx, ady = conclusionPos.y - jy;
-      const adist = Math.hypot(adx, ady) || 1;
-      const tipX = conclusionPos.x - (adx / adist) * tr;
-      const tipY = conclusionPos.y - (ady / adist) * tr;
-      if (distToSegment(sx, sy, jx, jy, tipX, tipY) < 8) {
-        onNodeClick?.(null);
-        onSelect(() => null);
-        selectRel(rels[0]);
-        return;
-      }
+    // Edges, then an expanded group's box.
+    const hit = relationAtPoint(sx, sy);
+    if (hit) {
+      onNodeClick?.(null);
+      onSelect(() => null);
+      selectRel(hit.rel);
+      return;
     }
 
     // Inside an expanded group's box, but on none of its contents. Last of the
@@ -214,5 +232,13 @@ export function useGraphClick({
     onSelectRel(() => null);
   };
 
-  return { onPointerDown, onPointerUp };
+  return {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    nodeAt,
+    relationAt: relationAtPoint,
+    toSim,
+  };
 }

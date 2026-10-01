@@ -5,7 +5,9 @@
 
 import { EditModal } from "./EditModal.jsx";
 import { EditRelationModal } from "./EditRelationModal.jsx";
+import { ReviseArgumentModal } from "./ReviseArgumentModal.jsx";
 import { WithdrawReasonModal } from "./WithdrawReasonModal.jsx";
+import { argumentRelationsOf } from "../../utils/stateUtils.js";
 
 export function EditModals({
   editingEl,
@@ -14,11 +16,17 @@ export function EditModals({
   editingRel,
   setEditingRel,
   onRelEditSave,
+  onArgumentSave,
+  relations,
+  elements = [],
+  argumentsOnly,
   round,
   withdrawingId,
   onWithdrawConfirm,
   onWithdrawCancel,
 }) {
+  // An argument has a dialog of its own, since its premises are what it is.
+  const argument = editingRel && argumentRelationsOf(relations, editingRel);
   return (
     <>
       {editingEl && (
@@ -29,9 +37,19 @@ export function EditModals({
           onCancel={() => setEditingEl(null)}
         />
       )}
-      {editingRel && (
+      {editingRel && argument && (
+        <ReviseArgumentModal
+          argument={argument}
+          elements={elements}
+          currentRound={round}
+          onSave={onArgumentSave}
+          onCancel={() => setEditingRel(null)}
+        />
+      )}
+      {editingRel && !argument && (
         <EditRelationModal
           relation={editingRel}
+          argumentsOnly={argumentsOnly}
           currentRound={round}
           onSave={onRelEditSave}
           onCancel={() => setEditingRel(null)}

@@ -7,7 +7,7 @@
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 
-/** "judgments" → "Judgments". The pills are single letters on their own. */
+/** "judgments" → "Judgments". Three of the pills are single letters on their own. */
 const titleCase = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 /**
@@ -84,6 +84,9 @@ export function NavBar({
         value={search}
         onChange={(e) => onSearch(e.target.value)}
         placeholder="Search…"
+        // A placeholder is no name: it goes when typing starts, and not every
+        // screen reader reads it.
+        aria-label="Search elements and relations"
         style={{
           minHeight: 36,
           boxSizing: "border-box",
@@ -93,7 +96,8 @@ export function NavBar({
           border: `1px solid ${search ? C.text : C.border}`,
           background: "transparent",
           color: C.text,
-          outline: "none",
+          // No `outline: "none"`: that left a keyboard reader no sign of having
+          // arrived in the box, the border changing only once text was typed.
           minWidth: 70,
           ...(isWide
             ? { marginLeft: "auto", width: "30%" }

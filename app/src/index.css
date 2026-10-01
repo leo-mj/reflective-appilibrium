@@ -127,9 +127,9 @@ body {
    Under the pointer it thickens and brightens, which is the whole of the hint
    that it moves — that and the resize cursor.
 
-   The box around the line is wider than the line, so it can be hit; the line is
-   centred in it and stays put as it thickens, so the panels do not shift under
-   a hover. */
+   The box around the line is wider than the line, so it can be hit; the line
+   sits on the box's edge at the split (see `useSplitRatio`) and thickens into
+   the box, so the panels do not shift under a hover. */
 .split-divider {
   cursor: col-resize;
 }

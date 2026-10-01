@@ -31,8 +31,17 @@ export const menuIconStyle = {
   flexShrink: 0,
 };
 
-/** Horizontal rule between menu sections. Render as <div style={menuDividerStyle} />. */
-export const menuDividerStyle = { height: 1, background: C.border, margin: "2px 0" };
+/**
+ * Horizontal rule between menu sections. Render as <div style={menuDividerStyle} />.
+ * Unshrinkable: in the narrow menu's capped column a rule has no content to
+ * hold it open, so it would be the first thing squeezed away.
+ */
+export const menuDividerStyle = {
+  height: 1,
+  flexShrink: 0,
+  background: C.border,
+  margin: "2px 0",
+};
 
 /**
  * One labelled block of the ☰ menu. Both layouts group the same rows under the

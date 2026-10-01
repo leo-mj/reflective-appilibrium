@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useContext, useState, useEffect } from "react";
+import { SampleSuggestionsContext } from "../sampleSuggestions.js";
 import { WORKFLOW_PHASE_LABELS } from "../../utils/workflowUtils.js";
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
@@ -6,7 +7,9 @@ import { SpinnerIcon } from "../Icons.jsx";
 import { quickScore } from "../../utils/simulateRethonClient.js";
 import { sendsToLlmText } from "../../utils/openaiClient.js";
 import { suggestionsUnavailable } from "../../utils/disabledReason.js";
+import { useKeyMissing } from "../../utils/llmKey.js";
 import { useHeaderAccent } from "../../hooks/useHeaderAccent.js";
+import { useBackendCapabilities } from "../../hooks/useBackendCapabilities.js";
 
 /**
  * The ground the header strip is drawn on, pinned to the top of the tab's own
@@ -81,7 +84,8 @@ export function ToolbarStrip({ disclosure, children }) {
  * @param {boolean}          props.hasResult
  * @param {Function}         props.onRun
  * @param {string|undefined} props.model
- * @param {boolean}          [props.disabled]  No backend, so nothing can be asked.
+ * @param {boolean}          [props.disabled]  Nothing can be asked: no backend,
+ *   or, outside the demo, no API key.
  * @param {string}           [props.needs]     What the process still lacks, if
  *   anything, e.g. "Add at least two elements first." Also disables the button.
  * @param {ReactNode}        [props.disclosure] The AI notice, pinned with the
@@ -106,8 +110,17 @@ export function SuggestionToolbar({
   disclosure,
 }) {
   const isDisabled = loading || disabled || Boolean(needs);
-  const why = suggestionsUnavailable({ loading, noBackend: disabled, needs });
+  // Disabled in a build with the LLM means a key is what is missing — in a
+  // reader's own process, where the demo's recorded suggestions are not offered.
+  const keyMissing = useKeyMissing();
+  const why = suggestionsUnavailable({
+    loading,
+    noBackend: disabled && !keyMissing,
+    noKey: disabled && keyMissing,
+    needs,
+  });
   const { accent, ink, weight, marker, badge } = useHeaderAccent(tab);
+  const sample = useContext(SampleSuggestionsContext);
   return (
     <ToolbarStrip disclosure={disclosure}>
       <div style={{ fontSize: 12, lineHeight: 1.5 }}>
@@ -117,14 +130,29 @@ export function SuggestionToolbar({
         {suggestionCount !== null && (
           <span style={{ color: C.dim }}> · {suggestionCount} remaining</span>
         )}
-        {model && <span style={{ color: C.dim }}> · {model}</span>}
+        {/* Recorded suggestions say so here too, beside the model's name, or
+            the name reads as the model being asked now. */}
+        {/* Kept whole: a model name breaks at its hyphens, which stranded
+            "5)" on a line of its own. */}
+        {model && (
+          <>
+            {" "}
+            <span style={{ color: C.dim, whiteSpace: "nowrap" }}>
+              · {sample ? `pre-set (${model})` : model}
+            </span>
+          </>
+        )}
       </div>
       <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        <Tooltip text={sendsToLlmText()}>
+        {/* One tooltip, not two: the button used to carry `why` as a DOM
+            `title` *inside* this Tooltip, so a disabled run button had the
+            native box and the app's own both trying to explain it. Whichever
+            the reader needs — the reason it cannot run, or what running sends
+            — is the text. */}
+        <Tooltip text={why || sendsToLlmText()} wrap>
           <button
             onClick={onRun}
             disabled={isDisabled}
-            title={why}
             {...(isDisabled ? {} : marker)}
             style={{
               background: "transparent",
@@ -185,9 +213,17 @@ export function ScoreDeltaBadge({
   weights,
 }) {
   const [delta, setDelta] = useState(null);
+  const { maxElements } = useBackendCapabilities();
+
+  // The question this badge asks is "what would the state *plus this suggestion*
+  // score", so it sends one element more than the state has. At exactly the
+  // server's cap that is one too many: the baseline beside it computes and every
+  // badge 422s. Asking anyway would mean one refused request per card and a
+  // console warning for each, to arrive at the blank badge we can show now.
+  const overCap = maxElements > 0 && state.elements.length + 1 > maxElements;
 
   useEffect(() => {
-    if (baseline == null) return;
+    if (baseline == null || overCap) return;
     let cancelled = false;
     const prefix = type === "principle" ? "P" : "J";
     const maxNum = Math.max(
@@ -218,7 +254,7 @@ export function ScoreDeltaBadge({
     return () => {
       cancelled = true;
     };
-  }, [text, baseline, weights]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [text, baseline, weights, overCap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (delta == null) return null;
 

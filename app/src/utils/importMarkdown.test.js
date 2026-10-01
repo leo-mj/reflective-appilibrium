@@ -149,7 +149,7 @@ describe("importStateFromFile — block extraction errors", () => {
   it("rejects a file with no re-state block", async () => {
     const file = makeFile("# Just markdown\n\nNo state block here.");
     await expect(importStateFromFile(file)).rejects.toThrow(
-      "No re-state block found",
+      "This file has no full history",
     );
   });
 
@@ -420,7 +420,7 @@ describe("importStateFromFile — block extraction edge cases", () => {
   it("rejects a file whose only code block is a different language", async () => {
     const file = makeFile("```json\n{}\n```\n");
     await expect(importStateFromFile(file)).rejects.toThrow(
-      "No re-state block found",
+      "This file has no full history",
     );
   });
 });
@@ -623,6 +623,52 @@ describe("importStateFromFile — relation: argumentId", () => {
     await expect(
       importStateFromFile(makeFile(wrapInMarkdown(state))),
     ).rejects.toThrow(/argumentId/);
+  });
+});
+
+describe("importStateFromFile — relation: retired depends", () => {
+  const importRels = (relations) =>
+    importStateFromFile(makeFile(wrapInMarkdown({ ...MINIMAL_STATE, relations })));
+  const depends = {
+    from: "J1",
+    to: "P1",
+    type: "depends",
+    explanation: "The verdict presupposes the principle.",
+    addedRound: 2,
+  };
+
+  it("reads A depends on B as B supports A, and says nothing of it", async () => {
+    const state = await importRels([depends]);
+    expect(state.relations).toEqual([
+      {
+        from: "P1",
+        to: "J1",
+        type: "supports",
+        explanation: "The verdict presupposes the principle.",
+        addedRound: 2,
+      },
+    ]);
+    expect(state.log).toEqual([]);
+  });
+
+  it("keeps status and history through the reversal", async () => {
+    const history = [{ round: 3, type: "withdrawn" }];
+    const [rel] = (
+      await importRels([{ ...depends, status: "withdrawn", history }])
+    ).relations;
+    expect(rel).toMatchObject({ type: "supports", status: "withdrawn", history });
+  });
+
+  it("drops one that lands on a support the state already holds", async () => {
+    const held = {
+      from: "P1",
+      to: "J1",
+      type: "supports",
+      explanation: "Held.",
+      addedRound: 1,
+    };
+    const { relations } = await importRels([depends, held]);
+    expect(relations).toEqual([held]);
   });
 });
 
@@ -1239,6 +1285,90 @@ describe("importStateFromFile — reviews", () => {
     await expect(
       importWith(Array.from({ length: 101 }, (_, i) => aReview({ id: `r${i}` }))),
     ).rejects.toThrow(/"reviews" exceeds 100 items/);
+  });
+});
+
+// ─── Merged processes ─────────────────────────────────────────────────────────
+
+describe("importStateFromFile — processes", () => {
+  const els = ["J1", "J2"].map((id) => ({
+    id,
+    type: "judgment",
+    status: "active",
+    confidence: 1,
+    text: id,
+    addedRound: 1,
+  }));
+  const importWith = (processes) =>
+    importStateFromFile(
+      makeFile(wrapInMarkdown({ ...MINIMAL_STATE, elements: els, processes })),
+    );
+
+  it("has no processes key on a process never merged", async () => {
+    const state = await importStateFromFile(makeFile(wrapInMarkdown(MINIMAL_STATE)));
+    expect(state).not.toHaveProperty("processes");
+  });
+
+  it("round-trips the processes, dropping members that are not elements", async () => {
+    const state = await importWith([
+      { id: "A", label: "Lying", members: ["J1", "GONE"] },
+      { id: "B", label: "Promises", members: ["J1", "J2"] },
+    ]);
+    expect(state.processes).toEqual([
+      { id: "A", label: "Lying", members: ["J1"] },
+      { id: "B", label: "Promises", members: ["J1", "J2"] },
+    ]);
+  });
+
+  it("refuses a process that is not an object", async () => {
+    await expect(importWith(["A"])).rejects.toThrow(/processes\[0\]/);
+  });
+});
+
+// ─── Pins ─────────────────────────────────────────────────────────────────────
+
+describe("importStateFromFile — pins", () => {
+  const els = ["J1", "J2"].map((id) => ({
+    id,
+    type: "judgment",
+    status: "active",
+    confidence: 1,
+    text: id,
+    addedRound: 1,
+  }));
+  const importWith = (pins) =>
+    importStateFromFile(
+      makeFile(wrapInMarkdown({ ...MINIMAL_STATE, elements: els, pins })),
+    );
+
+  it("has no pins key on a state nothing was dragged in", async () => {
+    const state = await importStateFromFile(makeFile(wrapInMarkdown(MINIMAL_STATE)));
+    expect(state).not.toHaveProperty("pins");
+  });
+
+  it("round-trips the pins, negative offsets included", async () => {
+    const state = await importWith({ J1: { x: -12.5, y: 40 } });
+    expect(state.pins).toEqual({ J1: { x: -12.5, y: 40 } });
+  });
+
+  it("drops a pin for an element the file does not hold", async () => {
+    const state = await importWith({ J1: { x: 1, y: 2 }, GONE: { x: 3, y: 4 } });
+    expect(state.pins).toEqual({ J1: { x: 1, y: 2 } });
+  });
+
+  it("keeps only the coordinates, whatever else a pin carries", async () => {
+    const state = await importWith({ J1: { x: 1, y: 2, extra: "no" } });
+    expect(state.pins.J1).toEqual({ x: 1, y: 2 });
+  });
+
+  it("refuses pins that are not an object", async () => {
+    await expect(importWith([1, 2])).rejects.toThrow(/pins/);
+  });
+
+  it("refuses a coordinate that is not a finite number", async () => {
+    await expect(importWith({ J1: { x: "1", y: 2 } })).rejects.toThrow(
+      /pins\.J1\.x/,
+    );
   });
 });
 

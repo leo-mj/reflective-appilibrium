@@ -150,10 +150,7 @@ async def suggest_theories(
                 _clean_source(raw_source) if isinstance(raw_source, dict) else None
             )
             if cleaned is None:
-                logger.info(
-                    f"Dropped a source on {text[:60]!r}: missing the fields its "
-                    "type requires."
-                )
+                logger.info("Dropped a source missing the fields its type requires.")
                 continue
             sources.append(cleaned)
 

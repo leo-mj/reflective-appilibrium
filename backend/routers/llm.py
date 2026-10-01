@@ -51,6 +51,47 @@ class CompletionResponse(BaseModel):
     usage: TokenUsage
 
 
+class ModelsResponse(BaseModel):
+    """Response from ``GET /api/llm/models``."""
+
+    models: list[str]
+
+
+def _provider_message(exc: Exception) -> str:
+    """The provider's own words, where its SDK kept them apart.
+
+    Both SDKs raise with the parsed response body on ``exc.body``, but not the
+    same part of it. Anthropic's is the whole response,
+    ``{"type": "error", "error": {"message": ...}}``; the OpenAI client — which
+    Mistral and Ollama go through too — has already unwrapped ``error``, leaving
+    ``{"message": ...}``. Their ``message``, by contrast, is "Error code: 401 - "
+    followed by the body's Python repr, which is what the modal used to show.
+    """
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        inner = body.get("error")
+        for candidate in (
+            inner.get("message") if isinstance(inner, dict) else inner,
+            body.get("message"),
+        ):
+            if isinstance(candidate, str) and candidate.strip():
+                status = getattr(exc, "status_code", None)
+                return f"{status}: {candidate.strip()}" if status else candidate.strip()
+    return getattr(exc, "message", None) or str(exc)
+
+
+def _provider_refusal(exc: Exception, what: str) -> HTTPException:
+    """A provider's error, scrubbed, as the 400 the settings modal shows.
+
+    For the two endpoints whose job is to say why a key or model does not work.
+    Safe to log once scrubbed: neither sends anything of anyone's reasoning, so
+    the provider's reply can quote only the key it just rejected.
+    """
+    message = scrub_provider_error(_provider_message(exc))
+    logger.info(f"{what} failed: {message}")
+    return HTTPException(status_code=400, detail=message)
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 
@@ -79,10 +120,26 @@ async def test_connection(
             json_mode=False,
         )
     except Exception as exc:  # noqa: BLE001 — this endpoint's job is to report why
-        message = getattr(exc, "message", None) or str(exc)
-        logger.info(f"Connection test failed for model '{llm.model}': {message}")
-        raise HTTPException(status_code=400, detail=scrub_provider_error(message))
+        raise _provider_refusal(exc, f"Connection test for model '{llm.model}'")
     return {"status": "ok", "model": llm.model}
+
+
+@router.get("/models", response_model=ModelsResponse)
+async def list_models(
+    llm: Annotated[LLMService, Depends(get_llm_service)],
+) -> ModelsResponse:
+    """The models the supplied key can use, newest first.
+
+    What the settings modal suggests for the Model field, asked of the provider
+    so the app keeps no list of its own to go stale. Through
+    ``get_llm_service`` like every endpoint that uses a key, so the provider
+    allowlist, the rule on server-side keys and the rate limit all apply.
+    """
+    try:
+        models = await llm.list_models()
+    except Exception as exc:  # noqa: BLE001 — as the connection test
+        raise _provider_refusal(exc, "Listing models")
+    return ModelsResponse(models=models)
 
 
 @router.post("/complete", response_model=CompletionResponse)
@@ -97,7 +154,7 @@ async def complete(
         temperature=request.temperature,
         json_mode=request.json_mode,
     )
-    logger.info(f"Received response beginning with: {result.text[:20]}")
+    logger.info(f"Received a {len(result.text)}-character response.")
     return CompletionResponse(
         text=result.text,
         model=llm.model,

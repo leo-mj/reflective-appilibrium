@@ -17,15 +17,24 @@
  * @param {Object} opts
  * @param {boolean} [opts.loading]   - A request is already in flight.
  * @param {boolean} [opts.noBackend] - No LLM is reachable in this build.
+ * @param {boolean} [opts.noKey]     - The LLM is there but no API key is, in a
+ *   process other than the demo, which alone is offered recorded suggestions.
  * @param {string}  [opts.needs]     - Unmet precondition, phrased as an
  *   instruction, e.g. "Add at least two elements first."
  * @returns {string|undefined}
  */
-export function suggestionsUnavailable({ loading, noBackend, needs } = {}) {
+export function suggestionsUnavailable({
+  loading,
+  noBackend,
+  noKey,
+  needs,
+} = {}) {
   // Ordered by what the user can do about it: nothing, nothing, something.
   if (loading) return "Working on the last request…";
   if (noBackend)
     return "AI suggestions need a backend, which this build does not have. The sample process shows recorded suggestions instead.";
+  if (noKey)
+    return "AI suggestions need your own API key: add one under ☰ → LLM settings. The demo process shows recorded suggestions without one.";
   if (needs) return needs;
   return undefined;
 }

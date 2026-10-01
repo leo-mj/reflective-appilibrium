@@ -2,7 +2,7 @@
  * @fileoverview The narrow screen's way in to adding: a floating + that opens
  * the same add bar the wide layout keeps permanently at the foot of the window.
  *
- * It hosts {@link module:components/TextTabAddPanel} rather than dialogs of its
+ * It hosts {@link module:components/user_edits/AddBar} rather than dialogs of its
  * own, so the two layouts cannot drift. The element, relation and argument
  * tabs, the multi-premise argument builder, the validation, and the rule that
  * withholds the relation tab while the graph is showing arguments only all come
@@ -21,13 +21,14 @@
 
 import { useState } from "react";
 import { C } from "../../constants/colors.js";
-import { AddBar } from "../user_edits/TextTabAddPanel.jsx";
+import { AddBar } from "../user_edits/AddBar.jsx";
 
 /**
  * @param {Object}      props
  * @param {REElement[]} props.elements - Elements that may be referenced; see linkableElements.
  * @param {function}    props.onAddElement
  * @param {function}    props.onAddRelation
+ * @param {function}    [props.onAddNewArgument]
  * @param {boolean}     [props.hideNonEntailsRels] - Passed through: with plain
  *   relations hidden the bar offers arguments in their place.
  * @param {Object}      [props.preset] - Passed through: what the tab this sits
@@ -37,6 +38,7 @@ export function MobileAddButton({
   elements,
   onAddElement,
   onAddRelation,
+  onAddNewArgument,
   hideNonEntailsRels,
   preset = null,
 }) {
@@ -141,6 +143,7 @@ export function MobileAddButton({
                 elements={elements}
                 onAddElement={onAddElement}
                 onAddRelation={onAddRelation}
+                onAddNewArgument={onAddNewArgument}
                 selected={null}
                 ctrlChain={null}
                 hideNonEntailsRels={hideNonEntailsRels}

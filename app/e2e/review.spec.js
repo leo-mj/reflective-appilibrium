@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { gotoHome, loadSample, showView, park, openMenu } from "./helpers.js";
+import { gotoHome, loadSample, showView, park, exportDownload } from "./helpers.js";
 
 /**
  * Demo mode, so the Review tab serves the pre-set example reading rather than
@@ -127,18 +127,14 @@ test.describe("Process review", () => {
   test("the export carries the reviews", async ({ page }) => {
     await acceptTwo(page);
 
-    await openMenu(page);
-    const [download] = await Promise.all([
-      page.waitForEvent("download"),
-      page.locator('button:text-is("Export")').click(),
-    ]);
+    const download = await exportDownload(page);
     const stream = await download.createReadStream();
     const markdown = (await stream.toArray()).join("");
 
     expect(markdown).toContain("## Process Reviews");
     // Oldest first, so a later review's back-references land after what they
     // refer to; two headings, one per accepted review.
-    expect(markdown.match(/^### Round \d+ — /gm)).toHaveLength(2);
+    expect(markdown.match(/^### Step \d+ — /gm)).toHaveLength(2);
     expect(markdown).toContain("**How the position moved**");
     // And the machine-readable block, which is what makes it re-importable.
     const state = JSON.parse(markdown.split("```re-state\n")[1].split("\n```")[0]);

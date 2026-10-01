@@ -85,7 +85,7 @@ describe("inkOn", () => {
   });
 
   it("picks the more readable of the two inks, whatever the fill", () => {
-    for (const fill of [C.supports, C.conflicts, C.undermines, C.depends, C.rejected]) {
+    for (const fill of [C.supports, C.conflicts, C.undermines, C.rejected]) {
       const ink = inkOn(fill);
       const other = ink === C.onFill ? C.onAmber : C.onFill;
       expect(contrast(fill, ink), fill).toBeGreaterThanOrEqual(contrast(fill, other));

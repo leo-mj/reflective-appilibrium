@@ -42,9 +42,8 @@ Relation types (all are directional — check both A→B and B→A):
 - supports: A provides positive reason for B (evidential, explanatory, or logical)
 - conflicts: A and B are incompatible; holding both generates contradiction or incoherence
 - undermines: A weakens B without flatly contradicting it; reduces plausibility or confidence
-- depends: A presupposes B; A cannot hold (or loses its grounding) if B is withdrawn
 
-Use ONLY these four types. Formal-inference types such as "entails" or "precludes" \
+Use ONLY these three types. If A presupposes B, record that B supports A. Formal-inference types such as "entails" or "precludes" \
 are recorded elsewhere, by the argument-reconstruction step, and must never appear here.
 
 A single pair can have multiple relations (e.g. P supports J in one respect but undermines it in another). Record each separately.
@@ -126,6 +125,76 @@ Respond with valid JSON only, in exactly this format:
 If no new relations are found, return {{"relations": []}}."""
 
 
+def build_merge_pairs_prompt(
+    topic: str,
+    pool: list[tuple[REElement, list[str]]],
+    process_labels: dict[str, str],
+) -> str:
+    """Build the LLM prompt for finding elements of merged processes that make
+    the same claim.
+
+    ``pool`` pairs each candidate element with the letters of the processes it
+    came from. Sameness of *claim* is the test, and the prompt spells out what
+    does not meet it — related, compatible, one a special case of the other —
+    since those are what a model asked for "similar" statements offers first. It
+    is told not to judge the claims: whether one is right has no bearing on
+    whether two statements make it. Returning nothing is stated to be expected,
+    so the model is not pushed into finding pairs that are not there.
+
+    The process labels are the users' own topics or file names, so they are
+    fenced with the statements rather than written into the instructions.
+    """
+    kind = {
+        "judgment": "judgment",
+        "principle": "principle",
+        "theory": "background theory",
+    }
+    element_lines = "\n".join(
+        f"{e.id} [process {'+'.join(ps)}] ({kind.get(e.type, e.type)}): {e.text}"
+        for e, ps in pool
+    )
+    process_lines = "\n".join(
+        f"{pid}: {label}" for pid, label in process_labels.items()
+    )
+
+    return f"""\
+You are assisting a reflective equilibrium (RE) analysis in ethics that was put \
+together by merging several separate processes. Each statement below is labelled \
+with the process (a letter) it came from.
+Topic: "{topic}"
+
+{DATA_RULE}
+
+Processes:
+{fence(process_lines)}
+
+Statements:
+{fence(element_lines)}
+
+Task: find pairs of statements that make the same claim in different words, so that \
+a person holding one holds the other: the same moral judgment, the same principle, or \
+the same background theory.
+
+Rules:
+- Each pair takes one statement from each of two different processes. Never pair two \
+statements that share a process letter.
+- Both statements must be of the same kind (judgment with judgment, principle with \
+principle, theory with theory).
+- Do not pair statements that are merely related, on the same topic, compatible, or \
+where one is a special case, a consequence, or a qualified version of the other. \
+Those are different claims.
+- Do not judge whether the claims are correct.
+- If no pair qualifies, return an empty list. Returning none is expected when the \
+processes do not overlap.
+
+Respond with valid JSON only, in exactly this format:
+{{
+  "pairs": [
+    {{"a": "J1", "b": "J7", "reason": "One sentence on why these make the same claim."}}
+  ]
+}}"""
+
+
 def build_judgments_prompt(
     topic: str,
     elements: list[REElement],
@@ -154,7 +223,7 @@ def build_judgments_prompt(
     rejected_lines = "\n".join(f"  {e.id}: {e.text}" for e in rejected) or "  (none)"
     log_lines = (
         "\n".join(
-            f"  Round {entry.round}: {entry.findings}"
+            f"  Step {entry.round}: {entry.findings}"
             for entry in log[-5:]
             if entry.findings
         )
@@ -176,7 +245,7 @@ Previously withdrawn elements (the user held these, then gave them up):
 Previously rejected suggestions (the user was offered these and declined them):
 {fence(rejected_lines)}
 
-Recent round notes:
+Recent notes, by step:
 {fence(log_lines)}
 
 Task: identify 3–5 moral questions or thought experiments that are relevant \
@@ -441,6 +510,17 @@ If no well-supported theory is relevant to this position, return \
 # empty ``options``.  What actually records the trajectory is the state's own
 # history — ``added_round`` plus the ``history`` event list on every element and
 # relation, with ``previous_text`` preserving the wording each revision replaced.
+#
+# Every ``round`` field there is a *step*: one per change. A *round*, as the
+# reader sees it, is a run of steps, closed as a workflow iteration ends or by
+# hand, and ``state.round_ends`` lists the last step of each closed one — see
+# "Steps and rounds" in app/src/utils/stateUtils.js. The prompt names both, and
+# asks for steps to be cited as steps, since that is what the app shows.
+
+
+def _round_of(state: REState, step: int) -> int:
+    """The round a step belongs to, from 1 — ``roundOfStep`` in stateUtils.js."""
+    return 1 + sum(1 for end in state.round_ends if step > end)
 
 
 def _history_events(item: Union[REElement, RERelation]) -> list[dict[str, Any]]:
@@ -496,7 +576,7 @@ def _history_events(item: Union[REElement, RERelation]) -> list[dict[str, Any]]:
 
 def _event_line(event: dict[str, Any]) -> str:
     """One history event as an indented line under the item it happened to."""
-    line = f"    R{event['round']} {event['type']}"
+    line = f"    step {event['round']} {event['type']}"
     if event["type"] == "revised" and event["previous_text"]:
         return f'{line} — was: "{event["previous_text"]}"'
     if event["reason"]:
@@ -510,7 +590,7 @@ def _element_block(elements: list[REElement]) -> str:
         origin = f", origin: {e.origin}" if e.origin else ""
         lines.append(
             f"  {e.id} [{e.type}] (confidence {e.confidence}, {e.status}, "
-            f"added R{e.added_round}{origin}): {e.text}"
+            f"added step {e.added_round}{origin}): {e.text}"
         )
         lines += [_event_line(ev) for ev in _history_events(e)]
     return "\n".join(lines) or "  (none)"
@@ -523,18 +603,19 @@ def _relation_block(relations: list[RERelation]) -> str:
         status = f", {r.status}" if r.status and r.status != "active" else ""
         lines.append(
             f"  {r.from_id} --{r.type}--> {r.to_id} "
-            f"(added R{r.added_round}{status}{origin}): {r.explanation}"
+            f"(added step {r.added_round}{status}{origin}): {r.explanation}"
         )
         lines += [_event_line(ev) for ev in _history_events(r)]
     return "\n".join(lines) or "  (none)"
 
 
 def _timeline_block(state: REState) -> str:
-    """Round-by-round: what entered, changed, or left, plus the user's own notes.
+    """Step by step, under each round: what entered, changed, or left, plus the
+    user's own notes.
 
     Derived from the state rather than read off the log, because the log records
     only what the app chose to write a sentence about — and says nothing at all
-    for a round in which only relations moved.
+    for a step in which only relations moved.
     """
     by_round: dict[int, list[str]] = {}
 
@@ -556,15 +637,20 @@ def _timeline_block(state: REState) -> str:
         log_by_round.setdefault(entry.round, []).append(entry)
 
     lines: list[str] = []
+    heading = None
     for round_ in sorted(set(by_round) | set(log_by_round)):
+        in_round = _round_of(state, round_)
+        if in_round != heading:
+            lines.append(f"  Round {in_round}:")
+            heading = in_round
         changes = "; ".join(by_round.get(round_, [])) or "no changes recorded"
-        lines.append(f"  Round {round_}: {changes}")
+        lines.append(f"    Step {round_}: {changes}")
         for entry in log_by_round.get(round_, []):
             notes = " / ".join(
                 part for part in (entry.findings, entry.decision, entry.changes) if part
             )
             if notes:
-                lines.append(f"    note: {notes}")
+                lines.append(f"      note: {notes}")
     return "\n".join(lines) or "  (none)"
 
 
@@ -578,8 +664,8 @@ def _earlier_reviews_block(reviews: list[REReview]) -> str:
         return "  (none)"
 
     *earlier, latest = reviews
-    lines = [f'  Round {r.round} — "{r.headline}"' for r in earlier]
-    lines.append(f"  Round {latest.round} (most recent, in full):")
+    lines = [f'  Step {r.round} — "{r.headline}"' for r in earlier]
+    lines.append(f"  Step {latest.round} (most recent, in full):")
     for label, body in (
         ("How the position moved", latest.arc),
         ("Surprising turns", latest.surprises),
@@ -593,8 +679,8 @@ def _earlier_reviews_block(reviews: list[REReview]) -> str:
 def build_review_prompt(state: REState) -> str:
     """Build the LLM prompt for a macro-level review of the whole process.
 
-    Deliberately not a round-by-round recap: the app already replays the process
-    in the History tab and lists every change in the round log, so the only thing
+    Deliberately not a step-by-step recap: the app already replays the process
+    in the History tab and lists every change in the log, so the only thing
     a review can add is the altitude above them — where the centre of the position
     moved, what the process did that its earlier rounds did not predict, and what
     coherence was available and left on the table.
@@ -618,7 +704,15 @@ still open, or has been overtaken by where the process went instead.
 
     return f"""\
 You are reviewing a wide reflective equilibrium (RE) process in ethics.
-Topic: "{state.topic or '(unspecified)'}" — {state.round} rounds so far.
+Topic: "{state.topic or '(unspecified)'}" — {state.round} steps so far, in \
+{len(state.round_ends) + 1} rounds.
+
+A step is one change: an element or relation added, revised, withdrawn or \
+reinstated. A round is a run of steps the user worked through as one iteration \
+of the method; it closes when an iteration of the app's workflow ends, or when \
+the user closes it. Every "step N" below is a step. The app shows steps and \
+rounds by those numbers, so when you say when something happened, cite it as \
+"step N", or "round N" for a round — never a step number as a round.
 
 {DATA_RULE}
 
@@ -628,7 +722,7 @@ Topic: "{state.topic or '(unspecified)'}" — {state.round} rounds so far.
 ### Relations
 {fence(_relation_block(state.relations))}
 
-### Round timeline
+### Timeline, by round and step
 {fence(_timeline_block(state))}
 
 ### Earlier reviews of this process
@@ -663,7 +757,7 @@ element strength was set deliberately or left at the default 0.67.
 {continuity}
 Constraints:
 - The five parts together must not exceed 500 words.
-- Do not recap the rounds one by one. The user already has that record; this is \
+- Do not recap the steps or rounds one by one. The user already has that record; this is \
 the view above it.
 - Do not judge the moral positions themselves, argue for or against them, or say \
 which you find more plausible. Report the shape of the process, not a verdict on it.
@@ -711,7 +805,7 @@ def build_conversation_system(state: REState, suggestion: dict[str, Any]) -> str
     )
     log_text = (
         "\n".join(
-            f"  Round {e.round}: {e.findings}" for e in state.log[-5:] if e.findings
+            f"  Step {e.round}: {e.findings}" for e in state.log[-5:] if e.findings
         )
         or "  (none)"
     )
@@ -730,7 +824,7 @@ def build_conversation_system(state: REState, suggestion: dict[str, Any]) -> str
         "against an assistant that always agrees is an equilibrium with no one.\n"
         "When you do agree, say why, and say what would change your mind.\n\n"
         f"{DATA_RULE}\n\n"
-        f"## RE state — topic: {state.topic or '(unspecified)'}, round {state.round}\n\n"
+        f"## RE state — topic: {state.topic or '(unspecified)'}, step {state.round}\n\n"
         f"### Elements\n{fence(elements_text)}\n\n"
         f"### Relations\n{fence(relations_text)}\n\n"
         f"### Recent log\n{fence(log_text)}\n\n"

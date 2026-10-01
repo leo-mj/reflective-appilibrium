@@ -6,13 +6,8 @@
 
 import { C } from "../../constants/colors.js";
 import { INPUT_STYLE } from "../../constants/modalConstants.js";
+import { CONFIDENCE_PRESETS } from "../../utils/confidenceLabel.js";
 import { FormField } from "./ModalShell.jsx";
-
-const PRESETS = [
-  { label: "Low", value: 0.33 },
-  { label: "Moderate", value: 0.67 },
-  { label: "High", value: 1.0 },
-];
 
 /**
  * @param {Object} props
@@ -28,7 +23,7 @@ export function ConfidenceInput({ value, onChange }) {
   return (
     <FormField label="Confidence">
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        {PRESETS.map((p) => {
+        {CONFIDENCE_PRESETS.map((p) => {
           const active = Math.abs(value - p.value) < 0.01;
           return (
             <button

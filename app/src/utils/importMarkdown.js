@@ -30,12 +30,13 @@ const RELATION_TYPES = new Set([
   "supports",
   "conflicts",
   "undermines",
-  "depends",
   "entails",
   "precludes",
   "jointly_entails",
   "jointly_precludes",
 ]);
+/** Retired relation types still accepted from older files, and read as another. */
+const LEGACY_RELATION_TYPES = new Set(["depends"]);
 
 // ─── Field validators ─────────────────────────────────────────────────────────
 
@@ -312,19 +313,47 @@ function validateElement(e, i) {
   return result;
 }
 
+/**
+ * `A depends on B` — A presupposes B — as the relation it now is: `B supports
+ * A`. `depends` joined two readings pointing opposite ways (B grounds A; A
+ * entails B), and this is the weaker one and the one in the same family, so
+ * it commits nobody to an entailment they never drew. Silent by design: the
+ * relation reads as though it had always been a support.
+ */
+function migrateDepends(result) {
+  return { ...result, from: result.to, to: result.from, type: "supports" };
+}
+
+/**
+ * Drops a migrated `depends` that lands on a support the state already held
+ * between the same two elements, which is kept as it was.
+ */
+function dropMigratedDuplicates(raw, relations) {
+  const migrated = (i) => raw[i].type === "depends";
+  const key = (r) => `${r.from} ${r.type} ${r.to} ${r.argumentId ?? ""}`;
+  const held = new Set(relations.filter((_, i) => !migrated(i)).map(key));
+  return relations.filter((r, i) => {
+    if (!migrated(i)) return true;
+    if (held.has(key(r))) return false;
+    held.add(key(r));
+    return true;
+  });
+}
+
 function validateRelation(r, i) {
   const ctx = `relations[${i}]`;
   const type = str(r.type, `${ctx}.type`, 20);
-  if (!RELATION_TYPES.has(type))
+  if (!RELATION_TYPES.has(type) && !LEGACY_RELATION_TYPES.has(type))
     throw new Error(`${ctx}.type "${type}" is not valid`);
 
-  const result = {
+  let result = {
     from: str(r.from, `${ctx}.from`, 10),
     to: str(r.to, `${ctx}.to`, 10),
     type,
     explanation: str(r.explanation ?? "", `${ctx}.explanation`, 2_000),
     addedRound: num(r.addedRound, `${ctx}.addedRound`),
   };
+  if (type === "depends") result = migrateDepends(result);
 
   if (r.status != null) {
     const s = str(r.status, `${ctx}.status`, 20);
@@ -340,6 +369,9 @@ function validateRelation(r, i) {
     result.rejectedRound = num(r.rejectedRound, `${ctx}.rejectedRound`);
   if (r.argumentId != null)
     result.argumentId = str(r.argumentId, `${ctx}.argumentId`, 200);
+  // The argument that replaced this premise link (stateUtils, isSupersededAt).
+  if (r.supersededBy != null)
+    result.supersededBy = str(r.supersededBy, `${ctx}.supersededBy`, 200);
 
   return result;
 }
@@ -432,7 +464,10 @@ export function validateState(raw) {
     phase: typeof raw.phase === "number" ? num(raw.phase, "phase") : 2,
     round: num(raw.round, "round"),
     elements: arr(raw.elements, "elements", 1_000).map(validateElement),
-    relations: arr(raw.relations, "relations", 5_000).map(validateRelation),
+    relations: dropMigratedDuplicates(
+      raw.relations,
+      arr(raw.relations, "relations", 5_000).map(validateRelation),
+    ),
     coherence: {
       tensions: arr(coherenceRaw.tensions ?? [], "coherence.tensions", 200).map(
         (s, i) => str(s, `coherence.tensions[${i}]`, 500),
@@ -472,6 +507,56 @@ export function validateState(raw) {
     result.reviews = arr(raw.reviews, "reviews", 100).map(validateReview);
   }
 
+  // The processes a merged one came from (utils/mergeStates.js). Members that
+  // are not elements are dropped rather than refused, as for a group: it is
+  // provenance, and a record that has drifted is still a good process.
+  if (raw.processes !== undefined) {
+    const elementIds = new Set(result.elements.map((e) => e.id));
+    result.processes = arr(raw.processes, "processes", 50).map((p, i) => {
+      const ctx = `processes[${i}]`;
+      if (!p || typeof p !== "object" || Array.isArray(p))
+        throw new Error(`${ctx} must be an object`);
+      const members = arr(p.members ?? [], `${ctx}.members`, 1_000)
+        .map((m, j) => str(m, `${ctx}.members[${j}]`, 10))
+        .filter((m) => elementIds.has(m));
+      const result = {
+        id: str(p.id, `${ctx}.id`, 10),
+        label: str(p.label ?? "", `${ctx}.label`, 200),
+        members: [...new Set(members)],
+      };
+      if (p.round != null) result.round = num(p.round, `${ctx}.round`);
+      return result;
+    });
+  }
+
+  // Where the reader dragged nodes (utils/pinUtils.js). A pin for an element
+  // the file does not hold is dropped rather than refused, as a group member is.
+  if (raw.pins !== undefined) {
+    if (!raw.pins || typeof raw.pins !== "object" || Array.isArray(raw.pins))
+      throw new Error("pins must be an object");
+    const elementIds = new Set(result.elements.map((e) => e.id));
+    result.pins = {};
+    for (const [id, p] of Object.entries(raw.pins).slice(0, 1_000)) {
+      if (!elementIds.has(id)) continue;
+      if (!p || typeof p !== "object")
+        throw new Error(`pins.${id} must be an object`);
+      result.pins[id] = { x: num(p.x, `pins.${id}.x`), y: num(p.y, `pins.${id}.y`) };
+    }
+  }
+
+  // The last step of each closed round (stateUtils, "Steps and rounds"). Kept
+  // ascending and within the process; an end past the last step, or a repeat,
+  // is dropped rather than refused, as a stray pin is — how the steps were
+  // grouped is not worth losing a file over.
+  if (raw.roundEnds !== undefined) {
+    const ends = arr(raw.roundEnds, "roundEnds", 1_000).map((e, i) =>
+      num(e, `roundEnds[${i}]`),
+    );
+    result.roundEnds = [...new Set(ends)]
+      .filter((e) => Number.isInteger(e) && e >= 1 && e <= result.round)
+      .sort((a, b) => a - b);
+  }
+
   if (raw.model !== undefined) {
     if (raw.model !== "questionnaire")
       throw new Error(`"model" must be "questionnaire" if present, got "${raw.model}"`);
@@ -507,7 +592,7 @@ export async function importStateFromFile(file) {
   const openIdx = text.indexOf(OPEN);
   if (openIdx === -1)
     throw new Error(
-      "No re-state block found. Make sure the file was exported from this app.",
+      "This file has no full history, so the process cannot be read from it. Export it again with “Full history” ticked.",
     );
   const lineEnd = text.indexOf("\n", openIdx + OPEN.length);
   if (lineEnd === -1)

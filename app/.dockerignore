@@ -1,0 +1,21 @@
+# What the frontend image must not be built from. The stage reinstalls
+# node_modules for Linux, so a copy from this machine would only be overwritten —
+# or, for a native package, break the build.
+node_modules
+dist
+dist-ssr
+coverage
+test-results
+playwright-report
+blob-report
+
+# Local settings. .env.backend stays: it is tracked and carries VITE_APP_ENV,
+# and the Dockerfile overrides its placeholder URL.
+.env
+.env.local
+.env.*.local
+*.local
+
+Dockerfile
+.dockerignore
+.DS_Store

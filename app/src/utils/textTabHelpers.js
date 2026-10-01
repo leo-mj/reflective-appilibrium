@@ -65,3 +65,32 @@ export function matchesSearchRel(r, q) {
     (r.explanation ?? "").toLowerCase().includes(lq)
   );
 }
+
+/**
+ * Which of a canvas's drawn elements a search finds, by the panel's own test
+ * ({@link matchesSearch}), so the graph and the text panel agree on what
+ * matches. A collapsed group — drawn as one node, with `memberIds` — is found
+ * when any member is.
+ *
+ * @param {Array<REElement | { id: string, type: "group", memberIds?: string[] }>} drawn
+ * @param {string} query - Already trimmed; empty finds nothing to filter by.
+ * @param {Map<string, REElement>} elementById - For a group's members.
+ * @returns {Set<string>|null} The ids found, or `null` when there is no query —
+ *   nothing to fade, as opposed to nothing found.
+ */
+export function searchFinds(drawn, query, elementById) {
+  if (!query) return null;
+  return new Set(
+    drawn
+      .filter((e) =>
+        e.type === "group"
+          ? e.memberIds?.some((id) => {
+              const m = elementById.get(id);
+              return m && matchesSearch(m, query);
+            })
+          : matchesSearch(e, query),
+      )
+      .map((e) => e.id),
+  );
+}
+

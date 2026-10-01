@@ -82,7 +82,11 @@ def parse_json_object(text: str, model: str) -> dict[str, Any]:
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
-        logger.error(f"Model '{model}' returned unparseable JSON: {text!r}")
+        # The length, never the text: a reply echoes the prompt it answers, and
+        # the prompt is someone's moral reasoning.
+        logger.error(
+            f"Model '{model}' returned unparseable JSON ({len(text)} characters)."
+        )
         raise HTTPException(
             status_code=502,
             detail=(

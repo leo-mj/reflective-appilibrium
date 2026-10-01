@@ -21,36 +21,25 @@
  * reflective equilibrium was, which is the one thing a first-time visitor is
  * there to find out.
  *
- * The script lives in `tourSections.js`; this file only applies it.
+ * The script lives in `tourSections.js`; this file only applies it. What it
+ * draws is in the files beside it: `TourSection`, `TourControls` and
+ * `Spotlight`, whose rings `useTourRing` measures.
  *
  * @module components/tour/GuidedTour
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { C, typeTokens } from "../../constants/colors.js";
-import { LLM_ENABLED } from "../../config.js";
+import { C } from "../../constants/colors.js";
+import { BACKEND_ENABLED, LLM_ENABLED } from "../../config.js";
+import { useHasLLMKey } from "../../utils/llmKey.js";
 import { buildTourSections } from "./tourSections.js";
 import { TOUR_Z, sheetHeight } from "./tourZ.js";
-import {
-  TOUR_MAX_W,
-  TOUR_MIN_W,
-  resetTourWidth,
-  setTourResizing,
-  setTourWidth,
-  storeTourWidth,
-  useTourWidth,
-} from "./tourWidth.js";
-
-const RING_PAD = 5;
-
-/** How far one arrow key moves the column's edge. */
-const KEY_STEP = 16;
-
-/** Gap left above the sheet when it scrolls a ringed control clear of it. */
-const REVEAL_PAD = 12;
-
-/** Past this, a press on the sheet's handle is a swipe rather than a tap. */
-const SWIPE_MIN = 8;
+import { useTourWidth } from "./tourWidth.js";
+import { applicableSections } from "./tourHelpers.js";
+import { ColumnResizer, ProgressBar, SheetHandle } from "./TourControls.jsx";
+import { TourSection } from "./TourSection.jsx";
+import { Spotlight } from "./Spotlight.jsx";
+import { useTourRing } from "./useTourRing.js";
 
 /**
  * How far down the column the reading line sits, as a fraction of its height.
@@ -66,220 +55,6 @@ const PROGRAMMATIC_MS = 700;
 /** Gap above a section scrolled to by Back or Next. */
 const SCROLL_PAD = 12;
 
-/** Shared empty array, so "nothing ringed" is a stable value between renders. */
-const EMPTY = [];
-
-/** Ties the spotlight's holes to the sheet they are cut out of. */
-const SPOTLIGHT_MASK = "tour-spotlight-mask";
-
-const TYPE_LABEL = {
-  judgment: "Judgment",
-  principle: "Principle",
-  theory: "Background theory",
-};
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-/**
- * An element as the tour quotes it: its own text, pulled from the live state
- * rather than copied into the script, so a section can never describe a node
- * the graph beside it no longer holds.
- */
-function QuoteCard({ element }) {
-  // The `text` tone, not the fill: this writes the id as type, where the fill
-  // tones measure 2.83:1 on the dark panel. It is also mode-independent, which
-  // the fills are not.
-  const color = typeTokens(element.type).text;
-  const gone = element.status === "withdrawn" || element.status === "rejected";
-  return (
-    <div
-      style={{
-        borderLeft: `3px solid ${color}`,
-        background: C.bg,
-        borderRadius: "0 6px 6px 0",
-        padding: "8px 12px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 12, fontWeight: "bold", color }}>
-          {element.id}
-        </span>
-        <span style={{ fontSize: 11, color: C.dim }}>
-          {TYPE_LABEL[element.type] ?? element.type}
-          {gone ? ` · ${element.status}` : ""}
-        </span>
-      </div>
-      <div
-        style={{
-          fontSize: 13.5,
-          lineHeight: 1.65,
-          color: C.text,
-          textDecoration: gone ? "line-through" : "none",
-        }}
-      >
-        {element.text}
-      </div>
-    </div>
-  );
-}
-
-function ProgressBar({ value }) {
-  return (
-    <div
-      style={{
-        height: 3,
-        background: C.border,
-        borderRadius: 2,
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          width: `${value * 100}%`,
-          height: "100%",
-          background: C.supports,
-          transition: "width 0.3s ease",
-        }}
-      />
-    </div>
-  );
-}
-
-/**
- * The grabber along the top of the narrow sheet: tap to swap between the two
- * heights, or swipe it the way you want it to go.
- *
- * A button rather than a bare drag surface, so it has a name, a tab stop and an
- * expanded state. Two heights rather than a free drag because the sheet is
- * sharing the screen with a graph that reflows to whatever is left: a
- * continuous drag would have the graph re-fitting under the reader's thumb all
- * the way down.
- */
-function SheetHandle({ expanded, onToggle }) {
-  const pressedAt = useRef(null);
-  return (
-    <button
-      onPointerDown={(e) => {
-        pressedAt.current = e.clientY;
-      }}
-      onPointerUp={(e) => {
-        const dy = e.clientY - (pressedAt.current ?? e.clientY);
-        onToggle(Math.abs(dy) < SWIPE_MIN ? !expanded : dy < 0);
-      }}
-      // Keyboards and assistive tech never send the pointer events above.
-      onClick={(e) => {
-        if (e.detail === 0) onToggle(!expanded);
-      }}
-      aria-expanded={expanded}
-      aria-label={expanded ? "Shrink the tour" : "Expand the tour"}
-      style={{
-        background: "transparent",
-        border: "none",
-        padding: "8px 0 4px",
-        width: "100%",
-        display: "flex",
-        justifyContent: "center",
-        cursor: "pointer",
-        touchAction: "none",
-      }}
-    >
-      <span
-        style={{
-          width: 36,
-          height: 4,
-          borderRadius: 2,
-          background: C.border,
-          display: "block",
-        }}
-      />
-    </button>
-  );
-}
-
-/**
- * The column's right edge, dragged to give the tour more of the screen or less.
- *
- * Unlike the sheet's handle this is a free drag, and for the mirror of the same
- * reason: the graph beside a column reflows to a *width*, and a reader who wants
- * the prose wider is doing exactly that on purpose. The two heights the sheet
- * offers are what keeps a graph from re-fitting under a thumb that was only
- * scrolling.
- *
- * Not painted at rest — the column's own border already says where it ends — so
- * the resize cursor and the title are what announce it, as on the add bar's
- * edges. `.resize-handle` in index.css is the hover and focus state.
- *
- * The width is not held here: the app outside pads itself by the same number,
- * and the two have to agree. See {@link module:components/tour/tourWidth}.
- */
-function ColumnResizer({ width }) {
-  /** Where the pointer went down, and how wide the column was then. */
-  const drag = useRef(null);
-
-  const nudge = (dx) => {
-    setTourWidth(width + dx);
-    storeTourWidth();
-  };
-
-  return (
-    <div
-      className="resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize tour column"
-      aria-valuenow={width}
-      aria-valuemin={TOUR_MIN_W}
-      aria-valuemax={TOUR_MAX_W}
-      tabIndex={0}
-      title="Drag to resize the tour — double-click to reset, or arrow keys"
-      style={{
-        position: "absolute",
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: 7,
-        background: C.dim,
-        cursor: "ew-resize",
-        touchAction: "none",
-        zIndex: 1,
-      }}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        // Or the pointer picks up the prose beside it instead.
-        e.preventDefault();
-        drag.current = { x: e.clientX, width };
-        setTourResizing(true);
-        e.currentTarget.setPointerCapture?.(e.pointerId);
-      }}
-      onPointerMove={(e) => {
-        if (!drag.current) return;
-        setTourWidth(drag.current.width + (e.clientX - drag.current.x));
-      }}
-      onPointerUp={(e) => {
-        if (!drag.current) return;
-        drag.current = null;
-        setTourResizing(false);
-        e.currentTarget.releasePointerCapture?.(e.pointerId);
-        storeTourWidth();
-      }}
-      onPointerCancel={() => {
-        drag.current = null;
-        setTourResizing(false);
-      }}
-      onDoubleClick={resetTourWidth}
-      onKeyDown={(e) => {
-        if (e.key === "ArrowLeft") nudge(-KEY_STEP);
-        else if (e.key === "ArrowRight") nudge(KEY_STEP);
-        else return;
-        e.preventDefault();
-      }}
-    />
-  );
-}
-
 const navBtn = (enabled) => ({
   background: "transparent",
   border: `1px solid ${C.border}`,
@@ -290,60 +65,6 @@ const navBtn = (enabled) => ({
   cursor: enabled ? "pointer" : "not-allowed",
   opacity: enabled ? 1 : 0.45,
 });
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Drops any section whose elements or argument the state does not hold.
- *
- * The demo-graph chapter names elements by ID. Editing the sample fixture, or
- * running the tour over an imported process, should cost the tour that section
- * rather than leave it pointing at nothing.
- */
-function applicableSections(sections, state) {
-  const ids = new Set(state.elements.map((e) => e.id));
-  const args = new Set(
-    state.relations.map((r) => r.argumentId).filter(Boolean),
-  );
-  return sections.filter((s) => {
-    const named = [...(s.quote ?? []), ...(s.focus ?? []), s.select].filter(
-      Boolean,
-    );
-    if (named.some((id) => !ids.has(id))) return false;
-    return !s.argument || args.has(s.argument);
-  });
-}
-
-/** The nearest ancestor that has somewhere to scroll to. */
-function scrollParent(el) {
-  for (let node = el?.parentElement; node; node = node.parentElement) {
-    const { overflowY } = getComputedStyle(node);
-    if (
-      (overflowY === "auto" || overflowY === "scroll") &&
-      node.scrollHeight > node.clientHeight
-    )
-      return node;
-  }
-  return null;
-}
-
-/**
- * Scrolls a control out from behind the narrow sheet.
- *
- * Most of what that layout rings are entries in the ☰ menu, which is longer
- * than the strip of screen left above the sheet. `scrollIntoView` will not do
- * it: it reckons in viewport, and by the viewport's arithmetic an entry behind
- * the sheet is already perfectly visible.
- *
- * @param {Element} el
- * @param {number}  limitY - Screen y the sheet's top edge sits at.
- */
-function revealAbove(el, limitY) {
-  const box = scrollParent(el);
-  if (!box) return;
-  const overshoot = el.getBoundingClientRect().bottom - limitY;
-  if (overshoot > 0) box.scrollTop += overshoot + REVEAL_PAD;
-}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -385,6 +106,9 @@ export function GuidedTour({
   // store rather than held here: the app pads itself by the same number, and a
   // tour wider than the room made for it covers what it is pointing at.
   const width = useTourWidth();
+  // A backend build with no key yet serves the pre-set suggestions, so the
+  // script has to know which of the two it is describing.
+  const hasKey = useHasLLMKey();
   const sections = useMemo(
     () =>
       applicableSections(
@@ -392,6 +116,8 @@ export function GuidedTour({
           isSample,
           hideNonEntailsRels,
           llmEnabled: LLM_ENABLED,
+          hasKey,
+          backendEnabled: BACKEND_ENABLED,
           topic: state.topic,
           narrow: sheet,
         }),
@@ -400,7 +126,14 @@ export function GuidedTour({
     // The script depends on the shape of the state, not on every edit to it:
     // rebuilding on each keystroke would reset nothing but would churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isSample, hideNonEntailsRels, state.topic, state.elements.length, sheet],
+    [
+      isSample,
+      hideNonEntailsRels,
+      hasKey,
+      state.topic,
+      state.elements.length,
+      sheet,
+    ],
   );
 
   const [idx, setIdx] = useState(0);
@@ -412,7 +145,6 @@ export function GuidedTour({
     },
     [onExpandChange],
   );
-  const [rects, setRects] = useState(EMPTY);
   const panelRef = useRef(null);
   const scrollRef = useRef(null);
   const sectionRefs = useRef([]);
@@ -423,19 +155,6 @@ export function GuidedTour({
   // longer of the two lands past the end of the shorter and the tour vanishes.
   if (idx > sections.length - 1) setIdx(sections.length - 1);
   const section = sections[idx];
-
-  // The spotlight points at a control and dims everything else, which is right
-  // while the reader is being shown where it is and wrong the moment they use
-  // it: pressing Start Workflow would leave what it started behind a grey
-  // sheet, and a ring drawn over the graph goes on covering whatever the reader
-  // opens on top of it. So the first touch of the app anywhere takes the whole
-  // highlight away; the next section arms it again.
-  const [ringArmedFor, setRingArmedFor] = useState(0);
-  const [ringShown, setRingShown] = useState(true);
-  if (ringArmedFor !== idx) {
-    setRingArmedFor(idx);
-    setRingShown(true);
-  }
 
   // ── Scroll drives the active section ──────────────────────────────────────
   const measureActive = useCallback(() => {
@@ -497,7 +216,7 @@ export function GuidedTour({
     onSetChrome({
       chrome: !!section.chrome,
       text: !!section.text,
-      menu: !!section.menu,
+      menu: section.menu ?? false,
       addBar: !!section.addBar,
     });
 
@@ -519,74 +238,15 @@ export function GuidedTour({
   }, [active, idx, section?.id]);
 
   // ── Ring whatever controls the section is about ───────────────────────────
-  // A section may name more than one: two routes to the same thing are worth
-  // showing together, and the spotlight below cuts a hole for each.
-  const targets = section?.target ? [section.target].flat() : EMPTY;
-  const targetKey = targets.join(" ");
-  const measureRing = useCallback(() => {
-    const found = targets
-      .map((t) => document.querySelector(`[data-tutorial="${t}"]`))
-      .filter(Boolean);
-    // Bring them out from under the sheet before reading where they are, or
-    // the ring is drawn correctly around something nobody can see.
-    if (sheet) {
-      const top =
-        window.innerHeight - sheetHeight(window.innerHeight, expanded);
-      found.forEach((el) => revealAbove(el, top));
-    }
-    setRects(found.map((el) => el.getBoundingClientRect()));
-    // `width` is not read here but every rect depends on it: the app is padded
-    // by the column, so dragging its edge moves everything the ring is drawn
-    // around. Listed so the effect below re-measures as it moves.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetKey, sheet, expanded, width]);
-
-  useEffect(() => {
-    if (!active) return;
-    // Two frames: the first lets the tab switch and the chrome above render,
-    // the second measures where the target actually landed. The later pass is
-    // for targets that are not in the DOM yet at that point — an entry in a
-    // menu this section is also asking the header to open.
-    let inner = 0;
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(measureRing);
-    });
-    const settled = setTimeout(measureRing, 180);
-    return () => {
-      cancelAnimationFrame(outer);
-      cancelAnimationFrame(inner);
-      clearTimeout(settled);
-    };
-  }, [active, idx, measureRing]);
-
-  useEffect(() => {
-    if (!active) return;
-    window.addEventListener("resize", measureRing);
-    return () => window.removeEventListener("resize", measureRing);
-  }, [active, measureRing]);
-
-  // Using the app takes the highlight away. Capture phase, so it lands whether
-  // or not the control stops the event, and pointerdown rather than click so
-  // the sheet is gone before whatever was pressed redraws underneath it.
-  useEffect(() => {
-    if (!active) return;
-    const used = () => setRingShown(false);
-    const onPointerDown = (e) => {
-      if (!panelRef.current?.contains(e.target)) used();
-    };
-    // The keyboard equivalent: driving the app from the keyboard is using it
-    // just as much, and Enter on a focused button never fires a pointer event.
-    const onKeyDown = (e) => {
-      if (e.key === "Escape" || e.key === "Tab") return;
-      if (!panelRef.current?.contains(document.activeElement)) used();
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [active]);
+  const rects = useTourRing({
+    active,
+    idx,
+    target: section?.target,
+    sheet,
+    expanded,
+    width,
+    panelRef,
+  });
 
   // ── How much of the bottom edge the sheet has taken ───────────────────────
   // On <html>, beside the theme attributes, because what needs it is a stylesheet
@@ -673,68 +333,10 @@ export function GuidedTour({
 
   return (
     <>
-      {/* Spotlight: one grey sheet over the app with a hole cut for each thing
-          the section points at, and a ring drawn round each hole. A mask rather
-          than a box-shadow, which can only ever leave one control lit.
-
-          Only sections about a control raise one; the ones about the graph
-          leave the app lit, because the graph is what they are pointing at —
-          and so does any section whose reader has started using the app. */}
-      {rects.length > 0 && ringShown && (
-        <svg
-          style={{
-            position: "fixed",
-            inset: 0,
-            width: "100vw",
-            // dvh for the same reason as the overlay: the holes in the mask are
-            // placed from getBoundingClientRect, so the sheet they are cut out
-            // of has to be the viewport those rects were measured in.
-            height: "100dvh",
-            zIndex: TOUR_Z.ring,
-            pointerEvents: "none",
-          }}
-        >
-          <defs>
-            <mask id={SPOTLIGHT_MASK}>
-              {/* Mask values, not colours: white is opaque, black is the
-                  hole. Tokenizing either would blank the spotlight. */}
-              <rect x="0" y="0" width="100%" height="100%" fill="#fff" />
-              {rects.map((r, i) => (
-                <rect
-                  key={i}
-                  x={r.left - RING_PAD}
-                  y={r.top - RING_PAD}
-                  width={r.width + RING_PAD * 2}
-                  height={r.height + RING_PAD * 2}
-                  rx={7}
-                  fill="#000"
-                />
-              ))}
-            </mask>
-          </defs>
-          <rect
-            x="0"
-            y="0"
-            width="100%"
-            height="100%"
-            fill="rgba(0,0,0,0.45)"
-            mask={`url(#${SPOTLIGHT_MASK})`}
-          />
-          {rects.map((r, i) => (
-            <rect
-              key={i}
-              x={r.left - RING_PAD}
-              y={r.top - RING_PAD}
-              width={r.width + RING_PAD * 2}
-              height={r.height + RING_PAD * 2}
-              rx={7}
-              fill="none"
-              stroke={C.supports}
-              strokeWidth={2}
-            />
-          ))}
-        </svg>
-      )}
+      {/* Only sections about a control raise the spotlight; the ones about the
+          graph leave the app lit, because the graph is what they are pointing
+          at — and so does any section whose reader has started using the app. */}
+      {rects.length > 0 && <Spotlight rects={rects} />}
 
       <aside
         ref={panelRef}
@@ -812,102 +414,20 @@ export function GuidedTour({
             padding: `0 ${pad}px`,
           }}
         >
-          {sections.map((s, i) => {
-            const isActive = i === idx;
-            // The argument's own explanation, written when it was recorded —
-            // a better gloss on why these premises give that conclusion than
-            // anything the script could say about them from outside.
-            const argRel = s.argument
-              ? state.relations.find((r) => r.argumentId === s.argument)
-              : null;
-            return (
-              <section
-                key={s.id}
-                ref={(el) => {
-                  sectionRefs.current[i] = el;
-                }}
-                aria-labelledby={`tour-title-${s.id}`}
-                aria-current={isActive ? "step" : undefined}
-                style={{
-                  padding: sheet ? "16px 0" : "24px 0",
-                  borderBottom:
-                    i === sections.length - 1
-                      ? "none"
-                      : `1px solid ${C.border}`,
-                  opacity: isActive ? 1 : 0.62,
-                  transition: "opacity 0.35s ease",
-                }}
-              >
-                {s.chapter && (
-                  <h2
-                    style={{
-                      fontSize: 11,
-                      letterSpacing: 1,
-                      textTransform: "uppercase",
-                      color: C.supports,
-                      margin: "0 0 10px",
-                    }}
-                  >
-                    {s.chapter}
-                  </h2>
-                )}
-                <h3
-                  id={`tour-title-${s.id}`}
-                  style={{
-                    fontSize: 16,
-                    fontWeight: "bold",
-                    color: C.text,
-                    margin: "0 0 10px",
-                  }}
-                >
-                  {s.title}
-                </h3>
-                {s.body.filter(Boolean).map((paragraph, p) => (
-                  <p
-                    key={p}
-                    style={{
-                      fontSize: 13.5,
-                      lineHeight: 1.8,
-                      color: C.dim,
-                      margin: "0 0 12px",
-                    }}
-                  >
-                    {paragraph}
-                  </p>
-                ))}
-                {s.quote?.length > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6,
-                      marginTop: 12,
-                    }}
-                  >
-                    {s.quote.map((id) => {
-                      const element = elementById.get(id);
-                      return element ? (
-                        <QuoteCard key={id} element={element} />
-                      ) : null;
-                    })}
-                  </div>
-                )}
-                {argRel?.explanation && (
-                  <p
-                    style={{
-                      fontSize: 12.5,
-                      lineHeight: 1.75,
-                      color: C.dim,
-                      fontStyle: "italic",
-                      margin: "12px 0 0",
-                    }}
-                  >
-                    {argRel.explanation}
-                  </p>
-                )}
-              </section>
-            );
-          })}
+          {sections.map((s, i) => (
+            <TourSection
+              key={s.id}
+              section={s}
+              isActive={i === idx}
+              isLast={i === sections.length - 1}
+              sheet={sheet}
+              elementById={elementById}
+              relations={state.relations}
+              sectionRef={(el) => {
+                sectionRefs.current[i] = el;
+              }}
+            />
+          ))}
           {/* Lets the last section climb to the reading line rather than
               stopping at the bottom edge. It cannot reach it on a tall screen,
               which is why `measureActive` also treats "scrolled to the end" as

@@ -3,11 +3,40 @@
  * @module components/Legend
  */
 
+import { useState } from "react";
 import { C } from "../../constants/colors.js";
 import { usePalette } from "../../hooks/useTheme.js";
 import { Tooltip } from "../Tooltip.jsx";
+import { RELATION_LABELS } from "../../utils/graphHelpers.js";
 
-export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRels }) {
+/** The HTML twin of the graph's `ProcessTag`: same pill, same chrome colours. */
+const PROCESS_PILL = {
+  fontSize: 9,
+  fontWeight: "bold",
+  lineHeight: "11px",
+  padding: "0 4px",
+  borderRadius: 6,
+  background: C.panel,
+  border: `1px solid ${C.dim}`,
+  color: C.text,
+};
+
+/**
+ * @param {Object} props
+ * @param {{ id: string, label: string }[]} [props.processes] - Set only after a
+ *   merge; its key says which letter on the nodes is which process.
+ * @param {boolean} [props.collapsible] - Folded behind a "Legend" button until
+ *   opened. For a phone, where the full legend wraps to three lines and took
+ *   about a sixth of the screen from the graph it explains.
+ */
+export function Legend({
+  hiddenLegendKeys,
+  setHiddenLegendKeys,
+  hideNonEntailsRels,
+  processes = [],
+  collapsible = false,
+}) {
+  const [open, setOpen] = useState(false);
   // The element swatches come from the palette in force, not from the fixed
   // accent tones: a legend that keeps showing the default blue while the graph
   // is drawn in the high-contrast one is worse than no legend.
@@ -25,15 +54,14 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRe
   const e = palette.edges;
   const lines = [
     ...(!hideNonEntailsRels ? [
-      { label: "Supports", color: e.supports, dash: "", key: "supports" },
-      { label: "Conflicts", color: e.conflicts, dash: "8,4", key: "conflicts" },
-      { label: "Undermines", color: e.undermines, dash: "4,4", key: "undermines" },
-      { label: "Depends on", color: e.depends, dash: "", key: "depends" },
+      { label: RELATION_LABELS.supports, color: e.supports, dash: "", key: "supports" },
+      { label: RELATION_LABELS.conflicts, color: e.conflicts, dash: "8,4", key: "conflicts" },
+      { label: RELATION_LABELS.undermines, color: e.undermines, dash: "4,4", key: "undermines" },
     ] : []),
-    { label: "Entails", color: e.entails, dash: "", key: "entails" },
-    { label: "Jointly Entails", color: e.jointly_entails, dash: "", key: "jointly_entails" },
-    { label: "Precludes", color: e.precludes, dash: "", key: "precludes" },
-    { label: "Jointly Precludes", color: e.jointly_precludes, dash: "", key: "jointly_precludes" },
+    { label: RELATION_LABELS.entails, color: e.entails, dash: "", key: "entails" },
+    { label: RELATION_LABELS.jointly_entails, color: e.jointly_entails, dash: "", key: "jointly_entails" },
+    { label: RELATION_LABELS.precludes, color: e.precludes, dash: "", key: "precludes" },
+    { label: RELATION_LABELS.jointly_precludes, color: e.jointly_precludes, dash: "", key: "jointly_precludes" },
   ];
 
   const hidden = (key) => hiddenLegendKeys?.has(key) ?? false;
@@ -54,7 +82,7 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRe
     userSelect: "none",
   });
 
-  return (
+  const legend = (
     <div
       style={{
         display: "flex",
@@ -154,6 +182,51 @@ export function Legend({ hiddenLegendKeys, setHiddenLegendKeys, hideNonEntailsRe
           </div>
         </Tooltip>
       ))}
+      {/* A key, not a filter: these do not toggle, so they carry no pointer. */}
+      {processes.map((p) => (
+        <div
+          key={`process-${p.id}`}
+          style={{ display: "flex", alignItems: "center", gap: 4 }}
+          data-testid="legend-process"
+        >
+          <span style={PROCESS_PILL}>{p.id}</span>
+          {p.label}
+        </div>
+      ))}
+    </div>
+  );
+  if (!collapsible) return legend;
+
+  // Folded, the legend still filters: what it hides stays hidden. So the
+  // button says so, or a graph missing its withdrawn elements would look
+  // broken with nothing on screen to explain it.
+  const hiddenCount = hiddenLegendKeys?.size ?? 0;
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        style={TOGGLE_STYLE}
+      >
+        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        Legend
+        {hiddenCount > 0 && ` · ${hiddenCount} hidden`}
+      </button>
+      {open && legend}
     </div>
   );
 }
+
+const TOGGLE_STYLE = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  minHeight: 32,
+  padding: "0 10px",
+  background: "transparent",
+  border: `1px solid ${C.border}`,
+  borderRadius: 4,
+  color: C.dim,
+  fontSize: 11,
+  cursor: "pointer",
+};

@@ -12,6 +12,7 @@
 import { createPortal } from "react-dom";
 import { C } from "../../constants/colors.js";
 import { confidenceDetail } from "../../utils/confidenceLabel.js";
+import { stepLabel } from "../../utils/stateUtils.js";
 
 /**
  * @typedef {Object} TooltipState
@@ -26,16 +27,19 @@ import { confidenceDetail } from "../../utils/confidenceLabel.js";
  *
  * Also serves the pseudo-element a collapsed group is drawn as, which has a
  * member list where an element has a statement, and no confidence, origin or
- * round of its own.
+ * round of its own. And a statement card, pinned by a click, which leaves its
+ * statement out: the card beside it already shows it.
  *
  * @param {Object}            props
  * @param {TooltipState|null} props.tooltip - Current tooltip data, or `null` to hide.
  * @param {React.ReactNode}   [props.actions] - Buttons for a pinned tooltip. Their
  *   presence is what makes the card interactive; a hover tooltip stays
  *   click-through so it never swallows a click meant for the canvas.
+ * @param {number[]}          [props.roundEnds] - For naming the round a step
+ *   was in; absent reads as one round, as it does everywhere.
  * @returns {React.ReactElement|null}
  */
-export function NodeTooltip({ tooltip, actions = null }) {
+export function NodeTooltip({ tooltip, actions = null, roundEnds }) {
   if (!tooltip) return null;
   const { x, y, el } = tooltip;
   // Clamp x so the tooltip (maxWidth 300 → half = 150) stays within the viewport.
@@ -86,7 +90,12 @@ export function NodeTooltip({ tooltip, actions = null }) {
             </div>
           ))}
         </div>
-      ) : (
+      ) : el.card ? null : (
+        // Not for a statement card (`card`, the statement view's display copy):
+        // its wording is the card, one hover away from whole, and this box
+        // repeating it beside the card was the clutter. What is left here —
+        // status, earlier wording, reason, confidence, origin, the actions —
+        // is what the card does not show.
         <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.4 }}>
           {el.text}
         </div>
@@ -120,7 +129,8 @@ export function NodeTooltip({ tooltip, actions = null }) {
           {/* Already a hover surface, so the exact value goes inline rather than
               behind a title nobody could reach. */}
           Confidence: {confidenceDetail(el.confidence)} · Origin: {el.origin}
-          {el.addedRound && ` · Added: Round ${el.addedRound}`}
+          {el.addedRound &&
+            ` · Added: ${stepLabel({ roundEnds }, el.addedRound)}`}
         </div>
       )}
       {actions && (

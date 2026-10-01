@@ -20,6 +20,8 @@
 
 /** @import { REElement, RERelation, REGroup, REState, PositionMap } from '../types.js' */
 
+import { wrapWords } from "./wrapWords.js";
+
 // ─── Reading groups off a state ───────────────────────────────────────────────
 
 /**
@@ -261,30 +263,7 @@ const COUNT_LINE_HEIGHT = 12;
  * @returns {string[]} One or two lines; never empty.
  */
 export function groupLabelLines(label) {
-  const words = String(label ?? "").trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return [""];
-
-  const lines = [];
-  for (const word of words) {
-    const last = lines.at(-1);
-    if (last != null && last.length + 1 + word.length <= LABEL_MAX_CHARS) {
-      lines[lines.length - 1] = `${last} ${word}`;
-    } else if (lines.length < LABEL_MAX_LINES) {
-      lines.push(word);
-    } else {
-      // Out of lines with words left over: the tail is cut below anyway.
-      lines[lines.length - 1] = `${last} ${word}`;
-    }
-  }
-
-  return lines.slice(0, LABEL_MAX_LINES).map((line, i, all) => {
-    const overlong = line.length > LABEL_MAX_CHARS;
-    // Only the last line may be trimmed: an earlier one that is too long means
-    // a single unbreakable word, and cutting it there would drop the rest.
-    if (!overlong) return line;
-    if (i === all.length - 1) return `${line.slice(0, LABEL_MAX_CHARS - 1)}…`;
-    return line.slice(0, LABEL_MAX_CHARS);
-  });
+  return wrapWords(label, LABEL_MAX_CHARS, LABEL_MAX_LINES);
 }
 
 /**

@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { fetchRelationSuggestions } from "../../utils/relationsClient.js";
-import { llmOrigin, relationTypeLabel } from "../../utils/stateUtils.js";
+import { llmOrigin } from "../../utils/stateUtils.js";
 import { useSuggestionWorkflow } from "../../hooks/useSuggestionWorkflow.js";
 import {
   AcceptButton,
@@ -20,6 +20,7 @@ import {
   ChatButton,
   ModifyTextarea,
   ErrorBanner,
+  NeedsKeyNotice,
   AiDisclosureBanner,
 } from "../SuggestionActions.jsx";
 import { nextPhaseEnabled } from "../../utils/workflowUtils.js";
@@ -32,7 +33,6 @@ const REL_COLOR = {
   supports: C.supports,
   conflicts: C.conflicts,
   undermines: C.undermines,
-  depends: C.depends,
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ function SuggestionCard({
             padding: "1px 6px",
           }}
         >
-          {relationTypeLabel(suggestion.type)}
+          {suggestion.type}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
           <AcceptButton onClick={onAccept} accentColor={C.supports} />
@@ -251,6 +251,7 @@ export function RelationSuggestTab({
           }
         />
 
+        <NeedsKeyNotice />
         {error && <ErrorBanner message={error} />}
 
         {activeElements.length < 2 && (

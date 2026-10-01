@@ -48,3 +48,33 @@ describe("quickScore", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+// None of the rethon routes reads the visitor's key or model, and score_changes
+// fires on every edit: sending the LLM headers put the key on the network with
+// each keystroke's worth of scoring, for nothing.
+describe("the visitor's API key", () => {
+  afterEach(() => sessionStorage.clear());
+
+  it("is not sent with any rethon request", async () => {
+    sessionStorage.setItem(
+      "llmSettings",
+      JSON.stringify({
+        apiKey: "sk-secret",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4o",
+      }),
+    );
+    const client = await load("dev");
+    await client.scoreChanges(STATE);
+    await client.quickScore([], []);
+    await client.scorePerRound(STATE);
+    await client.simulateRethon(STATE, true);
+    await client.simulateRethonStep(STATE, true);
+
+    expect(client.fetchMock).toHaveBeenCalledTimes(5);
+    for (const [url, init] of client.fetchMock.mock.calls) {
+      expect(init.headers, url).toEqual({ "Content-Type": "application/json" });
+    }
+  });
+});
+

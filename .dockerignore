@@ -1,0 +1,19 @@
+# Allowlist: the image needs the backend package and nothing else. Listing what
+# to exclude instead would let the next new file — a key, a session export — in
+# by default.
+*
+!backend/
+
+# Never in an image. backend/.env holds provider keys, and Settings reads it if
+# present, which would quietly override the container's environment.
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+backend/.venv/
+backend/tests/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/*.log
+backend/.server.pid
+backend/.pytest_cache/

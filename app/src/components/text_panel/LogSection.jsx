@@ -18,11 +18,7 @@ import { SectionHeader, Highlight } from "./TextTabCards.jsx";
 export function LogSection({ log, sectionRef, isCollapsed, onToggle, search }) {
   return (
     <div ref={sectionRef}>
-      <SectionHeader
-        title="Round Log"
-        collapsed={isCollapsed}
-        onToggle={onToggle}
-      />
+      <SectionHeader title="Log" collapsed={isCollapsed} onToggle={onToggle} />
       {!isCollapsed &&
         log.map((l) => (
           <div

@@ -157,7 +157,6 @@ RelationType = Literal[
     "supports",
     "conflicts",
     "undermines",
-    "depends",
     "entails",
     "jointly_entails",
     "precludes",
@@ -183,6 +182,10 @@ class RERelation(BaseModel):
     explanation: str = Field(max_length=2_000, default="")
     added_round: int = Field(alias="addedRound", ge=1)
     argument_id: Optional[str] = Field(None, alias="argumentId", max_length=200)
+    # On a premise link of an argument whose premises were revised: the id of
+    # the argument that replaced it. Withdrawn at that step, and kept so History
+    # can show the argument as it was — see "Revising an argument" in CLAUDE.md.
+    superseded_by: Optional[str] = Field(None, alias="supersededBy", max_length=200)
     origin: Optional[str] = Field(None, max_length=200)
 
     status: Optional[Status] = None
@@ -376,7 +379,16 @@ class REState(BaseModel):
 
     topic: str = Field(max_length=500, default="")
     phase: int = Field(default=2, ge=1)
-    round: int = Field(ge=1)
+    # A *step*, one per change, despite the name: every saved file uses it. The
+    # rounds a reader sees are runs of steps, and ``round_ends`` lists the last
+    # step of each closed one — "Steps and rounds" in app/src/utils/stateUtils.js.
+    # Absent from states written before rounds and steps were told apart.
+    # From 0: a new process has taken no step yet, and its first Assist call is
+    # made from there.
+    round: int = Field(ge=0)
+    round_ends: list[int] = Field(
+        default_factory=list, alias="roundEnds", max_length=1_000
+    )
     model: Optional[Literal["questionnaire"]] = None
     elements: list[REElement] = Field(default_factory=list, max_length=1_000)
     relations: list[RERelation] = Field(default_factory=list, max_length=5_000)

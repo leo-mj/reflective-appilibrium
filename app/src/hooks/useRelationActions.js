@@ -9,9 +9,15 @@
 import { useState } from "react";
 import {
   makeDiff,
+  editChanges,
   makeLogEntry,
   ARGUMENT_RELATION_TYPES,
+  RELATION_EDIT_FIELDS,
+  argumentRelationType,
+  argumentRelationsOf,
   newArgumentId,
+  nextElementId,
+  rewordElement,
   withEvent,
   withUserEdit,
 } from "../utils/stateUtils.js";
@@ -30,44 +36,227 @@ export function useRelationActions({
 }) {
   const [editingRel, setEditingRel] = useState(null);
 
+  /**
+   * Saves the revise dialog. An argument step revises the whole argument, as
+   * withdrawing one does: every premise takes the new type and explanation, so
+   * the argument cannot end up with premises disagreeing about what they
+   * establish, nor with an explanation on a row the card does not show.
+   */
   const handleRelEditSave = (formData) => {
+    const diffs = makeDiff(RELATION_EDIT_FIELDS, editingRel, formData);
+    // Nothing changed, so nothing was revised — neither the relation nor, for
+    // an argument step, every premise along with it.
+    if (!diffs.length) {
+      setEditingRel(null);
+      return;
+    }
     const newRound = state.round + 1;
-    // The edit form has no Origin field, so any text change to a relation
-    // that came from an LLM suggestion is auto-attributed as user-edited too.
-    const textChanged = formData.explanation !== editingRel.explanation;
-    const origin = textChanged
-      ? withUserEdit(editingRel.origin)
-      : editingRel.origin;
-    const diffs = makeDiff(["type", "explanation"], editingRel, formData);
+    const argument = argumentRelationsOf(state.relations, editingRel);
+    const revising = new Set(argument ?? [editingRel]);
+    // A relation turned into entails or precludes is a one-premise argument
+    // from then on, and needs an id of its own, as when one is added so.
+    const argumentId =
+      !editingRel.argumentId && ARGUMENT_RELATION_TYPES.has(formData.type)
+        ? newArgumentId()
+        : editingRel.argumentId;
+    const revise = (r) => ({
+      ...r,
+      ...formData,
+      ...(argumentId && { argumentId }),
+      // The edit form has no Origin field, so any text change to a relation
+      // that came from an LLM suggestion is auto-attributed as user-edited too.
+      origin:
+        formData.explanation !== r.explanation ? withUserEdit(r.origin) : r.origin,
+      status: "revised",
+      revisedRound: newRound,
+      history: withEvent(r, {
+        round: newRound,
+        type: "revised",
+        previousText: r.explanation,
+      }),
+    });
+    const what = argument
+      ? `Argument ${argument.map((r) => r.from).join(", ")} → ${editingRel.to}`
+      : `Relation ${editingRel.from} → ${editingRel.to}`;
     mutate((prev) => ({
       ...prev,
       round: newRound,
-      relations: prev.relations.map((r) =>
-        r === editingRel
-          ? {
-              ...editingRel,
-              ...formData,
-              origin,
-              status: "revised",
-              revisedRound: newRound,
-              history: withEvent(editingRel, {
-                round: newRound,
-                type: "revised",
-                previousText: editingRel.explanation,
-              }),
-            }
-          : r,
-      ),
+      relations: prev.relations.map((r) => (revising.has(r) ? revise(r) : r)),
       log: [
         ...prev.log,
         makeLogEntry(
           newRound,
-          `Relation ${editingRel.from} → ${editingRel.to} was edited by the user.`,
+          `${what} was edited by the user.`,
           "Changes applied",
-          diffs.length ? diffs.join("; ") : "No fields changed",
+          editChanges(what, diffs),
         ),
       ],
     }));
+    setEditingRel(null);
+  };
+
+  /**
+   * Saves the argument dialog: premises swapped, reworded, taken out or added,
+   * the conclusion swapped or reworded, and the argument's type and explanation
+   * — all one step, one log entry and one undo.
+   *
+   * A line written as a new statement becomes an element. A line whose wording
+   * was changed revises that element, everywhere it appears (`rewordElement`).
+   * If the premises and the conclusion are the same elements as before, the
+   * argument is revised in place, as `handleRelEditSave` does. If either
+   * changed, the argument is **replaced**: its links are withdrawn at this step
+   * and marked `supersededBy` a new argument carrying the new statements. That
+   * is what lets History show the argument as it was before the step and as it
+   * is after (stateUtils, isSupersededAt), where editing the links in place
+   * would leave playback showing today's argument at every step.
+   *
+   * @param {{ premises: Array<{ id?: string, type?: string, text: string }>,
+   *   conclusion?: { id?: string, type?: string, text: string },
+   *   negated: boolean, explanation: string }} form
+   */
+  const handleArgumentRevise = ({
+    premises,
+    conclusion,
+    negated,
+    explanation,
+  }) => {
+    const argument = argumentRelationsOf(state.relations, editingRel);
+    if (!argument) return;
+    const first = argument[0];
+    const step = state.round + 1;
+    const byId = new Map(state.elements.map((e) => [e.id, e]));
+    const lines = [...premises, ...(conclusion ? [conclusion] : [])];
+
+    const added = [];
+    const idOf = (p) => {
+      if (p.id) return p.id;
+      const id = nextElementId([...state.elements, ...added], p.type);
+      added.push({
+        id,
+        type: p.type,
+        text: p.text.trim(),
+        confidence: 0.67,
+        status: "active",
+        origin: "user",
+        addedRound: step,
+      });
+      return id;
+    };
+    const premiseIds = premises.map(idOf);
+    const conclusionId = conclusion ? idOf(conclusion) : first.to;
+    const reworded = new Map(
+      lines
+        .filter(
+          (p) =>
+            p.id && p.text.trim() && p.text.trim() !== byId.get(p.id)?.text,
+        )
+        .map((p) => [p.id, p.text.trim()]),
+    );
+    const oldIds = argument.map((r) => r.from);
+    const samePremises =
+      oldIds.length === premiseIds.length &&
+      premiseIds.every((id) => oldIds.includes(id));
+    // Another conclusion is another argument, as other premises are.
+    const sameArgument = samePremises && conclusionId === first.to;
+    const type = argumentRelationType(premiseIds.length, negated);
+    const typeChanged = type !== first.type;
+    const explanationChanged = explanation !== (first.explanation ?? "");
+
+    // Nothing changed, so nothing was revised (as for any other dialog).
+    if (sameArgument && !typeChanged && !explanationChanged && !reworded.size) {
+      setEditingRel(null);
+      return;
+    }
+
+    let relations;
+    if (sameArgument && !typeChanged && !explanationChanged) {
+      // Only wording changed, and that lives on the elements.
+      relations = (prev) => prev;
+    } else if (sameArgument) {
+      const inArgument = new Set(argument);
+      relations = (prev) =>
+        prev.map((r) =>
+          inArgument.has(r) && (typeChanged || explanationChanged)
+            ? {
+                ...r,
+                type,
+                explanation,
+                origin: explanationChanged ? withUserEdit(r.origin) : r.origin,
+                status: "revised",
+                revisedRound: step,
+                history: withEvent(r, {
+                  round: step,
+                  type: "revised",
+                  previousText: r.explanation,
+                }),
+              }
+            : r,
+        );
+    } else {
+      const replacement = newArgumentId();
+      const retired = new Set(argument);
+      const origin = first.origin ? withUserEdit(first.origin) : "user";
+      relations = (prev) => [
+        ...prev.map((r) =>
+          retired.has(r)
+            ? {
+                ...r,
+                status: "withdrawn",
+                supersededBy: replacement,
+                history: withEvent(r, {
+                  round: step,
+                  type: "withdrawn",
+                  reason: "Replaced by a revision of the argument.",
+                }),
+              }
+            : r,
+        ),
+        ...premiseIds.map((from) => ({
+          from,
+          to: conclusionId,
+          type,
+          argumentId: replacement,
+          explanation,
+          origin,
+          addedRound: step,
+        })),
+      ];
+    }
+
+    const changes = [
+      ...(samePremises
+        ? []
+        : [`premises: ${oldIds.join(", ")} → ${premiseIds.join(", ")}`]),
+      ...(conclusionId === first.to
+        ? []
+        : [`conclusion: ${first.to} → ${conclusionId}`]),
+      ...added.map((e) => `${e.id} added`),
+      ...[...reworded.keys()].map((id) => `${id} reworded`),
+      ...(typeChanged ? [`type: ${first.type} → ${type}`] : []),
+      ...(explanationChanged ? ["explanation revised"] : []),
+    ];
+    mutate((prev) => ({
+      ...prev,
+      round: step,
+      elements: [
+        ...prev.elements.map((e) =>
+          reworded.has(e.id) ? rewordElement(e, reworded.get(e.id), step) : e,
+        ),
+        ...added,
+      ],
+      relations: relations(prev.relations),
+      log: [
+        ...prev.log,
+        makeLogEntry(
+          step,
+          `Argument ${oldIds.join(", ")} → ${first.to} was revised by the user.`,
+          "Changes applied",
+          editChanges(`Argument ${oldIds.join(", ")} → ${first.to}`, changes),
+        ),
+      ],
+    }));
+    // The links a selection may have pointed at can be gone from view now.
+    if (!sameArgument) setSelectedRel(null);
     setEditingRel(null);
   };
 
@@ -204,6 +393,74 @@ export function useRelationActions({
     }
   };
 
+  /**
+   * An argument written out rather than picked: each premise and the
+   * conclusion is either a new element — added here, together with the
+   * relations joining them — or `{ id }`, an element already on the board.
+   *
+   * One change rather than a run of adds, so it is one round, one log entry and
+   * one undo — and so the ids are worked out against the whole element list,
+   * `possible` ones included, which the add bar's own list leaves out.
+   *
+   * @typedef {{id: string} | {type: string, text: string, confidence: number}} ArgumentSlot
+   * @param {{ premises: ArgumentSlot[], conclusion: ArgumentSlot,
+   *   negated: boolean, explanation: string, origin: string }} formData
+   */
+  const handleAddNewArgument = ({
+    premises,
+    conclusion,
+    negated,
+    explanation,
+    origin,
+  }) => {
+    const newRound = state.round + 1;
+    const argumentId = newArgumentId();
+    const type = argumentRelationType(premises.length, negated);
+    const added = [];
+    const add = (draft) => {
+      if (draft.id) return draft.id;
+      const id = nextElementId([...state.elements, ...added], draft.type);
+      added.push({ id, status: "active", addedRound: newRound, origin, ...draft });
+      return id;
+    };
+    const premiseIds = premises.map(add);
+    const conclusionId = add(conclusion);
+    const rels = premiseIds.map((from) => ({
+      origin: "user",
+      from,
+      to: conclusionId,
+      type,
+      argumentId,
+      explanation,
+      addedRound: newRound,
+    }));
+    const arrow = `${premiseIds.join(", ")} → ${conclusionId}`;
+    mutate((prev) => ({
+      ...prev,
+      round: newRound,
+      elements: [...prev.elements, ...added],
+      relations: [...prev.relations, ...rels],
+      log: [
+        ...prev.log,
+        makeLogEntry(
+          newRound,
+          added.length
+            ? `Argument ${arrow} was added by the user, with ${added.map((e) => e.id).join(", ")}.`
+            : `Argument ${arrow} was added by the user.`,
+          "Added",
+          [
+            ...(added.length ? [`${added.map((e) => e.id).join(", ")} added`] : []),
+            `${arrow} (${type}) added`,
+          ].join("; "),
+        ),
+      ],
+    }));
+    setSelected(null);
+    setSelectedRel(null);
+    setRecentlyAddedRel(rels.at(-1));
+    setRecentlyAdded(null);
+  };
+
   const handleRejectRelations = (formDatas) => {
     mutate((prev) => ({
       ...prev,
@@ -237,6 +494,8 @@ export function useRelationActions({
     handleReinstateRelation,
     handleDeleteRelationsByArgId,
     handleAddRelation,
+    handleAddNewArgument,
+    handleArgumentRevise,
     handleRejectRelations,
   };
 }

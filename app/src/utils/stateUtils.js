@@ -302,6 +302,33 @@ export function makeDiff(fields, oldObj, newObj) {
 }
 
 /**
+ * The `changes` of a logged edit, led by what was edited: "J4 — text: … → …".
+ * The diffs alone left History's log box, and the export's log, saying a
+ * wording had changed without saying whose — the name was only in `findings`,
+ * which the box does not show. A withdrawal's entry already reads that way
+ * ("J6: status → withdrawn").
+ *
+ * @param {string}   what  - The item: an element id, "Relation A → B", "Argument A, B → C".
+ * @param {string[]} diffs
+ */
+export function editChanges(what, diffs) {
+  return `${what} — ${diffs.join("; ")}`;
+}
+
+/**
+ * What the Revise dialogs let a reader change, for an element and for a
+ * relation. A revision is a change to one of these: the dialogs keep Save off
+ * until one differs, and the save handlers record nothing when none does —
+ * a no-op save used to advance the round, mark the item revised and log "No
+ * fields changed". One list for both, so they cannot disagree.
+ *
+ * `status` is not among them: the dialog has no such field, and comparing it
+ * logged "status: active → undefined" on every element revision.
+ */
+export const ELEMENT_EDIT_FIELDS = ["type", "confidence", "origin", "text"];
+export const RELATION_EDIT_FIELDS = ["type", "explanation"];
+
+/**
  * Constructs a round log entry object.
  *
  * @param {number} round    - Round number this entry documents.
@@ -338,10 +365,98 @@ export function stateAtRound(state, round) {
     relations: state.relations
       .filter(
         (r) =>
-          visIds.has(r.from) && visIds.has(r.to) && (r.addedRound || 1) <= round,
+          visIds.has(r.from) &&
+          visIds.has(r.to) &&
+          (r.addedRound || 1) <= round &&
+          // A premise link a revision had replaced by then is gone by then.
+          !isSupersededAt(r, round),
       )
       .map((r) => asOfRound(r, round)),
+    // Only the rounds closed by then, as `processes` shows only those merged.
+    ...(state.roundEnds && {
+      roundEnds: roundEndsOf(state).filter((end) => end <= round),
+    }),
   };
+}
+
+// ─── Steps and rounds ─────────────────────────────────────────────────────────
+//
+// `state.round`, and every `addedRound`, `revisedRound` and history `round`, is
+// a *step*: one per change, which is what makes playback exact. The field keeps
+// its name because every saved file uses it. What the reader sees as a *round*
+// is a run of consecutive steps, closed when a workflow iteration completes or
+// when the reader closes it by hand; `state.roundEnds` lists the last step of
+// each closed round, ascending. The steps since the last of them are the open
+// round, numbered one past the closed ones.
+
+/**
+ * The step each closed round ended on, ascending. Absent from every state
+ * written before rounds and steps were told apart — read it through this.
+ *
+ * @param {REState} state
+ * @returns {number[]}
+ */
+export function roundEndsOf(state) {
+  return Array.isArray(state?.roundEnds) ? state.roundEnds : [];
+}
+
+/**
+ * The round step `step` belongs to, from 1.
+ *
+ * @param {REState} state
+ * @param {number}  step
+ * @returns {number}
+ */
+export function roundOfStep(state, step) {
+  let round = 1;
+  for (const end of roundEndsOf(state)) {
+    if (step > end) round++;
+    else break;
+  }
+  return round;
+}
+
+/**
+ * When something happened, as the reader is shown it: "Round 2 · Step 14".
+ * The step pins the change; the round is where it falls in the method.
+ *
+ * @param {REState} state - Anything carrying `roundEnds`.
+ * @param {number}  step
+ * @returns {string}
+ */
+export function stepLabel(state, step) {
+  return `Round ${roundOfStep(state, step)} · Step ${step}`;
+}
+
+/** The round now open: one past those closed. */
+export function currentRound(state) {
+  return roundEndsOf(state).length + 1;
+}
+
+/**
+ * Whether the open round has anything in it to close. Every change writes a
+ * log entry at its step, so an entry past the last close is a change in this
+ * round; grouping, pinning or a review advance no step and do not count.
+ *
+ * @param {REState} state
+ * @returns {boolean}
+ */
+export function canCloseRound(state) {
+  const lastEnd = roundEndsOf(state).at(-1) ?? 0;
+  return state.round > lastEnd && state.log.some((l) => l.round > lastEnd);
+}
+
+/**
+ * The steps History stops at when it moves by round: before anything (0), the
+ * end of each closed round, and the latest step while the open round has any.
+ *
+ * @param {REState} state
+ * @returns {number[]}
+ */
+export function roundStops(state) {
+  const ends = roundEndsOf(state).filter((end) => end <= state.round);
+  const last = ends.at(-1) ?? 0;
+  return [0, ...ends, ...(state.round > last ? [state.round] : [])];
 }
 
 /**
@@ -379,6 +494,85 @@ export const ARGUMENT_RELATION_TYPES = new Set([
   "jointly_entails",
   "jointly_precludes",
 ]);
+
+/**
+ * The relations making up the argument `rel` is a step of — one per premise —
+ * or null when it is not an argument step.
+ *
+ * @param {RERelation[]} relations
+ * @param {RERelation}   rel
+ * @returns {RERelation[]|null}
+ */
+/**
+ * An element reworded at `step`, with the bookkeeping every rewording records:
+ * the wording it replaced, the step, a user-edited origin, and a `revised`
+ * event. Shared by the two places an element is reworded from inside an
+ * argument — accepting a detected one, and revising one — so a rewording
+ * reached either way reads the same in the history as one made in the editor.
+ *
+ * A withdrawn element is reinstated first: premises may be withdrawn ones, and
+ * a revision that left the withdrawal open would contradict its own status.
+ *
+ * @param {REElement} el
+ * @param {string}    text
+ * @param {number}    step
+ * @returns {REElement}
+ */
+export function rewordElement(el, text, step) {
+  return {
+    ...el,
+    text,
+    origin: withUserEdit(el.origin),
+    status: "revised",
+    previousText: el.text,
+    revisedRound: step,
+    history: withEvent(
+      isWithdrawnNow(el)
+        ? { ...el, history: withEvent(el, { round: step, type: "reinstated" }) }
+        : el,
+      { round: step, type: "revised", previousText: el.text },
+    ),
+  };
+}
+
+/**
+ * Whether a relation had been replaced by a revision of its argument by `step`.
+ *
+ * An argument whose premises change is replaced, not edited: its links are
+ * withdrawn at that step and marked `supersededBy` the argument that took its
+ * place, so History can still show it as it was. From that step on it is no
+ * part of the position, nor anything to reinstate — the present views drop it
+ * (`withoutSuperseded`), and History drops it from the step it was replaced.
+ *
+ * @param {RERelation} rel
+ * @param {number}     step
+ * @returns {boolean}
+ */
+export function isSupersededAt(rel, step) {
+  return Boolean(rel.supersededBy) && isWithdrawnAt(rel, step);
+}
+
+/**
+ * The state as it stands now, without the premise links revisions replaced.
+ * Returns `state` itself when there are none, so memoised readers keep theirs.
+ *
+ * @param {REState} state
+ * @returns {REState}
+ */
+export function withoutSuperseded(state) {
+  if (!state.relations.some((r) => r.supersededBy)) return state;
+  return {
+    ...state,
+    relations: state.relations.filter((r) => !isSupersededAt(r, state.round)),
+  };
+}
+
+export function argumentRelationsOf(relations, rel) {
+  if (!rel.argumentId || !ARGUMENT_RELATION_TYPES.has(rel.type)) return null;
+  return relations.filter(
+    (r) => r.argumentId === rel.argumentId && ARGUMENT_RELATION_TYPES.has(r.type),
+  );
+}
 
 /**
  * Elements a new relation or argument may be built from — everything except
@@ -476,19 +670,6 @@ export function argumentRelationType(premiseCount, negated) {
 export function argumentPostulateExplanation(postulates) {
   if (!postulates || postulates.length === 0) return "";
   return `Valid given: ${postulates.join(" ")}`;
-}
-
-/**
- * Human-readable label for a relation type. The stored identifier stays
- * `"depends"` (used as a color key, in the backend schema, and in saved
- * state); only the user-facing wording reads "depends on" so edges render as
- * "A depends on B".
- *
- * @param {string} type - Relation type identifier.
- * @returns {string}
- */
-export function relationTypeLabel(type) {
-  return type === "depends" ? "depends on" : type;
 }
 
 // ─── Origin helpers ───────────────────────────────────────────────────────────

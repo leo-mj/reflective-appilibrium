@@ -40,7 +40,6 @@ const INK_DARK = "#000000";
  * @property {string} supports
  * @property {string} conflicts
  * @property {string} undermines
- * @property {string} depends
  * @property {string} entails
  * @property {string} precludes
  * @property {string} jointly_entails
@@ -71,7 +70,6 @@ const DEFAULT_EDGES = {
   supports: "#06b6d4",
   conflicts: "#f97316",
   undermines: "#eab308",
-  depends: "#6b7280",
   entails: "#16a34a",
   precludes: "#e11d48",
   jointly_entails: "#16a34a",
@@ -79,7 +77,7 @@ const DEFAULT_EDGES = {
 };
 
 /**
- * The same six hues, moved into the luminance band that is legible on both
+ * The same five hues, moved into the luminance band that is legible on both
  * grounds *and* as type on the header chip.
  *
  * The band is narrow and worth stating. An edge is a line on the canvas, which
@@ -91,7 +89,7 @@ const DEFAULT_EDGES = {
  *
  * They are deliberately *not* all at one luminance: luminance is the channel
  * red-green colour deficiency leaves intact, so flattening it would remove the
- * cue that survives. The dialectical four spread 0.180–0.249.
+ * cue that survives. The dialectical three spread 0.209–0.249.
  *
  * What this set fixes is contrast, not hue separation. Orange, yellow and green
  * remain confusable for a red-green deficiency, and separating them would mean
@@ -102,7 +100,6 @@ const ACCESSIBLE_EDGES = {
   supports: "#0596af",
   conflicts: "#d25905",
   undermines: "#a57e06",
-  depends: "#6f7684",
   entails: "#159e48",
   precludes: "#e53159",
   jointly_entails: "#159e48",

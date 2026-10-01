@@ -58,7 +58,121 @@ def test_cors_origins_allows_an_explicit_list():
 
 
 def test_cors_origins_list_strips_whitespace():
-    assert make_settings(cors_origins=" a , b ").cors_origins_list == ["a", "b"]
+    settings = make_settings(cors_origins=" https://a.io , https://b.io ")
+    assert settings.cors_origins_list == ["https://a.io", "https://b.io"]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://leo-mj.github.io/reflective-appilibrium",
+        "https://example.com/",
+        "http://localhost:5173,https://example.com/app",
+        "https://example.com?x=1",
+        "example.com",
+        "ftp://example.com",
+    ],
+    ids=[
+        "pages-path",
+        "trailing-slash",
+        "second-entry",
+        "query",
+        "no-scheme",
+        "scheme",
+    ],
+)
+def test_cors_origins_rejects_anything_that_is_not_a_bare_origin(value):
+    """The browser's Origin header has no path, and Starlette matches verbatim —
+    so a Pages URL with its repo path would never match, and fail every request."""
+    with pytest.raises(ValidationError, match="not an origin"):
+        make_settings(cors_origins=value)
+
+
+@pytest.mark.parametrize("value", ["", "  ", ","])
+def test_cors_origins_may_be_empty_for_a_same_origin_deployment(value):
+    """One proxy serving the page and routing /api to the backend: no browser
+    ever calls from another origin, so there is nothing to allow — and nothing
+    should be, rather than a placeholder origin kept to get past startup."""
+    assert make_settings(cors_origins=value).cors_origins_list == []
+
+
+def test_a_same_origin_deployment_answers_no_cross_origin_caller():
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
+    api = FastAPI()
+    api.add_middleware(
+        CORSMiddleware,
+        allow_origins=make_settings(cors_origins="").cors_origins_list,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @api.get("/api/health")
+    def health():
+        return {"status": "ok"}
+
+    res = TestClient(api).get(
+        "/api/health", headers={"Origin": "https://elsewhere.org"}
+    )
+    assert res.status_code == 200
+    assert "access-control-allow-origin" not in res.headers
+
+
+def test_cors_origins_accepts_a_port():
+    assert make_settings(cors_origins="http://127.0.0.1:5173").cors_origins_list == [
+        "http://127.0.0.1:5173"
+    ]
+
+
+# ── Docs and response headers ─────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_docs_are_served_locally_and_absent_when_hosted(path):
+    """A public schema with a Try-it-out button spends a visitor's key for anyone."""
+    try:
+        app.dependency_overrides[get_settings] = lambda: make_settings()
+        assert TestClient(app).get(path).status_code == 200
+        app.dependency_overrides[get_settings] = lambda: make_settings(
+            deployment="hosted"
+        )
+        assert TestClient(app).get(path).status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_every_response_carries_the_security_headers():
+    try:
+        app.dependency_overrides[get_settings] = lambda: make_settings()
+        res = TestClient(app).get("/api/health")
+    finally:
+        app.dependency_overrides.clear()
+    assert res.headers["x-content-type-options"] == "nosniff"
+    assert res.headers["referrer-policy"] == "no-referrer"
+    assert res.headers["content-security-policy"] == "frame-ancestors 'none'"
+
+
+def test_only_api_responses_are_marked_no_store():
+    """API replies carry a user's reasoning; the docs page is no one's."""
+    try:
+        app.dependency_overrides[get_settings] = lambda: make_settings()
+        client = TestClient(app)
+        api, docs = client.get("/api/health"), client.get("/docs")
+    finally:
+        app.dependency_overrides.clear()
+    assert api.headers["cache-control"] == "no-store"
+    assert "no-store" not in docs.headers.get("cache-control", "")
+
+
+def test_an_error_response_carries_the_headers_too():
+    try:
+        app.dependency_overrides[get_settings] = lambda: make_settings()
+        res = TestClient(app).post("/api/simulate_rethon/simulate", json={})
+    finally:
+        app.dependency_overrides.clear()
+    assert res.status_code == 422
+    assert res.headers["cache-control"] == "no-store"
 
 
 # ── Server-side keys are loopback-only ────────────────────────────────────────
@@ -72,7 +186,7 @@ def settings_with_server_key():
     )
 
 
-def _request_from(client_host):
+def _request_from(client_host, forwarded_for=None):
     """A stand-in for a Request with a chosen peer — TestClient cannot vary it."""
 
     class _Client:
@@ -80,13 +194,14 @@ def _request_from(client_host):
 
     class _Request:
         client = _Client() if client_host is not None else None
+        headers = {"x-forwarded-for": forwarded_for} if forwarded_for else {}
 
     return _Request()
 
 
-def _call(settings, client_host, **headers):
+def _call(settings, client_host, forwarded_for=None, **headers):
     """Invoke the dependency directly, deriving identity as production does."""
-    request = _request_from(client_host)
+    request = _request_from(client_host, forwarded_for)
     identity = client_identity(
         request, settings, x_app_token=headers.get("x_app_token")
     )
@@ -116,6 +231,39 @@ def test_an_absent_peer_is_not_treated_as_local(settings_with_server_key):
     with pytest.raises(Exception) as exc:
         _call(settings_with_server_key, None)
     assert exc.value.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "forwarded_for",
+    [
+        # The shape a proxy leaves when the caller forged the header: the forged
+        # entry first, the real address appended after it.
+        "127.0.0.1, 203.0.113.7",
+        # A remote caller forwarded by a proxy on the same machine.
+        "203.0.113.7",
+    ],
+)
+def test_a_forwarded_remote_caller_is_not_local(
+    settings_with_server_key, forwarded_for
+):
+    """The loopback rule reads the whole forwarded chain, not only the peer.
+
+    Under uvicorn's --forwarded-allow-ips="*" the peer has already been
+    rewritten from the header's leftmost entry, so "x-forwarded-for: 127.0.0.1"
+    arrives as a loopback peer. What the caller cannot do is remove the address
+    its proxy appended, and that address is what refuses it here.
+    """
+    with pytest.raises(Exception) as exc:
+        _call(settings_with_server_key, "127.0.0.1", forwarded_for)
+    assert exc.value.status_code == 403
+
+
+def test_a_local_proxy_forwarding_a_local_caller_is_still_local(
+    settings_with_server_key,
+):
+    assert isinstance(
+        _call(settings_with_server_key, "127.0.0.1", "127.0.0.1"), LLMService
+    )
 
 
 def test_loopback_grant_can_be_switched_off_for_deployments(settings_with_server_key):
@@ -215,10 +363,13 @@ def _client_with(settings) -> TestClient:
     return TestClient(app)
 
 
+_GATED = "/api/llm/configured-providers"
+
+
 def test_no_token_configured_means_no_gate():
     """The localhost default: nothing to authenticate, so nothing is demanded."""
     try:
-        res = _client_with(make_settings()).get("/api/sessions")
+        res = _client_with(make_settings()).get(_GATED)
         assert res.status_code != 401
     finally:
         app.dependency_overrides.clear()
@@ -227,15 +378,9 @@ def test_no_token_configured_means_no_gate():
 def test_a_configured_token_is_required():
     try:
         client = _client_with(make_settings(app_access_tokens="s3cret"))
-        assert client.get("/api/sessions").status_code == 401
-        assert (
-            client.get("/api/sessions", headers={"x-app-token": "wrong"}).status_code
-            == 401
-        )
-        assert (
-            client.get("/api/sessions", headers={"x-app-token": "s3cret"}).status_code
-            == 200
-        )
+        assert client.get(_GATED).status_code == 401
+        assert client.get(_GATED, headers={"x-app-token": "wrong"}).status_code == 401
+        assert client.get(_GATED, headers={"x-app-token": "s3cret"}).status_code == 200
     finally:
         app.dependency_overrides.clear()
 
@@ -249,17 +394,26 @@ def test_health_stays_open_so_uptime_checks_need_no_credential():
 
 
 @pytest.mark.parametrize(
-    "path",
+    "method, path",
     [
-        "/api/sessions",
-        "/api/llm/configured-providers",
+        ("get", "/api/llm/configured-providers"),
+        ("post", "/api/judgments/elicit"),
+        ("post", "/api/review/analyze"),
+        ("post", "/api/simulate_rethon/simulate"),
     ],
 )
-def test_the_gate_covers_routers_generally(path):
-    """Applied at include_router, so a new route is gated without being listed."""
+def test_the_gate_covers_routers_generally(method, path):
+    """Applied at include_router, so a new route is gated without being listed.
+
+    The POST bodies are empty on purpose: the gate has to answer before the
+    request is validated, or an unauthenticated caller learns the schema by
+    being told what is wrong with their payload.
+    """
     try:
         client = _client_with(make_settings(app_access_tokens="s3cret"))
-        assert client.get(path).status_code == 401
+        call = getattr(client, method)
+        res = call(path) if method == "get" else call(path, json={})
+        assert res.status_code == 401
     finally:
         app.dependency_overrides.clear()
 

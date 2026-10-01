@@ -23,6 +23,7 @@ import { fitView } from "../utils/graphHelpers.js";
  * @param {boolean}       [options.enabled]  - Pass `false` to skip. Default true.
  * @param {number}        [options.padding]  - Total px subtracted per axis before fitting. Default 96.
  * @param {number}        [options.maxZoom]  - Upper zoom bound. Default 1.
+ * @param {number}        [options.minZoom]  - Lower zoom bound. Default fitView's.
  * @param {*}             [options.refitKey] - Re-fits whenever this value or `dims` changes.
  *                                            Omit for "fit once on mount" behaviour.
  */
@@ -34,6 +35,7 @@ export function useAutoFit({
   enabled = true,
   padding = 96,
   maxZoom = 1,
+  minZoom,
   refitKey,
 }) {
   const fittedRef = useRef(false);
@@ -53,7 +55,11 @@ export function useAutoFit({
       if (refitKey === p.refitKey && dims.w === p.w && dims.h === p.h) return;
     }
 
-    const view = fitView(positions, ids ?? null, dims, { padding, maxZoom });
+    const view = fitView(positions, ids ?? null, dims, {
+      padding,
+      maxZoom,
+      minZoom,
+    });
     if (!view) return;
 
     resetView(view.pan, view.zoom);

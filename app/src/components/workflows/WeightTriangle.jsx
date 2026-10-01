@@ -27,10 +27,13 @@
 
 import { useRef } from "react";
 import { C } from "../../constants/colors.js";
+import { DEFAULT_WEIGHTS } from "../../constants/simulationWeights.js";
 
 // ─── Geometry ─────────────────────────────────────────────────────────────────
 
 const W = 220;
+/** How wide the triangle draws itself, for whatever has to make room for it. */
+export const WEIGHT_TRIANGLE_WIDTH = W;
 const H = 200;
 const CX = W / 2;      // horizontal centre
 const CY = 112;        // vertical centre, shifted down to leave room for the top label
@@ -98,7 +101,7 @@ const VERTICES = [
     // label offset from vertex tip (dy[0] = label row, dy[1] = value row)
     labelDy: [-18, -7],
     tooltip:
-      "Systematising power of the theory — favour using fewer principles to cover more elements.",
+      "Systematising power of the theory — favour using fewer principles and background theories to cover more elements.",
   },
   {
     vertex: VA,
@@ -106,7 +109,7 @@ const VERTICES = [
     label: "Account",
     labelDy: [17, 28],
     tooltip:
-      "How well the principles account for the current elements. Higher values push toward principles that explain more of your accepted elements.",
+      "How well the principles and background theories account for the current elements. Higher values push toward a theory that explains more of your accepted elements.",
   },
   {
     vertex: VF,
@@ -118,8 +121,7 @@ const VERTICES = [
   },
 ];
 
-// Default weights (must match DEFAULT_WEIGHTS in SimulateRethonTab)
-const DEFAULT_DOT = toPixel({ account: 0.35, systematicity: 0.55, faithfulness: 0.1 });
+const DEFAULT_DOT = toPixel(DEFAULT_WEIGHTS);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 

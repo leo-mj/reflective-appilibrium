@@ -4,7 +4,13 @@
 // whose controls are gated on a backend — so in a demo build every visitor
 // landed on a screen of dead buttons with no explanation.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 
 import REState from "./REState.jsx";
 import { SAMPLE_STATE, makeQuestionnaireState } from "../state.js";
@@ -84,6 +90,35 @@ describe("the graph's full-screen toggle", () => {
     expect(textPanelShown(container)).toBe(true);
   });
 
+  it("lets the graph show what the panel's search finds, while the panel is there", async () => {
+    // Frames that run: the layout simulation ticks on them, and without it no
+    // node has a position to be drawn at.
+    vi.stubGlobal("requestAnimationFrame", (cb) =>
+      setTimeout(() => cb(performance.now()), 0),
+    );
+    const { container } = open();
+    const nodeOpacity = (id) =>
+      [
+        ...container.querySelectorAll(
+          'svg > g[transform*="scale"] g[transform^="translate("]',
+        ),
+      ].find((g) => g.querySelector(":scope > text")?.textContent === id)?.style
+        .opacity;
+    await waitFor(() => expect(nodeOpacity("P1")).toBeDefined());
+    fireEvent.change(container.querySelector('input[type="search"]'), {
+      target: { value: "J1" },
+    });
+    expect(nodeOpacity("J1")).toBe("1");
+    expect(nodeOpacity("P1")).toBe("0.12");
+
+    // Full screen hides the search box, and with it the search: a graph still
+    // filtered by a query nobody can see or clear would look broken.
+    fireEvent.click(screen.getByLabelText("Full screen"));
+    expect(nodeOpacity("P1")).toBe("1");
+    fireEvent.click(screen.getByLabelText("Exit full screen"));
+    expect(nodeOpacity("P1")).toBe("0.12");
+  });
+
   it("stays away when narrow, where the text is a tab of its own", () => {
     const { innerWidth } = window;
     window.innerWidth = 420;
@@ -98,10 +133,13 @@ describe("the graph's full-screen toggle", () => {
   it("also folds the assist panel away from the graph beside it", async () => {
     open();
     // Assist mode opens with the graph as its side panel, at half width. The
-    // workflow panel it shares the row with is lazily imported.
+    // workflow panel it shares the row with is lazily imported — and a chunk
+    // that has to be transformed before it can load takes longer than the
+    // default one-second wait whenever the whole suite is running at once,
+    // which is what made this the flakiest test in the file.
     fireEvent.click(screen.getByText("Assist"));
     expect(onAssistTab()).toBe(true);
-    await screen.findByText(/Elicit Judgments/);
+    await screen.findByText(/Elicit Judgments/, {}, { timeout: 5_000 });
 
     fireEvent.click(screen.getByLabelText("Full screen"));
     expect(screen.queryByText(/Elicit Judgments/)).toBeNull();
@@ -111,7 +149,7 @@ describe("the graph's full-screen toggle", () => {
     expect(screen.getByText("Graph").style.background).not.toBe("transparent");
 
     fireEvent.click(screen.getByLabelText("Exit full screen"));
-    await screen.findByText(/Elicit Judgments/);
+    await screen.findByText(/Elicit Judgments/, {}, { timeout: 5_000 });
   });
 });
 
@@ -126,7 +164,7 @@ describe("the guided tour", () => {
   afterEach(() => sessionStorage.removeItem("startTour"));
 
   it("opens on the demo the home page loaded for it", () => {
-    // The home page's Tutorial button sets this flag and then loads the sample,
+    // The home page's "Guided tour" sets this flag and then loads the sample,
     // so the tour opens on the state it is about to describe.
     sessionStorage.setItem("startTour", "1");
     open();
@@ -325,7 +363,8 @@ describe("questionnaire mode", () => {
 describe("the central divider", () => {
   afterEach(() => localStorage.removeItem("workspaceSplit"));
 
-  const divider = () => screen.queryByRole("separator", { name: "Resize panels" });
+  const divider = () =>
+    screen.queryByRole("separator", { name: "Resize panels" });
   const textPanel = (container) =>
     container.querySelector('[data-tutorial="text-panel"]');
 
@@ -364,5 +403,117 @@ describe("the central divider", () => {
     const { container } = open();
     fireEvent.keyDown(divider(), { key: "ArrowRight" });
     expect(textPanel(container).style.width).toBe("51%");
+  });
+});
+
+describe("merged-process tags", () => {
+  const merged = {
+    ...SAMPLE_STATE,
+    processes: [
+      {
+        id: "A",
+        label: "First",
+        members: SAMPLE_STATE.elements.map((e) => e.id),
+        round: 1,
+      },
+    ],
+  };
+  // The text cards' process fields — "Process A", captioned by the letter, with
+  // the process's own name as the value. Found by the stat's name rather than by
+  // a `title`, which is now the app's own Tooltip and so opens only on hover.
+  const chips = () => document.querySelectorAll('[data-stat^="Process "]');
+  const key = () => screen.queryAllByTestId("legend-process");
+
+  it("has no toggle before a merge", () => {
+    open();
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    expect(screen.queryByText("Process tags")).toBeNull();
+  });
+
+  it("shows the tags after a merge, and the toggle hides them everywhere", () => {
+    open(merged);
+    expect(chips().length).toBeGreaterThan(0);
+    expect(key()).toHaveLength(1);
+
+    fireEvent.click(screen.getAllByText("☰")[0]);
+    fireEvent.click(screen.getByText("Process tags"));
+    expect(chips()).toHaveLength(0);
+    expect(key()).toHaveLength(0);
+
+    fireEvent.click(screen.getByText("Process tags"));
+    expect(chips().length).toBeGreaterThan(0);
+  });
+});
+
+describe("changing between analyze and assist", () => {
+  it("keeps the one graph canvas, rather than drawing it afresh", async () => {
+    // Two canvases, one per mode, remounted the graph on every such change:
+    // pan and zoom reset and the view re-fitted, which flashed.
+    const { container } = open();
+    // The canvas, not the first icon: it is the svg the view is drawn under.
+    const canvas = container
+      .querySelector('svg > g[transform*="scale"]')
+      .closest("svg");
+    fireEvent.click(screen.getByText("Assist"));
+    await screen.findByText(/Elicit Judgments/, {}, { timeout: 5_000 });
+    expect(canvas.isConnected).toBe(true);
+    fireEvent.click(screen.getByText("Analyze"));
+    expect(canvas.isConnected).toBe(true);
+  });
+
+  it("draws the divider line at the same place in both", async () => {
+    // The left panel carries the split's width in both modes, and the line
+    // sits on the divider's left edge — the split itself. Fixing the right
+    // panel on an assist tab put the line a few pixels off.
+    localStorage.setItem("workspaceSplit", "0.4");
+    try {
+      open();
+      const check = () => {
+        const divider = screen.getByRole("separator", {
+          name: "Resize panels",
+        });
+        expect(divider.previousElementSibling.style.width).toBe("40%");
+        expect(divider.style.justifyContent).toBe("flex-start");
+      };
+      check();
+      fireEvent.click(screen.getByText("Assist"));
+      await screen.findByText(/Elicit Judgments/, {}, { timeout: 5_000 });
+      check();
+    } finally {
+      localStorage.removeItem("workspaceSplit");
+    }
+  });
+});
+
+describe("Escape", () => {
+  // J1's id badge, which is how the text panel selects it.
+  const j1Badge = () => screen.getAllByRole("button", { name: "Select J1" })[0];
+
+  it("lets go of the selection", () => {
+    open();
+    fireEvent.click(j1Badge());
+    expect(j1Badge().getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(j1Badge().getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("leaves it alone while a field is being typed in", () => {
+    const { container } = open();
+    fireEvent.click(j1Badge());
+    fireEvent.keyDown(container.querySelector('input[type="search"]'), {
+      key: "Escape",
+    });
+    expect(j1Badge().getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("leaves it alone when a dialog takes the Escape for itself", () => {
+    open();
+    fireEvent.click(j1Badge());
+    fireEvent.click(screen.getAllByRole("button", { name: "Revise" })[0]);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(j1Badge().getAttribute("aria-pressed")).toBe("true");
   });
 });

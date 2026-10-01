@@ -16,8 +16,10 @@ import { TextTab } from "./TextTab.jsx";
  *   to this panel — see {@link module:hooks/useSplitRatio}. Wide, there is
  *   always one; narrow, the panel is the whole width and rules itself off from
  *   what is under it instead.
- * @param {string} [width] - Its share of the row, from the divider. Wide only:
- *   narrow it takes the width and the row is a column.
+ * @param {string} [width] - Its share of the row, from the divider, on the
+ *   left. On the right it takes whatever the divider leaves, the left panel
+ *   being the one sized by it in every mode. Wide only: narrow it takes the
+ *   width and the row is a column.
  */
 export function TextPanel({
   isWide,
@@ -32,13 +34,16 @@ export function TextPanel({
     <div
       data-tutorial="text-panel"
       style={{
-        width: isWide ? width : "100%",
-        flex: isWide ? undefined : 1,
+        width: onRight ? undefined : isWide ? width : "100%",
+        flex: onRight || !isWide ? 1 : undefined,
+        minWidth: onRight ? 0 : undefined,
         height: isWide ? "auto" : undefined,
-        flexShrink: isWide ? 0 : undefined,
+        flexShrink: isWide && !onRight ? 0 : undefined,
         borderBottom: isWide ? "none" : `1px solid ${C.border}`,
+        // The gap on the shared edge. On the right the divider is it: the line
+        // is on the divider's left edge, and its 12px lie between the line and
+        // this panel.
         paddingRight: isWide && !onRight ? 12 : 0,
-        paddingLeft: onRight ? 12 : 0,
         paddingBottom: isWide ? 0 : 8,
         minHeight: 0,
         overflow: "hidden",

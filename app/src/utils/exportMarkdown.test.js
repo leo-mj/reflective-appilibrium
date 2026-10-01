@@ -4,7 +4,14 @@
 // so a twice-revised element lost its first version outside the JSON block.
 // These tests cover the history trail that replaced it.
 import { describe, it, expect } from "vitest";
-import { buildMarkdown } from "./exportMarkdown.js";
+import {
+  buildMarkdown,
+  DEFAULT_EXPORT_SECTIONS,
+  EXPORT_SECTIONS,
+  exportSectionsFor,
+} from "./exportMarkdown.js";
+import { importStateFromFile } from "./importMarkdown.js";
+import { importArgdownFromFile } from "./importArgdown.js";
 
 function makeState(overrides = {}) {
   return {
@@ -53,8 +60,8 @@ describe("buildMarkdown history trail", () => {
       {},
     );
     const block = elementsBlock(md);
-    expect(block).toContain('Round 3: reworded from "First wording"');
-    expect(block).toContain('Round 6: reworded from "Second wording"');
+    expect(block).toContain('Step 3: reworded from "First wording"');
+    expect(block).toContain('Step 6: reworded from "Second wording"');
   });
 
   it("records withdrawal with its reason, and reinstatement", () => {
@@ -73,8 +80,8 @@ describe("buildMarkdown history trail", () => {
       {},
     );
     const block = elementsBlock(md);
-    expect(block).toContain("Round 2: withdrawn — Too broad");
-    expect(block).toContain("Round 5: reinstated");
+    expect(block).toContain("Step 2: withdrawn — Too broad");
+    expect(block).toContain("Step 5: reinstated");
   });
 
   it("reads the legacy fields for states saved before history existed", () => {
@@ -91,7 +98,7 @@ describe("buildMarkdown history trail", () => {
       }),
       {},
     );
-    expect(elementsBlock(md)).toContain("Round 4: withdrawn — No longer held");
+    expect(elementsBlock(md)).toContain("Step 4: withdrawn — No longer held");
   });
 
   it("tags a rejected element, which the export used to leave unmarked", () => {
@@ -126,14 +133,14 @@ describe("buildMarkdown history trail", () => {
       }),
       {},
     );
-    expect(md).toContain("  - Round 4: withdrawn");
-    expect(md).toContain("  - Round 7: reinstated");
+    expect(md).toContain("  - Step 4: withdrawn");
+    expect(md).toContain("  - Step 7: reinstated");
   });
 
   it("leaves an untouched element with no trail", () => {
     const block = elementsBlock(buildMarkdown(makeState(), {}));
     expect(block).toContain("Current wording");
-    expect(block).not.toContain("Round ");
+    expect(block).not.toContain("Step ");
   });
 
   it("still embeds the machine-readable state block", () => {
@@ -184,8 +191,8 @@ describe("buildMarkdown process reviews", () => {
       {},
     );
     expect(md).toContain("## Process Reviews");
-    expect(md).toContain("### Round 3 — First reading.");
-    expect(md).toContain("### Round 7 — Second reading.");
+    expect(md).toContain("### Step 3 — First reading.");
+    expect(md).toContain("### Step 7 — Second reading.");
     // Oldest first, so a later review's back-references land after what they
     // refer to rather than before it.
     expect(md.indexOf("First reading.")).toBeLessThan(md.indexOf("Second reading."));
@@ -304,5 +311,142 @@ describe("buildMarkdown element sources", () => {
     const md = buildMarkdown(cited([aBook()]), {});
     const parsed = JSON.parse(md.split("```re-state\n")[1].split("\n```")[0]);
     expect(parsed.elements[0].sources[0].title).toBe("Reasons and persons");
+  });
+});
+
+describe("buildMarkdown sections", () => {
+  const only = (...keys) => new Set(keys);
+
+  it("writes today's export by default, and no Argdown", () => {
+    const md = buildMarkdown(makeState(), {});
+    expect(md).toContain("## Elements");
+    expect(md).toContain("```re-state");
+    expect(md).not.toContain("## Argdown");
+    expect([...DEFAULT_EXPORT_SECTIONS]).not.toContain("argdown");
+  });
+
+  it("writes only what was chosen, always under the title", () => {
+    const md = buildMarkdown(makeState(), {}, only("relations"));
+    expect(md).toMatch(/^# Reflective Equilibrium: Test topic/);
+    expect(md).not.toContain("## Elements");
+    expect(md).not.toContain("```re-state");
+    expect(md).not.toContain("## Graph");
+  });
+
+  it("embeds the Argdown map in a fence a statement cannot close", async () => {
+    const state = makeState({
+      elements: [
+        { ...makeState().elements[0], text: "Quoting ``` inside a statement" },
+      ],
+    });
+    const md = buildMarkdown(state, {}, only("argdown"));
+    expect(md).toContain("## Argdown\n\n````argdown\n===\ntitle:");
+    // What the fence holds is the Argdown export, and it reads back.
+    const argdown = md.split("````argdown\n")[1].split("\n````")[0];
+    const back = await importArgdownFromFile(
+      new File([argdown], "map.argdown", { type: "text/plain" }),
+    );
+    expect(back.elements[0]).toMatchObject({
+      id: "J1",
+      text: "Quoting ``` inside a statement",
+    });
+  });
+
+  it("reopens a file written with the full history alone", async () => {
+    const md = buildMarkdown(makeState(), {}, only("history"));
+    const back = await importStateFromFile(
+      new File([md], "re.md", { type: "text/markdown" }),
+    );
+    expect(back.topic).toBe("Test topic");
+  });
+
+  it("offers groups, merged processes and reviews only where there are some", () => {
+    const keys = (state) => exportSectionsFor(state).map((s) => s.key);
+    for (const k of ["groups", "processes", "reviews"])
+      expect(keys(makeState())).not.toContain(k);
+    const full = makeState({
+      groups: [{ id: "G1", label: "G", members: ["J1", "J2"], collapsed: false }],
+      processes: [{ id: "A", label: "L", members: ["J1"], round: 1 }],
+      reviews: [{ id: "r", round: 1, headline: "h", arc: "", surprises: "", missed: "", method: "", model: "", origin: "" }],
+    });
+    expect(keys(full)).toEqual(EXPORT_SECTIONS.map((s) => s.key));
+  });
+});
+
+describe("buildMarkdown merged processes", () => {
+  const merged = makeState({
+    processes: [
+      { id: "A", label: "Lying", members: ["J1"], round: 5 },
+      { id: "B", label: "Promises", members: ["J1"], round: 5 },
+    ],
+  });
+
+  it("names each element's process in the prose", () => {
+    expect(elementsBlock(buildMarkdown(merged, {}))).toContain(
+      "**J1** · 1 · process A+B",
+    );
+  });
+
+  it("keys the letters the graph images carry", () => {
+    const md = buildMarkdown(merged, {});
+    expect(md).toContain("## Merged Processes");
+    expect(md).toContain("- **A** — Lying *(merged at step 5)*: J1");
+  });
+
+  it("says nothing about processes when there was no merge", () => {
+    const md = buildMarkdown(makeState(), {});
+    expect(md).not.toContain("Merged Processes");
+    expect(elementsBlock(md)).not.toContain("process");
+  });
+});
+
+describe("buildMarkdown graph, and the statement view", () => {
+  const state = makeState({
+    elements: [
+      makeState().elements[0],
+      {
+        id: "P1",
+        type: "principle",
+        status: "active",
+        confidence: 1,
+        origin: "user",
+        text: "A principle",
+        addedRound: 1,
+      },
+    ],
+    relations: [
+      { from: "J1", to: "P1", type: "entails", explanation: "", addedRound: 1 },
+    ],
+  });
+  const positions = { J1: { x: 0, y: 0 }, P1: { x: 300, y: 0 } };
+
+  /** The SVG embedded in the Graph section. */
+  function graphSvg(md) {
+    const [, b64] = md.match(/## Graph\n\n<img src="data:image\/svg\+xml;base64,([^"]+)"/);
+    return decodeURIComponent(escape(atob(b64)));
+  }
+
+  it("draws nodes when the graph is not showing statements", () => {
+    const svg = graphSvg(buildMarkdown(state, positions, new Set(["graph"])));
+    expect(svg).not.toContain('fill="var(--c-panel)"');
+    expect(svg).not.toContain("Current wording");
+  });
+
+  it("draws cards, wording and all, when it is", () => {
+    const svg = graphSvg(
+      buildMarkdown(state, positions, new Set(["graph"]), { statements: true }),
+    );
+    expect(svg).toContain('fill="var(--c-panel)"');
+    expect(svg).toContain(">Current wording</tspan>");
+    expect(svg).toContain(">A principle</tspan>");
+  });
+
+  it("follows the view for the graph only, not the cluster diagrams", () => {
+    const md = buildMarkdown(state, positions, new Set(["clusters"]), {
+      statements: true,
+    });
+    expect(md).not.toContain("## Graph");
+    const [, b64] = md.match(/data:image\/svg\+xml;base64,([^"]+)"/);
+    expect(decodeURIComponent(escape(atob(b64)))).not.toContain("tspan");
   });
 });

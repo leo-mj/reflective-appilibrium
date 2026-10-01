@@ -1,5 +1,30 @@
 import { describe, it, expect } from "vitest";
-import { LLMProvider, LLM_PROVIDERS } from "./llmProviders.js";
+import {
+  LLMProvider,
+  LLM_PROVIDERS,
+  offeredProviders,
+} from "./llmProviders.js";
+
+// A hosted backend's "localhost" is the server, so it refuses those URLs and
+// the settings modal must not offer them (backend/dependencies.py).
+describe("offeredProviders", () => {
+  it("leaves out Ollama against a hosted backend", () => {
+    const ids = offeredProviders("hosted").map((p) => p.id);
+    expect(ids).not.toContain("local");
+    expect(ids).toEqual(["openai", "mistral", "anthropic"]);
+  });
+
+  it("offers everything against a local backend, or one not yet heard from", () => {
+    expect(offeredProviders("local")).toBe(LLM_PROVIDERS);
+    expect(offeredProviders(null)).toBe(LLM_PROVIDERS);
+  });
+
+  it("tells loopback URLs by host, not by the word in them", () => {
+    expect(new LLMProvider("a", "A", "http://127.0.0.1:1/v1").loopback).toBe(true);
+    expect(new LLMProvider("b", "B", "http://[::1]:1/v1").loopback).toBe(true);
+    expect(new LLMProvider("c", "C", "https://localhost.example/v1").loopback).toBe(false);
+  });
+});
 
 describe("LLM_PROVIDERS", () => {
   it("every entry is an LLMProvider instance", () => {
@@ -13,8 +38,11 @@ describe("LLM_PROVIDERS", () => {
       expect(p.id).toBeTruthy();
       expect(p.label).toBeTruthy();
       expect(p.baseUrl).toMatch(/^https?:\/\//);
-      expect(p.models.length).toBeGreaterThan(0);
     }
+  });
+
+  it("names no models: the provider is asked which a key can use", () => {
+    for (const p of LLM_PROVIDERS) expect(p.models).toBeUndefined();
   });
 
   it("no two providers share an id", () => {
@@ -33,7 +61,7 @@ describe("LLM_PROVIDERS", () => {
     }
   });
 
-  it("constructor throws on empty models list", () => {
-    expect(() => new LLMProvider("x", "X", "https://x.com/v1", [])).toThrow();
+  it("constructor throws on a missing base URL", () => {
+    expect(() => new LLMProvider("x", "X", "")).toThrow();
   });
 });

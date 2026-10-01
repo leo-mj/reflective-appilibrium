@@ -2,7 +2,16 @@ import { test, expect } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { gotoHome, startFresh, addElement, expectCounts, openMenu, park } from "./helpers.js";
+import {
+  gotoHome,
+  startFresh,
+  addElement,
+  expectCounts,
+  exportDownload,
+  loadSample,
+  openMenu,
+  park,
+} from "./helpers.js";
 
 test.describe("Session draft", () => {
   test("a reload offers the work back, and Resume restores it", async ({ page }) => {
@@ -35,6 +44,79 @@ test.describe("Session draft", () => {
 
     await expect(page.getByRole("heading", { name: "Continue where you left off" })).toBeHidden();
   });
+
+  test("starting another process asks before replacing the draft", async ({ page }) => {
+    await gotoHome(page);
+    await startFresh(page, "First process");
+    await addElement(page, "judgment", "A judgment in the first process.");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await park(page);
+    const topic = page.getByLabel("Topic of your reflective equilibrium process");
+    await topic.fill("Second process");
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+
+    // One draft slot: the new process's first autosave would write over it.
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("First process");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+
+    // Cancel changed nothing, so a reload still offers the first process.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await park(page);
+    await expect(page.getByRole("heading", { name: "Continue where you left off" })).toBeVisible();
+    await expect(page.locator("body")).toContainText("First process");
+  });
+
+  // The sample is not autosaved — it would take the one draft slot — so what the
+  // reader is owed instead is being told, before a reload takes the edits.
+  test("edits to the sample are not kept, and the app says so", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    const notice = page.getByRole("status").filter({ hasText: "Changes to the demo are not saved" });
+    await expect(notice).toBeHidden();
+
+    await addElement(page, "judgment", "A judgment added to the demo.");
+    await expect(notice).toBeVisible();
+
+    // Its Export is the ☰ one, a press away.
+    await notice.getByRole("button", { name: "Export" }).click();
+    await expect(page.getByRole("dialog")).toContainText("Choose what goes into the Markdown file.");
+    await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+
+    // As the notice says: a reload keeps nothing, and offers nothing back.
+    await page.waitForTimeout(1_200); // past the autosave's debounce, were there one
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await park(page);
+    await expect(page.getByRole("heading", { name: "Continue where you left off" })).toBeHidden();
+  });
+
+  // Said once: a line kept up over every later edit stops being read.
+  test("the notice goes with the next edit, and stays gone", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    const notice = page.getByRole("status").filter({ hasText: "Changes to the demo are not saved" });
+    await addElement(page, "judgment", "The edit that brings the notice up.");
+    await expect(notice).toBeVisible();
+
+    await addElement(page, "judgment", "The edit that puts it away.");
+    await expect(notice).toBeHidden();
+    await addElement(page, "judgment", "And one that does not bring it back.");
+    await expect(notice).toBeHidden();
+  });
+
+  test("the notice can be closed, and stays closed", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    const notice = page.getByRole("status").filter({ hasText: "Changes to the demo are not saved" });
+    await addElement(page, "judgment", "The edit that brings the notice up.");
+    await notice.getByRole("button", { name: "Close notice" }).click();
+    await expect(notice).toBeHidden();
+
+    await addElement(page, "judgment", "A later edit.");
+    await expect(notice).toBeHidden();
+  });
 });
 
 test.describe("Export and import", () => {
@@ -44,10 +126,7 @@ test.describe("Export and import", () => {
     await addElement(page, "judgment", "Judgment one for export.");
     await addElement(page, "principle", "Principle one for export.");
 
-    await openMenu(page);
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Export/ }).click();
-    const download = await downloadPromise;
+    const download = await exportDownload(page);
 
     // Markdown, not JSON: a human-readable report with the machine-readable
     // state in a fenced re-state block at the end.
@@ -78,6 +157,51 @@ test.describe("Export and import", () => {
     await expectCounts(page, { J: 1, P: 1 });
   });
 
+  test("an Argdown map imports as a graph", async ({ page }) => {
+    // The parser is a chunk of its own, loaded on the press, so this is also
+    // the check that the chunk loads in a real browser.
+    const file = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), "re-e2e-")),
+      "paper.argdown",
+    );
+    fs.writeFileSync(
+      file,
+      [
+        "===",
+        "title: My paper",
+        "===",
+        "",
+        "[Harm]: Preventing grave harm can outweigh honesty. #principle",
+        "",
+        "<Door>: The murderer at the door.",
+        "",
+        "(1) [Harm]",
+        "(2) [Grave]: Lying to the murderer prevents grave harm.",
+        "----",
+        "(3) [Permissible]: Lying to the murderer is permissible.",
+        "  -> [Kant]",
+        "",
+        "[Kant]: Never lie. #principle",
+        "",
+      ].join("\n"),
+    );
+
+    await gotoHome(page);
+    await startFresh(page, "Throwaway");
+    await openMenu(page);
+    const chooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /Import/ }).click();
+    // An empty process has nothing to replace, so there is no confirmation.
+    await (await chooserPromise).setFiles(file);
+    await park(page);
+
+    await expect(page.locator("body")).toContainText("My paper");
+    await expect(page.locator("body")).toContainText(
+      "Lying to the murderer is permissible.",
+    );
+    await expectCounts(page, { J: 2, P: 2 });
+  });
+
   test("the exported graph is self-contained", async ({ page }) => {
     // The SVG is embedded as a data URI and read outside the app, where the
     // app's stylesheet is not present. Any custom property it references has to
@@ -86,10 +210,7 @@ test.describe("Export and import", () => {
     await startFresh(page, "Export portability");
     await addElement(page, "judgment", "A judgment to draw in the exported graph.");
 
-    await openMenu(page);
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Export/ }).click();
-    const download = await downloadPromise;
+    const download = await exportDownload(page);
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "re-e2e-")), "export.md");
     await download.saveAs(file);
 

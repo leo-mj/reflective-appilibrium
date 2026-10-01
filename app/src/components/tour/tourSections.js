@@ -63,8 +63,9 @@ const byLayout = (wide, narrow) => ({ wide, narrow });
  * @property {boolean}  [text]   - True where the text panel belongs on screen.
  * @property {boolean}  [addBar] - Brings the add bar back before the chapters
  *   that would otherwise have earned it.
- * @property {boolean}  [menu]   - Opens the header's ☰ menu, for the sections
- *   that ring something inside it.
+ * @property {boolean|"settings"} [menu] - Opens the header's ☰ menu, for the
+ *   sections that ring something inside it. `"settings"`, at narrow widths,
+ *   opens it on its Settings view, where the wide ☰'s own entries are.
  */
 
 /**
@@ -81,16 +82,16 @@ function openingSections(topic) {
       body: [
         "Reflective equilibrium is a view of how justification works for beliefs in ethics: you start from concrete moral judgments you are fairly confident about, look for general principles that would explain them, and adjust both sides until they fit together.",
         "Neither side is bedrock. A principle can fall to a case that tells against it, and a verdict you were sure of can fall to the principle that best explains everything else. What justifies a position, in the end, is that it hangs together.",
-        "IMPORTANT: Neither reflective equilibrium nor this app guarantee reaching ethical truth.",
+        "Neither reflective equilibrium nor this app guarantees reaching ethical truth.",
       ],
       focus: [],
     },
     {
       id: "what-appilibrium-is",
       chapter: "The app",
-      title: "Reflective APPilibrium",
+      title: "Reflective Appilibrium",
       body: [
-        "Reaching an equilibrium state - a position in which all your judgments fit together with each other and with the principles - can be difficult.",
+        "Reaching an equilibrium state — a position in which all your judgments fit together with each other and with the principles — can be difficult.",
         "This app, Reflective Appilibrium, is supposed to assist in performing reflective equilibrium processes through visualisation, documentation, and (optionally) AI.",
         "How exactly? It's easier to show by using an example question than to explain in the abstract.",
       ],
@@ -131,7 +132,7 @@ function graphSections() {
       title: "Judgments — the concrete verdicts",
       body: [
         "Circles are judgments: verdicts on cases, of any generality. They are where a process starts.",
-        "The stronger the fill of a judgment, the more confident this thinker was about it.",
+        "The larger a judgment and the stronger its fill, the more confident this thinker was about it.",
         "Hover any graph node to read it in full.",
       ],
       quote: ["J1"],
@@ -162,9 +163,11 @@ function graphSections() {
     },
     {
       id: "tension",
-      title: "Conflicts",
+      // Not "Conflicts": that is a relation type of its own, orange, and hidden
+      // in this view. The legend calls these arrows "Jointly Precludes".
+      title: "Arguments against",
       body: [
-        "Red arrows show conflicts among your views: these premises rule the conclusion out. Here a principle about proximity and a judgment about parents together imply that obligations do weaken with distance in time — which is exactly what the judgment they point at denies.",
+        "Red arrows are arguments against — Jointly Precludes, in the legend: these premises together rule the conclusion out. Here a principle about proximity and a judgment about parents together imply that obligations do weaken with distance in time — which is exactly what the judgment they point at denies.",
         "This is reflective equilibrium doing its work. Something has to move: restrict the principle, give up the judgment, or accept the cost and say why. Nothing in the tool decides that for you.",
       ],
       quote: ["P6", "J7", "J10"],
@@ -173,16 +176,34 @@ function graphSections() {
     },
     {
       id: "theories",
-      title: "From narrow to wide equilibrium - background theories",
+      title: "From narrow to wide equilibrium — background theories",
       body: [
-        "Diamonds are background theories. Background theories are not immediate judgments about the ethical question at hand nor ethical rules that structure them.",
+        "Diamonds are background theories. Background theories are neither immediate judgments about the ethical question at hand nor ethical rules that structure them.",
         "Instead, they add further details that help inform arguments for and against judgments and principles. They can come from any domain of inquiry that is relevant for your ethical question, including metaphysics, epistemology, and social and natural sciences.",
         "Invoking background theories on top of judgments and principles makes a reflective equilibrium 'wide' as opposed to 'narrow'.",
-        "The two example theories below are the argument for P2 — the principle you just watched doing work above — and, being an argument, it can be attacked like one. Reaching down to this layer is what makes a reflective equilibrium wide.",
+        "The two example theories below are the argument for P2 — the principle you just watched doing work above — and, being an argument, it can be attacked like one.",
       ],
       quote: ["T1", "T2"],
       focus: ["T1", "T2", "P2"],
       argument: "arg-sample-1",
+    },
+    {
+      // The graph opens on arguments alone, so without this a reader never
+      // learns the dialectical family exists — though the demo holds far more
+      // of those relations than argument links.
+      id: "relation-types",
+      title: "Beyond arguments",
+      body: [
+        "An argument is the strictest relation there is: a claim that the premises get you the conclusion. Three looser ones record reasons that fall short of that — supports (one element gives a reason for another), conflicts (the two cannot both be held) and undermines (one weakens the other without contradicting it).",
+        byLayout(
+          "The graph opens on arguments alone, so none of these are drawn yet, though this demo holds plenty. All relations, ringed in the ☰ menu beside this card, draws them — conflicts in orange, not to be confused with the red arguments against — and adds + Rel to the graph's buttons and a Relations phase to the workflow.",
+          "The graph opens on arguments alone, so none of these are drawn yet, though this demo holds plenty. All relations, ringed under ☰ → Settings, draws them — conflicts in orange, not to be confused with the red arguments against — and adds + Rel to the graph's buttons and a Relations phase to the workflow.",
+        ),
+      ],
+      target: "menu-relations",
+      menu: true,
+      focus: [],
+      narrow: { menu: "settings" },
     },
     {
       id: "adding",
@@ -190,7 +211,7 @@ function graphSections() {
       title: "Adding to the graph",
       body: [
         "Of course, you not only want to read the graph, you want to write it.",
-        "+ J, + P and + T put a judgment, a principle or a background theory on the graph; + Arg opens a form for premises and a conclusion.",
+        "+ J, + P and + T put a judgment, a principle or a background theory on the graph; + Arg opens a form for premises and a conclusion. + Grp gathers elements under a name, and a group can be collapsed to one node to tidy the graph — it changes nothing in the position itself.",
         byLayout(
           "Or pick them out on the graph itself: select a node, Ctrl-click the others, and the bar that appears turns the selection into an argument.",
           "Or pick them out on the graph itself: tap a node, then tap the others with the argument bar open, and it turns the selection into an argument.",
@@ -212,7 +233,7 @@ function graphSections() {
       only: "narrow",
       title: "Everything else is behind ☰",
       body: [
-        "There is no room for a tab bar on a screen this narrow, so everything that is not the graph lives behind the ☰ button: the other views, the settings, import and export, and undo.",
+        "There is no room for a tab bar on a screen this narrow, so everything that is not the graph lives behind the ☰ button: the other views and undo, and — under its Settings entry — the options, import and export.",
         "The rest of the tour opens it as it goes, and rings whatever it is describing. Nothing here is doing anything until you tap it.",
       ],
       target: "btn-menu",
@@ -225,10 +246,10 @@ function graphSections() {
           "Click any node to modify it: revise the wording or withdraw it entirely. Withdrawing is not deleting — the node greys out and keeps its place in the record, and can be reinstated.",
           "Tap any node to modify it: revise the wording or withdraw it entirely. Withdrawing is not deleting — the node greys out and keeps its place in the record, and can be reinstated.",
         ),
-        "The principle below went in round 3, once it turned out to conflict with judgments its owner was far more sure of.",
+        "The principle below was added in round 2 and withdrawn in round 3, once it turned out to conflict with judgments its owner was far more sure of.",
         byLayout(
-          "And nothing is final either way: Undo, ringed in the header, steps back through the changes, as does Ctrl+Z. They are grouped by round rather than by keystroke, so it walks back through the thinking rather than through the typing.",
-          "And nothing is final either way: Undo, ringed in the ☰ menu, steps back through the changes. They are grouped by round rather than by keystroke, so it walks back through the thinking rather than through the typing.",
+          "And nothing is final either way: Undo, ringed in the header, steps back through the changes, as does Ctrl+Z. Each is one step — a whole change, not a keystroke — so it walks back through the thinking rather than through the typing.",
+          "And nothing is final either way: Undo, ringed in the ☰ menu, steps back through the changes. Each is one step — a whole change, not a keystroke — so it walks back through the thinking rather than through the typing.",
         ),
       ],
       quote: ["P4"],
@@ -239,9 +260,9 @@ function graphSections() {
       id: "text",
       title: byLayout("The text panel", "The text view"),
       body: [
-        "Reading the contents of your position is not limited to the graph. Every element and relation with its round, its confidence, its history, and the same buttons to revise, withdraw or reinstate it can be found in the text panel.",
+        "Reading the contents of your position is not limited to the graph. Every element and relation with the step it was added at, its confidence, its history, and the same buttons to revise, withdraw or reinstate it can be found in the text panel.",
         byLayout(
-          "(You reach it via Assist → Text and Analyze → Graph in the tab bar. The tab bar is hidden while the tour is reading the graph — it comes back a few sections below.)",
+          "(On the Analyze tabs it sits beside the graph, as here. On an Assist tab, Text in the Text · Graph · Focus switch beside Undo puts it where the graph was. The tab bar is hidden while the tour is reading the graph — it comes back a few sections below.)",
           "(You reach it via ☰ → Analyze → Text, and come back the same way.)",
         ),
       ],
@@ -256,11 +277,15 @@ function graphSections() {
       id: "menu-files",
       title: "Saving your progress",
       body: [
-        "Nothing you do here is stored on a server, so closing the tab is the end of the process. Export writes it out as a Markdown file instead — every element and relation, the round-by-round log, and the graph's layout — and Import reads one back, yours or one someone sent you.",
-        "Both are in the ☰ menu, open beside this card, along with the settings. Hover any entry to find out what it does.",
+        "Nothing you do here is stored on a server, so closing the tab is the end of the process. Export writes it out as a Markdown file instead, with the sections you pick — elements and relations, the log, step by step and round by round, the graph, an Argdown map — and Import reads one back, yours or one someone sent you, as long as it carries the full history.",
+        byLayout(
+          "Both are in the ☰ menu, open beside this card, along with the settings. Hover any entry to find out what it does.",
+          "Both are under ☰ → Settings, open beside this card, along with the other options. Long-press any entry to find out what it does.",
+        ),
       ],
       target: "menu-files",
       menu: true,
+      narrow: { menu: "settings" },
     },
   ];
 }
@@ -276,7 +301,7 @@ function graphSections() {
  * little a Crossref verdict claims — is worded on the tab itself, next to the
  * references it is about, which is where it is read rather than recalled.
  */
-function assistSections(cycle, llmEnabled) {
+function assistSections(cycle, llm) {
   return [
     {
       id: "assist",
@@ -284,11 +309,16 @@ function assistSections(cycle, llmEnabled) {
       title: "Assist proposes, you decide",
       body: [
         "The Assist section is the part that uses a large language model: it reads your position and proposes candidates — questions to draw out judgments, principles that would systematise them, background theories that bear on both, and arguments hiding between elements you already hold.",
-        "PLEASE NOTE: AI-generated statements within this app do not necessarily express the views of the Institute for Ethics in Technology.",
-        "Each AI-suggestion arrives as a proposal with an accept and a reject button. Nothing enters your position until you put it there, and anything you accept you can edit first.",
-        llmEnabled
-          ? "Suggestions are generated live, so they follow whatever you have on screen."
-          : "This demo has no model connected, so the Assist tabs show pre-recorded example suggestions from Claude Fable instead of live ones.",
+        "AI-generated statements within this app do not necessarily express the views of the Institute for Ethics in Technology.",
+        "Each AI suggestion arrives as a proposal with an accept and a reject button. Nothing enters your position until you put it there, and anything you accept you can edit first.",
+        {
+          demo: "This demo has no model connected, so the Assist tabs show pre-recorded example suggestions from Claude Fable instead of live ones.",
+          // A first visit to the backend build: the features are on, but with
+          // no key the tabs serve the same pre-set suggestions the demo does.
+          keyless:
+            "Until you add an API key of your own — the last section of this chapter shows where — the Assist tabs show pre-set example suggestions from Claude Fable, made for this demo rather than read off what is on screen.",
+          live: "Your key is set, so suggestions are generated live and follow whatever you have on screen.",
+        }[llm],
       ],
       target: "meta-assist",
       tab: "elicitJudgments",
@@ -300,9 +330,12 @@ function assistSections(cycle, llmEnabled) {
       id: "cycle",
       title: `The Workflow cycle: ${cycle}`,
       body: [
+        // "Theories that bear on both", never "theories both rest on": a theory
+        // proposed because the position presupposes it borrows its credibility
+        // from that position — see "Background theories" in the root CLAUDE.md.
         byLayout(
-          "Each Assist tab is one phase of a single iteration: draw out judgments, find principles that cover them, bring in the background theories both rest on, and detect the arguments running between them.",
-          "Each Assist view is one phase of a single iteration: draw out judgments, find principles that cover them, bring in the background theories both rest on, and detect the arguments running between them.",
+          "Each Assist tab is one phase of a single iteration: draw out judgments, find principles that cover them, bring in background theories that bear on both, and detect the arguments running between them.",
+          "Each Assist view is one phase of a single iteration: draw out judgments, find principles that cover them, bring in background theories that bear on both, and detect the arguments running between them.",
         ),
         "This helps you build out your views and spot both where they hang together well and where the problems lie.",
         byLayout(
@@ -322,7 +355,7 @@ function assistSections(cycle, llmEnabled) {
       body: [
         "Review is the one Assist tab whose output is not a change to the graph. It reads the process itself and reports in five parts: the arc your position has travelled, what is surprising in it, coherence that was available and not taken, and how you have been working — adding rather than revising, accepting suggestions as written rather than rewording them first.",
         "The workflow stops here every fifth time round the loop, and the reviews accumulate. Each new one is given the earlier ones and asked what has moved since, and whether an opportunity a previous review named was ever taken.",
-        "Accepting or discarding one advances no round and writes nothing to the log — a review is a reading of the record, not an entry in it — so there is no cost to running one in the middle of a process.",
+        "Accepting or discarding one takes no step and writes nothing to the log — a review is a reading of the record, not an entry in it — so there is no cost to running one in the middle of a process.",
       ],
       target: "tab-processReview",
       tab: "processReview",
@@ -333,11 +366,26 @@ function assistSections(cycle, llmEnabled) {
       id: "llm-settings",
       title: "Bringing your own AI model",
       body: [
-        "The app comes with no AI model of its own. Whoever runs it points the app at a model via the ☰ menu — LLM settings.",
+        byLayout(
+          "The app comes with no AI model of its own. You bring one, with a key of your own, via ☰ → LLM settings.",
+          "The app comes with no AI model of its own. You bring one, with a key of your own, via ☰ → Settings → LLM settings.",
+        ),
         "It asks for three things: a provider, a model on it, and a key to authenticate with — and will test the three against the provider before you commit them.",
-        llmEnabled
-          ? "This build can reach a backend, so a provider you configure here is the one the Assist tabs will call."
-          : "In this public demo, the AI features are not enabled, but you can still see what selecting your model of choice would look like.",
+        {
+          demo: "In this public demo, the AI features are not enabled, but you can still see what selecting your model of choice would look like.",
+          keyless:
+            "No key is saved yet, so the Assist tabs are showing the pre-set suggestions. Once you save one, they call your provider live.",
+          live: "A key is saved, so the Assist tabs call the provider you chose here.",
+        }[llm],
+        // Where a key can be entered, the reader is owed where it goes.
+        ...(llm === "demo"
+          ? []
+          : [
+              byLayout(
+                "Your key stays in this browser tab, and goes with each AI request to this app's server and straight on to your provider. ☰ → Privacy says what is and is not kept.",
+                "Your key stays in this browser tab, and goes with each AI request to this app's server and straight on to your provider. ☰ → Settings → Privacy says what is and is not kept.",
+              ),
+            ]),
       ],
       target: "btn-llm",
       // Still on the Assist tab: this chapter is about the model, and the
@@ -345,19 +393,20 @@ function assistSections(cycle, llmEnabled) {
       tab: "elicitJudgments",
       chrome: true,
       menu: true,
+      narrow: { menu: "settings" },
     },
   ];
 }
 
 /** Chapter 4 — the rest of the interface, in the order it is likely to be needed. */
-function chromeSections() {
+function chromeSections({ isSample, backendEnabled }) {
   return [
     {
       id: "analyze",
       chapter: "The rest of the interface",
       title: "Analyze — where you stand",
       body: [
-        "The Analyze part of the app is for looking at the position rather than growing it. Graph is what you have been reading. History replays the process round by round. Clusters finds the largest sets of your accepted elements that hold no conflict.",
+        "The Analyze part of the app is for looking at the position rather than growing it. Graph is what you have been reading. History replays the process step by step, or round by round. Clusters finds the largest sets of your accepted elements that hold no conflict.",
       ],
       target: "meta-analyze",
       tab: "graph",
@@ -368,10 +417,31 @@ function chromeSections() {
       narrow: { target: "menu-analyze", menu: true },
     },
     {
+      // Here rather than in the chapter on reading the demo graph, which is
+      // dropped on someone's own process: the view is for any process.
+      id: "statements",
+      title: "Reading statements on the graph",
+      body: [
+        "The card button above the zoom controls writes every element's statement onto the graph: each node becomes a card, its shape and fill kept as a badge beside the wording, and the graph is laid out with room for the words.",
+        byLayout(
+          "Hover a card to read a statement too long for it, and hover an arrow to read what its relation says. Zoomed far out, the cards shrink to a line each.",
+          "Tap a card to read a statement too long for it, and tap an arrow to read what its relation says. Zoomed far out, the cards shrink to a line each.",
+        ),
+        "The switch holds for History too, where each card shows the wording of the step being played — and for the graph in an export.",
+      ],
+      target: "statement-toggle",
+      tab: "graph",
+      chrome: true,
+      focus: [],
+    },
+    {
       id: "history",
       title: "History",
       body: [
-        "Drag the slider or press Play and the position rebuilds itself round by round, each element appearing in the round it was added and greying out in the round it was withdrawn.",
+        byLayout(
+          "Drag the slider or press Play and the position rebuilds itself one step at a time — every change is a step — each element appearing at the step it was added and greying out at the step it was withdrawn. Switched to Rounds, it moves a round at a time instead: a round closes as each iteration of the workflow ends, or when you press Close round beside the heading.",
+          "Drag the slider or press Play and the position rebuilds itself one step at a time — every change is a step — each element appearing at the step it was added and greying out at the step it was withdrawn. Switched to Rounds, it moves a round at a time instead: a round closes as each iteration of the workflow ends, or with Close round in the ☰ menu.",
+        ),
       ],
       target: "tab-history",
       tab: "history",
@@ -391,6 +461,58 @@ function chromeSections() {
       chrome: true,
       narrow: { menu: true },
     },
+    // Only where a backend computes it. The demo has neither the tab nor the
+    // scores, and a section describing them would be describing nothing.
+    ...(backendEnabled
+      ? [
+          {
+            id: "simulate",
+            title: "Simulate — the formal model",
+            body: [
+              "Simulate hands your position to rethon, a formal model of reflective equilibrium, and lets it do the adjusting: Equilibrate runs it until nothing more changes, then plays its steps on the graph. It lists what accepting would withdraw, take up again or reject, and — as with an AI suggestion — nothing changes until you accept.",
+              byLayout(
+                "Its theory is made of your principles and background theories, starting from the ones you hold. It rates a position on three measures — account, how well that theory accounts for your elements; systematicity, how few of them cover how much; faithfulness, how close you stay to where you started — and on their weighted sum, its achievement (Z). The ⚖ weights beside Equilibrate set how much each counts, and hovering any score says what it measures.",
+                "Its theory is made of your principles and background theories, starting from the ones you hold. It rates a position on three measures — account, how well that theory accounts for your elements; systematicity, how few of them cover how much; faithfulness, how close you stay to where you started — and on their weighted sum, its achievement (Z). The ⚖ weights beside Equilibrate set how much each counts, and long-pressing any score says what it measures.",
+              ),
+              // The narrow text view is a tab of its own, never beside History,
+              // so the chart is not reachable there and is not promised.
+              byLayout(
+                "The same scores appear in two more places. Every text card carries If withdrawn bars — how account and systematicity would move without that element: orange if the position would score higher without it, teal if it is earning its place. And with History open, Calculate achievement (Z) at the foot of the text panel scores every step, so you can see whether the process has been getting more coherent.",
+                "The same scores appear on every text card, as If withdrawn bars — how account and systematicity would move without that element: orange if the position would score higher without it, teal if it is earning its place.",
+              ),
+            ],
+            target: "tab-simulateRethon",
+            tab: "simulateRethon",
+            chrome: true,
+            narrow: { menu: true },
+          },
+        ]
+      : []),
+    // The demo merge is offered on the sample alone, which is also the only
+    // process this section's button exists for.
+    ...(isSample
+      ? [
+          {
+            id: "merge",
+            title: "Merging processes",
+            body: [
+              "Two people — or one, on two occasions — can work through a question separately and bring the results together. Merge reads a second exported process into this one as a single step: elements worded identically are fused, and everything else arrives as it stood.",
+              byLayout(
+                "To try it, Merge (demo), ringed in the ☰ menu, brings in a second sample process written to be merged into this one.",
+                "To try it, the Merge tile, ringed in the ☰ menu, brings in a second sample process written to be merged into this one.",
+              ),
+              byLayout(
+                "Afterwards every node wears a letter for the process it came from — A, B, or A+B where two were fused — and Assist gains a Merge Elements tab. It offers pairs, one element from each process, that may make the same claim in different words; whether each pair is one element or two is yours to decide.",
+                "Afterwards every node wears a letter for the process it came from — A, B, or A+B where two were fused — and Assist gains a Duplicates view. It offers pairs, one element from each process, that may make the same claim in different words; whether each pair is one element or two is yours to decide.",
+              ),
+            ],
+            target: "menu-merge",
+            tab: "graph",
+            chrome: true,
+            menu: true,
+          },
+        ]
+      : []),
     {
       id: "done",
       title: "That's the tour",
@@ -469,6 +591,12 @@ const showsGraph = (s) => !!(s.focus || s.select || s.argument || s.quote);
  * @param {boolean} options.hideNonEntailsRels - Names the cycle after the
  *   relation modes that are on, matching the tabs actually on screen.
  * @param {boolean} options.llmEnabled
+ * @param {boolean} [options.hasKey] - Whether the visitor has saved an API key.
+ *   A backend build without one serves the demo's pre-set suggestions, and
+ *   the tour must not tell a first-time visitor they are live.
+ * @param {boolean} [options.backendEnabled] - Adds the Simulate section. Its
+ *   own flag, though it follows `llmEnabled` today: the simulation needs the
+ *   backend, not a model.
  * @param {string}  [options.topic]
  * @param {boolean} [options.narrow] - Which layout is going to read it. The
  *   sections are the same either way; this settles where each one says its
@@ -479,9 +607,12 @@ export function buildTourSections({
   isSample,
   hideNonEntailsRels,
   llmEnabled,
+  hasKey = false,
+  backendEnabled = false,
   topic,
   narrow = false,
 }) {
+  const llm = !llmEnabled ? "demo" : hasKey ? "live" : "keyless";
   // The iteration's phases, in the order `WORKFLOW_NEXT_PHASE` runs them. The
   // review is deliberately absent: it is a stop between iterations, not one of
   // them, which is the whole of what its own section says.
@@ -492,8 +623,8 @@ export function buildTourSections({
     [
       ...openingSections(topic),
       ...(isSample ? graphSections() : []),
-      ...assistSections(cycle, llmEnabled),
-      ...chromeSections(),
+      ...assistSections(cycle, llm),
+      ...chromeSections({ isSample, backendEnabled }),
     ],
     narrow,
   );

@@ -3,7 +3,7 @@
  * @module hooks/useActiveSection
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const SECTION_KEYS = [
   "judgments",
@@ -40,6 +40,8 @@ const THRESHOLD_PX = 12;
  */
 export function useActiveSection(sectionRefs, scrollRef) {
   const [activeSection, setActiveSection] = useState(null);
+  // The last value measured, so an unchanged one sets no state at all.
+  const measured = useRef(null);
 
   const measure = useCallback(() => {
     const container = scrollRef.current;
@@ -57,16 +59,22 @@ export function useActiveSection(sectionRefs, scrollRef) {
     }
     // Above the first section — the round banner and the add bar sit there —
     // the reader is still on their way into it.
-    setActiveSection(reached ?? firstMounted);
+    const next = reached ?? firstMounted;
+    if (next === measured.current) return;
+    measured.current = next;
+    setActiveSection(next);
   }, [sectionRefs, scrollRef]);
 
   // After every render, because expanding a section moves every section below
   // it and no scroll event is fired for that.
   //
-  // set-state-in-effect guards against effects that drive renders in a loop.
-  // This one cannot: it reports a measurement of the DOM, which only an actual
-  // layout change can alter, and React drops an update that does not change the
-  // value. Measuring is the one thing that has to wait until after the commit.
+  // set-state-in-effect guards against effects that drive renders in a loop,
+  // and this one did drive one. React does not reliably drop an update that
+  // leaves the value as it was: it may render again first to find out. While
+  // the graph layout settles the text panel renders on every tick, and each of
+  // those renders queued one more here, until dev mode stopped it with
+  // "Maximum update depth exceeded". So `measure` sets state only when the
+  // section it measured is not the one it measured last.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(measure);
 

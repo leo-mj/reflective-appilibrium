@@ -135,5 +135,6 @@ async def detect_arguments(
         )
 
     except Exception as e:
-        logger.error(f"Detecing arguments failed: {e}", exc_info=True)
+        # The type, not the message: see logging_setup.ContentFreeFormatter.
+        logger.error(f"Detecting arguments failed: {type(e).__name__}", exc_info=True)
         raise

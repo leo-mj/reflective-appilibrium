@@ -11,12 +11,17 @@
 /** @import { REElement, RERelation, PositionMap } from '../../types.js' */
 
 import { C, TRANSITION } from "../../constants/colors.js";
-import { elementRadius, computeJunction } from "../../utils/graphHelpers.js";
+import {
+  boundaryDistance,
+  elementRadius,
+  computeJunction,
+} from "../../utils/graphHelpers.js";
 import { isWithdrawnAt } from "../../utils/stateUtils.js";
 import {
   GraphEdge,
   GraphGroupNode,
   GraphNode,
+  NodeRing,
   PulseRing,
 } from "./GraphElements.jsx";
 
@@ -135,19 +140,27 @@ export function graphEdgeVisuals(relation, wIds, dimEdge, selectedRelGroup, grou
  * @param {Set<string>} wIds
  * @param {Set<string>} newIds       - IDs added exactly at `snappedRound`.
  * @param {number}      snappedRound
- * @returns {{ isWithdrawn: boolean, opacity: number, transition: string, children: React.ReactNode }}
+ * @returns {{ isWithdrawn: boolean, opacity: number, fade: number, transition: string, children: React.ReactNode }}
+ *   A statement card takes its withdrawal as `fade`, on its badge and outline,
+ *   and keeps its wording readable — as `graphNodeVisuals` has it.
  */
 export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
   const isFuture = (element.addedRound || 1) > snappedRound;
   const isWithdrawn = wIds.has(element.id);
   const isNew = newIds.has(element.id);
+  const isCard = !!element.card;
   return {
     isWithdrawn,
-    opacity: isFuture ? 0 : isWithdrawn ? 0.25 : 1,
+    opacity: isFuture ? 0 : isWithdrawn && !isCard ? 0.25 : 1,
+    fade: isCard && isWithdrawn ? 0.25 : 1,
     transition: isFuture ? "none" : "opacity 2.2s ease-in-out",
     children:
       isNew && !isWithdrawn ? (
-        <PulseRing type={element.type} radius={elementRadius(element)} />
+        <PulseRing
+          type={element.type}
+          radius={elementRadius(element)}
+          card={element.card}
+        />
       ) : null,
   };
 }
@@ -162,55 +175,98 @@ export function historyNodeVisuals(element, wIds, newIds, snappedRound) {
  * @param {string|null}                selected   - ID of the selected element, or null.
  * @param {string|null}                [ctrlFirst] - ID of the ctrl-click first node, or null.
  * @param {string|null}                [recentlyAdded]
- * @param {Set<string>|null}           [previewWithdrawnIds] - IDs that would be withdrawn by the simulated equilibrium.
- * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, transition: string, children: React.ReactNode }}
+ * @param {{withdrawn?: Set<string>, takenUp?: Set<string>}|null} [preview] -
+ *   What the simulated position would withdraw and take up again: an orange
+ *   dashed ring on the one, a teal one on the other, the colours the text
+ *   panel's withdrawal bars use for "costs" and "earns".
+ * @returns {{ isWithdrawn: boolean, isRejected: boolean, opacity: number, fade: number, transition: string, children: React.ReactNode }}
+ *   For a statement card, `opacity` carries only the dimming a selection
+ *   elsewhere applies, and `fade` the withdrawn or rejected state, which the
+ *   card applies to its badge and outline and not to its wording.
  */
-export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, recentlyAdded, previewWithdrawnIds) {
+export function graphNodeVisuals(element, wIds, dimNode, selected, ctrlFirst, recentlyAdded, preview) {
   const isWithdrawn = wIds.has(element.id);
-  const isRejected = element.status === "rejected";
+  const isPreviewTakenUp = preview?.takenUp?.has(element.id) ?? false;
+  // Taken up from rejected too, so the rejected fade goes with it.
+  const isRejected = element.status === "rejected" && !isPreviewTakenUp;
   const isSelected = element.id === selected;
   const isCtrlFirst = element.id === ctrlFirst;
   const isRecentlyAdded = element.id === recentlyAdded;
-  const isPreviewWithdrawn = previewWithdrawnIds?.has(element.id) ?? false;
+  const isPreviewWithdrawn = preview?.withdrawn?.has(element.id) ?? false;
+  // In the theory at the step being played: a ring of its own, since a theory
+  // step mostly moves elements already held, which the other rings miss.
+  const isPreviewTheory = preview?.theory?.has(element.id) ?? false;
   const isDimmed = dimNode(element.id);
   // Opacity is now only ever about *state* — dimmed by a selection elsewhere,
   // withdrawn, rejected. Confidence used to fade the node too, which washed the
   // id out along with the disc and capped label contrast at ~3.8:1 however the
   // ink was chosen; it lives in the fill colour now (see constants/colors.js).
   const r = elementRadius(element);
+  // What the element's state does to it: withdrawn (or about to be, in the
+  // equilibrium preview) fades further than rejected.
+  const fade = isWithdrawn || isPreviewWithdrawn ? 0.25 : isRejected ? 0.35 : 1;
   return {
     isWithdrawn: isWithdrawn || isPreviewWithdrawn,
     isRejected,
-    opacity: isDimmed
-      ? 0.12
-      : isWithdrawn || isPreviewWithdrawn
-        ? 0.25
-        : isRejected
-          ? 0.35
-          : 1,
+    // A node fades whole. A card does not: faded whole, its wording was all
+    // but unreadable, and reading it is what the statement view is for. So
+    // it takes the state as `fade`, on its badge and outline only.
+    opacity: isDimmed ? 0.12 : element.card ? 1 : fade,
+    fade: element.card ? fade : 1,
     transition: TRANSITION,
-    children: isSelected ? (
-      <circle
-        r={r + 8}
-        fill="none"
+    children: (
+      <>
+        {nodeRing()}
+        {isPreviewTheory && (
+          <NodeRing
+            element={element}
+            r={r}
+            pad={3}
+            stroke={C.principle.accent}
+            strokeWidth={2}
+            opacity={0.9}
+          />
+        )}
+      </>
+    ),
+  };
+
+  /** The one outer ring a node wears: selection first, then the preview's. */
+  function nodeRing() {
+    return isSelected ? (
+      <NodeRing
+        element={element}
+        r={r}
+        pad={8}
         // Theme-aware: a white ring on the light ground measures 1.05:1.
         stroke={C.text}
         strokeWidth={2}
         opacity={0.6}
       />
     ) : isPreviewWithdrawn ? (
-      <circle
-        r={r + 6}
-        fill="none"
+      <NodeRing
+        element={element}
+        r={r}
+        pad={6}
         stroke={C.conflicts}
         strokeWidth={1.5}
         strokeDasharray="4 3"
         opacity={0.7}
       />
+    ) : isPreviewTakenUp ? (
+      <NodeRing
+        element={element}
+        r={r}
+        pad={6}
+        stroke={C.supports}
+        strokeWidth={1.5}
+        strokeDasharray="4 3"
+        opacity={0.8}
+      />
     ) : isCtrlFirst || isRecentlyAdded ? (
-      <PulseRing type={element.type} radius={r} />
-    ) : null,
-  };
+      <PulseRing type={element.type} radius={r} card={element.card} />
+    ) : null;
+  }
 }
 
 // ─── Shared render functions ──────────────────────────────────────────────────
@@ -249,12 +305,20 @@ export function renderJointArgument(
     .filter((d) => d.el && d.pos);
   if (premises.length === 0) return null;
 
-  // Conclusion node radius — needed for junction clamping and arrow geometry.
-  const tr = elementRadius(conclusionEl);
-
   const centX = premises.reduce((s, d) => s + d.pos.x, 0) / premises.length;
   const centY = premises.reduce((s, d) => s + d.pos.y, 0) / premises.length;
-  const { jx, jy } = computeJunction(centX, centY, conclusionPos, tr);
+  const { jx, jy } = computeJunction(
+    centX,
+    centY,
+    conclusionPos,
+    boundaryDistance(conclusionEl, centX - conclusionPos.x, centY - conclusionPos.y),
+  );
+  // Where the conclusion's border lies on the way in from the junction.
+  const tr = boundaryDistance(
+    conclusionEl,
+    jx - conclusionPos.x,
+    jy - conclusionPos.y,
+  );
 
   // Conclusion arrow geometry
   const adx = conclusionPos.x - jx, ady = conclusionPos.y - jy;
@@ -268,8 +332,8 @@ export function renderJointArgument(
   return (
     <g opacity={opacity} style={{ transition }}>
       {premises.map(({ r, el, pos }) => {
-        const sr = elementRadius(el);
         const dx = jx - pos.x, dy = jy - pos.y;
+        const sr = boundaryDistance(el, dx, dy);
         const dist = Math.hypot(dx, dy) || 1;
         return (
           <line
@@ -331,6 +395,9 @@ export function renderEdge(relation, positions, elementById, visuals, parallelOf
  * @param {Object}      visuals   - Output of `historyNodeVisuals` or `graphNodeVisuals`.
  * @param {boolean}     isDragging
  * @param {Function}    setTooltip
+ * @param {{ onMouseEnter: Function, onMouseLeave: Function }} [hover] - In
+ *   place of the tooltip's handlers, for a node whose hover does something
+ *   else — a statement card, which grows.
  * @returns {React.ReactElement|null}
  */
 export function renderNode(
@@ -339,6 +406,7 @@ export function renderNode(
   visuals,
   isDragging,
   setTooltip,
+  hover,
 ) {
   const position = positions[element.id];
   if (!position) return null;
@@ -350,7 +418,7 @@ export function renderNode(
     element,
     position,
     cursor: isDragging ? "grabbing" : "pointer",
-    ...makeTooltipHandlers(isDragging, setTooltip, element),
+    ...(hover ?? makeTooltipHandlers(isDragging, setTooltip, element)),
   };
   // A collapsed group is a node in every way the canvas cares about — it is
   // hit-tested, selected, hovered and drawn at a position like any other — but

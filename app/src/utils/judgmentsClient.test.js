@@ -34,7 +34,7 @@ describe("fetchJudgmentElicitations", () => {
   it("prod + sample: returns dummy, never calls fetch", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: false }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: false, BACKEND_URL: "http://localhost:8000" }));
     const { fetchJudgmentElicitations } = await import("./judgmentsClient.js");
 
     const result = await fetchJudgmentElicitations(
@@ -55,7 +55,7 @@ describe("fetchJudgmentElicitations", () => {
         json: () => Promise.resolve(mockResponse),
       }),
     );
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: true }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: true, BACKEND_URL: "http://localhost:8000" }));
     openaiStub();
     const { fetchJudgmentElicitations } = await import("./judgmentsClient.js");
 
@@ -75,7 +75,7 @@ describe("fetchJudgmentElicitations", () => {
   it("dev + sample + useDummy checked: returns dummy, never calls fetch", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    vi.doMock("../config.js", () => ({ LLM_ENABLED: true }));
+    vi.doMock("../config.js", () => ({ LLM_ENABLED: true, BACKEND_URL: "http://localhost:8000" }));
     openaiStub();
     const { fetchJudgmentElicitations } = await import("./judgmentsClient.js");
 

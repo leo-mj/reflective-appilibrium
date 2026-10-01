@@ -164,9 +164,6 @@ export default {
     { from: "J1", to: "J2", type: "supports", explanation: "Both express concern for long-term consequences on future people.", addedRound: 1 },
     { from: "J8", to: "J1", type: "supports", explanation: "If extinction prevention is obligatory, so is preventing severe environmental harm.", addedRound: 4 },
 
-    // Depends
-    { from: "P5", to: "T1", type: "depends", explanation: "The Rawlsian extension presupposes that future people qualify as moral patients.", addedRound: 5 },
-
     // Arguments (jointly_entails)
     // arg-dummy-1: T1 + T2 → P2
     { from: "T1", to: "P2", type: "jointly_entails", argumentId: "arg-dummy-1", explanation: "T1 grounds moral patienthood in well-being capacity; T2 establishes that future people as a class are metaphysically determinate; together they entail probabilistic obligation (P2).", addedRound: 7 },

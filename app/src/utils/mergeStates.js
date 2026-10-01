@@ -1,0 +1,366 @@
+/**
+ * @fileoverview Merges a second RE process into the current one.
+ *
+ * The merge is **one step** of the current process: everything the incoming
+ * process contributes arrives at that step, as it stands at the end of that
+ * process. Its own history — the steps and rounds, the withdrawals and revisions, the log —
+ * is not replayed, because none of it happened in *this* process; playback would
+ * otherwise show elements here before they were ever brought in. What survives of
+ * it is the log entry the merge writes, which is also where the renumbering is
+ * spelled out, since the incoming log's prose names ids that no longer exist.
+ *
+ * Elements of the same type and the same wording (whitespace aside) are **fused**:
+ * the current process's copy is kept exactly as it is, and the incoming relations
+ * are re-pointed at it. Relations and arguments that then duplicate one already
+ * present are dropped, and so is one that fusing has turned into a loop.
+ *
+ * Which process each element came from is `state.processes` — `[{ id: "A", label,
+ * members, round }]`, lettered in merge order and stamped with the step of the
+ * merge that brought it in — so the graph can keep the two apart
+ * afterwards. Deliberately not a field on the elements: it is a view of the
+ * process, as a group is, and the backend's element model refuses fields it does
+ * not know. A fused element is a member of both; one added after a merge, of none.
+ *
+ * @module utils/mergeStates
+ */
+
+import { groupsOf, nextGroupId } from "./groupUtils.js";
+import {
+  historyOf,
+  makeLogEntry,
+  nextElementId,
+  reviewsOf,
+  sortElementIds,
+} from "./stateUtils.js";
+
+/** @import { REState, RERelation } from '../types.js' */
+
+/**
+ * Throws, with a user-readable message, if the two states cannot be merged.
+ *
+ * Checked before the merge rather than inside it, because the merge runs as a
+ * state updater, and an updater must not throw.
+ *
+ * @param {REState} current
+ * @param {REState} incoming
+ */
+export function assertMergeable(current, incoming) {
+  // A questionnaire's elements are addressed by `questionnaireIndex` into its
+  // own spec, and a second process has no place in that spec.
+  if (current.model === "questionnaire" || incoming.model === "questionnaire")
+    throw new Error("Questionnaire sessions cannot be merged.");
+  if (!incoming.elements.length)
+    throw new Error("That file holds no elements to merge.");
+}
+
+/**
+ * The processes a merged one was put together from, in merge order, as they
+ * stood at `atRound`. Absent on every state that has never been merged — read
+ * it through here.
+ *
+ * Bounded by round because before a merge there was one process, and a letter
+ * on it would be saying otherwise. Defaults to the state's own round, which is
+ * what makes a state projected back by `stateAtRound` — the text panel's view
+ * during playback — right without its caller doing anything.
+ *
+ * @param {REState} [state]
+ * @param {number} [atRound]
+ * @returns {{ id: string, label: string, members: string[], round?: number }[]}
+ */
+export function processesOf(state, atRound = state?.round ?? Infinity) {
+  return (state?.processes ?? []).filter((p) => (p.round ?? 0) <= atRound);
+}
+
+/**
+ * The processes an element came from, in merge order — two for a fused
+ * element, none for one added since.
+ *
+ * @param {{ id: string, members: string[] }[]} processes
+ * @param {string} elementId
+ */
+export function processesOfElement(processes, elementId) {
+  return processes.filter((p) => p.members.includes(elementId));
+}
+
+/**
+ * Element id → the tag drawn on its node: `"A"`, or `"A+B"` for one fused from
+ * both. Empty for a process that has never been merged, so nothing is drawn.
+ *
+ * @param {{ id: string, members: string[] }[]} processes
+ * @returns {Map<string, string>}
+ */
+export function processTagMap(processes) {
+  const ids = new Map();
+  for (const p of processes)
+    for (const m of p.members) ids.set(m, [...(ids.get(m) ?? []), p.id]);
+  return new Map([...ids].map(([m, list]) => [m, list.join("+")]));
+}
+
+/**
+ * A, B, … Z, AA, AB — letters only, so a tag can never be mistaken for an
+ * element id like P27.
+ */
+function processLetter(i) {
+  let s = "";
+  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26))
+    s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+  return s;
+}
+
+/** The wording two elements must share to be fused. */
+const fuseKey = (el) => `${el.type}\u0000${el.text.trim().replace(/\s+/g, " ")}`;
+/**
+ * The incoming item's current standing, re-dated to the merge round: withdrawn
+ * and rejected items arrive as such, with that event as their whole history.
+ * A revision is past history and so is not carried; the item arrives as `active`
+ * with the wording it had reached.
+ */
+function arriving(item, round) {
+  const {
+    history: _h,
+    previousText: _p,
+    revisedRound: _rv,
+    withdrawnRound: _w,
+    rejectedRound: _rj,
+    reason: _r,
+    questionnaireIndex: _q,
+    ...rest
+  } = item;
+  const next = { ...rest, addedRound: round };
+  if (item.status === "withdrawn") {
+    const reason = historyOf(item).findLast((e) => e.type === "withdrawn")?.reason
+      ?? item.reason;
+    next.history = [{ round, type: "withdrawn", ...(reason ? { reason } : {}) }];
+    if (reason) next.reason = reason;
+  } else if (item.status === "rejected") {
+    next.history = [{ round, type: "rejected" }];
+  } else if (item.status != null) {
+    next.status = "active";
+  }
+  return next;
+}
+
+/**
+ * Relations keyed by argument: joint premises share an `argumentId`, and any
+ * relation without one stands alone.
+ *
+ * @param {RERelation[]} relations
+ * @returns {Map<string, RERelation[]>}
+ */
+export function byArgument(relations) {
+  const out = new Map();
+  relations.forEach((r, i) => {
+    const key = r.argumentId ?? `solo-${i}`;
+    out.set(key, [...(out.get(key) ?? []), r]);
+  });
+  return out;
+}
+
+/** What makes two arguments the same argument: type, premise set, conclusion. */
+export const argumentSignature = (rels) =>
+  `${rels[0].type}|${[...new Set(rels.map((r) => r.from))].sort().join(",")}|${rels[0].to}`;
+
+/**
+ * Merges `incoming` into `current` as one new round, with a log entry recording
+ * what came in, what it was renumbered to, and what was fused or dropped.
+ *
+ * Pure: the argument ids it mints are derived from the round, not random, so it
+ * is safe to run as a reducer's updater.
+ *
+ * @param {REState} current
+ * @param {REState} incoming
+ * @param {{ label?: string }} [opts] - What to call the incoming process if it
+ *   has no topic — its file name, say.
+ * @returns {REState}
+ */
+export function mergeStates(current, incoming, opts) {
+  return mergeWithReport(current, incoming, opts).state;
+}
+
+/**
+ * What a merge would do, for the reader to see before agreeing to it: how much
+ * it adds, and which incoming elements are identical to ones already here.
+ *
+ * Computed by running the merge itself, not by a second reading of the rules,
+ * so the preview cannot describe a different merge from the one Merge performs.
+ *
+ * @param {REState} current
+ * @param {REState} incoming
+ * @param {{ label?: string }} [opts]
+ * @returns {{
+ *   label: string,
+ *   added: number,
+ *   relationsAdded: number,
+ *   fused: { from: string, id: string, text: string }[],
+ * }}
+ */
+export function previewMerge(current, incoming, opts) {
+  const { report } = mergeWithReport(current, incoming, opts);
+  const textOf = new Map(current.elements.map((e) => [e.id, e.text]));
+  return {
+    ...report,
+    fused: report.fused.map((f) => ({ ...f, text: textOf.get(f.id) })),
+  };
+}
+
+/** The merge proper: the merged state, and what `previewMerge` reports of it. */
+function mergeWithReport(current, incoming, { label } = {}) {
+  const round = current.round + 1;
+
+  // ── Elements ───────────────────────────────────────────────────────────────
+  const byKey = new Map(current.elements.map((e) => [fuseKey(e), e.id]));
+  const idMap = new Map();
+  const added = [];
+  const renumbered = [];
+  const fused = [];
+
+  for (const el of incoming.elements) {
+    const match = byKey.get(fuseKey(el));
+    if (match) {
+      idMap.set(el.id, match);
+      fused.push({ from: el.id, id: match });
+      continue;
+    }
+    const id = nextElementId([...current.elements, ...added], el.type);
+    idMap.set(el.id, id);
+    byKey.set(fuseKey(el), id);
+    added.push({ ...arriving(el, round), id });
+    renumbered.push({ from: el.id, id });
+  }
+
+  // ── Processes ──────────────────────────────────────────────────────────────
+  // The first merge is when the open process becomes one process among several,
+  // so it is lettered then, with everything already on the board. Members are
+  // every element a process maps to — fused ones included, which is what makes
+  // a fused element a member of both. An incoming process that was itself put
+  // together by merging keeps its processes apart, each under a letter of its
+  // own; whatever it added after that merge goes under one more.
+  const name = (p) => (p ?? "").trim().slice(0, 200);
+  let processes = current.processes ?? [];
+  if (!processes.length)
+    processes = [
+      {
+        id: processLetter(0),
+        label: name(current.topic) || "This process",
+        members: current.elements.map((e) => e.id),
+        round,
+      },
+    ];
+  const remap = (ids) => [...new Set(ids.map((m) => idMap.get(m)).filter(Boolean))];
+  const inner = incoming.processes ?? [];
+  const placed = new Set(inner.flatMap((p) => p.members));
+  const incomingLabel = name(incoming.topic) || name(label) || "Merged process";
+  const arrivingProcesses = [
+    ...inner.map((p) => ({ label: p.label, members: remap(p.members) })),
+    {
+      label: incomingLabel,
+      members: remap(incoming.elements.map((e) => e.id).filter((m) => !placed.has(m))),
+    },
+  ].filter((p) => p.members.length);
+  const newLetters = [];
+  for (const p of arrivingProcesses) {
+    const id = processLetter(processes.length);
+    newLetters.push(id);
+    processes = [...processes, { id, ...p, round }];
+  }
+
+  // ── Relations ──────────────────────────────────────────────────────────────
+  const seen = new Set(
+    [...byArgument(current.relations).values()].map(argumentSignature),
+  );
+  const newRelations = [];
+  let dropped = 0;
+  let argCount = 0;
+
+  for (const [key, rels] of byArgument(incoming.relations)) {
+    const mapped = rels
+      .filter((r) => idMap.has(r.from) && idMap.has(r.to))
+      .map((r) => ({ ...r, from: idMap.get(r.from), to: idMap.get(r.to) }));
+    const signature = mapped.length ? argumentSignature(mapped) : null;
+    if (
+      mapped.length !== rels.length ||
+      mapped.some((r) => r.from === r.to) ||
+      seen.has(signature)
+    ) {
+      dropped += rels.length;
+      continue;
+    }
+    seen.add(signature);
+    const argumentId = key.startsWith("solo-") ? undefined : `arg-m${round}-${++argCount}`;
+    newRelations.push(
+      ...mapped.map((r) => {
+        const next = arriving(r, round);
+        if (argumentId) next.argumentId = argumentId;
+        return next;
+      }),
+    );
+  }
+
+  // ── Groups ─────────────────────────────────────────────────────────────────
+  // Membership follows the renumbering; an element fused into one the current
+  // process has already grouped stays where it is, since an element belongs to
+  // at most one group.
+  let groups = groupsOf(current);
+  const claimed = new Set(groups.flatMap((g) => g.members));
+  for (const g of groupsOf(incoming)) {
+    const members = [...new Set(g.members.map((m) => idMap.get(m)))].filter(
+      (m) => m && !claimed.has(m),
+    );
+    if (members.length < 2) continue;
+    members.forEach((m) => claimed.add(m));
+    groups = [...groups, { ...g, id: nextGroupId(groups), members }];
+  }
+
+  // ── Log ────────────────────────────────────────────────────────────────────
+  const reviews = reviewsOf(incoming).length;
+  const findings = [
+    `Merged "${incomingLabel}" as process ${newLetters.join(", ")} (${incoming.elements.length} elements, ${incoming.relations.length} relations, at step ${incoming.round}).`,
+    fused.length
+      ? `Fused as identical to an existing element: ${fused.map((f) => `${f.from} → ${f.id}`).join(", ")}.`
+      : "",
+    dropped
+      ? `${dropped} incoming relation${dropped === 1 ? "" : "s"} dropped as duplicating one already present.`
+      : "",
+    // A review reads a process's own rounds and ids, neither of which survive.
+    reviews
+      ? `Its ${reviews} process review${reviews === 1 ? " was" : "s were"} not carried over.`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const changes = [
+    added.length
+      ? `${renumbered
+          .sort((a, b) => sortElementIds(a.id, b.id))
+          .map(({ from, id }) => (from === id ? id : `${from} → ${id}`))
+          .join(", ")} added`
+      : "",
+    newRelations.length
+      ? `${newRelations.length} relation${newRelations.length === 1 ? "" : "s"} added`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+
+  const merged = {
+    ...current,
+    round,
+    processes,
+    elements: [...current.elements, ...added],
+    relations: [...current.relations, ...newRelations],
+    log: [
+      ...current.log,
+      makeLogEntry(round, findings, "Merged", changes || "Nothing new added"),
+    ],
+  };
+  if (groups.length || current.groups !== undefined) merged.groups = groups;
+  return {
+    state: merged,
+    report: {
+      label: incomingLabel,
+      added: added.length,
+      relationsAdded: newRelations.length,
+      fused,
+    },
+  };
+}

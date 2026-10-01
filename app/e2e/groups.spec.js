@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { gotoHome, loadSample, park } from "./helpers.js";
+import SAMPLE_STATE from "../src/sample-data/sample-state.js";
+import { ARGUMENT_RELATION_TYPES } from "../src/utils/stateUtils.js";
 
 /**
  * The pan/zoom layer inside the graph's own `<svg>`.
@@ -67,6 +69,9 @@ async function ctrlClickNode(page, id) {
   );
   await expect(shape, `no node "${id}" in the graph`).toHaveCount(1);
   await shape.click({ modifiers: ["ControlOrMeta"] });
+  // Off the node again: left resting on it, the pointer keeps its hover card
+  // open, and the card can cover the node the next click aims at.
+  await park(page);
 }
 
 /**
@@ -131,11 +136,79 @@ async function clickInsideHull(page) {
   await page.mouse.click(point.x, point.y);
 }
 
-/** Picks two judgments the sample is currently drawing. */
-async function twoJudgments(page) {
-  const ids = (await drawnIds(page)).filter((id) => id.startsWith("J"));
-  expect(ids.length).toBeGreaterThan(1);
-  return ids.slice(0, 2);
+/**
+ * Judgments no argument in the demo touches. On the canvas's default,
+ * arguments-only view nothing is drawn to or from them, so a group of two is a
+ * disc and a box with no lines through them — what these tests click on.
+ */
+const LOOSE_JUDGMENTS = (() => {
+  const argued = new Set(
+    SAMPLE_STATE.relations
+      .filter((r) => ARGUMENT_RELATION_TYPES.has(r.type))
+      .flatMap((r) => [r.from, r.to]),
+  );
+  return new Set(
+    SAMPLE_STATE.elements
+      .filter((e) => e.type === "judgment" && !argued.has(e.id))
+      .map((e) => e.id),
+  );
+})();
+
+/**
+ * Picks two judgments the sample is currently drawing, from those no argument
+ * touches and whose node the pointer can reach.
+ *
+ * It took the first two drawn, J1 and J2, which were unargued until the demo
+ * gained six arguments. Then two things went wrong, most runs: J1 was an
+ * argument's conclusion, whose converging lines ran through the group's disc
+ * and box and took the clicks aimed there; and with J1 left out, the larger
+ * layout sometimes put the next judgment under the add bar along the canvas's
+ * foot, which took the click instead. So a node counts only if what is at its
+ * centre is the node itself.
+ *
+ * The add bar is folded away first. A ctrl+click hands the selection to it,
+ * which opens its argument form and makes it taller, over the canvas's lower
+ * part — so a node reachable before the first click could be under the bar by
+ * the second, and so could the group's own Collapse handle. These tests are
+ * about groups; the bar folded is the canvas they mean.
+ *
+ * `{ onCanvas: false }` for a test that picks them in a dialog instead: there
+ * is nothing to fold or reach past, and the dialog covers the bar's button.
+ */
+async function twoJudgments(page, { onCanvas = true } = {}) {
+  const drawn = (await drawnIds(page)).filter((id) => LOOSE_JUDGMENTS.has(id));
+  if (!onCanvas) {
+    expect(drawn.length).toBeGreaterThan(1);
+    return drawn.slice(0, 2);
+  }
+  await page.getByRole("button", { name: "Minimise the add bar" }).click();
+  await expect(page.getByRole("button", { name: /Show add bar/ })).toBeVisible();
+  // Reachable, and comfortably inside the canvas: clear of the legend across
+  // its top and the button column down its right edge. A node the app does not
+  // count as wholly in view is glided to when selected, which moves the rest
+  // of the canvas — the second node included — out from under the pointer.
+  const reachable = await page.evaluate((ids) => {
+    const texts = [...document.querySelectorAll("text")];
+    return ids.filter((id) => {
+      const label = texts.find((t) => t.textContent.trim() === id);
+      const shape = label?.previousElementSibling;
+      if (!shape) return false;
+      const r = shape.getBoundingClientRect();
+      const canvas = shape.ownerSVGElement.getBoundingClientRect();
+      const inside =
+        r.left > canvas.left + 40 &&
+        r.right < canvas.right - 120 &&
+        r.top > canvas.top + 90 &&
+        r.bottom < canvas.bottom - 40;
+      const hit = document.elementFromPoint(
+        r.left + r.width / 2,
+        r.top + r.height / 2,
+      );
+      return inside && !!hit && shape.parentNode.contains(hit);
+    });
+  }, drawn);
+  expect(reachable.length, `reachable loose judgments: ${reachable}`).toBeGreaterThan(1);
+  return reachable.slice(0, 2);
 }
 
 test.describe("Grouping nodes", () => {
@@ -236,6 +309,12 @@ test.describe("Grouping nodes", () => {
     // Once open, a group's members are ordinary nodes and its own node is gone;
     // the box is the only handle it has left, and its handles have to be
     // reachable there however near the panel's edge the layout has put it.
+    //
+    // Slow, and marked so: grouping, opening and reopening each re-heat the
+    // layout, and each click on the disc waits for it to come to rest — about
+    // 12s apiece on the 26-element demo, 45s in all on a development machine,
+    // which a CI runner took past the default 60s.
+    test.slow();
     await gotoHome(page);
     await loadSample(page);
 
@@ -303,7 +382,7 @@ test.describe("Grouping nodes", () => {
     const dialog = page.getByLabel("Group name").locator("..").locator("..");
     await expect(dialog).toContainText(/ctrl/i);
 
-    const [a, b] = await twoJudgments(page);
+    const [a, b] = await twoJudgments(page, { onCanvas: false });
     await page.getByLabel(new RegExp(`^${a}:`)).check();
     await page.getByLabel(new RegExp(`^${b}:`)).check();
     await page.getByLabel("Group name").fill("Made from the toolbar");

@@ -16,6 +16,8 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+import anthropic
+import openai
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI, BadRequestError
 
@@ -23,6 +25,10 @@ from openai import AsyncOpenAI, BadRequestError
 logger = logging.getLogger(__name__)
 
 _ANTHROPIC_BASE = "https://api.anthropic.com"
+
+# More than any provider lists today, and a bound on the pages followed if one
+# ever paginates without end.
+_MAX_LISTED_MODELS = 300
 
 
 def _is_unsupported_schema(exc: BadRequestError) -> bool:
@@ -126,6 +132,15 @@ class LLMConfig:
     base_url: str
     model: str
     max_tokens: int = 4096
+    # Both SDKs default to 600s and two retries, so one slow provider could hold a
+    # request for half an hour. See Settings.llm_timeout.
+    timeout_seconds: float = 600.0
+    max_retries: int = 1
+
+
+# An unreachable host should fail in seconds whatever the total budget, which
+# exists for slow generation, not slow connecting.
+_CONNECT_TIMEOUT_SECONDS = 10.0
 
 
 @dataclass
@@ -151,13 +166,54 @@ class LLMService:
         self.max_tokens = config.max_tokens
         self._anthropic: Optional[AsyncAnthropic] = None
         self._openai: Optional[AsyncOpenAI] = None
+        # Each SDK's own Timeout, never httpx's directly: the SDKs choose their
+        # HTTP library and change it between majors (anthropic 1.x and openai 3.x
+        # moved to httpx2), and reject a Timeout built on a different one.
+        connect = min(_CONNECT_TIMEOUT_SECONDS, config.timeout_seconds)
         if _is_anthropic(config.base_url):
-            self._anthropic = AsyncAnthropic(api_key=config.api_key)
+            self._anthropic = AsyncAnthropic(
+                api_key=config.api_key,
+                timeout=anthropic.Timeout(config.timeout_seconds, connect=connect),
+                max_retries=config.max_retries,
+            )
         else:
             self._openai = AsyncOpenAI(
                 api_key=config.api_key or "placeholder",
                 base_url=config.base_url,
+                timeout=openai.Timeout(config.timeout_seconds, connect=connect),
+                max_retries=config.max_retries,
             )
+
+    async def list_models(self) -> list[str]:
+        """The model ids this key can use, newest first.
+
+        Asked of the provider rather than kept in a list here, so what the
+        settings modal suggests is never out of date and never chosen for the
+        user. Anthropic returns its models newest first already; the
+        OpenAI-compatible listings (OpenAI, Mistral, Ollama) carry a ``created``
+        timestamp and are sorted on it. Unfiltered: OpenAI's includes models
+        that do not chat, such as embeddings, and telling them apart from the id
+        would be a guess that goes stale.
+
+        So the modal treats the list as a list and recommends nothing from it
+        (issue #41). The newest model is often not a chat model — providers
+        release image, audio, realtime and embedding models all the time — and
+        the Model field's hint used to name the first entry as the example. It
+        names none now; and a failed connection test that was not the key being
+        refused says the chosen model may be one that cannot chat. Neither
+        filtering nor ranking by id patterns was taken: both are that same
+        stale guess, and a hint that recommends nothing cannot recommend wrong.
+        """
+        client = self._anthropic if self._anthropic is not None else self._openai
+        assert client is not None
+        listed = []
+        async for model in client.models.list():
+            listed.append(model)
+            if len(listed) >= _MAX_LISTED_MODELS:
+                break
+        if self._openai is not None:
+            listed.sort(key=lambda m: getattr(m, "created", None) or 0, reverse=True)
+        return [m.id for m in listed]
 
     async def complete(
         self,

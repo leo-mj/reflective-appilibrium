@@ -42,7 +42,7 @@ describe("tensions", () => {
 
   it("ignores relation types that are not tensions", () => {
     const elements = [el("J1"), el("P1")];
-    for (const type of ["supports", "depends", "entails", "jointly_entails"]) {
+    for (const type of ["supports", "entails", "jointly_entails"]) {
       expect(computeCoherence(elements, [rel("J1", "P1", type)]).tensions).toEqual(
         [],
       );
@@ -311,7 +311,7 @@ describe("possible support", () => {
     expect(possibleSupport).toEqual(["J1 jointly entails P1 (withdrawn)"]);
   });
 
-  it.each(["conflicts", "undermines", "precludes", "depends"])(
+  it.each(["conflicts", "undermines", "precludes"])(
     "ignores %s, which is not support",
     (type) => {
       const { possibleSupport } = computeCoherence(

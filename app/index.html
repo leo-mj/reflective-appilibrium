@@ -49,16 +49,36 @@
       content="A graph of judgments, principles and background theories linked by arguments."
     />
     <meta name="twitter:card" content="summary_large_image" />
+    <!-- The site's Content-Security-Policy allows this script by the hash of its
+         exact text, computed at build time (vite-plugins/contentSecurityPolicy.js), so
+         editing it needs nothing else. Inline event handlers (onclick="…") are
+         another matter: a hash cannot allow them, and the policy blocks them.
+
+         The theme is set here, before the first paint, so the page never
+         flashes the wrong one: the reader's own choice if they made one, and
+         otherwise what their system prefers. Storage can throw (private-mode
+         Safari), which leaves the system's preference to decide. -->
     <script>
       (function () {
+        var stored = function (key) {
+          try {
+            return localStorage.getItem(key);
+          } catch (e) {
+            return null;
+          }
+        };
         var map = {
           serif: "Georgia,'Times New Roman',serif",
           mono: "ui-monospace,Menlo,Consolas,monospace",
         };
-        var id = localStorage.getItem("fontId");
+        var id = stored("fontId");
         if (id && map[id])
           document.documentElement.style.setProperty("--font-family", map[id]);
-        if (localStorage.getItem("theme") === "light")
+        var theme = stored("theme");
+        var prefersLight =
+          window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: light)").matches;
+        if (theme === "light" || (theme !== "dark" && prefersLight))
           document.documentElement.setAttribute("data-theme", "light");
       })();
     </script>

@@ -21,9 +21,12 @@ The first run on a new machine needs the browser once:
 npx playwright install chromium
 ```
 
-You do **not** need to start the dev server. `playwright.config.js` starts one
-and waits for the port, and `reuseExistingServer` is on outside CI, so a
-`npm run dev` you already have running is reused rather than killed.
+You do **not** need to start the dev server. `playwright.config.js` starts its
+own, built as the demo, on a port of its own (5175), and stops it afterwards. A
+`npm run dev` you already have running on 5173 is left alone and never used:
+it carries your own `.env`, and a suite that assumes the demo build, run against
+a backend build, fails in ways that have nothing to do with the code — the
+score badges a backend answers for, for instance, which the demo never shows.
 
 ## How it is put together
 
@@ -35,8 +38,13 @@ and waits for the port, and `reuseExistingServer` is on outside CI, so a
 | `navigation.spec.js` | Analyze tabs, filter chips, search |
 | `persistence.spec.js` | draft resume/discard, export → import round trip |
 | `assist.spec.js` | assist workflow, accepting a suggestion |
+| `discuss.spec.js` | the Discuss panel, against a faked backend — runs only under the `backend` project |
 | `questionnaire.spec.js` | questionnaire mode end to end (skips if no spec present) |
 | `responsive.spec.js` | narrow layout — runs only under the `mobile` project |
+| `live-backend.spec.js` | the SPA against the **real** FastAPI server: withdrawal scores, the simulation, History's step-by-step scores — runs only under the `live-backend` project |
+| `statement-cards.spec.js` | the Graph tab's card view where only a browser can tell: cards not overlapping, measured text fitting its card, the pointer landing on one, a grown card taking clicks — and, under `mobile`, a tap growing one |
+| `tour.spec.js` | the whole guided tour, section by section, under `chromium` and `mobile`: every control a section names is drawn, ringed, and not covered — by the tour's own sheet or anything else |
+| `dragging.spec.js` | dragging a node moves it and nothing else, and where it was dropped survives the autosave, a reload and an export → import round trip |
 | `a11y.spec.js` | axe-core audit of the composed pages, keyboard reachability |
 | `known-issues.spec.js` | fixed defects, and open ones asserted to be still open |
 
@@ -49,6 +57,28 @@ and waits for the port, and `reuseExistingServer` is on outside CI, so a
   the backend, the LLM and BYOK. That is what a clean CI checkout gets anyway
   (`app/.env` is gitignored), and it means the assist specs exercise the
   suggestion plumbing against pre-set examples — no API key, no network.
+- **Except where demo cannot reach.** Discuss exists only in a build with a
+  backend and a saved key, so the `backend` project starts a second dev server
+  (port 5174, `VITE_APP_ENV=backend`) whose backend URL is a host that does not
+  exist. The spec answers every call to it with `page.route`, so no real server,
+  key or provider is involved. Add a spec to `BACKEND_SPECS` in
+  `playwright.config.js` only if it needs that build.
+- **One project meets the real server.** `live-backend` starts uvicorn from
+  the repo root (port 8766) and a dev server built as "backend" pointed at it
+  (5176), and runs only what needs no key and calls no third party — the rethon
+  scoring and simulation routes. Everything else fakes one side of the line,
+  so this is the one place a request or response changed on one side fails.
+  It needs Python with `backend/requirements.txt`, as `npm run test:e2e` now
+  starts the server; CI's e2e job installs both. The server's settings are
+  pinned in `playwright.config.js` — no keys, no tokens, Crossref off, local —
+  so `backend/.env` cannot change what it tests. Its first run found History's
+  round-by-round scores sending an empty round-0 projection the server refused.
+- **A run starts only the servers its projects use** — when they are named
+  with `--project`. `--project=chromium` starts the demo server alone;
+  `--project=live-backend` the Python server and the build pointed at it. A run
+  with no `--project`, or narrowed only by file, `-g` or a wildcard project,
+  starts them all, which is what CI's full run does. So to check one desktop
+  spec without waiting on the backend: `npx playwright test <file> --project=chromium`.
 - **Park the mouse before asserting on text.** Playwright leaves the cursor
   where it clicked, and the app opens a tooltip on hover that sits over panel
   headings. `park(page)` moves it out of the way.

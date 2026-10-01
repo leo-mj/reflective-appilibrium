@@ -7,6 +7,7 @@ import {
   NetworkIcon,
   HistoryIcon,
   ClusterIcon,
+  DuplicatesIcon,
   SuggestIcon,
   PrincipleIcon,
   JudgmentIcon,
@@ -16,8 +17,9 @@ import {
 } from "../components/Icons.jsx";
 
 // The guided workflow's five phases come first, in the order it runs them; the
-// one after them is an Assist tab that is deliberately *not* a phase — see
-// WORKFLOW_NEXT_PHASE in utils/workflowUtils.js, which it stays out of.
+// two after them are Assist tabs that are deliberately *not* phases — see
+// WORKFLOW_NEXT_PHASE in utils/workflowUtils.js, which they stay out of. The
+// last is offered only after a process merge.
 export const ASSIST_TABS = [
   "questionnaire",
   "elicitJudgments",
@@ -26,6 +28,7 @@ export const ASSIST_TABS = [
   "detectArguments",
   "suggestRelations",
   "processReview",
+  "mergeElements",
 ];
 
 export const SIMULATE_TABS = ["simulateRethon"];
@@ -41,7 +44,7 @@ export const SIMULATE_TABS = ["simulateRethon"];
  *
  * Frozen module constants, and looked up by tab rather than built at the call
  * site, because the bar applies a preset when the *identity* of the one it is
- * handed changes — see {@link module:components/TextTabAddPanel.AddBar}. An
+ * handed changes — see {@link module:components/user_edits/AddBar.AddBar}. An
  * object built inline would be a new one every render, and the bar would reset
  * under the reader's hands each time.
  *
@@ -71,12 +74,15 @@ export const ADD_BAR_PRESETS = {
  * @param {Object} opts
  * @param {string} [opts.model] — `"questionnaire"` in questionnaire mode.
  * @param {boolean} [opts.hideNonEntailsRels]
+ * @param {boolean} [opts.hasMerged] — Whether another process has been merged
+ *   in; the Merge tab has nothing to pair until one has.
  * @returns {(tab: string) => boolean}
  */
-export function tabVisibility({ model, hideNonEntailsRels } = {}) {
+export function tabVisibility({ model, hideNonEntailsRels, hasMerged } = {}) {
   return (t) =>
     (!hideNonEntailsRels || t !== "suggestRelations") &&
-    (model === "questionnaire" || t !== "questionnaire");
+    (model === "questionnaire" || t !== "questionnaire") &&
+    (hasMerged || t !== "mergeElements");
 }
 
 export const TAB_ICONS = {
@@ -90,6 +96,7 @@ export const TAB_ICONS = {
   detectArguments: <SimulateIcon />,
   suggestTheories: <TheoryIcon />,
   processReview: <ReviewIcon />,
+  mergeElements: <DuplicatesIcon />,
   simulateRethon: <SimulateIcon />,
 };
 
@@ -104,6 +111,7 @@ export const TAB_LABELS = {
   suggestRelations: "Relations",
   suggestTheories: "Theories",
   processReview: "Review",
+  mergeElements: "Merge Elements",
   simulateRethon: "Simulate",
 };
 
@@ -112,7 +120,8 @@ export const TAB_TOOLTIPS = {
     "Answer a questionnaire based on pre-set questions to conduct a guided RE process.",
   graph:
     "Force-directed graph. Click a node to select; Ctrl+click to start a relation.",
-  history: "Replay your RE process round by round using the history slider.",
+  history:
+    "Replay your RE process step by step, or round by round, with the history slider.",
   clusters:
     "Coherence clusters — the largest possible groups of connected elements with no conflicts.",
   elicitJudgments: "AI helps you surface and refine your moral judgments.",
@@ -127,4 +136,6 @@ export const TAB_TOOLTIPS = {
     "AI proposes well-supported background theories that bear on your topic and your current position — those that ground it, and those it is in tension with.",
   processReview:
     "AI reads your process so far and reports the major shifts across rounds.",
+  mergeElements:
+    "AI finds elements of the merged processes that may make the same claim; you decide whether to merge them.",
 };

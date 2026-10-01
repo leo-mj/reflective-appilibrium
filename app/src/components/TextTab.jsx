@@ -13,6 +13,7 @@ import {
 import { BACKEND_ENABLED } from "../config.js";
 import { C } from "../constants/colors.js";
 import { groupsOf } from "../utils/groupUtils.js";
+import { withdrawalScale } from "../utils/withdrawalScale.js";
 import { useTextTabData } from "../hooks/useTextTabData.js";
 import { useActiveSection } from "../hooks/useActiveSection.js";
 import { Ctx } from "./text_panel/TextTabContext.js";
@@ -32,6 +33,33 @@ import { HistoryRoundBanner } from "./text_panel/TextTabPrimitives.jsx";
 import { CoherenceSection } from "./text_panel/CoherenceSection.jsx";
 import { LogSection } from "./text_panel/LogSection.jsx";
 import { MobileAddButton } from "./text_panel/MobileAddButton.jsx";
+import { EmptyProcessGuide } from "./EmptyProcessGuide.jsx";
+import { roundStops } from "../utils/stateUtils.js";
+
+/**
+ * The per-step scores the server returns, as History's slider counts them: as
+ * they are by step, or one point per round — the score at its last step —
+ * numbered by round (stateUtils, "Steps and rounds").
+ *
+ * @returns {{ roundScores: Array, snappedRound: number, unitLabel: string }}
+ */
+function chartInUnit(stepScores, process, step, unit) {
+  if (unit !== "round")
+    return { roundScores: stepScores, snappedRound: step, unitLabel: "Step" };
+  const stops = roundStops(process);
+  const byStep = new Map(stepScores.map((s) => [s.round, s.scores]));
+  let snapped = 0;
+  stops.forEach((stop, i) => {
+    if (stop <= step) snapped = i;
+  });
+  return {
+    roundScores: stops
+      .slice(1)
+      .map((stop, i) => ({ round: i + 1, scores: byStep.get(stop) ?? null })),
+    snappedRound: snapped,
+    unitLabel: "Round",
+  };
+}
 
 // ─── Module-level constants ───────────────────────────────────────────────────
 /**
@@ -44,7 +72,6 @@ const TOP_BUTTON_CLEARANCE = 48;
 
 /** How far down the list must be scrolled before "↑ Top" has anything to do. */
 const TOP_BUTTON_AT = 200;
-
 
 const DEFAULT_COLLAPSED_SECTIONS = {
   judgments: false,
@@ -61,20 +88,25 @@ const DEFAULT_COLLAPSED_SECTIONS = {
  * Static nav config: keys and labels only. Counts/visibility computed at
  * runtime. `name` spells out the abbreviated labels for the accessible name —
  * "J" reads as the letter, which says nothing about where the pill goes.
+ *
+ * Letters for the three element types only, being the prefixes of the ids the
+ * reader sees on every node and card. Every other section is a word: "G", "C"
+ * and "L" explained themselves only in a hover tooltip, and a finger has no
+ * hover. The pills are drawn at wide widths only, where the words fit.
  */
 const NAV_SECTIONS = [
   { key: "judgments", label: "J", name: "judgments" },
   { key: "principles", label: "P", name: "principles" },
   { key: "theories", label: "T", name: "theories" },
-  { key: "arguments", label: "A", name: "arguments" },
-  { key: "relations", label: "R", name: "relations" },
+  { key: "arguments", label: "Arguments", name: "arguments" },
+  { key: "relations", label: "Relations", name: "relations" },
   // The user's own filing, before the analysis of it.
-  { key: "groups", label: "G", name: "groups" },
+  { key: "groups", label: "Groups", name: "groups" },
   // One pill, because it is one section: tensions, orphans and clusters are
   // all answers to how the commitments hang together. It used to be two — "!"
   // for the findings and "C" for the clusters — which split the question.
-  { key: "coherence", label: "C", name: "coherence" },
-  { key: "log", label: "L", name: "log" },
+  { key: "coherence", label: "Coherence", name: "coherence" },
+  { key: "log", label: "Log", name: "log" },
 ];
 
 // ─── TextTab ──────────────────────────────────────────────────────────────────
@@ -95,6 +127,7 @@ export function TextTab({
   onReinstateRel,
   onAddElement,
   onAddRelation,
+  onAddNewArgument,
   onToggleGroup,
   onEditGroupRequest,
   onUngroup,
@@ -111,6 +144,9 @@ export function TextTab({
   weights,
   showZScores = false,
   historyView = null,
+  search: searchProp,
+  onSearch,
+  wholeProcess = null,
 }) {
   // ── Refs ────────────────────────────────────────────────────────────────
   /** Whether the list is far enough down for "↑ Top" to be worth showing. */
@@ -125,7 +161,11 @@ export function TextTab({
   const refLog = useRef(null);
 
   // ── State ───────────────────────────────────────────────────────────────
-  const [search, setSearch] = useState("");
+  // Held by `REState` when it gives one, so the graph beside the panel can
+  // light up what the search finds; held here otherwise.
+  const [ownSearch, setOwnSearch] = useState("");
+  const search = searchProp ?? ownSearch;
+  const setSearch = onSearch ?? setOwnSearch;
   const [collapsed, setCollapsed] = useState(DEFAULT_COLLAPSED_SECTIONS);
   /**
    * @type {[Record<string,{delta_account:number,delta_systematicity:number}|null>|null, Function]}
@@ -157,8 +197,17 @@ export function TextTab({
     [state.elements, state.relations],
   );
 
+  // Quantised, so it holds still while the numbers move under it — see
+  // {@link module:utils/withdrawalScale}.
+  const deltaScale = useMemo(
+    () => withdrawalScale(withdrawalDeltas),
+    [withdrawalDeltas],
+  );
+
   useEffect(() => {
-    if (!BACKEND_ENABLED) return;
+    // Nothing to score at round 0, and the server refuses an empty element
+    // list (422) — History arrives there on every visit.
+    if (!BACKEND_ENABLED || state.elements.length === 0) return;
     let cancelled = false;
     scoreChanges(state, true, weights).then((result) => {
       if (cancelled || !result) return;
@@ -187,7 +236,11 @@ export function TextTab({
   const loadRoundScores = () => {
     if (!BACKEND_ENABLED || roundScoresLoading) return;
     setRoundScoresLoading(true);
-    scorePerRound(state)
+    // The whole process, not the round being played: `state` is History's
+    // projection, which on arrival is round 0 with nothing in it — a request
+    // the server refuses — and later holds only the rounds up to the one on
+    // screen. The chart marks that round itself, and dims the ones after it.
+    scorePerRound(wholeProcess ?? state)
       .then((data) => setRoundScores(data.round_scores))
       .catch(() => {})
       .finally(() => setRoundScoresLoading(false));
@@ -279,6 +332,32 @@ export function TextTab({
       requestAnimationFrame(() => navigateTo("relations"));
   }, [scrollToRelationsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A selection rebuilds the list with what was selected at the top — the
+  // card, its neighbours, its relations — but the list kept its scroll, so a
+  // card picked well down the panel left the reader looking at the faded "All
+  // elements" instead. So the panel goes to the top whenever the selection
+  // changes, and on letting go comes back to where the reader had scrolled,
+  // since the list they were reading is what returns.
+  const scrollBeforeSelection = useRef(null);
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box) return;
+    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)")
+      ?.matches
+      ? "auto"
+      : "smooth";
+    if (selected || selectedRel) {
+      if (scrollBeforeSelection.current === null)
+        scrollBeforeSelection.current = box.scrollTop;
+      box.scrollTo({ top: 0, behavior });
+    } else if (scrollBeforeSelection.current !== null) {
+      const top = scrollBeforeSelection.current;
+      scrollBeforeSelection.current = null;
+      // After the list is back, or there is nothing yet to scroll to.
+      requestAnimationFrame(() => box.scrollTo({ top, behavior: "auto" }));
+    }
+  }, [selected, selectedRel]);
+
   const activeSection = useActiveSection(sectionRefs, scrollRef);
 
   // ── Nav bar items ─────────────────────────────────────────────────────────
@@ -334,7 +413,7 @@ export function TextTab({
     const asArguments = key === "relations" && hideNonEntailsRels;
     return {
       key,
-      label: asArguments ? "A" : label,
+      label: asArguments ? "Arguments" : label,
       name: asArguments ? "arguments" : name,
       ...sectionMeta[key],
     };
@@ -361,6 +440,8 @@ export function TextTab({
         pCovers,
         search,
         withdrawalDeltas,
+        // One scale for every card, so the bars can be read down the list.
+        withdrawalScale: deltaScale,
         groups,
         onToggleGroup,
         onEditGroupRequest,
@@ -409,6 +490,34 @@ export function TextTab({
             }}
           >
             <HistoryRoundBanner historyView={historyView} />
+
+            {/* A new process, not History's round 0: that is a projection of
+                one that has elements, and says so in the banner above. */}
+            {!historyView && state.elements.length === 0 && (
+              <div style={{ padding: "12px 8px 4px" }}>
+                <EmptyProcessGuide isWide={isWide} />
+              </div>
+            )}
+
+            {/* The bars' colours say which way a score moves, not whether that
+                is good news, and a positive change reads as a merit unless
+                told otherwise. Once for the panel; each bar's hover text says
+                it again for a reader far down the list. */}
+            {withdrawalDeltas &&
+              Object.values(withdrawalDeltas).some(Boolean) && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    lineHeight: 1.4,
+                    color: C.dim,
+                    padding: "6px 4px 2px",
+                  }}
+                >
+                  If withdrawn: + (orange) means the position would score
+                  higher without that element; − (teal) means it is earning
+                  its place.
+                </div>
+              )}
 
             {highlightedIds && (
               <HighlightedSection
@@ -523,6 +632,7 @@ export function TextTab({
           <MobileAddButton
             onAddElement={onAddElement}
             onAddRelation={onAddRelation}
+            onAddNewArgument={onAddNewArgument}
             elements={linkableElements(state.elements)}
             hideNonEntailsRels={hideNonEntailsRels}
           />
@@ -538,8 +648,12 @@ export function TextTab({
           >
             {roundScores ? (
               <RoundScoresChart
-                roundScores={roundScores}
-                snappedRound={state.round}
+                {...chartInUnit(
+                  roundScores,
+                  wholeProcess ?? state,
+                  state.round,
+                  historyView?.unit,
+                )}
               />
             ) : (
               <button
@@ -556,9 +670,7 @@ export function TextTab({
                   width: "100%",
                 }}
               >
-                {roundScoresLoading
-                  ? "Calculating…"
-                  : "Calculate Z-scores per round"}
+                {roundScoresLoading ? "Calculating…" : "Calculate achievement (Z)"}
               </button>
             )}
           </div>

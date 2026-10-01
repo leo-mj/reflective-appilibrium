@@ -4,8 +4,11 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useREActions } from "./useREActions.js";
 import { textAtRound, isWithdrawnNow } from "../utils/stateUtils.js";
+import { makeEmptyState } from "../state.js";
 
-vi.mock("../utils/importMarkdown.js", () => ({
+// The real validator stays: the Argdown reader validates what it builds with it.
+vi.mock("../utils/importMarkdown.js", async (importOriginal) => ({
+  ...(await importOriginal()),
   importStateFromFile: vi.fn(),
 }));
 import { importStateFromFile } from "../utils/importMarkdown.js";
@@ -50,6 +53,34 @@ function baseState(overrides = {}) {
     ...overrides,
   };
 }
+
+// ─── A new process ────────────────────────────────────────────────────────────
+
+// `round` counts steps, one per change. A process nothing has happened in is
+// at step 0, so two additions reach step 2 — it used to start at 1, from when
+// the field counted rounds, and read "Step 3".
+describe("a new process", () => {
+  it("starts at step 0, and its first change is step 1", () => {
+    const fresh = makeEmptyState("A topic");
+    expect(fresh.round).toBe(0);
+
+    const { result } = renderHook(() => useREActions(fresh));
+    for (const text of ["First.", "Second."]) {
+      act(() => {
+        result.current.handleAddElement({
+          type: "judgment",
+          text,
+          confidence: 0.67,
+          origin: "user",
+        });
+      });
+    }
+    expect(result.current.state.round).toBe(2);
+    expect(result.current.state.elements.map((e) => e.addedRound)).toEqual([
+      1, 2,
+    ]);
+  });
+});
 
 // ─── handleAddElement ─────────────────────────────────────────────────────────
 
@@ -135,6 +166,104 @@ describe("handleAddElement", () => {
       result.current.handleAddElement({ type: "theory", text: "T", confidence: 1.0, origin: "user" });
     });
     expect(result.current.state.elements[1].id).toBe("T1");
+  });
+});
+
+// ─── handleAddNewArgument ─────────────────────────────────────────────────────
+
+describe("handleAddNewArgument", () => {
+  const written = (overrides = {}) => ({
+    premises: [
+      { type: "principle", text: "Lying is wrong.", confidence: 0.67 },
+      { type: "judgment", text: "Telling Ann X is lying.", confidence: 0.67 },
+    ],
+    conclusion: { type: "judgment", text: "Don't tell Ann X.", confidence: 0.67 },
+    negated: false,
+    explanation: "Modus ponens",
+    origin: "Leo",
+    ...overrides,
+  });
+
+  it("adds the elements and a joint argument between them, as one round", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleAddNewArgument(written()));
+    const { elements, relations, round, log } = result.current.state;
+
+    expect(elements.slice(1).map((e) => [e.id, e.text, e.origin])).toEqual([
+      ["P1", "Lying is wrong.", "Leo"],
+      ["J2", "Telling Ann X is lying.", "Leo"],
+      ["J3", "Don't tell Ann X.", "Leo"],
+    ]);
+    const added = relations.slice(1);
+    expect(added.map((r) => [r.from, r.to, r.type])).toEqual([
+      ["P1", "J3", "jointly_entails"],
+      ["J2", "J3", "jointly_entails"],
+    ]);
+    expect(added[0].argumentId).toBeTruthy();
+    expect(added[0].argumentId).toBe(added[1].argumentId);
+    expect(added[0].explanation).toBe("Modus ponens");
+    expect(round).toBe(2);
+    expect(log).toHaveLength(1);
+    expect(result.current.recentlyAddedRel).toBe(added[1]);
+  });
+
+  it("is a plain preclusion with one premise, negated", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() =>
+      result.current.handleAddNewArgument(
+        written({ premises: written().premises.slice(0, 1), negated: true }),
+      ),
+    );
+    expect(result.current.state.relations.at(-1).type).toBe("precludes");
+  });
+
+  it("numbers past elements the add bar never sees", () => {
+    // `possible` elements are left out of the bar's list, but their ids are
+    // taken all the same.
+    const { result } = renderHook(() =>
+      useREActions(
+        baseState({ elements: [makeEl(), makeEl({ id: "J2", status: "possible" })] }),
+      ),
+    );
+    act(() => result.current.handleAddNewArgument(written()));
+    expect(result.current.state.elements.slice(2).map((e) => e.id)).toEqual([
+      "P1",
+      "J3",
+      "J4",
+    ]);
+  });
+
+  it("takes elements already on the board by id, adding only the new ones", () => {
+    const { result } = renderHook(() =>
+      useREActions(
+        baseState({
+          elements: [makeEl(), makeEl({ id: "P1", type: "principle" })],
+        }),
+      ),
+    );
+    act(() =>
+      result.current.handleAddNewArgument(
+        written({
+          premises: [{ id: "P1" }, written().premises[0]],
+          conclusion: { id: "J1" },
+        }),
+      ),
+    );
+    const { elements, relations, log } = result.current.state;
+    expect(elements.map((e) => e.id)).toEqual(["J1", "P1", "P2"]);
+    expect(relations.slice(1).map((r) => [r.from, r.to])).toEqual([
+      ["P1", "J1"],
+      ["P2", "J1"],
+    ]);
+    expect(log.at(-1).findings).toContain("with P2");
+  });
+
+  it("is undone in one step", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleAddNewArgument(written()));
+    act(() => result.current.handleUndo());
+    expect(result.current.state.elements).toHaveLength(1);
+    expect(result.current.state.relations).toHaveLength(1);
   });
 });
 
@@ -252,7 +381,7 @@ describe("handleAddRelation", () => {
     // Adding with select=false should leave recentlyAddedRel unchanged
     act(() => {
       result.current.handleAddRelation(
-        { from: "J1", to: "P1", type: "depends", explanation: "" },
+        { from: "J1", to: "P1", type: "undermines", explanation: "" },
         { select: false },
       );
     });
@@ -272,6 +401,19 @@ describe("handleEditSave", () => {
     const el = result.current.state.elements[0];
     expect(el.text).toBe("Updated text");
     expect(el.status).toBe("revised");
+  });
+
+  it("logs whose wording changed, not only how", () => {
+    // History's log box shows `changes` alone, which used to read
+    // "text: … → …" with no element in it.
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleEditRequest("J1"));
+    act(() => {
+      result.current.handleEditSave({ text: "New text", confidence: 1.0, type: "judgment", origin: "user" });
+    });
+    expect(result.current.state.log.at(-1).changes).toBe(
+      "J1 — text: Original text → New text",
+    );
   });
 
   it("stores original text in previousText and sets revisedRound", () => {
@@ -317,8 +459,12 @@ describe("handleEditSave", () => {
     expect(changes).toContain("confidence:");
   });
 
-  it("appends log entry noting 'No fields changed' when nothing differs", () => {
-    const { result } = renderHook(() => useREActions(baseState()));
+  // This used to advance the round, mark the element revised and log "No
+  // fields changed": a revision that did not happen, in the history, the log and
+  // what the process review reads.
+  it("changes nothing when nothing differs, and closes the dialog", () => {
+    const initial = baseState();
+    const { result } = renderHook(() => useREActions(initial));
     act(() => result.current.handleEditRequest("J1"));
     act(() => {
       result.current.handleEditSave({
@@ -326,10 +472,38 @@ describe("handleEditSave", () => {
         confidence: 1.0,
         type: "judgment",
         origin: "user",
-        status: "active",
       });
     });
-    expect(result.current.state.log[0].changes).toBe("No fields changed");
+    expect(result.current.state).toBe(initial);
+    expect(result.current.editingEl).toBeNull();
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("leaves a withdrawn element withdrawn when nothing differs", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleWithdrawConfirm("J1", "Too broad"));
+    const before = result.current.state;
+    act(() => result.current.handleEditRequest("J1"));
+    act(() => {
+      result.current.handleEditSave({
+        text: "Original text",
+        confidence: 1.0,
+        type: "judgment",
+        origin: "user",
+      });
+    });
+    expect(result.current.state).toBe(before);
+    expect(isWithdrawnNow(result.current.state.elements[0])).toBe(true);
+  });
+
+  it("logs only the fields the dialog changed", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.handleEditRequest("J1"));
+    act(() => {
+      result.current.handleEditSave({ text: "New text", confidence: 1.0, type: "judgment", origin: "user" });
+    });
+    // The dialog has no status field; comparing one logged "status: active → undefined".
+    expect(result.current.state.log[0].changes).toBe("J1 — text: Original text → New text");
   });
 
   it("clears editingEl after save", () => {
@@ -447,6 +621,66 @@ describe("handleRelEditSave", () => {
     });
     expect(result.current.editingRel).toBeNull();
   });
+
+  // A joint argument: two premises, one relation each, one argumentId.
+  const jointArgument = () =>
+    baseState({
+      elements: [makeEl(), makeEl({ id: "J2" }), makeEl({ id: "P1", type: "principle" })],
+      relations: [
+        makeRel({ type: "jointly_entails", argumentId: "a1", explanation: "Together" }),
+        makeRel({ from: "J2", type: "jointly_entails", argumentId: "a1", explanation: "Together" }),
+      ],
+    });
+
+  it("revises every premise of an argument, not only the row pressed", () => {
+    const { result } = renderHook(() => useREActions(jointArgument()));
+    act(() => result.current.setEditingRel(result.current.state.relations[1]));
+    act(() => {
+      result.current.handleRelEditSave({ type: "jointly_precludes", explanation: "Rather not" });
+    });
+    for (const rel of result.current.state.relations) {
+      expect(rel.type).toBe("jointly_precludes");
+      expect(rel.explanation).toBe("Rather not");
+      expect(rel.argumentId).toBe("a1");
+      expect(rel.status).toBe("revised");
+    }
+    expect(result.current.state.log.at(-1).findings).toBe(
+      "Argument J1, J2 → P1 was edited by the user.",
+    );
+  });
+
+  it("changes nothing when a relation's fields are unchanged", () => {
+    const initial = baseState();
+    const { result } = renderHook(() => useREActions(initial));
+    act(() => result.current.setEditingRel(result.current.state.relations[0]));
+    act(() => {
+      result.current.handleRelEditSave({ type: "supports", explanation: "J1 supports P1" });
+    });
+    expect(result.current.state).toBe(initial);
+    expect(result.current.editingRel).toBeNull();
+  });
+
+  // Every premise is revised with the argument, so a no-op save here used to
+  // mark them all revised.
+  it("changes nothing when an argument's fields are unchanged", () => {
+    const initial = jointArgument();
+    const { result } = renderHook(() => useREActions(initial));
+    act(() => result.current.setEditingRel(result.current.state.relations[1]));
+    act(() => {
+      result.current.handleRelEditSave({ type: "jointly_entails", explanation: "Together" });
+    });
+    expect(result.current.state).toBe(initial);
+    expect(result.current.state.relations.map((r) => r.status)).toEqual([undefined, undefined]);
+  });
+
+  it("gives a relation turned into entails an argument of its own", () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    act(() => result.current.setEditingRel(result.current.state.relations[0]));
+    act(() => {
+      result.current.handleRelEditSave({ type: "entails", explanation: "x" });
+    });
+    expect(result.current.state.relations[0].argumentId).toBeTruthy();
+  });
 });
 
 // ─── Revision history ─────────────────────────────────────────────────────────
@@ -538,9 +772,18 @@ describe("handleApplyRethonEquilibrium", () => {
   const byId = (result, id) =>
     result.current.state.elements.find((e) => e.id === id);
 
-  it("withdraws everything outside the commitment set", () => {
+  const changes = (overrides = {}) => ({
+    withdraw: [],
+    takeUp: [],
+    reject: [],
+    ...overrides,
+  });
+
+  it("withdraws what it is told to, and nothing else", () => {
     const { result } = renderHook(() => useREActions(state()));
-    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(changes({ withdraw: ["J2"] })),
+    );
     expect(byId(result, "J1").status).toBe("active");
     expect(byId(result, "J2").status).toBe("withdrawn");
     expect(byId(result, "J2").reason).toMatch(/rethon/i);
@@ -548,25 +791,79 @@ describe("handleApplyRethonEquilibrium", () => {
 
   it("records the withdrawal as an event", () => {
     const { result } = renderHook(() => useREActions(state()));
-    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(changes({ withdraw: ["J2"] })),
+    );
     expect(byId(result, "J2").history).toEqual([
       { round: 2, type: "withdrawn", reason: expect.stringMatching(/rethon/i) },
     ]);
   });
 
-  it("leaves already-withdrawn and rejected elements untouched", () => {
-    const before = state();
-    const { result } = renderHook(() => useREActions(before));
-    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
-    expect(byId(result, "J3")).toEqual(before.elements[2]);
-    expect(byId(result, "J4")).toEqual(before.elements[3]);
+  it("takes up again what the equilibrium holds, from withdrawn or rejected", () => {
+    // It used to skip both: an element the equilibrium held was listed as
+    // retained and stayed withdrawn.
+    const { result } = renderHook(() => useREActions(state()));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(
+        changes({ takeUp: ["J3", "J4"] }),
+      ),
+    );
+    for (const id of ["J3", "J4"]) {
+      expect(byId(result, id).status).toBe("active");
+      expect(byId(result, id).history.at(-1)).toEqual({
+        round: 2,
+        type: "reinstated",
+      });
+    }
   });
 
-  it("bumps the round and logs what was retained", () => {
+  it("rejects what the equilibrium holds the negation of", () => {
     const { result } = renderHook(() => useREActions(state()));
-    act(() => result.current.handleApplyRethonEquilibrium(new Set(["J1"])));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(changes({ reject: ["J1"] })),
+    );
+    expect(byId(result, "J1").status).toBe("rejected");
+    expect(byId(result, "J1").history.at(-1).type).toBe("rejected");
+  });
+
+  it("is one step, logged with what changed", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(
+        changes({ withdraw: ["J2"], takeUp: ["J3"] }),
+      ),
+    );
     expect(result.current.state.round).toBe(2);
-    expect(result.current.state.log.at(-1).changes).toContain("J1");
+    const { changes: logged } = result.current.state.log.at(-1);
+    expect(logged).toContain("Withdrawn: J2");
+    expect(logged).toContain("Taken up again: J3");
+  });
+
+  it("records the run, so it can be reproduced from the log", () => {
+    const { result } = renderHook(() => useREActions(state()));
+    act(() =>
+      result.current.handleApplyRethonEquilibrium(
+        changes({
+          withdraw: ["J2"],
+          run: {
+            depth: 2,
+            weights: { account: 0.35, systematicity: 0.55, faithfulness: 0.1 },
+            from: 0.683,
+            to: 0.954,
+          },
+        }),
+      ),
+    );
+    expect(result.current.state.log.at(-1).findings).toBe(
+      "Rethon simulation applied (depth 2; weights: account 0.35, systematicity 0.55, faithfulness 0.10; achievement 0.683 → 0.954).",
+    );
+  });
+
+  it("takes no step when nothing would change", () => {
+    const before = state();
+    const { result } = renderHook(() => useREActions(before));
+    act(() => result.current.handleApplyRethonEquilibrium(changes()));
+    expect(result.current.state.round).toBe(before.round);
   });
 });
 
@@ -836,7 +1133,7 @@ describe("handleWithdrawRelRequest", () => {
 
   it("does not clear selectedRel when a different relation is selected", () => {
     const rel1 = makeRel({ from: "J1", to: "P1" });
-    const rel2 = makeRel({ from: "P1", to: "J1", type: "depends" });
+    const rel2 = makeRel({ from: "P1", to: "J1", type: "undermines" });
     const state = baseState({ relations: [rel1, rel2] });
     const { result } = renderHook(() => useREActions(state));
     act(() => result.current.handleSelectRel(result.current.state.relations[1]));
@@ -942,7 +1239,7 @@ describe("handleRejectRelations", () => {
     act(() => {
       result.current.handleRejectRelations([
         { from: "J1", to: "P1", type: "conflicts", explanation: "x" },
-        { from: "P1", to: "J1", type: "depends", explanation: "y" },
+        { from: "P1", to: "J1", type: "undermines", explanation: "y" },
       ]);
     });
     expect(result.current.state.log[0].findings).toContain("2 relation suggestions rejected");
@@ -1353,6 +1650,36 @@ describe("handleImportFile", () => {
     expect(result.current.selected).toBeNull();
     expect(result.current.selectedRel).toBeNull();
   });
+
+  it("reads an .argdown file as an argument map, not as an exported state", async () => {
+    importStateFromFile.mockClear();
+    const { result } = renderHook(() => useREActions(baseState()));
+    const map =
+      "[a]: Lying is wrong. #principle\n  -> [b]\n\n[b]: This lie is fine.\n";
+    await act(async () => {
+      await result.current.handleImportFile(new File([map], "paper.argdown"));
+    });
+    expect(importStateFromFile).not.toHaveBeenCalled();
+    expect(result.current.state.topic).toBe("paper");
+    expect(result.current.state.elements.map((e) => e.id)).toEqual([
+      "P1",
+      "J1",
+    ]);
+    expect(result.current.state.relations).toMatchObject([
+      { from: "P1", to: "J1", type: "conflicts" },
+    ]);
+  });
+  it("prepares an Argdown map for merging, labelled without its extension", async () => {
+    const { result } = renderHook(() => useREActions(baseState()));
+    let prepared;
+    await act(async () => {
+      prepared = await result.current.handlePrepareMerge(
+        new File(["[a]: A claim from my paper."], "my-paper.argdown"),
+      );
+    });
+    expect(prepared.label).toBe("my-paper");
+    expect(prepared.incoming.elements).toHaveLength(1);
+  });
 });
 
 // ─── Groups ───────────────────────────────────────────────────────────────────
@@ -1682,5 +2009,115 @@ describe("group actions", () => {
 
     act(() => result.current.handleUngroup("G1"));
     expect(result.current.selected).toBeNull();
+  });
+});
+
+// ─── Pins ─────────────────────────────────────────────────────────────────────
+
+describe("pin actions", () => {
+  const threeElements = () =>
+    baseState({
+      elements: [makeEl(), makeEl({ id: "J2" }), makeEl({ id: "J3" })],
+      relations: [],
+    });
+
+  it("pins where a node was dropped, without a round, a log entry or an undo step", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() => result.current.handlePinNodes({ J1: { x: 10, y: -20 } }));
+
+    expect(result.current.state.pins).toEqual({ J1: { x: 10, y: -20 } });
+    expect(result.current.state.round).toBe(1);
+    expect(result.current.state.log).toEqual([]);
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("keeps a drag through the undo of an edit made before it", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() =>
+      result.current.handleAddElement({
+        type: "judgment",
+        text: "New",
+        confidence: 1,
+        origin: "user",
+      }),
+    );
+    act(() => result.current.handlePinNodes({ J1: { x: 5, y: 5 } }));
+    act(() => result.current.handleUndo());
+
+    expect(result.current.state.elements).toHaveLength(3);
+    expect(result.current.state.pins).toEqual({ J1: { x: 5, y: 5 } });
+  });
+
+  it("keeps a drag through a redo too", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() =>
+      result.current.handleAddElement({
+        type: "judgment",
+        text: "New",
+        confidence: 1,
+        origin: "user",
+      }),
+    );
+    act(() => result.current.handleUndo());
+    act(() => result.current.handlePinNodes({ J2: { x: 1, y: 1 } }));
+    act(() => result.current.handleRedo());
+
+    expect(result.current.state.elements).toHaveLength(4);
+    expect(result.current.state.pins).toEqual({ J2: { x: 1, y: 1 } });
+  });
+
+  it("resets the layout as one undo step, which undo takes back", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() =>
+      result.current.handlePinNodes({ J1: { x: 1, y: 1 }, J2: { x: 2, y: 2 } }),
+    );
+    act(() => result.current.handleResetLayout());
+    expect(result.current.state.pins).toEqual({});
+    expect(result.current.canUndo).toBe(true);
+
+    act(() => result.current.handleUndo());
+    expect(result.current.state.pins).toEqual({
+      J1: { x: 1, y: 1 },
+      J2: { x: 2, y: 2 },
+    });
+
+    act(() => result.current.handleRedo());
+    expect(result.current.state.pins).toEqual({});
+  });
+
+  it("lets go of a group's members' pins as the group closes", () => {
+    // Collapsed, they have to gather on the group's disc; pins would hold open
+    // the ground collapsing is there to reclaim.
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() =>
+      result.current.handlePinNodes({
+        J1: { x: 1, y: 1 },
+        J2: { x: 2, y: 2 },
+        J3: { x: 3, y: 3 },
+      }),
+    );
+    // A new group arrives collapsed.
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    expect(result.current.state.pins).toEqual({ J3: { x: 3, y: 3 } });
+  });
+
+  it("does not touch pins when an already-closed group changes", () => {
+    const { result } = renderHook(() => useREActions(threeElements()));
+    act(() => result.current.handleCreateGroup(["J1", "J2"]));
+    // Dragging the closed group pins its members, together.
+    act(() =>
+      result.current.handlePinNodes({ J1: { x: 1, y: 1 }, J2: { x: 1, y: 2 } }),
+    );
+    act(() =>
+      result.current.handleSaveGroup({
+        id: "G1",
+        label: "Renamed",
+        members: ["J1", "J2"],
+      }),
+    );
+    expect(result.current.state.pins).toEqual({
+      J1: { x: 1, y: 1 },
+      J2: { x: 1, y: 2 },
+    });
   });
 });
