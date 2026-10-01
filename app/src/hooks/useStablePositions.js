@@ -5,7 +5,7 @@
 
 /** @import { REState, Dims, PositionMap } from '../types.js' */
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as d3 from "d3";
 import { nodeRadius } from "../utils/graphHelpers.js";
 import { groupsOf } from "../utils/groupUtils.js";
@@ -131,8 +131,12 @@ export function useStablePositions(state, dims, onPin) {
   /** @type {React.RefObject<Map<string, {x: number, y: number}>>} Where each dragged node stood when it was picked up. */
   const grabbedRef = useRef(new Map());
   // Latest callback, read at drop time, so that `drag` can stay stable.
+  // Assigned after the commit rather than during render: a ref written while
+  // rendering is not guaranteed to survive a discarded render.
   const onPinRef = useRef(onPin);
-  onPinRef.current = onPin;
+  useLayoutEffect(() => {
+    onPinRef.current = onPin;
+  });
   const [positions, setPositions] = useState({});
   const [ready, setReady] = useState(false);
   const halfWidth = dims.w / 2;

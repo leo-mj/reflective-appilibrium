@@ -206,6 +206,9 @@ export function GuidedTour({
     if (!wasActive.current) {
       wasActive.current = true;
       if (idx !== 0) {
+        // The rewind has to be this pass, for the reason above: done during
+        // render it would not stop this effect applying the old section.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIdx(0);
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
         return;

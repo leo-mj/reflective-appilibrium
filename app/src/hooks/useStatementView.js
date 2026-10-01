@@ -164,6 +164,14 @@ export function useStatementView({
 
   // Each tick's pass builds on the last one — see `nextStatementLayout` for why
   // running it afresh on every tick of the simulation jiggles.
+  //
+  // react-hooks/refs objects to the ref being read and written while rendering,
+  // and to what is derived from it reaching useViewGlide. Deliberately so: the
+  // ref carries the last pass into the next one, and holding it in state
+  // instead would cost a second render on every tick of the simulation. A
+  // discarded render can at worst leave the layout one pass ahead, which the
+  // next pass absorbs.
+  /* eslint-disable react-hooks/refs */
   const layout = useRef(null);
   const positions = useMemo(() => {
     if (!statements) {
@@ -193,6 +201,7 @@ export function useStatementView({
     pan,
     zoom,
   });
+  /* eslint-enable react-hooks/refs */
   const toggleStatements = () => {
     depart();
     setStatementViewOn(!statementViewOn());
