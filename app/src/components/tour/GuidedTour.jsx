@@ -32,6 +32,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
 import { BACKEND_ENABLED, LLM_ENABLED } from "../../config.js";
 import { useHasLLMKey } from "../../utils/llmKey.js";
+import {
+  setStatementViewOn,
+  statementViewOn,
+} from "../../utils/statementViewSetting.js";
 import { buildTourSections } from "./tourSections.js";
 import { TOUR_Z, sheetHeight } from "./tourZ.js";
 import { useTourWidth } from "./tourWidth.js";
@@ -194,8 +198,16 @@ export function GuidedTour({
 
   // ── The app follows the section being read ────────────────────────────────
   const wasActive = useRef(false);
+  // The tour reads the graph as nodes — circles, rounded rectangles, diamonds —
+  // and comes to the statement cards near its end, so it opens on the nodes and
+  // hands the reader's own setting back as it closes, unless they switched the
+  // cards on again while reading.
+  const statementsBefore = useRef(false);
   useEffect(() => {
     if (!active) {
+      if (wasActive.current && statementsBefore.current && !statementViewOn())
+        setStatementViewOn(true);
+      statementsBefore.current = false;
       wasActive.current = false;
       return;
     }
@@ -205,6 +217,8 @@ export function GuidedTour({
     // from last time is never applied, because this pass returns before it.
     if (!wasActive.current) {
       wasActive.current = true;
+      statementsBefore.current = statementViewOn();
+      setStatementViewOn(false);
       if (idx !== 0) {
         // The rewind has to be this pass, for the reason above: done during
         // render it would not stop this effect applying the old section.

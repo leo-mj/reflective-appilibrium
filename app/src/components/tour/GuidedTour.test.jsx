@@ -15,6 +15,10 @@ import { GuidedTour } from "./GuidedTour.jsx";
 import { TOUR_W, TOUR_Z, sheetHeight } from "./tourZ.js";
 import { TOUR_MIN_W, resetTourWidth } from "./tourWidth.js";
 import { SAMPLE_STATE } from "../../state.js";
+import {
+  setStatementViewOn,
+  statementViewOn,
+} from "../../utils/statementViewSetting.js";
 
 beforeEach(() => {
   // The ring is measured a frame after the section changes.
@@ -310,6 +314,37 @@ describe("leaving", () => {
     ]);
   });
 
+  it("reads the graph as nodes, and hands the statement cards back after", () => {
+    setStatementViewOn(true);
+    const spies = {
+      onClose: vi.fn(),
+      onSetTab: vi.fn(),
+      onSelectNode: vi.fn(),
+      onSelectRel: vi.fn(),
+      onSetChrome: vi.fn(),
+      onFocusGraph: vi.fn(),
+    };
+    const tour = (active) => (
+      <GuidedTour
+        active={active}
+        state={SAMPLE_STATE}
+        isSample
+        hideNonEntailsRels
+        {...spies}
+      />
+    );
+    const { rerender } = render(tour(true));
+    expect(statementViewOn()).toBe(false);
+    rerender(tour(false));
+    expect(statementViewOn()).toBe(true);
+
+    // Left off by a reader who had it off: the tour turns nothing on.
+    setStatementViewOn(false);
+    rerender(tour(true));
+    rerender(tour(false));
+    expect(statementViewOn()).toBe(false);
+  });
+
   it("ends on Finish rather than a Next that goes nowhere", () => {
     const spies = openTour();
     walkTo("That's the tour");
@@ -467,7 +502,8 @@ describe("resizing the tour column", () => {
 
   const grip = () =>
     screen.queryByRole("separator", { name: "Resize tour column" });
-  const column = () => screen.getByRole("complementary", { name: "Guided tour" });
+  const column = () =>
+    screen.getByRole("complementary", { name: "Guided tour" });
 
   it("opens at the width it ships at", () => {
     openTour();

@@ -43,109 +43,126 @@ export function NodeTooltip({ tooltip, actions = null, roundEnds }) {
   if (!tooltip) return null;
   const { x, y, el } = tooltip;
   // Clamp x so the tooltip (maxWidth 300 → half = 150) stays within the viewport.
-  const clampedX = Math.max(150, Math.min(window.innerWidth - 150, x));
+  const clampedX = Math.round(
+    Math.max(150, Math.min(window.innerWidth - 150, x)),
+  );
   // If near the top edge, show below the cursor instead of above.
   const nearTop = y < 120;
+  // Placed by layout rather than `translate(-50%, -100%)`: the card's height is
+  // fractional (12px type at a line height of 1.4), and a transform by a
+  // fraction of a pixel drew all of its text blurred. The slot is a fixed
+  // 300px centred on the point, which centres the card in it, and the card
+  // hangs from its top or stands on its bottom edge, both whole pixels.
   return createPortal(
     <div
       style={{
         position: "fixed",
-        left: Math.round(clampedX),
-        top: Math.round(y),
-        transform: nearTop ? "translate(-50%, 10px)" : "translate(-50%, -100%)",
-        background: C.panel,
-        border: `1px solid ${C.border}`,
-        borderRadius: 6,
-        padding: "8px 12px",
-        maxWidth: 300,
-        pointerEvents: actions ? "auto" : "none",
-        boxShadow: actions ? "0 2px 10px rgba(0,0,0,0.35)" : "none",
+        left: clampedX - 150,
+        width: 300,
+        ...(nearTop
+          ? { top: Math.round(y) + 10 }
+          : { bottom: window.innerHeight - Math.round(y) }),
+        display: "flex",
+        justifyContent: "center",
+        pointerEvents: "none",
         zIndex: 10,
       }}
-      // The canvas clears the pin on any background click, so a click landing
-      // on the card itself must not bubble out to it.
-      onPointerDown={actions ? (e) => e.stopPropagation() : undefined}
-      onPointerUp={actions ? (e) => e.stopPropagation() : undefined}
     >
       <div
         style={{
-          color: C.text,
-          fontSize: 12,
-          fontWeight: "bold",
-          marginBottom: 4,
+          background: C.panel,
+          border: `1px solid ${C.border}`,
+          borderRadius: 6,
+          padding: "8px 12px",
+          minWidth: 0,
+          pointerEvents: actions ? "auto" : "none",
+          boxShadow: actions ? "0 2px 10px rgba(0,0,0,0.35)" : "none",
         }}
+        // The canvas clears the pin on any background click, so a click landing
+        // on the card itself must not bubble out to it.
+        onPointerDown={actions ? (e) => e.stopPropagation() : undefined}
+        onPointerUp={actions ? (e) => e.stopPropagation() : undefined}
       >
-        {el.type === "group"
-          ? `${el.label} — group of ${el.memberIds.length}`
-          : `${el.id} (${el.type}) — ${el.status}`}
-      </div>
-      {el.type === "group" ? (
-        // What the disc is standing in for. A collapsed group hides its members
-        // but keeps every relation they hold against the rest of the graph, so
-        // the one thing the card has to answer is which elements those are.
-        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>
-          {el.members.map((m) => (
-            <div key={m.id}>
-              <span style={{ color: C.text }}>{m.id}</span> {m.text}
-            </div>
-          ))}
-        </div>
-      ) : el.card ? null : (
-        // Not for a statement card (`card`, the statement view's display copy):
-        // its wording is the card, one hover away from whole, and this box
-        // repeating it beside the card was the clutter. What is left here —
-        // status, earlier wording, reason, confidence, origin, the actions —
-        // is what the card does not show.
-        <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.4 }}>
-          {el.text}
-        </div>
-      )}
-      {el.type !== "group" && el.previousText && (
         <div
           style={{
-            color: C.revised,
-            fontSize: 10,
-            marginTop: 4,
-            fontStyle: "italic",
+            color: C.text,
+            fontSize: 12,
+            fontWeight: "bold",
+            marginBottom: 4,
           }}
         >
-          Previously: {el.previousText}
+          {el.type === "group"
+            ? `${el.label} — group of ${el.memberIds.length}`
+            : `${el.id} (${el.type}) — ${el.status}`}
         </div>
-      )}
-      {el.type !== "group" && el.reason && (
-        <div
-          style={{
-            color: C.withdrawnMark,
-            fontSize: 10,
-            marginTop: 4,
-            fontStyle: "italic",
-          }}
-        >
-          Withdrawn: {el.reason}
-        </div>
-      )}
-      {el.type !== "group" && (
-        <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
-          {/* Already a hover surface, so the exact value goes inline rather than
+        {el.type === "group" ? (
+          // What the disc is standing in for. A collapsed group hides its members
+          // but keeps every relation they hold against the rest of the graph, so
+          // the one thing the card has to answer is which elements those are.
+          <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.5 }}>
+            {el.members.map((m) => (
+              <div key={m.id}>
+                <span style={{ color: C.text }}>{m.id}</span> {m.text}
+              </div>
+            ))}
+          </div>
+        ) : el.card ? null : (
+          // Not for a statement card (`card`, the statement view's display copy):
+          // its wording is the card, one hover away from whole, and this box
+          // repeating it beside the card was the clutter. What is left here —
+          // status, earlier wording, reason, confidence, origin, the actions —
+          // is what the card does not show.
+          <div style={{ color: C.dim, fontSize: 12, lineHeight: 1.4 }}>
+            {el.text}
+          </div>
+        )}
+        {el.type !== "group" && el.previousText && (
+          <div
+            style={{
+              color: C.revised,
+              fontSize: 10,
+              marginTop: 4,
+              fontStyle: "italic",
+            }}
+          >
+            Previously: {el.previousText}
+          </div>
+        )}
+        {el.type !== "group" && el.reason && (
+          <div
+            style={{
+              color: C.withdrawnMark,
+              fontSize: 10,
+              marginTop: 4,
+              fontStyle: "italic",
+            }}
+          >
+            Withdrawn: {el.reason}
+          </div>
+        )}
+        {el.type !== "group" && (
+          <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
+            {/* Already a hover surface, so the exact value goes inline rather than
               behind a title nobody could reach. */}
-          Confidence: {confidenceDetail(el.confidence)} · Origin: {el.origin}
-          {el.addedRound &&
-            ` · Added: ${stepLabel({ roundEnds }, el.addedRound)}`}
-        </div>
-      )}
-      {actions && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginTop: 8,
-            paddingTop: 6,
-            borderTop: `1px solid ${C.border}`,
-          }}
-        >
-          {actions}
-        </div>
-      )}
+            Confidence: {confidenceDetail(el.confidence)} · Origin: {el.origin}
+            {el.addedRound &&
+              ` · Added: ${stepLabel({ roundEnds }, el.addedRound)}`}
+          </div>
+        )}
+        {actions && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginTop: 8,
+              paddingTop: 6,
+              borderTop: `1px solid ${C.border}`,
+            }}
+          >
+            {actions}
+          </div>
+        )}
+      </div>
     </div>,
     document.body,
   );
