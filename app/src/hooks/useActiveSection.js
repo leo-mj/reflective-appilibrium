@@ -75,7 +75,6 @@ export function useActiveSection(sectionRefs, scrollRef) {
   // those renders queued one more here, until dev mode stopped it with
   // "Maximum update depth exceeded". So `measure` sets state only when the
   // section it measured is not the one it measured last.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(measure);
 
   useEffect(() => {

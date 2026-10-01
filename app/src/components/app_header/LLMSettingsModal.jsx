@@ -105,6 +105,13 @@ export function LLMSettingsModal({ open, onClose, returnFocusTo }) {
   const [testing, setTesting] = useState(false);
   const [serverKeyUrls, setServerKeyUrls] = useState(new Set());
   const [usage, setUsage] = useState({ input: 0, output: 0 });
+  // The session's token count, read as the modal opens — adjusted during
+  // render, as the provider is below, rather than set from an effect.
+  const [usageOpen, setUsageOpen] = useState(false);
+  if (open !== usageOpen) {
+    setUsageOpen(open);
+    if (open) setUsage(getSessionUsage());
+  }
   // Tagged with the provider asked, so a list that arrives after the reader
   // has moved to another provider is not offered under it.
   const [listed, setListed] = useState({ baseUrl: null, models: [] });
@@ -125,9 +132,7 @@ export function LLMSettingsModal({ open, onClose, returnFocusTo }) {
   }
 
   useEffect(() => {
-    if (!open) return;
-    setUsage(getSessionUsage());
-    if (demo) return;
+    if (!open || demo) return;
     fetch(`${BACKEND_URL}/api/llm/configured-providers`)
       .then((r) => r.json())
       .then((data) => setServerKeyUrls(new Set(data.base_urls)))

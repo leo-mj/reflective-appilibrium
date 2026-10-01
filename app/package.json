@@ -21,7 +21,6 @@
   "dependencies": {
     "@argdown/core": "^2.0.1",
     "d3": "^7.9.0",
-    "openai": "^6.32.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.8"
   },
@@ -37,7 +36,7 @@
     "axe-core": "^4.12.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "jsdom": "^29.0.2",
