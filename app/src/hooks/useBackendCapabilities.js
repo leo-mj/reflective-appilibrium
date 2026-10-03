@@ -78,7 +78,10 @@ function load() {
         maxDepth: data?.max_neighbourhood_depth ?? 0,
       }),
     )
-    .catch(() => settle({ ...UNAVAILABLE, loaded: true }));
+    .catch(() => settle({ ...UNAVAILABLE, loaded: true }))
+    // Resolves to what was settled, for callers that act on the answer rather
+    // than render it (utils/wakeBackend.js).
+    .then(() => current);
   return inFlight;
 }
 
@@ -94,9 +97,12 @@ function load() {
  *
  * It is the same request the app makes anyway — later subscribers join it —
  * so it costs nothing extra, and in the demo build it does nothing.
+ *
+ * @returns {Promise<BackendCapabilities>|null} The settled capabilities, or
+ *   null in the demo build, where nothing is asked.
  */
 export function prefetchBackendCapabilities() {
-  load();
+  return load();
 }
 
 /**

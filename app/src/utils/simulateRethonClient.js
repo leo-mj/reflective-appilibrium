@@ -232,3 +232,34 @@ export async function simulateRethon(state, local, evolution = null, weights = n
   accumulateUsage(data);
   return data;
 }
+
+/**
+ * Asks the backend to start its simulation and scoring workers now.
+ *
+ * The workers are where the rethon stack is loaded, and on a backend that has
+ * scaled to zero starting them is most of the wait before a first score or
+ * simulation. The start page sends this after the health check
+ * (utils/wakeBackend.js), so the wait passes while the reader is still there.
+ * The backend answers once both are up, at once if they already were.
+ *
+ * Best effort: a backend that predates the endpoint, a 429 or a failure all
+ * leave the workers to start on the first computation, as they always did.
+ *
+ * @returns {Promise<boolean>} Whether the backend said both are ready.
+ */
+export async function warmBackendWorkers() {
+  if (!BACKEND_ENABLED) return false;
+  try {
+    // No body and no headers, which makes this a "simple" request: a
+    // Content-Type would add a CORS preflight, one more round trip queued
+    // behind a cold instance's start-up.
+    const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/warm`, {
+      method: "POST",
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.ready === true;
+  } catch {
+    return false;
+  }
+}
