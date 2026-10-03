@@ -1,5 +1,5 @@
 /**
- * @fileoverview Asks the backend what it can actually do, once per mount.
+ * @fileoverview Asks the backend what it can actually do, once per page load.
  *
  * Build-time flags say whether a backend exists; they cannot say what that
  * backend is configured to allow. The element cap in particular is a server
@@ -80,6 +80,23 @@ function load() {
     )
     .catch(() => settle({ ...UNAVAILABLE, loaded: true }));
   return inFlight;
+}
+
+/**
+ * Starts the shared health check without waiting for a component to want it.
+ *
+ * The check doubles as the backend's wake-up call: a hosted backend that has
+ * scaled to zero starts an instance when the first request reaches it, and
+ * that takes tens of seconds. Left to the first subscriber, the request went
+ * out only once the editor opened, so the whole start-up landed on the reader's
+ * first minute in it. Called from the start page, the start-up happens while
+ * they are still reading it.
+ *
+ * It is the same request the app makes anyway — later subscribers join it —
+ * so it costs nothing extra, and in the demo build it does nothing.
+ */
+export function prefetchBackendCapabilities() {
+  load();
 }
 
 /**

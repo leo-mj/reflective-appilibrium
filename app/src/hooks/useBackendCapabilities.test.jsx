@@ -9,9 +9,11 @@ vi.mock("../config.js", () => ({
   BACKEND_URL: "http://localhost:8000",
 }));
 
-const { useBackendCapabilities, resetBackendCapabilities } = await import(
-  "./useBackendCapabilities.js"
-);
+const {
+  useBackendCapabilities,
+  prefetchBackendCapabilities,
+  resetBackendCapabilities,
+} = await import("./useBackendCapabilities.js");
 
 beforeEach(() => {
   // The health check is cached for the life of the page now — one per load,
@@ -121,5 +123,38 @@ describe("useBackendCapabilities", () => {
     const { result } = renderHook(() => useBackendCapabilities());
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.maxElements).toBe(0);
+  });
+});
+
+// The start page calls this so that a backend scaled to zero starts while the
+// reader is still on it. It must be the editor's own request, started early —
+// not a second one.
+describe("prefetchBackendCapabilities", () => {
+  it("starts the health check with no component subscribed", () => {
+    respondWith({ status: "ok" });
+    prefetchBackendCapabilities();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health$/);
+  });
+
+  it("is the request later callers join, not an extra one", async () => {
+    respondWith({ status: "ok", max_simulation_elements: 20 });
+    prefetchBackendCapabilities();
+    prefetchBackendCapabilities();
+    const { result } = renderHook(() => useBackendCapabilities());
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(result.current.maxElements).toBe(20);
+  });
+
+  it("hands its answer to a caller that arrives after it settled", async () => {
+    respondWith({ status: "ok", deployment: "hosted" });
+    prefetchBackendCapabilities();
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    const { result } = renderHook(() => useBackendCapabilities());
+    expect(result.current.loaded).toBe(true);
+    expect(result.current.deployment).toBe("hosted");
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

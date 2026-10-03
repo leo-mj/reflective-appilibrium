@@ -154,3 +154,18 @@ describe("exporting the draft from the dialog", () => {
     expect(markdown).toContain("## Elements");
   });
 });
+
+// The demo has no backend: its start page must not wake anything. The backend
+// build's side of this is HomePage.wake.test.jsx, which has to mock the config.
+describe("waking the backend", () => {
+  it("makes no request in the demo build", () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    try {
+      renderHome();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

@@ -4,11 +4,12 @@
  * @module components/HomePage
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { C, inkOn } from "../constants/colors.js";
 import { Tooltip } from "./Tooltip.jsx";
 import { ModalShell } from "./user_edits/ModalShell.jsx";
 import { useTheme, usePalette } from "../hooks/useTheme.js";
+import { prefetchBackendCapabilities } from "../hooks/useBackendCapabilities.js";
 import {
   clearDraft,
   isWorthResuming,
@@ -370,6 +371,12 @@ export function HomePage({
   onLoadSession,
 }) {
   const { isDark, toggle: toggleTheme } = useTheme();
+  // Wakes a backend that has scaled to zero while the reader is still here,
+  // rather than once they open the editor. The editor makes the same request
+  // and joins this one; the demo build makes none.
+  useEffect(() => {
+    prefetchBackendCapabilities();
+  }, []);
   // Read once on mount: the draft is written by the editor, so it cannot change
   // while this page is on screen, and re-reading would fight the Discard button.
   const [draft, setDraft] = useState(() => loadDraft());
