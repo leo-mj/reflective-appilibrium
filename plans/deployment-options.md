@@ -125,10 +125,13 @@ already stateless. Ephemeral container disk is not a compromise here, it is the
 whole design, which is one fewer thing to configure and one fewer thing holding
 a participant's reasoning.
 
-The cold start is survivable for a reason worth recording: the app fetches
-`/api/health` on page load, so the wake begins when a reader opens the tab and
-finishes while they are on the intro and tutorial screens, rather than when they
-press Simulate.
+*Corrected 2026-10-03.* This paragraph used to say the app fetched
+`/api/health` on page load, so the wake began when a reader opened the tab. That
+was untrue of the build deployed: the health check was sent only once an editor
+component asked for it, and a reader on the start page woke nothing — observed on
+the live site, where the instance started only after "Skip guided tour". Since
+`cold-start` the start page sends the health check and then a warm-up request as
+it appears; see "Cold start — 2026-10-03" below.
 
 ### Oracle Cloud Always Free — the alternative
 
@@ -281,9 +284,10 @@ URL is the demo" true.
 - **`CORS_ORIGINS` names the Cloudflare origin only.** The demo never calls the
   backend.
 - **Cloud Run**, as recommended above: `--max-instances=1`, 1 GiB, startup CPU
-  boost, a budget alert, and no minimum instance — the `/api/health` fetch on
-  page load already hides the cold start, and an always-on instance would
-  spend the free tier idling. Plus `TRUSTED_PROXY_HOPS=1`, below.
+  boost, a budget alert, and no minimum instance — the start page's wake-up
+  hides most of the cold start (see "Cold start — 2026-10-03"; when this was
+  written the fetch it relied on did not yet happen on page load), and an
+  always-on instance would spend the free tier idling. Plus `TRUSTED_PROXY_HOPS=1`, below.
 - Cloud Run is deployed from CI, but only by hand: `deploy-backend` runs from
   the Actions tab, never on a push. The two static sites deploy on every push
   to `deploy` (`deploy` and `deploy-cloudflare`), the Cloudflare one reading the
@@ -317,3 +321,54 @@ unlock server keys through a proxy even if someone reinstates the `*`.
 
 Order of work: that fix; the `_headers` output; `ci.yml`; Cloud Run; then
 `RELEASING.md` rewritten for three targets.
+
+## Cold start — 2026-10-03
+
+Observed on Cloud Run: about **25 s** from "Starting new instance" to "STARTUP
+TCP probe succeeded", startup CPU boost on. The image is streamed lazily, so
+the cost is mostly reading files, and the server read a great many: importing
+`backend.main` imported the whole rethon stack (numba, llvmlite, pandas, …)
+through the routers, although only the workers compute with it.
+
+Three changes on the `cold-start` branch:
+
+1. **The server no longer loads rethon.** The routers import
+   `services/rethon_tasks.py`, which holds the request validation and light
+   stand-ins that the pools pickle by reference; the workers import the heavy
+   modules on their first task. `backend/tests/test_startup_imports.py` fails if
+   `import backend.main` loads any of the heavy packages again.
+2. **The start page wakes the backend**: `/api/health`, then
+   `POST /api/simulate_rethon/warm`, which starts both worker pools and answers
+   when they are up. It runs *inside* a request because Cloud Run's
+   request-based billing gives an instance CPU only while a request is in
+   flight; warming in the background after start-up would not progress.
+3. **The editor says when it is still waiting** (`ServerWakeNotice`): after two
+   seconds, which phase (server starting, or workers loading rethon) and the
+   seconds elapsed.
+
+Measured in this repository's cloud container with `make measure-startup
+ARGS=--cold` (Linux; `--cold` evicts the package files from the page cache, the
+nearest local analogue of a lazily streamed image):
+
+| | before | after |
+| --- | --- | --- |
+| native libraries the server maps at import | 263 MB | **5.4 MB** |
+| Python modules the server reads at import | 37.3 MB | **12.7 MB** |
+| heavy packages loaded by the server | all 8 | **none** |
+| `/api/health` answering, cold | 3.88 s | **2.38 s** |
+| `/api/health` answering, warm cache | 2.64 s | 1.93 s |
+| server RSS, idle | 219 MB | **97 MB** |
+| process tree RSS after a score and a simulation | 670 MB | 548 MB |
+| first score / first simulation, no warm-up | 3.37 / 2.30 s | 2.08 / 1.60 s |
+| `/warm`, cold | — | 2.48 s |
+| first score / first simulation after `/warm` | — | **0.71 / 0.63 s** |
+
+These are local numbers; the container reads from a local disk. What carries
+over to Cloud Run is the ratio of bytes read before the server can answer,
+roughly 300 MB down to 18 MB, not the seconds. The real figure has to be read
+off the Cloud Run logs after the next deploy.
+
+What is left of the server's import is mostly the LLM SDKs (`anthropic` ≈ 0.9 s,
+`openai` ≈ 0.4 s, through `services/llm.py`). Importing them lazily is the next
+step if the deployed cold start is still long; the tests patch
+`backend.services.llm.AsyncOpenAI` and `AsyncAnthropic`, so that needs care.

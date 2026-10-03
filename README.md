@@ -190,6 +190,13 @@ cd app && npm test       # frontend unit tests (Vitest)
 cd app && npm run test:e2e   # browser tests (Playwright), see app/e2e/README.md
 ```
 
+`make measure-startup` times the backend's start-up — the server's import, its
+health check, the worker warm-up and the first score and simulation — and how
+much it reads to get there. `ARGS=--cold` drops the package files from the page
+cache first (Linux; on macOS run `sudo purge` before it), which is the nearest
+local stand-in for a host that has scaled to zero. See
+`plans/deployment-options.md` for the figures.
+
 ---
 
 ## License
