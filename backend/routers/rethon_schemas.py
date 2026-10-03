@@ -166,3 +166,10 @@ class SimulateRethonStepRequest(BaseModel):
     evolution: Optional[List[List[REElement]]] = None
     weights: Optional[ModelWeights] = None
     neighbourhood_depth: int = Field(default=1, ge=1, le=4)
+
+
+class WarmResponse(BaseModel):
+    """What /warm reports once both workers are up, or have failed to start."""
+
+    ready: bool
+    seconds: float

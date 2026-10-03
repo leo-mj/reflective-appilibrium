@@ -28,6 +28,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from typing import Annotated, Awaitable, Callable, TypeVar, Union
 import asyncio
 import logging
+import time
 
 from .rethon_schemas import (
     SimulateRethonRequest,
@@ -39,20 +40,23 @@ from .rethon_schemas import (
     ScoreChangesResponse,
     QuickScoreRequest,
     QuickScoreResponse,
+    WarmResponse,
 )
 from ..config import Settings, get_settings
-from ..process_pool import ComputationStopped, run_in_pool
+from ..process_pool import ComputationStopped, run_in_pool, warm_pool
 from ..services.rethon_caps import enforce_depth_cap, enforce_element_cap
-from ..services.rethon_simulation import (
+
+# rethon_tasks, not the computations themselves: importing those would load the
+# whole rethon stack into this process, which never computes with it, and most
+# of a fresh instance's start-up was reading it. See rethon_tasks' docstring.
+from ..services.rethon_tasks import (
     SimulationFinished,
+    compute_quick_score,
+    compute_score_changes,
+    compute_score_per_round,
     simulate_one_step,
     simulate_to_fixed_point,
     validate_and_build,
-)
-from ..services.rethon_scoring import (
-    compute_score_changes,
-    compute_quick_score,
-    compute_score_per_round,
 )
 
 logger = logging.getLogger(__name__)
@@ -333,4 +337,24 @@ async def quick_score(
         request.weights,
         settings.simulation_element_caps,
         timeout=settings.simulation_timeout,
+    )
+
+
+@scoring_router.post("/warm", response_model=WarmResponse)
+async def warm_workers() -> WarmResponse:
+    """Start the scoring and simulation workers now, and answer once both are up.
+
+    The start page sends this after the health check, so the minutes a reader
+    spends there are what the workers start in — not the first score badge or
+    the first press of Simulate. Scoring first, since the editor's badges ask
+    for a score as soon as it opens. A no-op when the workers are already up.
+    On the scoring router because, like the badges, it is sent by the frontend
+    on its own, not by a press.
+    """
+    started = time.perf_counter()
+    scoring = await warm_pool("scoring")
+    simulation = await warm_pool("simulation")
+    return WarmResponse(
+        ready=scoring and simulation,
+        seconds=round(time.perf_counter() - started, 2),
     )

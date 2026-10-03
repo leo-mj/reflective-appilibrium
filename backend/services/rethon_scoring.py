@@ -3,6 +3,7 @@
 from typing import List, Dict, Optional
 import logging
 
+from . import rethon_import  # noqa: F401 — must precede rethon; see that module
 from theodias import Position, StandardPosition, BDDDialecticalStructure
 from rethon import StandardLocalReflectiveEquilibrium
 from ..models.re_state import REElement, REHistoryEvent, RERelation

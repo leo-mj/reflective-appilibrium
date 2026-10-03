@@ -14,11 +14,13 @@ for different things:
 - **Bytes loaded by ``import backend.main``** — native libraries and Python
   modules. Deterministic, the same on every machine, and the closest local
   stand-in for what a cold instance has to read. Compare these across a change.
-- **Times** — the import, the server answering ``/api/health``, and the first
-  score and first simulation, each of which starts a worker process that
-  imports the rethon stack for itself. These depend on the machine and on
-  whether the files are already in memory, so compare them on one machine, and
-  repeat a run before believing a difference.
+- **Times** — the import; the server answering ``/api/health``; the warm-up
+  the start page asks for next (``/warm``), which starts both worker processes,
+  each importing the rethon stack for itself; and the first score and first
+  simulation after it. ``--no-warm`` skips the warm-up, so the first score and
+  simulation start their workers — what happened before there was one. Times
+  depend on the machine and on whether the files are already in memory, so
+  compare them on one machine, and repeat a run before believing a difference.
 
 ``--cold`` asks the operating system to drop the packages from its file cache
 before each step, which is the nearest a laptop gets to a fresh instance. On
@@ -249,7 +251,7 @@ def _tree_rss_mb(pid: int) -> Optional[float]:
     return round(total / 1024, 1)
 
 
-def _measure_server() -> dict:
+def _measure_server(warm: bool) -> dict:
     port = _free_port()
     base = f"http://127.0.0.1:{port}"
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}
@@ -288,10 +290,22 @@ def _measure_server() -> dict:
             raise RuntimeError("no answer from /api/health within 180 s")
         rss_idle = _tree_rss_mb(server.pid)
 
+        # What the start page sends after the health check. Older versions have
+        # no such endpoint, and the first score then starts the worker itself.
+        warm_s = "skipped"
+        if warm:
+            try:
+                warm_s = round(_request(f"{base}/api/simulate_rethon/warm", {}), 2)
+            except urllib.error.HTTPError as err:
+                if err.code != 404:
+                    raise
+                warm_s = "not in this version"
+
         score = f"{base}/api/simulate_rethon/quick_score"
         simulate = f"{base}/api/simulate_rethon/simulate"
         result = {
             "health_ready_s": round(ready, 2),
+            "warm_s": warm_s,
             "first_score_s": round(_request(score, SCORE), 2),
             "second_score_s": round(_request(score, SCORE), 2),
             "first_simulation_s": round(_request(simulate, SIMULATE), 2),
@@ -334,6 +348,9 @@ def _print_report(r: dict) -> None:
         print()
         print("server (uvicorn backend.main:app)")
         print(f"  start -> /api/health answers {s['health_ready_s']:>7.2f} s")
+        warm_s = s["warm_s"]
+        warm_text = f"{warm_s:>7.2f} s" if isinstance(warm_s, float) else warm_s
+        print(f"  warm-up (/warm, both workers) {warm_text}")
         print(
             f"  first score / second         {s['first_score_s']:>7.2f} s / {s['second_score_s']:.2f} s"
         )
@@ -355,6 +372,11 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument(
         "--import-only", action="store_true", help="skip starting a server"
     )
+    parser.add_argument(
+        "--no-warm",
+        action="store_true",
+        help="skip /warm, so the first score and simulation start their workers",
+    )
     parser.add_argument("--json", action="store_true", help="print one JSON object")
     parser.add_argument("--probe", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
@@ -372,7 +394,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     if not args.import_only:
         if args.cold:
             _evict_packages()
-        report["server"] = _measure_server()
+        report["server"] = _measure_server(warm=not args.no_warm)
 
     if args.json:
         print(json.dumps(report))

@@ -46,6 +46,7 @@ import hashlib
 import random
 from typing import FrozenSet, Iterable, Optional, Set, Tuple
 
+from . import rethon_import  # noqa: F401 — must precede rethon; see that module
 from theodias import DialecticalStructure, Position, StandardPosition
 from rethon import (
     StandardGlobalReflectiveEquilibrium,
@@ -53,40 +54,11 @@ from rethon import (
 )
 
 from ..models.re_state import REElement
-
-THEORY_TYPES = ("principle", "theory")
-
-
-def theory_sentences(lookup: dict) -> FrozenSet[int]:
-    """Indices of the pool's principles and background theories, whatever their
-    status: like the commitments, the theory may take up an element the reader
-    has set aside. ``lookup`` maps positive indices to elements; negated keys,
-    where present, are ignored."""
-    return frozenset(
-        index
-        for index, el in lookup.items()
-        if index > 0 and isinstance(el, REElement) and el.type in THEORY_TYPES
-    )
-
-
-def held_theory(lookup: dict) -> Tuple[int, ...]:
-    """Indices of the principles and background theories the user holds now —
-    active or revised — which is the theory position the scoring evaluates
-    (``_build_type_positions`` in ``rethon_scoring``) and the simulation's
-    first theory.
-
-    In the order the start takes them when not all can be held together: most
-    confident first, ties by position in the pool."""
-    return tuple(
-        sorted(
-            (
-                index
-                for index in theory_sentences(lookup)
-                if lookup[index].status in ("active", "revised")
-            ),
-            key=lambda index: (-(lookup[index].confidence or 0), index),
-        )
-    )
+from .rethon_tasks import (  # noqa: F401 — moved there; re-exported for callers here
+    THEORY_TYPES,
+    held_theory,
+    theory_sentences,
+)
 
 
 def _position_key(position: Position) -> Tuple[int, ...]:

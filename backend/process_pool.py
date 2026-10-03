@@ -73,6 +73,7 @@ import asyncio
 import logging
 import multiprocessing
 import weakref
+import concurrent.futures
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from functools import partial
@@ -108,23 +109,28 @@ def _workers(name: PoolName, settings: Settings) -> int:
     )
 
 
-def _init_worker() -> None:
+def _init_worker(name: str) -> None:
     """Runs once in each worker, before its first task."""
     # Imported for their side effects: the slow rethon/theodias import is paid
     # here rather than inside a request, and rethon's logging configuration has
-    # been applied by the time the repair below runs.
+    # been applied by the time the repair below runs. The workers are the only
+    # place the rethon stack is loaded — the server process imports
+    # services/rethon_tasks instead, whose entry points find these modules
+    # already imported.
     from .services import rethon_scoring, rethon_simulation  # noqa: F401
 
     configure_backend_logging()
-    logger.info("Simulation worker ready.")
+    # Named, since both pools log this: it used to say "Simulation" for both.
+    logger.info("%s worker ready.", name.capitalize())
 
 
-def create_pool(max_workers: int) -> ProcessPoolExecutor:
+def create_pool(max_workers: int, name: str = "simulation") -> ProcessPoolExecutor:
     """A fresh pool. Use ``get_pool`` in application code; this is for tests."""
     return ProcessPoolExecutor(
         max_workers=max_workers,
         mp_context=multiprocessing.get_context("spawn"),
         initializer=_init_worker,
+        initargs=(name,),
     )
 
 
@@ -133,7 +139,7 @@ def get_pool(name: PoolName) -> ProcessPoolExecutor:
     with _lock:
         if name not in _pools:
             workers = _workers(name, get_settings())
-            _pools[name] = create_pool(workers)
+            _pools[name] = create_pool(workers, name)
             logger.info("Started the %s pool with %d worker(s).", name, workers)
         return _pools[name]
 
@@ -278,6 +284,60 @@ async def run_in_pool(
             )
     finally:
         gate.release()
+
+
+def _ready() -> None:
+    """Nothing. Submitted so that a worker starts and runs its initializer."""
+
+
+# The warm-up submitted to each pool, so that overlapping warm-ups wait on one
+# start rather than each queueing a task. Keyed by the pool itself: a pool that
+# is discarded and replaced starts cold again, and its entry goes with it.
+_warmups: (
+    "weakref.WeakKeyDictionary[ProcessPoolExecutor, concurrent.futures.Future]"
+) = weakref.WeakKeyDictionary()
+
+
+async def warm_pool(name: PoolName, timeout: float = 120) -> bool:
+    """Start pool ``name``'s worker unless it has one, and wait until it is ready.
+
+    The workers are where the rethon stack is loaded — the server process keeps
+    it out (services/rethon_tasks) — so a worker's start is most of what a cold
+    instance spends before its first score or simulation: tens of seconds of
+    reading files on Cloud Run. Started on demand, that wait landed on whoever
+    pressed first. The frontend now asks for it from the start page instead.
+
+    Done inside a request, and awaited, on purpose. Cloud Run's request-based
+    billing gives an instance CPU only while a request is in flight, so a worker
+    started in the background and left to it would barely progress until the
+    next request came. The request that asks for the warm-up is what keeps the
+    CPU allocated while the worker starts.
+
+    Skips the queue: a pool already running a computation has a live worker, so
+    there is nothing to warm, and waiting behind the computation would only hold
+    this request open. True once the worker is ready; False if it did not start
+    within ``timeout`` seconds or the pool broke, in which case the next real
+    computation finds out the usual way.
+    """
+    pool = get_pool(name)
+    with _lock:
+        ready = _warmups.get(pool)
+        if ready is None:
+            if getattr(pool, "_processes", None):
+                return True
+            ready = pool.submit(_ready)
+            _warmups[pool] = ready
+    try:
+        # Shielded: a warm-up that times out here keeps going for the next one.
+        await asyncio.wait_for(asyncio.shield(asyncio.wrap_future(ready)), timeout)
+        return True
+    except asyncio.TimeoutError:
+        logger.warning("The %s worker was not ready after %ss.", name, timeout)
+        return False
+    except BrokenProcessPool:
+        logger.error("A %s worker died while starting; starting a new pool.", name)
+        _discard(name, pool, kill=False)
+        return False
 
 
 def shutdown_pools() -> None:

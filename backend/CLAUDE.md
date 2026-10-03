@@ -41,8 +41,25 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   itself recommends, and confirmation is our own title/author/year check.
 - `CROSSREF_MAILTO` is the *operator's* address for Crossref's polite pool, set
   in `.env` and empty by default. Never populate it from whoever is using the app.
-- `import rethon` (via `routers/simulate_rethon`) configures logging with
-  `disable_existing_loggers` at its default, switching off every logger created
-  before it. `main.py` re-enables the `backend` tree after the router imports —
-  keep that block *after* them, or the assist routers go silent again.
+- **The server process never loads the rethon stack** (rethon, theodias,
+  numba, llvmlite, numpy, pandas, …). It was most of what a cold instance read
+  before it could answer — 263 MB of native libraries, about 25 s on Cloud Run
+  — and the server never computes with it: every simulation and score runs in a
+  worker (`process_pool.py`). So the router imports `services/rethon_tasks.py`
+  (validation, `SimulationFinished`, and stand-ins for the worker entry points
+  that import the real computation only inside a worker), never
+  `rethon_simulation` or `rethon_scoring`. `test_startup_imports.py` fails if
+  `import backend.main` loads any of it again.
+- **The workers are warmed from the start page** (`POST
+  /api/simulate_rethon/warm`, `warm_pool`), inside a request on purpose:
+  request-based billing gives an instance CPU only while a request is open.
+- `import rethon` configures logging with `disable_existing_loggers` at its
+  default, switching off every logger that exists at that moment. Since rethon
+  is no longer imported at a fixed point in the server, the repair travels with
+  the import: `services/rethon_import.py` imports rethon and re-enables the
+  `backend` tree, and every module using rethon imports it first.
+- `make measure-startup` (`backend/tools/measure_startup.py`) reports what
+  `import backend.main` loads and how long the server, the warm-up and the
+  first computations take. Compare the bytes across a change; times only on one
+  machine.
 - Target LLMs: Qwen3 30B quantized (consumer GPU), DeepSeek-V3.2 / GPT-OSS-120B (high-end)
