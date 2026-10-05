@@ -570,6 +570,8 @@ jobs:
           #   price is a few seconds' cold start after an idle spell.
           # TRUSTED_PROXY_HOPS=1: Cloud Run's front end appends the caller's
           #   address to x-forwarded-for, and that entry is the one to believe.
+          # LOG_FORMAT=json: Cloud Logging reads each line's severity, and keeps
+          #   a traceback as one entry instead of one per line.
           # The ^##^ prefix makes ## the separator, so CORS_ORIGINS may list
           #   several comma-separated origins.
           gcloud run deploy appilibrium-backend \
@@ -583,7 +585,7 @@ jobs:
             --max-instances 1 \
             --concurrency 40 \
             --timeout 300 \
-            --set-env-vars "^##^DEPLOYMENT=hosted##TRUSTED_PROXY_HOPS=1##CORS_ORIGINS=${{ vars.BACKEND_CORS_ORIGINS }}"
+            --set-env-vars "^##^DEPLOYMENT=hosted##TRUSTED_PROXY_HOPS=1##LOG_FORMAT=json##CORS_ORIGINS=${{ vars.BACKEND_CORS_ORIGINS }}"
 
       - name: Check it answers
         run: |

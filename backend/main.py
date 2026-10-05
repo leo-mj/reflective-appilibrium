@@ -37,7 +37,7 @@ from .routers import (
     theories,
     arguments,
 )
-from .logging_setup import configure_backend_logging
+from .logging_setup import RequestIdMiddleware, configure_backend_logging
 from .process_pool import shutdown_pools
 from .security_headers import SecurityHeadersMiddleware
 
@@ -99,8 +99,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# Added last so it is outermost, and a CORS preflight answer carries the headers too.
+# Added outside CORS, so a CORS preflight answer carries the headers too.
 app.add_middleware(SecurityHeadersMiddleware)
+# Outside even that, so every line any request causes carries its id — uvicorn's
+# report of an exception that escaped the app included.
+app.add_middleware(RequestIdMiddleware)
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 

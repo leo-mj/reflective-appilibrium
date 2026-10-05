@@ -45,4 +45,14 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   `disable_existing_loggers` at its default, switching off every logger created
   before it. `main.py` re-enables the `backend` tree after the router imports —
   keep that block *after* them, or the assist routers go silent again.
+  uvicorn's loggers were switched off the same way, which hid every exception
+  that escaped the app; the same call turns `uvicorn` and `uvicorn.error` back
+  on through our handler (uvicorn's own would quote exception messages) and
+  keeps `uvicorn.access` off.
+- **Logs never quote content.** `ContentFreeFormatter` prints a traceback's
+  frames and exception types but no message, since messages quote input;
+  `test_log_privacy.py` holds every path to that. `LOG_FORMAT=json` (set on
+  Cloud Run by `deploy-backend`) writes one JSON object per line, with
+  `severity`, and `request_id` — the trace id the platform's proxy gave the
+  request, so a line can be found from the request log, or a fresh one.
 - Target LLMs: Qwen3 30B quantized (consumer GPU), DeepSeek-V3.2 / GPT-OSS-120B (high-end)

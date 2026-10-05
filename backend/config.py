@@ -285,6 +285,13 @@ class Settings(BaseSettings):
     simulation_workers: int = Field(default=1, ge=1)
     scoring_workers: int = Field(default=1, ge=1)
 
+    # ── Logging ───────────────────────────────────────────────────────────────
+
+    # "text" for a person reading a terminal; "json" for a log collector — one
+    # object per line, with a severity it can filter on and a traceback kept in
+    # one entry. See logging_setup. Either way no exception's message is printed.
+    log_format: Literal["text", "json"] = "text"
+
     # ── Provider mechanics ────────────────────────────────────────────────────
 
     # ── Reference checking ────────────────────────────────────────────────────
