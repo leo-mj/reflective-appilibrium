@@ -61,6 +61,7 @@ function privacySections({ backend, capabilities }) {
       "A discussion is not kept either: this page sends it whole with each question. " +
       "Where rate limits are on, the address or access token you connect from is counted for a minute. " +
       "Its logs record counts, ids and model names, never what you wrote. " +
+      "Opening a process is counted once per tab, with nothing that identifies you or your browser. " +
       "The service hosting it may keep its own connection logs.";
   }
 

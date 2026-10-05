@@ -484,6 +484,17 @@ jobs:
   # notice, say €1: the free tier covers normal use, and the alert is what says
   # when that stops being true.
   #
+  # And keep no visitor addresses. Cloud Run logs every request with the
+  # caller's IP and user agent; this drops those entries before they are stored.
+  # The backend's own lines stay, and Cloud Monitoring still charts request
+  # counts, latency and errors, none of which holds an address:
+  #
+  #   gcloud logging sinks update _Default --add-exclusion='name=no-request-logs,filter=LOG_ID("run.googleapis.com/requests") AND resource.labels.service_name="appilibrium-backend"'
+  #
+  # Usage is counted without them: the web app's health check writes one
+  # "Session started." line per tab that opens a process (health in
+  # backend/main.py). Logs Explorer: jsonPayload.logger="backend.sessions".
+  #
   # The run's summary prints the service URL, which is the VITE_BACKEND_URL the
   # deploy-cloudflare job needs.
   deploy-backend:

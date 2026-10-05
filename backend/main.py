@@ -177,15 +177,25 @@ async def redoc_docs() -> HTMLResponse:
 
 # ── Health ─────────────────────────────────────────────────────────────────────
 
+_sessions = logging.getLogger("backend.sessions")
+
 
 @app.get("/api/health", tags=["meta"])
 async def health(
     settings: Annotated[Settings, Depends(get_settings)],
+    session: bool = False,
 ) -> dict:
     """Return service status, the active model, and which features are on.
 
     Deliberately outside the access-token gate so an uptime check needs no
     credential.
+
+    ``?session=1`` is the web app's own check, made once per tab when a process
+    opens, and each one writes a line to ``backend.sessions``: what the operator
+    counts usage by. A count and nothing else — no address, no browser, nothing
+    kept on the visitor's device — so a returning visitor counts again, which is
+    the price of not recognising anyone. Uptime checks leave the flag off and
+    are not counted.
 
     ``max_simulation_elements`` is what lets the frontend stop asking rather
     than ask and be refused, and 0 means no cap.
@@ -198,6 +208,8 @@ async def health(
     Reads settings through the dependency rather than the module-level value so
     that it reflects overrides, which is also what makes it testable.
     """
+    if session:
+        _sessions.info("Session started.")
     return {
         "status": "ok",
         "model": settings.default_model,

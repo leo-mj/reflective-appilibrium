@@ -65,7 +65,9 @@ function load() {
   // A backend that is simply down must not leave the page waiting: a failed
   // check settles as "nothing available", which is the state the demo build is
   // in permanently.
-  inFlight = fetch(`${BACKEND_URL}/api/health`)
+  // `session=1` makes this the server's count of sessions: one per tab, and
+  // nothing in it says whose (see health in backend/main.py).
+  inFlight = fetch(`${BACKEND_URL}/api/health?session=1`)
     .then((res) => (res.ok ? res.json() : null))
     .then((data) =>
       settle({

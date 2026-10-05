@@ -55,4 +55,9 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   Cloud Run by `deploy-backend`) writes one JSON object per line, with
   `severity`, and `request_id` — the trace id the platform's proxy gave the
   request, so a line can be found from the request log, or a fresh one.
+- **No visitor addresses are kept.** The rate limiter holds one in memory for
+  its minute, and no log line names one; the deployed service also excludes
+  Cloud Run's request log (`deploy-backend` setup in `ci.yml`). Usage is
+  counted instead by `/api/health?session=1`, the app's once-per-tab check,
+  which writes an identifier-free line to `backend.sessions`.
 - Target LLMs: Qwen3 30B quantized (consumer GPU), DeepSeek-V3.2 / GPT-OSS-120B (high-end)

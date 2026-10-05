@@ -65,7 +65,7 @@ describe("useBackendCapabilities", () => {
     const { result } = renderHook(() => useBackendCapabilities());
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health$/);
+    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health\?session=1$/);
   });
 
   // Replaces an abort-on-unmount test. Aborting was right while each mount
