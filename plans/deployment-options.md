@@ -390,3 +390,24 @@ What is left of the server's import is mostly the LLM SDKs (`anthropic` ≈ 0.9 
 `openai` ≈ 0.4 s, through `services/llm.py`). Importing them lazily is the next
 step if the deployed cold start is still long; the tests patch
 `backend.services.llm.AsyncOpenAI` and `AsyncAnthropic`, so that needs care.
+
+**Follow-up, the same day.** Two more things, found on the live site and by
+profiling a worker's first call:
+
+- **A worker's first computation compiled numba code.** theodias's position
+  functions are `@jit(nopython=True)` without `cache=True`, so each new worker
+  compiled them on its first call: 2.0 s for a score and 0.86 s for a
+  simulation, in a fresh process, against 0.001–0.005 s after. `/warm` now has
+  each worker run a small score or simulation (`services/rethon_warmup.py`).
+  Measured with `--cold`: `/warm` 4.2–4.7 s, then the first score and
+  simulation 0.01–0.02 s (they were 1.1–1.3 s after a warm-up that only started
+  the workers).
+- **Cloud Run answered a cold start's first `/api/health` with a 500.** It came
+  from the platform, not the app, so it had no CORS header and the browser
+  reported it as a CORS failure. The app took that single failure as "server
+  unreachable" for the rest of the page load, which also meant "no depth limit
+  known": the Simulate tab offered depths 1–4 starting at 3, and the server,
+  limited to 2, refused the run with a 422. The health check is now retried
+  every 3 s for up to 90 s on a network error, a 429 or a 5xx, and the Simulate
+  tab neither offers a depth nor runs until the server has answered. The
+  request log in Cloud Run gives the platform's own message for such a 500.

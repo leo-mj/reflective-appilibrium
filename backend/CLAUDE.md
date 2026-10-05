@@ -53,6 +53,10 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
 - **The workers are warmed from the start page** (`POST
   /api/simulate_rethon/warm`, `warm_pool`), inside a request on purpose:
   request-based billing gives an instance CPU only while a request is open.
+  Each worker also runs a small score or simulation (`services/rethon_warmup.py`):
+  theodias's numba functions are compiled on a worker's first call, not cached,
+  which cost the first real computation 1–2 s. `test_rethon_warmup.py` holds
+  that the small process compiles everything a larger one needs.
 - `import rethon` configures logging with `disable_existing_loggers` at its
   default, switching off every logger that exists at that moment. Since rethon
   is no longer imported at a fixed point in the server, the repair travels with

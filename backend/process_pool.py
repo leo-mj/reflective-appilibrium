@@ -298,8 +298,15 @@ _warmups: (
 ) = weakref.WeakKeyDictionary()
 
 
-async def warm_pool(name: PoolName, timeout: float = 120) -> bool:
+async def warm_pool(
+    name: PoolName, task: Callable[[], None] = _ready, timeout: float = 120
+) -> bool:
     """Start pool ``name``'s worker unless it has one, and wait until it is ready.
+
+    ``task`` is what the new worker runs first. The default does nothing beyond
+    starting it; the router passes a small computation (``rethon_warmup``),
+    since a worker's first one also compiles theodias's numba functions, which
+    starting alone does not.
 
     The workers are where the rethon stack is loaded — the server process keeps
     it out (services/rethon_tasks) — so a worker's start is most of what a cold
@@ -325,7 +332,7 @@ async def warm_pool(name: PoolName, timeout: float = 120) -> bool:
         if ready is None:
             if getattr(pool, "_processes", None):
                 return True
-            ready = pool.submit(_ready)
+            ready = pool.submit(task)
             _warmups[pool] = ready
     try:
         # Shielded: a warm-up that times out here keeps going for the next one.
@@ -337,6 +344,11 @@ async def warm_pool(name: PoolName, timeout: float = 120) -> bool:
     except BrokenProcessPool:
         logger.error("A %s worker died while starting; starting a new pool.", name)
         _discard(name, pool, kill=False)
+        return False
+    except Exception:
+        # The worker started; only its first computation failed, and a real one
+        # would meet the same failure and report it to whoever asked for it.
+        logger.error("The %s warm-up failed.", name, exc_info=True)
         return False
 
 

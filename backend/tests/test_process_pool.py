@@ -166,6 +166,10 @@ def test_a_simulation_is_identical_in_a_worker(fn):
 # ── The point of the exercise ─────────────────────────────────────────────────
 
 
+def _fail_to_warm() -> None:
+    raise RuntimeError("no rethon here")
+
+
 def _hold_the_gil(n: int) -> int:
     """One long C-level call, which keeps the GIL for its whole duration.
 
@@ -585,5 +589,17 @@ def test_a_warmed_worker_answers_the_first_score():
         res = client.post("/api/simulate_rethon/quick_score", json=_payload())
         assert res.status_code == 200
         assert _worker_processes("scoring") == [worker]
+    finally:
+        process_pool.shutdown_pools()
+
+
+def test_a_failed_warm_up_says_not_ready_rather_than_failing_the_request():
+    """The warm-up's first computation can fail like any other; /warm is best
+    effort, so that reads as "not ready" and the real computation reports it."""
+    process_pool.shutdown_pools()
+    try:
+        ready = asyncio.run(process_pool.warm_pool("scoring", _fail_to_warm))
+        assert ready is False
+        assert len(_worker_processes("scoring")) == 1
     finally:
         process_pool.shutdown_pools()

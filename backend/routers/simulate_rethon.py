@@ -57,6 +57,8 @@ from ..services.rethon_tasks import (
     simulate_one_step,
     simulate_to_fixed_point,
     validate_and_build,
+    warm_scoring,
+    warm_simulation,
 )
 
 logger = logging.getLogger(__name__)
@@ -352,8 +354,8 @@ async def warm_workers() -> WarmResponse:
     on its own, not by a press.
     """
     started = time.perf_counter()
-    scoring = await warm_pool("scoring")
-    simulation = await warm_pool("simulation")
+    scoring = await warm_pool("scoring", warm_scoring)
+    simulation = await warm_pool("simulation", warm_simulation)
     return WarmResponse(
         ready=scoring and simulation,
         seconds=round(time.perf_counter() - started, 2),

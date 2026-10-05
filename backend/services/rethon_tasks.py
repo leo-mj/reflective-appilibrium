@@ -216,3 +216,15 @@ def compute_score_per_round(*args, **kwargs):
     from .rethon_scoring import compute_score_per_round as compute
 
     return compute(*args, **kwargs)
+
+
+def warm_scoring() -> None:
+    from .rethon_warmup import warm_scoring as warm
+
+    warm()
+
+
+def warm_simulation() -> None:
+    from .rethon_warmup import warm_simulation as warm
+
+    warm()
