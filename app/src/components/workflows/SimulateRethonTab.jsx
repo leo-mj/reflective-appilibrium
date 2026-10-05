@@ -33,6 +33,7 @@ import { simulateRethon } from "../../utils/simulateRethonClient.js";
 import { ErrorBanner } from "../SuggestionActions.jsx";
 import { ARGUMENT_RELATION_TYPES } from "../../utils/stateUtils.js";
 import { useBackendCapabilities } from "../../hooks/useBackendCapabilities.js";
+import { useBackendWake, wakeBackend } from "../../utils/wakeBackend.js";
 import { usePlayback } from "../../hooks/usePlayback.js";
 import { usePalette } from "../../hooks/useTheme.js";
 import { inkWeight } from "../../constants/palettes.js";
@@ -151,6 +152,14 @@ export function SimulateRethonTab({
   const { maxDepth, loaded, reachable } = useBackendCapabilities();
   const serverAnswered = loaded && reachable;
   const neighbourhoodDepth = maxDepth || chosenDepth;
+  // And no run until the wake-up has finished: the workers warmed, so the
+  // first simulation does not wait behind their start. Woken here too, in case
+  // the editor was reached without the start page; a no-op otherwise.
+  const { phase } = useBackendWake();
+  useEffect(() => {
+    wakeBackend();
+  }, []);
+  const serverReady = serverAnswered && phase === "ready";
 
   const activeCount = state.elements.filter((e) =>
     ["active", "revised"].includes(e.status),
@@ -314,7 +323,7 @@ export function SimulateRethonTab({
   };
   const handleReject = () => conclude("rejected");
 
-  const baseDisabled = loading || cannotRun || !serverAnswered;
+  const baseDisabled = loading || cannotRun || !serverReady;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -505,11 +514,11 @@ export function SimulateRethonTab({
           </div>
         )}
 
-        {!serverAnswered && (
+        {!serverReady && (
           <div role="status" style={{ fontSize: 12, color: C.dim }}>
-            {loaded
-              ? "The server could not be reached, so the simulation cannot run. Reload the page to try again."
-              : "Waiting for the server to answer before the simulation can run."}
+            {phase === "unavailable" || (loaded && !reachable)
+              ? "Server unreachable."
+              : "Available once the server is ready."}
           </div>
         )}
 

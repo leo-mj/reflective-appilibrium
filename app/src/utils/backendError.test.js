@@ -180,7 +180,7 @@ describe("fetchBackend", () => {
       const err = await fetchBackend("http://x").catch((e) => e);
       expect(err).toBeInstanceOf(ServerStartingError);
       expect(err.kind).toBe("starting");
-      expect(err.message).toMatch(/still starting up/);
+      expect(err.message).toMatch(/still starting/);
     } finally {
       setStartingUpCheck(() => false);
     }

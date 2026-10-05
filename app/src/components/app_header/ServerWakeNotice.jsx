@@ -30,27 +30,23 @@ const SHOW_AFTER_SECONDS = 2;
 
 const MESSAGES = {
   starting: {
-    title: "Starting the server.",
-    detail:
-      "After a quiet spell it switches itself off, and waking it can take up to about half a minute. AI suggestions, scores and simulations work once it is up; everything else works now.",
+    title: "Starting the server…",
+    detail: "This can take up to half a minute.",
   },
   // A request reached no server at a time it was expected to answer. It may
   // have gone idle and be starting again, or be down; the health check's
   // answer will say which, so the notice does not guess.
   retrying: {
-    title: "Trying to reach the server.",
-    detail:
-      "It did not answer. If it had gone idle it is starting again, which takes up to about half a minute; if not, it may be down. Everything that does not need it works now.",
+    title: "Reconnecting to the server…",
+    detail: "",
   },
   unavailable: {
     title: "The server could not be reached.",
-    detail:
-      "AI suggestions, scores and simulations are unavailable for now; everything else works, and your work is kept in this browser. Reload the page to try again.",
+    detail: "Reload the page to try again.",
   },
   warming: {
-    title: "Preparing scores and simulations.",
-    detail:
-      "The server is up and is loading rethon, the library that computes them; this can take up to about half a minute. AI suggestions already work.",
+    title: "Preparing scores and simulations…",
+    detail: "",
   },
 };
 
@@ -95,7 +91,8 @@ export function ServerWakeNotice() {
       }}
     >
       <span>
-        <strong>{title}</strong> {detail}
+        <strong>{title}</strong>
+        {detail && ` ${detail}`}
       </span>
       {seconds != null && (
         <span

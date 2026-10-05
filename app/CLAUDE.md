@@ -237,8 +237,11 @@ matters on this side:
   alone and a result is read against them, so the ☰ menu's "Simulation
   weights" row was removed rather than kept as a second way to the same
   state. `AppHeader.test.jsx` holds the menu to having none.
-- **Nothing runs until the server has answered** (`loaded && reachable` from
-  `useBackendCapabilities`): before that its depth limit is unknown. A health
+- **Nothing runs until the server is ready**: answered (`loaded && reachable`
+  from `useBackendCapabilities`), before which its depth limit is unknown, and
+  woken (`phase === "ready"` from `useBackendWake`), so a first run does not
+  wait behind the workers' start. The tab calls `wakeBackend()` itself, a no-op
+  after the start page has. A health
   check that failed while a hosted server was starting used to read as "no
   limit", so the tab offered depths 1–4 and the server refused the run (422).
   The check is retried for as long as a start takes (`HEALTH_RETRY_FOR_MS`),
@@ -250,7 +253,8 @@ matters on this side:
   - `ServerStartingError`, the mild one, **shortly after start-up**
     (`isStartingUp` in `utils/wakeBackend.js`): the page-load wake-up before
     the server first answers, the workers' warm-up, and `STARTUP_GRACE_MS`
-    after. `ErrorBanner` shows it in the notice amber, as a wait.
+    after. `ErrorBanner` shows it in the notice amber, as a wait. Both messages
+    are one short sentence; the header notice carries the rest.
   - `ServerUnreachableError`, the serious one, **at any other time**, in the
     danger red. That includes while a wake-up that a failure started is still
     waiting for an answer: a failure is no evidence the server is starting —

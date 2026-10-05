@@ -29,6 +29,12 @@ vi.mock("../../hooks/useBackendCapabilities.js", () => ({
   }),
 }));
 
+const wake = vi.hoisted(() => ({ phase: "ready" }));
+vi.mock("../../utils/wakeBackend.js", () => ({
+  useBackendWake: () => ({ phase: wake.phase, since: null, reason: "page" }),
+  wakeBackend: () => undefined,
+}));
+
 import { SimulateRethonTab } from "./SimulateRethonTab.jsx";
 import { simulateRethon } from "../../utils/simulateRethonClient.js";
 
@@ -38,6 +44,7 @@ afterEach(() => {
   capabilities.maxDepth = 0;
   capabilities.loaded = true;
   capabilities.reachable = true;
+  wake.phase = "ready";
 });
 
 const element = (id, type) => ({
@@ -114,7 +121,7 @@ describe("before the server has said what it allows", () => {
     expect(run.disabled).toBe(true);
     fireEvent.click(run);
     expect(simulateRethon).not.toHaveBeenCalled();
-    expect(screen.getByText(/waiting for the server/i)).toBeTruthy();
+    expect(screen.getByText(/once the server is ready/i)).toBeTruthy();
   });
 
   it("offers no depth and does not run when the server could not be reached", () => {
@@ -124,6 +131,24 @@ describe("before the server has said what it allows", () => {
     expect(screen.getByRole("button", { name: /equilibrate/i }).disabled).toBe(
       true,
     );
-    expect(screen.getByText(/could not be reached/i)).toBeTruthy();
+    expect(screen.getByText(/server unreachable/i)).toBeTruthy();
+  });
+});
+
+// The health check answering is not enough: the workers load rethon after it,
+// and a run pressed then waited behind their start.
+describe("while the server is up but its workers are still starting", () => {
+  it("offers the depth but does not run until the wake-up is done", () => {
+    wake.phase = "warming";
+    const { rerender } = render(<SimulateRethonTab state={aState()} />);
+    expect(depthOptions()).toEqual([1, 2, 3, 4]);
+    const run = () => screen.getByRole("button", { name: /equilibrate/i });
+    expect(run().disabled).toBe(true);
+    expect(screen.getByText(/once the server is ready/i)).toBeTruthy();
+
+    wake.phase = "ready";
+    rerender(<SimulateRethonTab state={aState()} />);
+    expect(run().disabled).toBe(false);
+    expect(screen.queryByText(/once the server is ready/i)).toBeNull();
   });
 });

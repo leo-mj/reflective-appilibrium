@@ -123,11 +123,10 @@ export async function backendError(res, endpoint = "") {
 
 /** What a request that reached no server says shortly after start-up. */
 export const SERVER_STARTING_MESSAGE =
-  "The server is still starting up, which takes up to about half a minute after a quiet spell. Try again once the notice at the top has gone.";
+  "The server is still starting. Try again in a moment.";
 
 /** What it says at any other time. */
-export const SERVER_UNREACHABLE_MESSAGE =
-  "Could not reach the server. Check your internet connection and try again. If the notice at the top says the server is starting, it had gone idle and is coming back.";
+export const SERVER_UNREACHABLE_MESSAGE = "Could not reach the server.";
 
 /**
  * A request reached no server at a time when none was expected to be missing.

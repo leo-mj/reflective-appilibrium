@@ -83,7 +83,7 @@ describe("ServerWakeNotice", () => {
     });
     render(<ServerWakeNotice />);
     wait(3000);
-    expect(notice().textContent).toContain("Starting the server.");
+    expect(notice().textContent).toContain("Starting the server…");
     expect(notice().textContent).toContain("3 s");
     wait(5000);
     expect(notice().textContent).toContain("8 s");
@@ -97,7 +97,7 @@ describe("ServerWakeNotice", () => {
     wait(4000);
     await answer("/api/health", { status: "ok" });
     wait(1000);
-    expect(notice().textContent).toContain("Preparing scores and simulations.");
+    expect(notice().textContent).toContain("Preparing scores and simulations…");
     // One clock for the whole wait, not restarted between the phases.
     expect(notice().textContent).toContain("5 s");
 
@@ -172,13 +172,13 @@ describe("ServerWakeNotice", () => {
 
     wait(3000);
     // Not "starting": nothing yet says it is, rather than down.
-    expect(notice().textContent).toContain("Trying to reach the server.");
+    expect(notice().textContent).toContain("Reconnecting to the server…");
     expect(notice().textContent).toContain("3 s");
     // A wake-up that a failure started is no evidence the server is starting —
     // it may be down — so a request in the meantime is still the serious kind.
     expect(await failOnce()).toBeInstanceOf(ServerUnreachableError);
     await answer("/api/health", { status: "ok" });
-    expect(notice().textContent).toContain("Preparing scores and simulations.");
+    expect(notice().textContent).toContain("Preparing scores and simulations…");
     // It answered, so it was a restart: from here it is the wait again. The
     // failure still asks again, the server having gone quiet once more.
     expect(await failOnce()).toBeInstanceOf(ServerStartingError);
