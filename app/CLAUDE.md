@@ -244,13 +244,23 @@ matters on this side:
   The check is retried for as long as a start takes (`HEALTH_RETRY_FOR_MS`),
   since Cloud Run answered the first request of a cold start with a 500 of its
   own, which reaches the page as a CORS failure.
-- **A request that reaches no server is its own error** (`ServerStartingError`
-  from `fetchBackend` in `utils/backendError.js`), worded as a wait rather than
-  a failure: from a browser, a hosted server still starting and the platform's
-  error page in front of it both arrive as a bare "Failed to fetch". It also
-  starts the wake-up over (`rewakeBackend` in `utils/wakeBackend.js`), so the
-  header notice comes back — a server scales to zero behind a page left open.
-  An abort is passed through untouched; Stop is not the server's doing.
+- **A request that reaches no server fails one of two ways** (`fetchBackend` in
+  `utils/backendError.js`; from a browser, a server still starting and the
+  platform's error page in front of it both arrive as a bare "Failed to fetch"):
+  - `ServerStartingError`, the mild one, **shortly after start-up**
+    (`isStartingUp` in `utils/wakeBackend.js`): the page-load wake-up before
+    the server first answers, the workers' warm-up, and `STARTUP_GRACE_MS`
+    after. `ErrorBanner` shows it in the notice amber, as a wait.
+  - `ServerUnreachableError`, the serious one, **at any other time**, in the
+    danger red. That includes while a wake-up that a failure started is still
+    waiting for an answer: a failure is no evidence the server is starting —
+    it may be down — and only its answering again makes it a restart.
+
+  Either one starts the wake-up over (`rewakeBackend`), since a server scales to
+  zero behind a page left open; the header notice then reads "Trying to reach
+  the server" rather than "Starting", until it answers. The kind is decided
+  before the wake-up starts, or every failure would read as the mild one. An
+  abort is passed through untouched; Stop is not the server's doing.
 - **The description links to rethon's homepage** (its package metadata's
   Home-page, `RETHON_HOMEPAGE`).
 - **The log records the run**: depth, weights and achievement before and

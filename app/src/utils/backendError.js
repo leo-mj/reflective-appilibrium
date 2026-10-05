@@ -121,34 +121,58 @@ export async function backendError(res, endpoint = "") {
   return err;
 }
 
+/** What a request that reached no server says shortly after start-up. */
+export const SERVER_STARTING_MESSAGE =
+  "The server is still starting up, which takes up to about half a minute after a quiet spell. Try again once the notice at the top has gone.";
+
+/** What it says at any other time. */
+export const SERVER_UNREACHABLE_MESSAGE =
+  "Could not reach the server. Check your internet connection and try again. If the notice at the top says the server is starting, it had gone idle and is coming back.";
+
 /**
- * The error for a backend that did not answer at all.
+ * A request reached no server at a time when none was expected to be missing.
  *
- * Its own kind, because on a hosted backend that scales to zero it is mostly not
- * a failure but a wait: the first requests after a quiet spell reach no server
- * yet, and the platform's own error page carries no CORS header, so a browser
- * reports "Failed to fetch" whatever the platform said. Telling the reader the
- * backend "failed" sends them looking for a fault; telling them it is starting
- * says to wait, which is what helps. An offline browser, a wrong URL or a CORS
- * origin that does not match look the same from here, so the wording leaves
- * room for those.
+ * The serious one of the two: the browser may be offline, the server down, or
+ * its address or CORS origin wrong — from here they all look alike, a bare
+ * "Failed to fetch", whatever the platform answered. It still sets the
+ * wake-up going (`onBackendUnreachable`), since a hosted server that went idle
+ * behind a page left open looks exactly like this too; the notice then says
+ * which it was.
+ */
+export class ServerUnreachableError extends Error {
+  constructor(endpoint = "", cause = undefined) {
+    super(SERVER_UNREACHABLE_MESSAGE);
+    this.name = "ServerUnreachableError";
+    this.kind = "unreachable";
+    this.endpoint = endpoint;
+    this.cause = cause;
+  }
+}
+
+/**
+ * A request reached no server while it was starting, or just after.
+ *
+ * The mild one: a hosted backend that scales to zero cannot answer the first
+ * requests of a start, and the platform may turn them away before it is up.
+ * That is a wait, not a fault, and is worded as one — `ErrorBanner` shows it
+ * in the notice colour rather than the danger red.
  */
 export class ServerStartingError extends Error {
   constructor(endpoint = "", cause = undefined) {
-    super(
-      "The server is not answering yet. It may be starting up after a quiet spell, which takes up to about half a minute; try again once the notice at the top has gone.",
-    );
+    super(SERVER_STARTING_MESSAGE);
     this.name = "ServerStartingError";
-    this.starting = true;
+    this.kind = "starting";
     this.endpoint = endpoint;
     this.cause = cause;
   }
 }
 
 // Who wants to know that a request reached no server (utils/wakeBackend.js,
-// which starts waking it again). A registry rather than an import, since that
-// module imports the clients that import this one.
+// which starts waking it again), and who says whether one is starting. Set by
+// registration rather than import, since that module imports the clients that
+// import this one.
 const unreachableListeners = new Set();
+let startingUp = () => false;
 
 /**
  * Calls ``fn`` whenever a request reaches no server.
@@ -162,13 +186,36 @@ export function onBackendUnreachable(fn) {
 }
 
 /**
+ * Says how to tell whether the server is starting up, which decides which of
+ * the two errors a request that reached no server becomes.
+ *
+ * @param {() => boolean} fn
+ */
+export function setStartingUpCheck(fn) {
+  startingUp = fn;
+}
+
+/**
+ * The error for a request that reached no server, decided before anyone is
+ * told — telling starts a wake-up, after which everything would read as one.
+ */
+function notAnswering(endpoint, cause) {
+  const err = startingUp()
+    ? new ServerStartingError(endpoint, cause)
+    : new ServerUnreachableError(endpoint, cause);
+  unreachableListeners.forEach((fn) => fn());
+  return err;
+}
+
+/**
  * Wraps a `fetch` so that a transport failure says what happened.
  *
  * On a public site the likeliest failure is not a 500 but no response at all: a
  * backend asleep on its free tier, a CORS origin that does not match, a DNS name
  * that does not resolve. All three surface as `TypeError: Failed to fetch`,
  * which tells the reader nothing and sends them looking at their own state. It
- * becomes a `ServerStartingError`, and whoever listens is told, so that the
+ * becomes a `ServerStartingError` while the server is starting up and a
+ * `ServerUnreachableError` otherwise, and whoever listens is told, so that the
  * page can wake the server and say so.
  *
  * An abort is the caller's own doing (Stop, leaving a tab) and passes through
@@ -187,8 +234,7 @@ export async function fetchBackend(url, init, endpoint = "") {
     return init === undefined ? await fetch(url) : await fetch(url, init);
   } catch (cause) {
     if (cause?.name === "AbortError" || init?.signal?.aborted) throw cause;
-    unreachableListeners.forEach((fn) => fn());
-    throw new ServerStartingError(endpoint, cause);
+    throw notAnswering(endpoint, cause);
   }
 }
 
@@ -207,10 +253,7 @@ export async function fetchOk(url, init, endpoint = "") {
     // Served from the page's own host there is no CORS to hide the platform's
     // answer, and a starting server arrives as a gateway error with no detail of
     // ours — the app's own 503 always carries one.
-    if (GATEWAY.has(res.status) && !err.detail) {
-      unreachableListeners.forEach((fn) => fn());
-      throw new ServerStartingError(endpoint);
-    }
+    if (GATEWAY.has(res.status) && !err.detail) throw notAnswering(endpoint);
     throw err;
   }
   return res;

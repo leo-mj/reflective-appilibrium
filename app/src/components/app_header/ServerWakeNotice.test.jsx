@@ -17,8 +17,9 @@ const { wakeBackend, resetBackendWake } =
   await import("../../utils/wakeBackend.js");
 const { resetBackendCapabilities } =
   await import("../../hooks/useBackendCapabilities.js");
-const { fetchBackend, ServerStartingError } =
+const { fetchBackend, ServerStartingError, ServerUnreachableError } =
   await import("../../utils/backendError.js");
+const { STARTUP_GRACE_MS } = await import("../../utils/wakeBackend.js");
 
 let pending;
 
@@ -120,18 +121,7 @@ describe("ServerWakeNotice", () => {
     expect(notice()).toBeNull();
   });
 
-  // A hosted backend scales to zero behind a page left open. The next request
-  // reaches no server; it fails with its own kind of error, and the notice
-  // comes back for the new start.
-  it("comes back when a later request reaches no server, and the server is woken again", async () => {
-    act(() => {
-      wakeBackend();
-    });
-    render(<ServerWakeNotice />);
-    await answer("/api/health", { status: "ok" });
-    await answer("/api/simulate_rethon/warm", { ready: true });
-    expect(notice()).toBeNull();
-
+  async function failOnce() {
     fetch.mockImplementationOnce(() =>
       Promise.reject(new TypeError("Failed to fetch")),
     );
@@ -142,15 +132,60 @@ describe("ServerWakeNotice", () => {
         { method: "POST" },
       ).catch((e) => e);
     });
-    expect(failure).toBeInstanceOf(ServerStartingError);
+    return failure;
+  }
+
+  async function wakeFully() {
+    act(() => {
+      wakeBackend();
+    });
+    render(<ServerWakeNotice />);
+    await answer("/api/health", { status: "ok" });
+    await answer("/api/simulate_rethon/warm", { ready: true });
+    expect(notice()).toBeNull();
+  }
+
+  it("calls a request that reaches no server during the start a wait", async () => {
+    act(() => {
+      wakeBackend();
+    });
+    render(<ServerWakeNotice />);
+    expect(await failOnce()).toBeInstanceOf(ServerStartingError);
+    await answer("/api/health", { status: "ok" });
+    expect(await failOnce()).toBeInstanceOf(ServerStartingError);
+  });
+
+  it("still calls it a wait just after the start", async () => {
+    await wakeFully();
+    wait(STARTUP_GRACE_MS - 1000);
+    expect(await failOnce()).toBeInstanceOf(ServerStartingError);
+  });
+
+  // A hosted backend scales to zero behind a page left open, and from here
+  // that looks like any other failure to answer — so it is the serious error,
+  // and the notice that follows says whether the server is coming back.
+  it("calls it a failure at any other time, and wakes the server again", async () => {
+    await wakeFully();
+    wait(STARTUP_GRACE_MS + 1000);
+    expect(await failOnce()).toBeInstanceOf(ServerUnreachableError);
     expect(fetch).toHaveBeenLastCalledWith("https://backend.test/api/health");
 
     wait(3000);
-    expect(notice().textContent).toContain("Starting the server.");
+    // Not "starting": nothing yet says it is, rather than down.
+    expect(notice().textContent).toContain("Trying to reach the server.");
     expect(notice().textContent).toContain("3 s");
+    // A wake-up that a failure started is no evidence the server is starting —
+    // it may be down — so a request in the meantime is still the serious kind.
+    expect(await failOnce()).toBeInstanceOf(ServerUnreachableError);
     await answer("/api/health", { status: "ok" });
     expect(notice().textContent).toContain("Preparing scores and simulations.");
+    // It answered, so it was a restart: from here it is the wait again. The
+    // failure still asks again, the server having gone quiet once more.
+    expect(await failOnce()).toBeInstanceOf(ServerStartingError);
+    expect(fetch).toHaveBeenLastCalledWith("https://backend.test/api/health");
+    await answer("/api/health", { status: "ok" });
     await answer("/api/simulate_rethon/warm", { ready: true });
+    wait(3000);
     expect(notice()).toBeNull();
   });
 
