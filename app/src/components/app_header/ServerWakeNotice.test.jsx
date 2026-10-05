@@ -17,6 +17,8 @@ const { wakeBackend, resetBackendWake } =
   await import("../../utils/wakeBackend.js");
 const { resetBackendCapabilities } =
   await import("../../hooks/useBackendCapabilities.js");
+const { fetchBackend, ServerStartingError } =
+  await import("../../utils/backendError.js");
 
 let pending;
 
@@ -116,5 +118,52 @@ describe("ServerWakeNotice", () => {
     render(<ServerWakeNotice />);
     wait(10000);
     expect(notice()).toBeNull();
+  });
+
+  // A hosted backend scales to zero behind a page left open. The next request
+  // reaches no server; it fails with its own kind of error, and the notice
+  // comes back for the new start.
+  it("comes back when a later request reaches no server, and the server is woken again", async () => {
+    act(() => {
+      wakeBackend();
+    });
+    render(<ServerWakeNotice />);
+    await answer("/api/health", { status: "ok" });
+    await answer("/api/simulate_rethon/warm", { ready: true });
+    expect(notice()).toBeNull();
+
+    fetch.mockImplementationOnce(() =>
+      Promise.reject(new TypeError("Failed to fetch")),
+    );
+    let failure;
+    await act(async () => {
+      failure = await fetchBackend(
+        "https://backend.test/api/judgments/elicit",
+        { method: "POST" },
+      ).catch((e) => e);
+    });
+    expect(failure).toBeInstanceOf(ServerStartingError);
+    expect(fetch).toHaveBeenLastCalledWith("https://backend.test/api/health");
+
+    wait(3000);
+    expect(notice().textContent).toContain("Starting the server.");
+    expect(notice().textContent).toContain("3 s");
+    await answer("/api/health", { status: "ok" });
+    expect(notice().textContent).toContain("Preparing scores and simulations.");
+    await answer("/api/simulate_rethon/warm", { ready: true });
+    expect(notice()).toBeNull();
+  });
+
+  it("says so, without a clock, when the server could not be reached", async () => {
+    act(() => {
+      wakeBackend();
+    });
+    render(<ServerWakeNotice />);
+    await act(async () => {
+      pending["/api/health"]({ ok: false, status: 404 });
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+    });
+    expect(notice().textContent).toContain("The server could not be reached.");
+    expect(notice().textContent).not.toMatch(/\d+ s$/);
   });
 });

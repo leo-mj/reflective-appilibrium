@@ -16,14 +16,19 @@
  * if the backend did not answer at all, which the rest of the app already
  * handles in its own way. A warm-up that fails or that an older backend does
  * not know still ends in `ready`: the workers then start on the first
- * computation, as they always did.
+ * computation, as they always did. A request that later reaches no server
+ * starts it over from `starting` (`rewakeBackend`).
  *
  * @module utils/wakeBackend
  */
 
 import { useSyncExternalStore } from "react";
 import { BACKEND_ENABLED } from "../config.js";
-import { prefetchBackendCapabilities } from "../hooks/useBackendCapabilities.js";
+import {
+  prefetchBackendCapabilities,
+  recheckBackendCapabilities,
+} from "../hooks/useBackendCapabilities.js";
+import { onBackendUnreachable } from "./backendError.js";
 import { warmBackendWorkers } from "./simulateRethonClient.js";
 
 /**
@@ -48,6 +53,27 @@ function set(next) {
   listeners.forEach((fn) => fn());
 }
 
+// Which wake-up is current. A request failing mid-way through one starts
+// another, and the earlier one's answers must not overwrite the later's phase.
+let generation = 0;
+
+function run(check) {
+  const mine = ++generation;
+  const since = Date.now();
+  set({ phase: "starting", since });
+  const current = () => mine === generation;
+  return check().then(async (capabilities) => {
+    if (!current()) return;
+    if (!capabilities?.reachable) {
+      set({ phase: "unavailable", since: null });
+      return;
+    }
+    set({ phase: "warming", since });
+    await warmBackendWorkers();
+    if (current()) set({ phase: "ready", since: null });
+  });
+}
+
 /**
  * Starts the health check, then the warm-up. Once per page load; later calls do
  * nothing. In the demo build there is nothing to wake.
@@ -56,18 +82,30 @@ function set(next) {
  */
 export function wakeBackend() {
   if (state.phase !== "idle") return undefined;
-  const since = Date.now();
-  set({ phase: "starting", since });
-  return prefetchBackendCapabilities().then(async (capabilities) => {
-    if (!capabilities?.reachable) {
-      set({ phase: "unavailable", since: null });
-      return;
-    }
-    set({ phase: "warming", since });
-    await warmBackendWorkers();
-    set({ phase: "ready", since: null });
-  });
+  return run(prefetchBackendCapabilities);
 }
+
+/**
+ * Wakes the server again, after a request reached none.
+ *
+ * A hosted backend scales to zero after a quiet spell, so a page left open goes
+ * on talking to a server that has gone; the next request starts a new one, and
+ * the platform may answer it before that one is up. So any request that reaches
+ * no server (`onBackendUnreachable`) starts the wake-up over — health check with
+ * its retries, then the warm-up, the new instance's workers being cold — and the
+ * notice shows the wait. A wake-up still waiting for the health check is left
+ * to finish: it is already asking.
+ *
+ * @returns {Promise<void>|undefined}
+ */
+export function rewakeBackend() {
+  if (!BACKEND_ENABLED || state.phase === "starting") return undefined;
+  return run(recheckBackendCapabilities);
+}
+
+onBackendUnreachable(() => {
+  rewakeBackend();
+});
 
 /** @returns {WakeState} */
 export function useBackendWake() {
@@ -83,6 +121,7 @@ export function useBackendWake() {
 
 /** Forgets the wake-up. For tests. */
 export function resetBackendWake() {
+  generation += 1;
   state = initial();
   listeners.clear();
 }

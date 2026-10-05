@@ -8,7 +8,7 @@
 import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
 import { accumulateUsage } from "./openaiClient.js";
 import { ARGUMENT_RELATION_TYPES } from "./stateUtils.js";
-import { backendError } from "./backendError.js";
+import { backendError, fetchBackend, fetchOk } from "./backendError.js";
 
 /**
  * The headers of every call here: none of these routes reads the visitor's API
@@ -55,7 +55,7 @@ async function describeScoringFailure(res, endpoint) {
  */
 export async function simulateRethonStep(state, local, evolution = null, weights = null, neighbourhoodDepth = 1, { signal } = {}) {
   const url = `${BACKEND_URL}/api/simulate_rethon/step`;
-  const res = await fetch(url, {
+  const res = await fetchOk(url, {
     method: "POST",
     signal,
     headers: JSON_ONLY,
@@ -70,8 +70,7 @@ export async function simulateRethonStep(state, local, evolution = null, weights
       weights,
       neighbourhood_depth: neighbourhoodDepth,
     }),
-  });
-  if (!res.ok) throw await backendError(res, url);
+  }, url);
   return res.json();
 }
 
@@ -114,7 +113,7 @@ export async function simulateRethonStep(state, local, evolution = null, weights
 export async function quickScore(elements, relations, weights = null) {
   if (!BACKEND_ENABLED) return null;
   try {
-    const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/quick_score`, {
+    const res = await fetchBackend(`${BACKEND_URL}/api/simulate_rethon/quick_score`, {
       method: "POST",
       headers: JSON_ONLY,
       body: JSON.stringify({ elements, relations, weights }),
@@ -139,7 +138,7 @@ export async function quickScore(elements, relations, weights = null) {
 
 export async function scorePerRound(state, local = true, weights = null) {
   const url = `${BACKEND_URL}/api/simulate_rethon/score_per_round`;
-  const res = await fetch(url, {
+  const res = await fetchOk(url, {
     method: "POST",
     headers: JSON_ONLY,
     body: JSON.stringify({
@@ -149,8 +148,7 @@ export async function scorePerRound(state, local = true, weights = null) {
       local,
       weights,
     }),
-  });
-  if (!res.ok) throw await backendError(res, url);
+  }, url);
   return res.json();
 }
 
@@ -183,7 +181,7 @@ export async function scorePerRound(state, local = true, weights = null) {
 export async function scoreChanges(state, local = true, weights = null) {
   if (!BACKEND_ENABLED) return null;
   try {
-    const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/score_changes`, {
+    const res = await fetchBackend(`${BACKEND_URL}/api/simulate_rethon/score_changes`, {
       method: "POST",
       headers: JSON_ONLY,
       body: JSON.stringify({
@@ -213,7 +211,7 @@ export async function scoreChanges(state, local = true, weights = null) {
  */
 export async function simulateRethon(state, local, evolution = null, weights = null, neighbourhoodDepth = 1, { signal } = {}) {
   const url = `${BACKEND_URL}/api/simulate_rethon/simulate`;
-  const res = await fetch(url, {
+  const res = await fetchOk(url, {
     method: "POST",
     signal,
     headers: JSON_ONLY,
@@ -226,8 +224,7 @@ export async function simulateRethon(state, local, evolution = null, weights = n
       weights,
       neighbourhood_depth: neighbourhoodDepth,
     }),
-  });
-  if (!res.ok) throw await backendError(res, url);
+  }, url);
   const data = await res.json();
   accumulateUsage(data);
   return data;

@@ -86,8 +86,13 @@ function askHealth() {
   });
 }
 
+// Whether the check in flight has settled. A settled one is still `inFlight`,
+// so that later callers reuse its answer; a re-check replaces it.
+let pending = false;
+
 function load() {
   if (!BACKEND_ENABLED || inFlight) return inFlight;
+  pending = true;
   const giveUpAt = Date.now() + HEALTH_RETRY_FOR_MS;
   // A network failure is retried too: the platform's own error reaches the page
   // as one, having no CORS header.
@@ -120,10 +125,31 @@ function load() {
       }),
     )
     .catch(() => settle({ ...UNAVAILABLE, loaded: true }))
+    .finally(() => {
+      pending = false;
+    })
     // Resolves to what was settled, for callers that act on the answer rather
     // than render it (utils/wakeBackend.js).
     .then(() => current);
   return inFlight;
+}
+
+/**
+ * Asks again, with the same retries, unless a check is already under way.
+ *
+ * For a page that has been open a while: a hosted backend that scaled to zero
+ * behind it restarts on the next request, and the answer the page holds — or
+ * the "unreachable" it settled on — is about a server that is no longer there.
+ * What is known stays in place until the new answer arrives, so nothing that
+ * reads it blinks off in the meantime.
+ *
+ * @returns {Promise<BackendCapabilities>|null}
+ */
+export function recheckBackendCapabilities() {
+  if (!BACKEND_ENABLED) return null;
+  if (pending) return inFlight;
+  inFlight = null;
+  return load();
 }
 
 /**
@@ -167,6 +193,7 @@ export function resetBackendCapabilities() {
   clearTimeout(retryTimer);
   retryTimer = null;
   inFlight = null;
+  pending = false;
   current = BACKEND_ENABLED ? UNAVAILABLE : { ...UNAVAILABLE, loaded: true };
   listeners.clear();
 }

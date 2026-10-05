@@ -10,7 +10,11 @@
  * broken app rather than a busy one.
  *
  * Shown only once a wait has gone on for a moment, so a backend that is already
- * up never flashes it, and gone as soon as the workers are ready. The phase is
+ * up never flashes it, and gone as soon as the workers are ready. It comes back
+ * when a later request reaches no server — a hosted backend scales to zero
+ * behind a page left open — since that starts the wake-up over. And it stays,
+ * without a clock, if the server could not be reached at all: the health
+ * check's retries outlast any start. The phase is
  * announced; the seconds are not, since a live region that changes every second
  * is read out every second.
  *
@@ -29,6 +33,11 @@ const MESSAGES = {
     title: "Starting the server.",
     detail:
       "After a quiet spell it switches itself off, and waking it can take up to about half a minute. AI suggestions, scores and simulations work once it is up; everything else works now.",
+  },
+  unavailable: {
+    title: "The server could not be reached.",
+    detail:
+      "AI suggestions, scores and simulations are unavailable for now; everything else works, and your work is kept in this browser. Reload the page to try again.",
   },
   warming: {
     title: "Preparing scores and simulations.",
@@ -50,9 +59,12 @@ export function ServerWakeNotice() {
     return () => clearInterval(id);
   }, [waiting]);
 
-  if (!waiting || since == null) return null;
-  const seconds = Math.max(0, Math.floor((now - since) / 1000));
-  if (seconds < SHOW_AFTER_SECONDS) return null;
+  const unavailable = phase === "unavailable";
+  if (!unavailable && (!waiting || since == null)) return null;
+  const seconds = unavailable
+    ? null
+    : Math.max(0, Math.floor((now - since) / 1000));
+  if (!unavailable && seconds < SHOW_AFTER_SECONDS) return null;
   const { title, detail } = MESSAGES[phase];
 
   return (
@@ -76,16 +88,18 @@ export function ServerWakeNotice() {
       <span>
         <strong>{title}</strong> {detail}
       </span>
-      <span
-        aria-hidden="true"
-        style={{
-          marginLeft: "auto",
-          color: C.dim,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {seconds} s
-      </span>
+      {seconds != null && (
+        <span
+          aria-hidden="true"
+          style={{
+            marginLeft: "auto",
+            color: C.dim,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {seconds} s
+        </span>
+      )}
     </div>
   );
 }

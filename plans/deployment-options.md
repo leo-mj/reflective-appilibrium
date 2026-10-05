@@ -411,3 +411,14 @@ profiling a worker's first call:
   every 3 s for up to 90 s on a network error, a 429 or a 5xx, and the Simulate
   tab neither offers a depth nor runs until the server has answered. The
   request log in Cloud Run gives the platform's own message for such a 500.
+- **A request that reaches no server now fails as `ServerStartingError`**, with
+  wording that says to wait rather than that something broke, and starts the
+  wake-up over, so the header notice returns with its clock. That covers an
+  instance that scaled to zero while the page stayed open, which the start
+  page's wake-up cannot. Same-host deployments see the platform's 502/503/504
+  instead, and one without the app's own `detail` is read the same way.
+- **Why the 500 left no trace in the app's logs**: it never reached the app —
+  look in the request log (`run.googleapis.com/requests`). Separately, on
+  `main` `import rethon` disables uvicorn's own loggers (`uvicorn.error`,
+  `uvicorn.access`) as well as ours, and only `backend.*` is switched back on;
+  with rethon out of the server process that no longer happens here.

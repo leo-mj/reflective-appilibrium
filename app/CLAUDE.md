@@ -244,6 +244,13 @@ matters on this side:
   The check is retried for as long as a start takes (`HEALTH_RETRY_FOR_MS`),
   since Cloud Run answered the first request of a cold start with a 500 of its
   own, which reaches the page as a CORS failure.
+- **A request that reaches no server is its own error** (`ServerStartingError`
+  from `fetchBackend` in `utils/backendError.js`), worded as a wait rather than
+  a failure: from a browser, a hosted server still starting and the platform's
+  error page in front of it both arrive as a bare "Failed to fetch". It also
+  starts the wake-up over (`rewakeBackend` in `utils/wakeBackend.js`), so the
+  header notice comes back — a server scales to zero behind a page left open.
+  An abort is passed through untouched; Stop is not the server's doing.
 - **The description links to rethon's homepage** (its package metadata's
   Home-page, `RETHON_HOMEPAGE`).
 - **The log records the run**: depth, weights and achievement before and
