@@ -14,7 +14,7 @@ vi.mock("../config.js", async (importOriginal) => ({
 
 const { wakeBackend, useBackendWake, resetBackendWake } =
   await import("./wakeBackend.js");
-const { resetBackendCapabilities } =
+const { resetBackendCapabilities, HEALTH_RETRY_EVERY_MS } =
   await import("../hooks/useBackendCapabilities.js");
 
 /** A fetch whose answers the test releases, keyed by the path asked for. */
@@ -84,13 +84,48 @@ describe("wakeBackend", () => {
     expect(result.current.since).toBeGreaterThanOrEqual(before);
   });
 
-  it("does not warm a backend that did not answer", async () => {
+  // A server still starting may not answer the first request at all — Cloud
+  // Run answered one with a 500 that, lacking a CORS header, reaches the page as
+  // a network failure. The check is asked again, and the wait goes on.
+  it("keeps starting while the server cannot answer yet, and warms it once it does", async () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => useBackendWake());
+      act(() => {
+        wakeBackend();
+      });
+      await act(async () => {
+        net.pending["/api/health"].reject(new TypeError("Failed to fetch"));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(phase(result)).toBe("starting");
+
+      await act(() => vi.advanceTimersByTimeAsync(HEALTH_RETRY_EVERY_MS));
+      expect(net.fetchMock).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        net.pending["/api/health"].resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ status: "ok" }),
+        });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(phase(result)).toBe("warming");
+      expect(net.fetchMock.mock.calls[2][0]).toBe(
+        "https://backend.test/api/simulate_rethon/warm",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not warm a backend that refused the health check", async () => {
     const { result } = renderHook(() => useBackendWake());
     act(() => {
       wakeBackend();
     });
     await act(async () => {
-      net.pending["/api/health"].reject(new Error("connection refused"));
+      net.pending["/api/health"].resolve({ ok: false, status: 404 });
       await new Promise((r) => setTimeout(r, 0));
     });
     expect(phase(result)).toBe("unavailable");

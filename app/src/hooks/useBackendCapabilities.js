@@ -60,13 +60,54 @@ function settle(next) {
   listeners.forEach((fn) => fn());
 }
 
+/**
+ * How long a health check that fails keeps being retried, and how often.
+ *
+ * A hosted backend that has scaled to zero takes tens of seconds to start, and
+ * the platform does not always hold the first request that long: Cloud Run
+ * answered one with a 500 of its own, carrying no CORS header, which a browser
+ * reports as a network failure. Settled on that single failure, the page held
+ * "unreachable" until it was reloaded — no depth cap known, so the Simulate tab
+ * offered a choice the server then refused. So a failure that a starting server
+ * explains is asked again, for longer than a start takes.
+ */
+export const HEALTH_RETRY_FOR_MS = 90_000;
+export const HEALTH_RETRY_EVERY_MS = 3_000;
+
+/** A 404 or 401 says something about the server, not about it starting. */
+const isRetryable = (status) => status === 429 || status >= 500;
+
+let retryTimer = null;
+
+function askHealth() {
+  return fetch(`${BACKEND_URL}/api/health`).then(async (res) => {
+    if (res.ok) return { data: await res.json(), retry: false };
+    return { data: null, retry: isRetryable(res.status) };
+  });
+}
+
 function load() {
   if (!BACKEND_ENABLED || inFlight) return inFlight;
-  // A backend that is simply down must not leave the page waiting: a failed
-  // check settles as "nothing available", which is the state the demo build is
-  // in permanently.
-  inFlight = fetch(`${BACKEND_URL}/api/health`)
-    .then((res) => (res.ok ? res.json() : null))
+  const giveUpAt = Date.now() + HEALTH_RETRY_FOR_MS;
+  // A network failure is retried too: the platform's own error reaches the page
+  // as one, having no CORS header.
+  const attempt = () =>
+    askHealth()
+      .catch(() => ({ data: null, retry: true }))
+      .then(({ data, retry }) =>
+        retry && Date.now() + HEALTH_RETRY_EVERY_MS <= giveUpAt
+          ? new Promise((resolve) => {
+              retryTimer = setTimeout(
+                () => resolve(attempt()),
+                HEALTH_RETRY_EVERY_MS,
+              );
+            })
+          : data,
+      );
+  // A backend that is simply down must not leave the page waiting for ever: once
+  // the retries run out it settles as "nothing available", which is the state
+  // the demo build is in permanently.
+  inFlight = attempt()
     .then((data) =>
       settle({
         loaded: true,
@@ -123,6 +164,8 @@ export function useBackendCapabilities() {
 
 /** Forgets the cached health check. For tests. */
 export function resetBackendCapabilities() {
+  clearTimeout(retryTimer);
+  retryTimer = null;
   inFlight = null;
   current = BACKEND_ENABLED ? UNAVAILABLE : { ...UNAVAILABLE, loaded: true };
   listeners.clear();

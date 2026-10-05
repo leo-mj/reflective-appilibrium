@@ -144,7 +144,12 @@ export function SimulateRethonTab({
   // tab offers no choice there. Hosted it is 2 — depth 3 took the merged demo
   // past its 60s limit — and depth 1 finds too little to be worth offering, so
   // a choice between them would be a choice of nothing.
-  const { maxDepth } = useBackendCapabilities();
+  //
+  // Until the server has answered, its limit is unknown, so there is neither a
+  // choice nor a run: a health check that failed while the server was starting
+  // used to read as "no limit", and the tab offered depths the server refused.
+  const { maxDepth, loaded, reachable } = useBackendCapabilities();
+  const serverAnswered = loaded && reachable;
   const neighbourhoodDepth = maxDepth || chosenDepth;
 
   const activeCount = state.elements.filter((e) =>
@@ -309,7 +314,7 @@ export function SimulateRethonTab({
   };
   const handleReject = () => conclude("rejected");
 
-  const baseDisabled = loading || cannotRun;
+  const baseDisabled = loading || cannotRun || !serverAnswered;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -377,7 +382,7 @@ export function SimulateRethonTab({
               >
                 <span style={DEPTH_LABEL_STYLE}>Depth {maxDepth}</span>
               </Tooltip>
-            ) : (
+            ) : !serverAnswered ? null : (
               <Tooltip text="How far from the current position each step looks. Deeper finds more, and takes much longer.">
                 <label style={DEPTH_LABEL_STYLE}>
                   Depth
@@ -497,6 +502,14 @@ export function SimulateRethonTab({
             Add at least three active elements, one argument, and a principle
             or background theory to run the simulation — its theory is built
             from those.
+          </div>
+        )}
+
+        {!serverAnswered && (
+          <div role="status" style={{ fontSize: 12, color: C.dim }}>
+            {loaded
+              ? "The server could not be reached, so the simulation cannot run. Reload the page to try again."
+              : "Waiting for the server to answer before the simulation can run."}
           </div>
         )}
 

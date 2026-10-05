@@ -237,6 +237,13 @@ matters on this side:
   alone and a result is read against them, so the ☰ menu's "Simulation
   weights" row was removed rather than kept as a second way to the same
   state. `AppHeader.test.jsx` holds the menu to having none.
+- **Nothing runs until the server has answered** (`loaded && reachable` from
+  `useBackendCapabilities`): before that its depth limit is unknown. A health
+  check that failed while a hosted server was starting used to read as "no
+  limit", so the tab offered depths 1–4 and the server refused the run (422).
+  The check is retried for as long as a start takes (`HEALTH_RETRY_FOR_MS`),
+  since Cloud Run answered the first request of a cold start with a 500 of its
+  own, which reaches the page as a CORS failure.
 - **The description links to rethon's homepage** (its package metadata's
   Home-page, `RETHON_HOMEPAGE`).
 - **The log records the run**: depth, weights and achievement before and

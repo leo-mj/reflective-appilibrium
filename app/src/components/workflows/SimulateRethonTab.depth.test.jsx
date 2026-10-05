@@ -14,11 +14,15 @@ vi.mock("../../utils/simulateRethonClient.js", () => ({
 vi.mock("../graphs_shared/SimulateScoresChart.jsx", () => ({
   SimulateScoresChart: () => null,
 }));
-const capabilities = vi.hoisted(() => ({ maxDepth: 0 }));
+const capabilities = vi.hoisted(() => ({
+  maxDepth: 0,
+  loaded: true,
+  reachable: true,
+}));
 vi.mock("../../hooks/useBackendCapabilities.js", () => ({
   useBackendCapabilities: () => ({
-    loaded: true,
-    reachable: true,
+    loaded: capabilities.loaded,
+    reachable: capabilities.reachable,
     maxElements: 0,
     deployment: capabilities.maxDepth ? "hosted" : "local",
     maxDepth: capabilities.maxDepth,
@@ -32,6 +36,8 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   capabilities.maxDepth = 0;
+  capabilities.loaded = true;
+  capabilities.reachable = true;
 });
 
 const element = (id, type) => ({
@@ -92,5 +98,32 @@ describe("on a server that searches to a depth of 2", () => {
     render(<SimulateRethonTab state={aState()} />);
     fireEvent.click(screen.getByRole("button", { name: /equilibrate/i }));
     expect(depthSent(simulateRethon)).toBe(2);
+  });
+});
+
+// Seen on the hosted site: the health check failed while the server was
+// starting, the tab read that as "no limit", offered 1–4 starting at 3, and the
+// server refused the run with a 422.
+describe("before the server has said what it allows", () => {
+  it("offers no depth and does not run while the health check is pending", () => {
+    capabilities.loaded = false;
+    capabilities.reachable = false;
+    render(<SimulateRethonTab state={aState()} />);
+    expect(screen.queryByRole("combobox")).toBeNull();
+    const run = screen.getByRole("button", { name: /equilibrate/i });
+    expect(run.disabled).toBe(true);
+    fireEvent.click(run);
+    expect(simulateRethon).not.toHaveBeenCalled();
+    expect(screen.getByText(/waiting for the server/i)).toBeTruthy();
+  });
+
+  it("offers no depth and does not run when the server could not be reached", () => {
+    capabilities.reachable = false;
+    render(<SimulateRethonTab state={aState()} />);
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.getByRole("button", { name: /equilibrate/i }).disabled).toBe(
+      true,
+    );
+    expect(screen.getByText(/could not be reached/i)).toBeTruthy();
   });
 });

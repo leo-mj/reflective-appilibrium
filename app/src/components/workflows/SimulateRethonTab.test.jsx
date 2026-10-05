@@ -16,6 +16,18 @@ vi.mock("../graphs_shared/SimulateScoresChart.jsx", () => ({
   SimulateScoresChart: () => null,
 }));
 
+// A server that has answered and sets no depth limit: the tab runs only once
+// one has (SimulateRethonTab.depth.test.jsx), and these tests are about running.
+vi.mock("../../hooks/useBackendCapabilities.js", () => ({
+  useBackendCapabilities: () => ({
+    loaded: true,
+    reachable: true,
+    maxElements: 0,
+    deployment: "local",
+    maxDepth: 0,
+  }),
+}));
+
 import { SimulateRethonTab } from "./SimulateRethonTab.jsx";
 import { BASE_INTERVAL_MS } from "../../hooks/usePlayback.js";
 import { simulateRethon } from "../../utils/simulateRethonClient.js";
