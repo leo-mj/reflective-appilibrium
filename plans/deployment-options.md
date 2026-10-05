@@ -359,9 +359,27 @@ nearest local analogue of a lazily streamed image):
 | `/api/health` answering, warm cache | 2.64 s | 1.93 s |
 | server RSS, idle | 219 MB | **97 MB** |
 | process tree RSS after a score and a simulation | 670 MB | 548 MB |
-| first score / first simulation, no warm-up | 3.37 / 2.30 s | 2.08 / 1.60 s |
+| first score / first simulation, no warm-up | 3.37 / 2.30 s | 2.08 / 1.60 s — noise, see below |
 | `/warm`, cold | — | 2.48 s |
 | first score / first simulation after `/warm` | — | **0.71 / 0.63 s** |
+
+Those are single runs, and one row did not survive repeating. Re-run on
+2026-10-05 in a fresh container, the two versions alternated, four runs each
+without the warm-up and three with it:
+
+| | before | after |
+| --- | --- | --- |
+| `/api/health` answering, cold | 4.8–6.1 s | 3.0–4.0 s |
+| first score, no warm-up | 3.1–3.7 s | 3.0–3.7 s |
+| first simulation, no warm-up | 3.1–3.9 s | 3.6–4.4 s |
+| `/warm`, cold | — | 3.2–3.7 s |
+| first score / simulation after `/warm` | — | 1.1–1.3 s |
+
+**The split does not make the first computation faster; the warm-up moves its
+cost.** The workers are spawned, not forked, so each always imported rethon for
+itself, whether or not the server had. Keeping rethon out of the server shortens
+the server's start; `/warm` then pays the workers' import while the reader is on
+the start page, so a computation that comes after it does not.
 
 These are local numbers; the container reads from a local disk. What carries
 over to Cloud Run is the ratio of bytes read before the server can answer,
