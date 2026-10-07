@@ -5,9 +5,12 @@
 #   docker build -t appilibrium-frontend app
 #   docker run -p 8080:8080 -e BACKEND_UPSTREAM=<backend-host>:8000 appilibrium-frontend
 
+# Base images are named with their registry: Podman and Buildah, unlike Docker,
+# refuse a short name like nginxinc/… when no registries.conf says where to look.
+
 # ── Build stage ───────────────────────────────────────────────────────────────
 
-FROM node:24-alpine AS build
+FROM docker.io/library/node:24-alpine AS build
 WORKDIR /app
 
 # Dependencies before sources, so a code change reuses the install layer.
@@ -30,7 +33,7 @@ RUN npm run build:backend
 # The unprivileged variant runs as a non-root user and listens on 8080 — what a
 # cluster that forbids root containers requires, and the same posture as the
 # backend image.
-FROM nginxinc/nginx-unprivileged:stable-alpine
+FROM docker.io/nginxinc/nginx-unprivileged:stable-alpine
 
 # The server config is a template: at start the image fills in the variables
 # below from the environment (and only those — nginx's own $host and friends are
