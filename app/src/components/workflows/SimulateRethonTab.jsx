@@ -216,13 +216,16 @@ export function SimulateRethonTab({
   // theories' largest consistent part, which is also the simulation's first
   // theory (backend/services/rethon_theory.py). Ringed on the graph until
   // there is a result, so a principle left out of it is visibly left out.
-  // The weights do not move it, so they are not sent.
-  const [scoredTheory, setScoredTheory] = useState(null);
+  // The weights do not move it, so they are not sent. Gated where it is read
+  // rather than cleared when it cannot be asked for, so the effect only ever
+  // sets it from the answer.
+  const [fetchedTheory, setFetchedTheory] = useState(null);
+  const scoredTheory = serverReady && !cannotRun ? fetchedTheory : null;
   useEffect(() => {
-    if (!serverReady || cannotRun) return setScoredTheory(null);
+    if (!serverReady || cannotRun) return;
     let cancelled = false;
     quickScore(state.elements, state.relations).then((scores) => {
-      if (!cancelled) setScoredTheory(scores?.theory ?? null);
+      if (!cancelled) setFetchedTheory(scores?.theory ?? null);
     });
     return () => {
       cancelled = true;
