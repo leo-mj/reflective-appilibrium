@@ -111,7 +111,7 @@ frontend-e2e:
   # nothing is downloaded at run time. The tag must match @playwright/test in
   # app/package-lock.json exactly; after a bump, a mismatch fails with
   # "Executable doesn't exist", which is the cue to update it here.
-  image: mcr.microsoft.com/playwright:v1.62.1-noble
+  image: mcr.microsoft.com/playwright:v1.63.0-noble
   # Generous next to a green run, but retries: 2 in playwright.config.js mean a
   # genuinely failing suite takes three passes.
   timeout: 25m
