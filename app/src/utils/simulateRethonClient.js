@@ -8,7 +8,7 @@
 import { BACKEND_ENABLED, BACKEND_URL } from "../config.js";
 import { accumulateUsage } from "./openaiClient.js";
 import { ARGUMENT_RELATION_TYPES } from "./stateUtils.js";
-import { backendError } from "./backendError.js";
+import { backendError, fetchBackend, fetchOk } from "./backendError.js";
 
 /**
  * The headers of every call here: none of these routes reads the visitor's API
@@ -55,7 +55,7 @@ async function describeScoringFailure(res, endpoint) {
  */
 export async function simulateRethonStep(state, local, evolution = null, weights = null, neighbourhoodDepth = 1, { signal } = {}) {
   const url = `${BACKEND_URL}/api/simulate_rethon/step`;
-  const res = await fetch(url, {
+  const res = await fetchOk(url, {
     method: "POST",
     signal,
     headers: JSON_ONLY,
@@ -70,8 +70,7 @@ export async function simulateRethonStep(state, local, evolution = null, weights
       weights,
       neighbourhood_depth: neighbourhoodDepth,
     }),
-  });
-  if (!res.ok) throw await backendError(res, url);
+  }, url);
   return res.json();
 }
 
@@ -101,20 +100,22 @@ export async function simulateRethonStep(state, local, evolution = null, weights
 /**
  * Compute account and systematicity for an element set analytically.
  *
- * Derives C (all active/revised/rejected elements) and T (active/revised
- * principle/theory elements) from element types — no prior simulation needed.
- * Returns ``{ account, systematicity }`` or ``null`` when scoring is not
- * possible (too few elements, no argument relations, no theory elements).
+ * Derives C (all active/revised/rejected elements) and T (the largest
+ * consistent part of the active/revised principle/theory elements, as the
+ * simulation starts from it) from element types — no prior simulation needed.
+ * Returns ``{ account, systematicity, theory }``, `theory` being T's ids, or
+ * ``null`` when scoring is not possible (too few elements, no argument
+ * relations, no theory elements).
  *
  * @param {Array}       elements
  * @param {Array}       relations
  * @param {Object|null} [weights=null]
- * @returns {Promise<{account: number, systematicity: number}|null>}
+ * @returns {Promise<{account: number, systematicity: number, theory: string[]}|null>}
  */
 export async function quickScore(elements, relations, weights = null) {
   if (!BACKEND_ENABLED) return null;
   try {
-    const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/quick_score`, {
+    const res = await fetchBackend(`${BACKEND_URL}/api/simulate_rethon/quick_score`, {
       method: "POST",
       headers: JSON_ONLY,
       body: JSON.stringify({ elements, relations, weights }),
@@ -130,7 +131,13 @@ export async function quickScore(elements, relations, weights = null) {
       return null;
     }
     const data = await res.json();
-    return data.account != null ? { account: data.account, systematicity: data.systematicity } : null;
+    return data.account != null
+      ? {
+          account: data.account,
+          systematicity: data.systematicity,
+          theory: data.theory ?? [],
+        }
+      : null;
   } catch (e) {
     console.warn(`[quick_score] ${e.message}`);
     return null;
@@ -139,7 +146,7 @@ export async function quickScore(elements, relations, weights = null) {
 
 export async function scorePerRound(state, local = true, weights = null) {
   const url = `${BACKEND_URL}/api/simulate_rethon/score_per_round`;
-  const res = await fetch(url, {
+  const res = await fetchOk(url, {
     method: "POST",
     headers: JSON_ONLY,
     body: JSON.stringify({
@@ -149,8 +156,7 @@ export async function scorePerRound(state, local = true, weights = null) {
       local,
       weights,
     }),
-  });
-  if (!res.ok) throw await backendError(res, url);
+  }, url);
   return res.json();
 }
 
@@ -183,7 +189,7 @@ export async function scorePerRound(state, local = true, weights = null) {
 export async function scoreChanges(state, local = true, weights = null) {
   if (!BACKEND_ENABLED) return null;
   try {
-    const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/score_changes`, {
+    const res = await fetchBackend(`${BACKEND_URL}/api/simulate_rethon/score_changes`, {
       method: "POST",
       headers: JSON_ONLY,
       body: JSON.stringify({
@@ -213,7 +219,7 @@ export async function scoreChanges(state, local = true, weights = null) {
  */
 export async function simulateRethon(state, local, evolution = null, weights = null, neighbourhoodDepth = 1, { signal } = {}) {
   const url = `${BACKEND_URL}/api/simulate_rethon/simulate`;
-  const res = await fetch(url, {
+  const res = await fetchOk(url, {
     method: "POST",
     signal,
     headers: JSON_ONLY,
@@ -226,9 +232,39 @@ export async function simulateRethon(state, local, evolution = null, weights = n
       weights,
       neighbourhood_depth: neighbourhoodDepth,
     }),
-  });
-  if (!res.ok) throw await backendError(res, url);
+  }, url);
   const data = await res.json();
   accumulateUsage(data);
   return data;
+}
+
+/**
+ * Asks the backend to start its simulation and scoring workers now.
+ *
+ * The workers are where the rethon stack is loaded, and on a backend that has
+ * scaled to zero starting them is most of the wait before a first score or
+ * simulation. The start page sends this after the health check
+ * (utils/wakeBackend.js), so the wait passes while the reader is still there.
+ * The backend answers once both are up, at once if they already were.
+ *
+ * Best effort: a backend that predates the endpoint, a 429 or a failure all
+ * leave the workers to start on the first computation, as they always did.
+ *
+ * @returns {Promise<boolean>} Whether the backend said both are ready.
+ */
+export async function warmBackendWorkers() {
+  if (!BACKEND_ENABLED) return false;
+  try {
+    // No body and no headers, which makes this a "simple" request: a
+    // Content-Type would add a CORS preflight, one more round trip queued
+    // behind a cold instance's start-up.
+    const res = await fetch(`${BACKEND_URL}/api/simulate_rethon/warm`, {
+      method: "POST",
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.ready === true;
+  } catch {
+    return false;
+  }
 }

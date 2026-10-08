@@ -11,6 +11,7 @@ import { CheckIcon, XIcon, EditIcon, RevertIcon, ChatIcon } from "./Icons.jsx";
 import { Tooltip } from "./Tooltip.jsx";
 import { requestLLMSettings, useKeyMissing } from "../utils/llmKey.js";
 import { SampleSuggestionsContext } from "./sampleSuggestions.js";
+import { SERVER_STARTING_MESSAGE } from "../utils/backendError.js";
 
 const CIRCLE_BTN = {
   width: 26,
@@ -193,17 +194,35 @@ export function ChatButton({ isOpen, onClick, accentColor }) {
  * @param {string} props.message
  */
 export function ErrorBanner({ message }) {
+  // A server still starting is a wait, not a fault (`ServerStartingError`), so
+  // it takes the notice amber of NeedsKeyNotice below rather than the danger
+  // red. Known by its message, since that is all the tabs keep of an error.
+  const waiting = message === SERVER_STARTING_MESSAGE;
   return (
     <div
-      style={{
-        background: C.dangerSurface,
-        border: `1px solid ${C.danger}`,
-        borderRadius: 6,
-        padding: "10px 14px",
-        fontSize: 12,
-        color: C.dangerInk,
-        marginBottom: 14,
-      }}
+      role={waiting ? "status" : undefined}
+      data-kind={waiting ? "starting" : "error"}
+      style={
+        waiting
+          ? {
+              background: C.undermines + "14",
+              border: `1px solid ${C.undermines}55`,
+              borderRadius: 6,
+              padding: "10px 14px",
+              fontSize: 12,
+              color: C.text,
+              marginBottom: 14,
+            }
+          : {
+              background: C.dangerSurface,
+              border: `1px solid ${C.danger}`,
+              borderRadius: 6,
+              padding: "10px 14px",
+              fontSize: 12,
+              color: C.dangerInk,
+              marginBottom: 14,
+            }
+      }
     >
       {message}
     </div>

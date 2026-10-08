@@ -43,10 +43,11 @@ from .security_headers import SecurityHeadersMiddleware
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
-# Must stay after the router imports: `import rethon`, reached through
-# routers.simulate_rethon, disables every logger created before it, and this is
-# what switches ours back on. See logging_setup for the whole story — the
-# simulation workers call the same function, so the two cannot drift.
+# Gives the backend's loggers their handler. It also used to undo `import
+# rethon`, which disables every logger created before it and was reached through
+# the router; the server process no longer imports rethon at all, and the repair
+# now travels with the import (services/rethon_import.py). See logging_setup —
+# the simulation workers call the same function, so the two cannot drift.
 configure_backend_logging()
 
 # ── App ────────────────────────────────────────────────────────────────────────

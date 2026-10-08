@@ -4,6 +4,7 @@
  * @module components/SimulateRethonCards
  */
 
+import { Fragment } from "react";
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { SCORE_MEASURES } from "../../constants/scoreMeasures.js";
@@ -59,22 +60,27 @@ export function ChangeList({ title, hint, elements, color }) {
           <span style={{ fontWeight: "normal", color: C.dim }}> — {hint}</span>
         )}
       </div>
-      {elements.map((e) => (
-        <div
-          key={e.id}
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            gap: 6,
-            fontSize: 11,
-            lineHeight: 1.5,
-            marginBottom: 3,
-          }}
-        >
-          <IdBadge element={e} />
-          <span style={{ color: C.text }}>{e.text}</span>
-        </div>
-      ))}
+      {/* One grid for the whole list rather than a row each, so the badges
+          share a column as wide as the widest of them and every statement
+          starts at the same place, J4's as J13's. */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "max-content minmax(0, 1fr)",
+          alignItems: "baseline",
+          columnGap: 6,
+          rowGap: 3,
+          fontSize: 11,
+          lineHeight: 1.5,
+        }}
+      >
+        {elements.map((e) => (
+          <Fragment key={e.id}>
+            <IdBadge element={e} />
+            <span style={{ color: C.text }}>{e.text}</span>
+          </Fragment>
+        ))}
+      </div>
     </div>
   );
 }
@@ -93,6 +99,9 @@ export function IdBadge({ element }) {
         border: `1px solid ${negated ? C.border : color}`,
         borderRadius: 4,
         padding: "1px 5px",
+        // Stretched to its column in a list, the id sits in the middle of the
+        // wider badge; inline elsewhere, this does nothing.
+        textAlign: "center",
       }}
     >
       {negated ? "¬" : ""}
@@ -245,9 +254,9 @@ export function StepRow({ step, score, current, onSelect }) {
   const unchanged = !step.joined.length && !step.left.length;
   const quiet =
     step.index === 0
-      ? "Your current commitments"
+      ? "The elements you accept and reject now"
       : step.index === 1 && unchanged
-        ? "The theory you hold"
+        ? "Your active principles and background theories"
         : unchanged
           ? "No change"
           : null;
@@ -274,7 +283,12 @@ export function StepRow({ step, score, current, onSelect }) {
         }}
       >
         <span
-          style={{ color: C.dim, minWidth: 18, textAlign: "right", flexShrink: 0 }}
+          style={{
+            color: C.dim,
+            minWidth: 18,
+            textAlign: "right",
+            flexShrink: 0,
+          }}
         >
           {step.index}
         </span>
@@ -291,7 +305,7 @@ export function StepRow({ step, score, current, onSelect }) {
             textAlign: "center",
           }}
         >
-          {isCommitments ? "Commitments" : "Theory"}
+          {isCommitments ? "Elements" : "Theory"}
         </span>
         <span
           style={{

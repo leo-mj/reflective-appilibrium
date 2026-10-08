@@ -5,6 +5,10 @@ import {
   backendError,
   fetchBackend,
   fetchOk,
+  onBackendUnreachable,
+  setStartingUpCheck,
+  ServerStartingError,
+  ServerUnreachableError,
 } from "./backendError.js";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -140,8 +144,81 @@ describe("fetchBackend", () => {
       vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
     );
     await expect(fetchBackend("http://x/api/health")).rejects.toThrow(
-      /Could not reach the backend/,
+      /Could not reach the server/,
     );
+  });
+
+  // Two kinds, so that nothing has to read the wording to tell a server that is
+  // starting from one that cannot be reached.
+  it("throws a ServerUnreachableError at an ordinary time, and tells whoever listens", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
+    );
+    const heard = vi.fn();
+    const stop = onBackendUnreachable(heard);
+    try {
+      const err = await fetchBackend("http://x", undefined, "/api/x").catch(
+        (e) => e,
+      );
+      expect(err).toBeInstanceOf(ServerUnreachableError);
+      expect(err.kind).toBe("unreachable");
+      expect(err.endpoint).toBe("/api/x");
+      expect(heard).toHaveBeenCalledTimes(1);
+    } finally {
+      stop();
+    }
+  });
+
+  it("throws the milder ServerStartingError while the server is starting up", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
+    );
+    setStartingUpCheck(() => true);
+    try {
+      const err = await fetchBackend("http://x").catch((e) => e);
+      expect(err).toBeInstanceOf(ServerStartingError);
+      expect(err.kind).toBe("starting");
+      expect(err.message).toMatch(/still starting/);
+    } finally {
+      setStartingUpCheck(() => false);
+    }
+  });
+
+  // Telling the listeners starts a wake-up, which would make every failure
+  // read as "starting" if the kind were decided after.
+  it("decides the kind before telling anyone", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
+    );
+    let starting = false;
+    setStartingUpCheck(() => starting);
+    const stop = onBackendUnreachable(() => {
+      starting = true;
+    });
+    try {
+      const err = await fetchBackend("http://x").catch((e) => e);
+      expect(err).toBeInstanceOf(ServerUnreachableError);
+    } finally {
+      stop();
+      setStartingUpCheck(() => false);
+    }
+  });
+
+  // Stop on the Simulate tab aborts its request; that is not the server's doing.
+  it("passes an abort through untouched, and tells nobody", async () => {
+    const abort = new DOMException("The operation was aborted.", "AbortError");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(abort));
+    const heard = vi.fn();
+    const stop = onBackendUnreachable(heard);
+    try {
+      await expect(fetchBackend("http://x", {})).rejects.toBe(abort);
+      expect(heard).not.toHaveBeenCalled();
+    } finally {
+      stop();
+    }
   });
 
   it("keeps the original failure as the cause", async () => {
@@ -172,5 +249,39 @@ describe("fetchOk", () => {
       vi.fn().mockResolvedValue(res(429, "", { "Retry-After": "12" })),
     );
     await expect(fetchOk("http://x")).rejects.toThrow(/12 seconds/);
+  });
+
+  // Served from the page's own host, the platform's answer to a request that
+  // reached no server yet is readable: a gateway error with no detail of ours.
+  it("reads a gateway error without our detail as a server not answering", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(res(503, "<html>Service Unavailable</html>")),
+    );
+    await expect(fetchOk("http://x")).rejects.toBeInstanceOf(
+      ServerUnreachableError,
+    );
+    setStartingUpCheck(() => true);
+    try {
+      await expect(fetchOk("http://x")).rejects.toBeInstanceOf(
+        ServerStartingError,
+      );
+    } finally {
+      setStartingUpCheck(() => false);
+    }
+  });
+
+  // The app's own 503 — a worker that died — always says what happened.
+  it("keeps the app's own 503 as the failure it reports", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(res(503, '{"detail":"The worker process stopped."}')),
+    );
+    const err = await fetchOk("http://x").catch((e) => e);
+    expect(err).not.toBeInstanceOf(ServerStartingError);
+    expect(err).not.toBeInstanceOf(ServerUnreachableError);
+    expect(err.message).toMatch(/worker process stopped/);
   });
 });

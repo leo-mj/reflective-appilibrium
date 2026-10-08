@@ -26,6 +26,7 @@ import {
 import { groupOfElement } from "../../utils/groupUtils.js";
 import { processesOf, processesOfElement } from "../../utils/mergeStates.js";
 import { confidenceLabel } from "../../utils/confidenceLabel.js";
+import { SCORE_MEASURES } from "../../constants/scoreMeasures.js";
 import { withdrawalScale as scaleOf } from "../../utils/withdrawalScale.js";
 import { Ctx } from "./TextTabContext.js";
 import { useCardDetails, setCardDetails } from "./cardDetails.js";
@@ -249,7 +250,8 @@ export function ElementCard({ e, dim }) {
             return (
               <StatSection label="If withdrawn">
                 <DeltaBar
-                  label="Account"
+                  label={SCORE_MEASURES.account.label}
+                  labelTitle={SCORE_MEASURES.account.tooltip}
                   value={dA}
                   text={fmt(dA)}
                   scale={scale}
@@ -259,7 +261,8 @@ export function ElementCard({ e, dim }) {
                 />
                 {dS !== 0 && (
                   <DeltaBar
-                    label="Systematicity"
+                    label={SCORE_MEASURES.systematicity.label}
+                    labelTitle={SCORE_MEASURES.systematicity.tooltip}
                     value={dS}
                     text={fmt(dS)}
                     scale={scale}

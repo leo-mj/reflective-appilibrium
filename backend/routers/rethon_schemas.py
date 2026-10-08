@@ -87,10 +87,15 @@ class QuickScoreResponse(BaseModel):
     Returns only account and systematicity — faithfulness is omitted because
     in the type-based approach C₀ = C (no prior state), so faithfulness is
     always 1.0 and adds no information.
+
+    ``theory`` is the ids of the theory scored — the held principles and
+    theories' largest consistent part — which the Simulate tab rings on the
+    graph, so a principle left out of it is visibly left out.
     """
 
     account: Optional[float]
     systematicity: Optional[float]
+    theory: Optional[list[str]] = None
 
 
 class RoundScores(BaseModel):
@@ -166,3 +171,10 @@ class SimulateRethonStepRequest(BaseModel):
     evolution: Optional[List[List[REElement]]] = None
     weights: Optional[ModelWeights] = None
     neighbourhood_depth: int = Field(default=1, ge=1, le=4)
+
+
+class WarmResponse(BaseModel):
+    """What /warm reports once both workers are up, or have failed to start."""
+
+    ready: bool
+    seconds: float

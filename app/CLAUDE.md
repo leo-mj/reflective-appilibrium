@@ -230,6 +230,17 @@ matters on this side:
   `preview.theory`). A theory step mostly moves elements already held as
   commitments, so the withdraw and take-up rings left it invisible on the
   graph. `RingKey` under the playback row names all three rings.
+- **Before a run, that ring marks the theory the scores are taken against**
+  — the held principles' largest consistent part, which `quick_score` returns
+  as `theory` and which is also the run's first theory. `ScoredTheory` names
+  any held principle left out of it. Without it, a principle in open conflict
+  counted for nothing in every score, and nothing on screen said so.
+- **The texts speak the app's types, not rethon's vocabulary**: "the elements
+  you accept and reject" for its commitments, and "theory" only once the
+  description has said what it is — a consistent set of principles and
+  background theories, which is also what "Theory" names on a background
+  theory, so it cannot be left to the reader. The description says what the
+  three measures are about; `SCORE_MEASURES` and the tour say the same.
 - **Before and after**: the bar gives achievement at step 1 — the held
   position, when the run could start from the held theory — and at the end.
 - **The weights live in the toolbar, and only there** (`weightControl` from
@@ -237,6 +248,34 @@ matters on this side:
   alone and a result is read against them, so the ☰ menu's "Simulation
   weights" row was removed rather than kept as a second way to the same
   state. `AppHeader.test.jsx` holds the menu to having none.
+- **Nothing runs until the server is ready**: answered (`loaded && reachable`
+  from `useBackendCapabilities`), before which its depth limit is unknown, and
+  woken (`phase === "ready"` from `useBackendWake`), so a first run does not
+  wait behind the workers' start. The tab calls `wakeBackend()` itself, a no-op
+  after the start page has. A health
+  check that failed while a hosted server was starting used to read as "no
+  limit", so the tab offered depths 1–4 and the server refused the run (422).
+  The check is retried for as long as a start takes (`HEALTH_RETRY_FOR_MS`),
+  since Cloud Run answered the first request of a cold start with a 500 of its
+  own, which reaches the page as a CORS failure.
+- **A request that reaches no server fails one of two ways** (`fetchBackend` in
+  `utils/backendError.js`; from a browser, a server still starting and the
+  platform's error page in front of it both arrive as a bare "Failed to fetch"):
+  - `ServerStartingError`, the mild one, **shortly after start-up**
+    (`isStartingUp` in `utils/wakeBackend.js`): the page-load wake-up before
+    the server first answers, the workers' warm-up, and `STARTUP_GRACE_MS`
+    after. `ErrorBanner` shows it in the notice amber, as a wait. Both messages
+    are one short sentence; the header notice carries the rest.
+  - `ServerUnreachableError`, the serious one, **at any other time**, in the
+    danger red. That includes while a wake-up that a failure started is still
+    waiting for an answer: a failure is no evidence the server is starting —
+    it may be down — and only its answering again makes it a restart.
+
+  Either one starts the wake-up over (`rewakeBackend`), since a server scales to
+  zero behind a page left open; the header notice then reads "Trying to reach
+  the server" rather than "Starting", until it answers. The kind is decided
+  before the wake-up starts, or every failure would read as the mild one. An
+  abort is passed through untouched; Stop is not the server's doing.
 - **The description links to rethon's homepage** (its package metadata's
   Home-page, `RETHON_HOMEPAGE`).
 - **The log records the run**: depth, weights and achievement before and
@@ -285,7 +324,8 @@ them out of the primitives in `TextTabPrimitives.jsx`.
   is not a colour, so the declaration was dropped and the default chip had no
   border at all; those take `C.border` instead.
 - **The fields are a grid, not a row** (`cardStats`), of `auto-fill` columns at
-  a 110px minimum. Packed in a row, every field's position depends on the width
+  a 22ch minimum — characters, so "Round 12 · Step 140" fits in any font; at
+  110px the step was eaten by the ellipsis. Packed in a row, every field's position depends on the width
   of the text before it, so a column of cards had its origins and rounds in a
   different place on every line. Values are held to one ellipsised line for the
   same reason — a value that wraps moves the rows under it — which is why
@@ -330,10 +370,14 @@ them out of the primitives in `TextTabPrimitives.jsx`.
   the element minus the score now, so orange (+) means the position would
   score higher without it and teal (−) that it earns its place. One caption at
   the top of the panel says so, and each bar's hover text says it again.
+  **Two hover texts a row**: the bar and number say what the change means;
+  the measure's name says what the measure is (`labelTitle`, from
+  `SCORE_MEASURES`).
 - **Z is "Achievement (Z)", never "Z-score"** — rethon's weighted sum of
   account, systematicity and faithfulness, not a statistical z-score.
   `constants/scoreMeasures.js` holds the four names and hover texts that the
-  Simulate row, both score charts and History's button share.
+  Simulate row, both score charts, History's button and the withdrawal bars
+  share.
 - **`data-stat` and `data-card="element"` are structural hooks, and the tests
   depend on them.** The e2e helpers used to find a card by climbing from a
   "Revise" button while the ancestor held one "Confidence:" label; the fold can

@@ -5,12 +5,13 @@
 // arrived, and what has since happened to it. These tests pin that order, the
 // status-dependent styling that goes with it, and the fold that hides the lot.
 import { vi, describe, it, expect, afterEach } from "vitest";
-import { render, fireEvent, act, cleanup } from "@testing-library/react";
+import { render, fireEvent, cleanup } from "@testing-library/react";
 
 import { Ctx } from "./TextTabContext.js";
 import { setCardDetails } from "./cardDetails.js";
 import { ArgumentCard, ElementCard, RelationCard } from "./TextTabCards.jsx";
 import { tooltipText } from "../tooltipTestUtils.js";
+import { SCORE_MEASURES } from "../../constants/scoreMeasures.js";
 
 afterEach(cleanup);
 
@@ -382,29 +383,28 @@ describe("the withdrawal scores", () => {
   });
 
   it("names the scale on hover, and which way is good news", () => {
-    // Through the app's own Tooltip, not the DOM's `title`, so it has to be
-    // hovered and waited out like any other.
-    vi.useFakeTimers();
-    const { container } = renderIn(<ElementCard e={el()} dim={false} />, {
+    const { getByText } = renderIn(<ElementCard e={el()} dim={false} />, {
       withdrawalDeltas: DELTAS,
       withdrawalScale: 0.2,
     });
-    const account = [...container.querySelectorAll("div")].find(
-      (d) => d.textContent === "Account-0.048",
+    // On the bar and number. A negative account change: withdrawing it would
+    // cost the position, which the colour alone does not say.
+    expect(tooltipText(getByText("-0.048"))).toBe(
+      "Account change if withdrawn: it is earning its place (bar drawn to ±0.2)",
     );
-    fireEvent.mouseEnter(account);
-    act(() => vi.advanceTimersByTime(400));
-    expect(
-      [...document.body.querySelectorAll("div")].some(
-        (d) =>
-          d.style.position === "fixed" &&
-          // A negative account change: withdrawing it would cost the
-          // position, which the colour alone does not say.
-          d.textContent ===
-            "Account change if withdrawn: it is earning its place (bar drawn to ±0.2)",
-      ),
-    ).toBe(true);
-    vi.useRealTimers();
+  });
+
+  it("defines each measure on its name", () => {
+    const { getByText } = renderIn(<ElementCard e={el()} dim={false} />, {
+      withdrawalDeltas: DELTAS,
+      withdrawalScale: 0.2,
+    });
+    expect(tooltipText(getByText("Account"))).toBe(
+      SCORE_MEASURES.account.tooltip,
+    );
+    expect(tooltipText(getByText("Systematicity"))).toBe(
+      SCORE_MEASURES.systematicity.tooltip,
+    );
   });
 
   it("derives a scale when its host hands it none", () => {
