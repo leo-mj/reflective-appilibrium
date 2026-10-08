@@ -434,8 +434,11 @@ export function StatSection({ label, children }) {
  * `aria-hidden` — it is there to make a column of these comparable at a glance,
  * which three decimal places on their own are not. Its length is the magnitude
  * against `scale`, which every bar in the panel shares, so what the lengths
- * compare is one element with the next. `title` is where the scale is named,
- * this being a bar with no visible axis.
+ * compare is one element with the next.
+ *
+ * Two hover texts, for two questions: the name answers what the measure is
+ * (`labelTitle`), the bar and number what this change means (`title`, which
+ * is also where the scale is named, this being a bar with no visible axis).
  *
  * @param {Object} props
  * @param {string} props.label
@@ -445,7 +448,8 @@ export function StatSection({ label, children }) {
  * @param {string} props.color - The bar's fill: a graph hue, read as colour.
  * @param {string} [props.textColor] - The number's ink, where that hue does not
  *   read as type on the panel. Defaults to the bar's own colour.
- * @param {string} [props.title]
+ * @param {string} [props.labelTitle] - What the measure is.
+ * @param {string} [props.title] - What this change in it means.
  */
 export function DeltaBar({
   label,
@@ -454,6 +458,7 @@ export function DeltaBar({
   scale,
   color,
   textColor,
+  labelTitle,
   title,
 }) {
   // Rounded before it reaches CSS: 0.132 / 0.2 × 100 is 66.00000000000001 in
@@ -461,17 +466,17 @@ export function DeltaBar({
   const pct =
     Math.round(Math.min(100, (Math.abs(value) / scale) * 100) * 100) / 100;
   return (
-    <Tooltip text={title}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2.2fr) auto",
-          alignItems: "center",
-          gap: 8,
-          fontSize: CONTENT_FONT_SIZE,
-          lineHeight: 1.7,
-        }}
-      >
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2.2fr) auto",
+        alignItems: "center",
+        gap: 8,
+        fontSize: CONTENT_FONT_SIZE,
+        lineHeight: 1.7,
+      }}
+    >
+      <Tooltip text={labelTitle}>
         <span
           style={{
             color: C.text,
@@ -482,38 +487,49 @@ export function DeltaBar({
         >
           {label}
         </span>
+      </Tooltip>
+      <Tooltip text={title}>
+        {/* One trigger over the bar and the number, laid out on the row's own
+            columns by subgrid. The number is a bare text child rather than a
+            span of its own: that is what tells the tooltip the trigger has
+            visible text, so it does not name the span after the hover text. */}
         <span
-          aria-hidden="true"
+          data-delta-value=""
           style={{
-            position: "relative",
-            height: 6,
-            borderRadius: 3,
-            background: `${C.border}`,
-            overflow: "hidden",
-          }}
-        >
-          <span
-            style={{
-              position: "absolute",
-              top: 0,
-              bottom: 0,
-              left: 0,
-              width: `${pct}%`,
-              background: color,
-              borderRadius: 3,
-            }}
-          />
-        </span>
-        <span
-          style={{
+            gridColumn: "2 / -1",
+            display: "grid",
+            gridTemplateColumns: "subgrid",
+            alignItems: "center",
             color: textColor ?? color,
             fontVariantNumeric: "tabular-nums",
           }}
         >
+          <span
+            aria-hidden="true"
+            style={{
+              position: "relative",
+              height: 6,
+              borderRadius: 3,
+              background: `${C.border}`,
+              overflow: "hidden",
+            }}
+          >
+            <span
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: `${pct}%`,
+                background: color,
+                borderRadius: 3,
+              }}
+            />
+          </span>
           {text}
         </span>
-      </div>
-    </Tooltip>
+      </Tooltip>
+    </div>
   );
 }
 

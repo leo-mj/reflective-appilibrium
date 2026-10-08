@@ -10,6 +10,7 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 
 vi.mock("../../utils/simulateRethonClient.js", () => ({
   simulateRethon: vi.fn(() => new Promise(() => {})),
+  quickScore: vi.fn(async () => null),
 }));
 vi.mock("../graphs_shared/SimulateScoresChart.jsx", () => ({
   SimulateScoresChart: () => null,

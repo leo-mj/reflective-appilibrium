@@ -131,10 +131,16 @@ commitments already start from the user's current statuses, so a fresh theory
 was the one part that restarted the process instead of continuing it; and a
 local search started near the empty position can settle on less than the user
 holds (`test_rethon_theory.py` has such a case). **A held theory the arguments
-make inconsistent starts from its largest consistent part**, principles taken
-most confident first — most positions worth simulating have open conflicts,
-and falling back to rethon's start instead began the demo from one principle
-and withdrew most of it. Only a process holding no principle or theory falls
+make inconsistent starts from its largest consistent part** — largest by
+count, confidence only choosing between equally large parts — since most
+positions worth simulating have open conflicts, and falling back to rethon's
+start instead began the demo from one principle and withdrew most of it.
+Taking the most confident first and keeping what stayed consistent, as it once
+did, could give up two principles for one. **The scoring evaluates that same part**
+(`largest_consistent_part` in `rethon_theory.py`), recomputed for each card's
+"if withdrawn" variant: theodias closes an inconsistent theory to the whole
+pool, so scoring the held theory whole read account as 0 whatever the
+commitments held. Only a process holding no principle or theory falls
 back to rethon's start. Whether seeded and unseeded runs reach different
 equilibria is a result worth recording, not a reason to go back.
 

@@ -100,15 +100,17 @@ export async function simulateRethonStep(state, local, evolution = null, weights
 /**
  * Compute account and systematicity for an element set analytically.
  *
- * Derives C (all active/revised/rejected elements) and T (active/revised
- * principle/theory elements) from element types — no prior simulation needed.
- * Returns ``{ account, systematicity }`` or ``null`` when scoring is not
- * possible (too few elements, no argument relations, no theory elements).
+ * Derives C (all active/revised/rejected elements) and T (the largest
+ * consistent part of the active/revised principle/theory elements, as the
+ * simulation starts from it) from element types — no prior simulation needed.
+ * Returns ``{ account, systematicity, theory }``, `theory` being T's ids, or
+ * ``null`` when scoring is not possible (too few elements, no argument
+ * relations, no theory elements).
  *
  * @param {Array}       elements
  * @param {Array}       relations
  * @param {Object|null} [weights=null]
- * @returns {Promise<{account: number, systematicity: number}|null>}
+ * @returns {Promise<{account: number, systematicity: number, theory: string[]}|null>}
  */
 export async function quickScore(elements, relations, weights = null) {
   if (!BACKEND_ENABLED) return null;
@@ -129,7 +131,13 @@ export async function quickScore(elements, relations, weights = null) {
       return null;
     }
     const data = await res.json();
-    return data.account != null ? { account: data.account, systematicity: data.systematicity } : null;
+    return data.account != null
+      ? {
+          account: data.account,
+          systematicity: data.systematicity,
+          theory: data.theory ?? [],
+        }
+      : null;
   } catch (e) {
     console.warn(`[quick_score] ${e.message}`);
     return null;

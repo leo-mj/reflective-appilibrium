@@ -113,7 +113,7 @@ describe("stepLog", () => {
 
   it("says each step in words, one entry per step", () => {
     expect(log.map((l) => l.round)).toEqual([0, 1, 2, 3, 4]);
-    expect(log[1].changes).toMatch(/starts from the theory you hold/i);
+    expect(log[1].changes).toMatch(/starts from your active principles and background theories/i);
     expect(log[2].changes).toBe("Takes up J3. Drops J2.");
     expect(log[3].changes).toBe("P2 joins the theory.");
     expect(log[4].changes).toBe("Rejects J4.");

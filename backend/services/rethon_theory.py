@@ -22,7 +22,8 @@ commitments are already carried over as they stand now, so a fresh theory was
 the one part of the simulation that ignored where the user had got to. Where
 the arguments make the held theory inconsistent — a position with open
 conflicts, which is most positions worth simulating — the start is **the
-largest consistent part of it**, taking the most confident principles first.
+largest consistent part of it** (``largest_consistent_part``): largest by
+count, confidence choosing only between equally large parts.
 Falling back to rethon's own start instead, as it first did, began the demo
 from a single principle and withdrew most of the position. Only where nothing
 is held does the start fall back to rethon's choice, restricted as everything
@@ -44,7 +45,7 @@ never pass it.
 
 import hashlib
 import random
-from typing import FrozenSet, Iterable, Optional, Set, Tuple
+from typing import FrozenSet, Iterable, List, Optional, Set, Tuple
 
 from . import rethon_import  # noqa: F401 — must precede rethon; see that module
 from theodias import DialecticalStructure, Position, StandardPosition
@@ -59,6 +60,50 @@ from .rethon_tasks import (  # noqa: F401 — moved there; re-exported for calle
     held_theory,
     theory_sentences,
 )
+
+
+def largest_consistent_part(
+    ds: DialecticalStructure, held: Iterable[int], n: int
+) -> Set[int]:
+    """The largest subset of ``held``, by count, that the arguments allow
+    holding together; the whole of it where they allow that. Among equally
+    large subsets, the one keeping the earliest sentences of ``held`` — in
+    ``held_theory`` order, the most confident. Empty where nothing is held.
+    The simulation starts from this and the scoring evaluates it, so the two
+    read an inconsistent theory alike.
+
+    Confidence only breaks ties. Taking the most confident first and keeping
+    whatever stayed consistent, as this once did, could drop two principles to
+    keep the one more confident principle both conflict with.
+
+    Exact, by branch and bound: each sentence in turn is first kept, then left
+    out, and a branch is cut where what it keeps is already inconsistent — no
+    position holding an inconsistent one is consistent — or where keeping all
+    that remains could not beat the largest found. Exponential at worst; in
+    practice a conflict or two among a few dozen elements, which it settles
+    in a handful of checks.
+    """
+    held = list(held)
+    if ds.is_consistent(StandardPosition.from_set(set(held), n)):
+        return set(held)
+    best: List[int] = []
+
+    def search(i: int, kept: List[int]) -> None:
+        nonlocal best
+        # A tie is cut too, so the first found of the largest size stands:
+        # keeping is tried before leaving out, earliest sentence first.
+        if len(kept) + len(held) - i <= len(best):
+            return
+        if i == len(held):
+            best = kept
+            return
+        with_it = kept + [held[i]]
+        if ds.is_consistent(StandardPosition.from_set(set(with_it), n)):
+            search(i + 1, with_it)
+        search(i + 1, kept)
+
+    search(0, [])
+    return set(best)
 
 
 def _position_key(position: Position) -> Tuple[int, ...]:
@@ -101,21 +146,12 @@ class _TheoryRestriction:
 
     def seeded_theory(self) -> Optional[Position]:
         """The first theory: the held theory where the arguments allow holding
-        it all, its largest consistent part otherwise — principles taken most
-        confident first, each kept if it is consistent with those kept before.
+        it all, its ``largest_consistent_part`` otherwise.
         None where nothing is held, or nothing held is consistent."""
         ds = self.dialectical_structure()
         n = ds.sentence_pool().size()
         held = [i for i in self._held_theory if i in self._theory_sentences]
-        if not held:
-            return None
-        whole = StandardPosition.from_set(set(held), n)
-        if ds.is_consistent(whole):
-            return whole
-        kept: Set[int] = set()
-        for index in held:
-            if ds.is_consistent(StandardPosition.from_set(kept | {index}, n)):
-                kept.add(index)
+        kept = largest_consistent_part(ds, held, n)
         return StandardPosition.from_set(kept, n) if kept else None
 
     def pick_theory_candidate(self, theory_candidates, **kwargs) -> Position:

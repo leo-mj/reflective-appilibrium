@@ -4,7 +4,12 @@ from typing import List, Dict, Optional
 import logging
 
 from . import rethon_import  # noqa: F401 — must precede rethon; see that module
-from theodias import Position, StandardPosition, BDDDialecticalStructure
+from theodias import (
+    BDDDialecticalStructure,
+    DialecticalStructure,
+    Position,
+    StandardPosition,
+)
 from rethon import StandardLocalReflectiveEquilibrium
 from ..models.re_state import REElement, REHistoryEvent, RERelation
 from ..routers.rethon_schemas import (
@@ -24,31 +29,17 @@ from .rethon_simulation import (
     build_numerical_arguments,
     get_final_score,
 )
+from .rethon_theory import held_theory, largest_consistent_part
 
 logger = logging.getLogger(__name__)
 
 
-def _build_type_positions(
-    elements: List[REElement],
-    id_to_index: Dict[str, int],
-    n: int,
-) -> tuple[Position, Position]:
-    """Build commitment (C) and theory (T) positions from element types.
-
-    - **All** elements (judgments, principles, background theories) that are
-      active/revised (→ positive) or rejected (→ negative) form the commitment
-      position.  An agent can be committed to a principle just as much as to a
-      particular judgment.
-    - Only principle and background-theory (type "theory") elements that are
-      active/revised form the theory position, because these are the elements
-      that constitute the explanatory framework.
-
-    Principles and background theories therefore appear in *both* C and T.
-
-    Allows Z to be computed analytically without running a full RE simulation.
-    Returns ``(c_pos, t_pos)``.
-    """
-    c_set: set[int] = {
+def _commitment_set(elements: List[REElement], id_to_index: Dict[str, int]) -> set[int]:
+    """The commitment position C: **all** elements (judgments, principles,
+    background theories) that are active/revised (→ positive) or rejected
+    (→ negative). An agent can be committed to a principle just as much as to
+    a particular judgment."""
+    return {
         (
             id_to_index[el.id]
             if el.status in ("active", "revised")
@@ -57,15 +48,32 @@ def _build_type_positions(
         for el in elements
         if el.status in ("active", "revised", "rejected") and el.id in id_to_index
     }
-    t_set: set[int] = {
-        id_to_index[el.id]
-        for el in elements
-        if el.type in ("principle", "theory")
-        and el.status in ("active", "revised")
-        and el.id in id_to_index
-    }
+
+
+def _build_type_positions(
+    elements: List[REElement],
+    lookup: Dict[int, REElement],
+    ds: DialecticalStructure,
+    n: int,
+) -> tuple[Position, Position]:
+    """Build commitment (C) and theory (T) positions from element types.
+
+    C is ``_commitment_set``. T is made of the active/revised principles and
+    background theories, the elements that constitute the explanatory
+    framework — their ``largest_consistent_part``, which is the theory the
+    simulation starts from. Taking them all instead would let an open conflict
+    between principles make T inconsistent, whose closure is the whole pool:
+    account would be 0 whatever C held.
+
+    Principles and background theories therefore appear in *both* C and T.
+
+    Allows Z to be computed analytically without running a full RE simulation.
+    Returns ``(c_pos, t_pos)``.
+    """
+    id_to_index = {el.id: index for index, el in lookup.items()}
+    t_set = largest_consistent_part(ds, held_theory(lookup), n)
     return (
-        StandardPosition.from_set(c_set, n),
+        StandardPosition.from_set(_commitment_set(elements, id_to_index), n),
         StandardPosition.from_set(t_set, n),
     )
 
@@ -82,7 +90,8 @@ def compute_score_changes(
     Uses an analytical approach: every committed element forms the commitment
     position (C) and principle/theory elements form the theory position (T), as
     in ``_build_type_positions`` — the same vocabulary the simulation's theory
-    is restricted to (``rethon_theory``).  No full RE simulation is run.
+    is restricted to (``rethon_theory``), and the same theory it starts from.
+    No full RE simulation is run.
 
     "Analytical" is not "cheap": the BDD below is built over the whole sentence
     pool and then queried once per element, so this is the most size-sensitive
@@ -113,30 +122,20 @@ def compute_score_changes(
         return empty
     try:
         built = build_numerical_arguments(elements=elements, relations=arg_relations)
-        id_to_index: Dict[str, int] = {el.id: i + 1 for i, el in enumerate(elements)}
+        id_to_index: Dict[str, int] = {el.id: i for i, el in built.lookup.items()}
         bdd_ds = BDDDialecticalStructure.from_arguments(
             arguments=built.num_arguments,
             n_unnegated_sentence_pool=n,
         )
         # C₀: all active/revised (positive) and rejected (negative) elements.
-        # T*: only principle and theory elements that are active/revised.
-        # Principles and background theories appear in both C₀ and T*.
-        c0_set: set[int] = {
-            (
-                id_to_index[el.id]
-                if el.status in ("active", "revised")
-                else -id_to_index[el.id]
-            )
-            for el in elements
-            if el.status in ("active", "revised", "rejected")
-        }
-        t_set: set[int] = {
-            id_to_index[el.id]
-            for el in elements
-            if el.type in ("principle", "theory") and el.status in ("active", "revised")
-        }
-        if not t_set:
+        # T*: the largest consistent part of the active/revised principles and
+        # theories, as in ``_build_type_positions``. Principles and background
+        # theories appear in both C₀ and T*.
+        c0_set = _commitment_set(elements, id_to_index)
+        held = held_theory(built.lookup)
+        if not held:
             return empty  # No theory position — Z cannot be computed.
+        t_set = largest_consistent_part(bdd_ds, held, n)
         c0_pos = StandardPosition.from_set(c0_set, n)
         t_pos = StandardPosition.from_set(t_set, n)
         re_obj = StandardLocalReflectiveEquilibrium(
@@ -158,8 +157,15 @@ def compute_score_changes(
                     delta_systematicity = 0.0  # T unchanged
                 else:
                     # Principles/theories live in both C and T — remove from both.
+                    # T is taken afresh from what remains held: withdrawing a
+                    # principle may let one it conflicted with back in.
                     c_mod_pos = StandardPosition.from_set(c0_set - {idx}, n)
-                    t_mod_pos = StandardPosition.from_set(t_set - {idx}, n)
+                    t_mod_pos = StandardPosition.from_set(
+                        largest_consistent_part(
+                            bdd_ds, [i for i in held if i != idx], n
+                        ),
+                        n,
+                    )
                     delta_account = (
                         re_obj.account(c_mod_pos, t_mod_pos) - baseline_account
                     )
@@ -321,9 +327,9 @@ def compute_quick_score(
 ) -> QuickScoreResponse:
     """Compute account and systematicity for the current element set analytically.
 
-    Derives C (all active/revised/rejected elements) and T (active/revised
-    principle/theory elements) directly from element types — no simulation or
-    prior evolution is required.
+    Derives C (all active/revised/rejected elements) and T (the largest
+    consistent part of the active/revised principle/theory elements) directly
+    from element types — no simulation or prior evolution is required.
 
     Returns ``account=None, systematicity=None`` when there are fewer than 3
     elements, no argument relations, or no active principle/theory elements.
@@ -346,12 +352,11 @@ def compute_quick_score(
         ):
             return QuickScoreResponse(account=None, systematicity=None)
         built = build_numerical_arguments(elements=elements, relations=arg_relations)
-        id_to_index: Dict[str, int] = {el.id: i + 1 for i, el in enumerate(elements)}
         bdd_ds = BDDDialecticalStructure.from_arguments(
             arguments=built.num_arguments,
             n_unnegated_sentence_pool=n,
         )
-        c_pos, t_pos = _build_type_positions(elements, id_to_index, n)
+        c_pos, t_pos = _build_type_positions(elements, built.lookup, bdd_ds, n)
         # RE object used only for its scoring methods — no re_process() call.
         re_obj = StandardLocalReflectiveEquilibrium(
             dialectical_structure=bdd_ds, initial_commitments=c_pos
@@ -361,6 +366,7 @@ def compute_quick_score(
         return QuickScoreResponse(
             account=re_obj.account(c_pos, t_pos),
             systematicity=re_obj.systematicity(t_pos),
+            theory=[built.lookup[i].id for i in sorted(t_pos.as_set())],
         )
     except Exception:
         return QuickScoreResponse(account=None, systematicity=None)

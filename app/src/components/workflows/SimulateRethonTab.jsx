@@ -29,7 +29,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { C } from "../../constants/colors.js";
 import { Tooltip } from "../Tooltip.jsx";
 import { SpinnerIcon } from "../Icons.jsx";
-import { simulateRethon } from "../../utils/simulateRethonClient.js";
+import { quickScore, simulateRethon } from "../../utils/simulateRethonClient.js";
 import { ErrorBanner } from "../SuggestionActions.jsx";
 import { ARGUMENT_RELATION_TYPES } from "../../utils/stateUtils.js";
 import { useBackendCapabilities } from "../../hooks/useBackendCapabilities.js";
@@ -212,10 +212,30 @@ export function SimulateRethonTab({
   // What the log box over the graph says, one entry per step.
   const log = useMemo(() => stepLog(steps), [steps]);
 
-  // The graph shows the position at the step on screen, and the log up to it,
-  // for as long as there is a result.
+  // The theory the scores are taken against — the held principles and
+  // theories' largest consistent part, which is also the simulation's first
+  // theory (backend/services/rethon_theory.py). Ringed on the graph until
+  // there is a result, so a principle left out of it is visibly left out.
+  // The weights do not move it, so they are not sent.
+  const [scoredTheory, setScoredTheory] = useState(null);
   useEffect(() => {
-    if (!evolution) return onSetEquilibriumPreview?.(null);
+    if (!serverReady || cannotRun) return setScoredTheory(null);
+    let cancelled = false;
+    quickScore(state.elements, state.relations).then((scores) => {
+      if (!cancelled) setScoredTheory(scores?.theory ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverReady, cannotRun, state.elements, state.relations]);
+
+  // The graph shows the position at the step on screen, and the log up to it,
+  // for as long as there is a result; the scored theory otherwise.
+  useEffect(() => {
+    if (!evolution)
+      return onSetEquilibriumPreview?.(
+        scoredTheory ? { theory: new Set(scoredTheory) } : null,
+      );
     const position = positionAt(evolution, frame);
     onSetEquilibriumPreview?.({
       ...previewOf(positionChanges(state.elements, position)),
@@ -223,7 +243,7 @@ export function SimulateRethonTab({
       log,
       step: frame,
     });
-  }, [evolution, frame, log, state.elements, onSetEquilibriumPreview]);
+  }, [evolution, frame, log, scoredTheory, state.elements, onSetEquilibriumPreview]);
   useEffect(
     () => () => onSetEquilibriumPreview?.(null),
     [onSetEquilibriumPreview],
@@ -498,19 +518,47 @@ export function SimulateRethonTab({
             >
               rethon
             </a>
-            , a formal model of reflective equilibrium. It adjusts your
-            commitments and a theory —
-            made of your principles and background theories, starting from the
-            ones you hold — in turns, until neither changes. Each step plays on
-            the graph, and nothing in your position changes until you accept.
+, a formal model of reflective equilibrium. rethon calls a consistent set
+            of principles and background theories a <em>theory</em>. Starting
+            from yours, it takes turns: it picks the theory that best balances
+            account and systematicity, then changes which elements you accept or
+            reject — judgments, principles and background theories alike — to
+            best balance account and faithfulness, and repeats until neither
+            turn changes anything. Withdrawn elements stay in play, so a turn
+            can take one up again.
+            <ul style={{ margin: "6px 0", paddingLeft: 18 }}>
+              <li>
+                <strong style={{ color: C.text }}>Account</strong>: how closely
+                what the theory implies matches the elements you accept and
+                reject.
+              </li>
+              <li>
+                <strong style={{ color: C.text }}>Systematicity</strong>: how
+                much the theory implies for how few principles and background
+                theories it has.
+              </li>
+              <li>
+                <strong style={{ color: C.text }}>Faithfulness</strong>: how
+                much of what you accepted and rejected at the start is kept.
+              </li>
+            </ul>
+            The ⚖ weights set how much each counts. Each turn plays on the
+            graph, and nothing in your position changes until you accept.
           </div>
+        )}
+
+        {!result && !loading && scoredTheory && (
+          <ScoredTheory
+            theory={scoredTheory}
+            held={heldTheoryOf(state.elements)}
+          />
         )}
 
         {cannotRun && (
           <div style={{ fontSize: 12, color: C.dim }}>
             Add at least three active elements, one argument, and a principle
-            or background theory to run the simulation — its theory is built
-            from those.
+            or background theory to run the simulation — rethon builds its
+            theory only from principles and background theories.
           </div>
         )}
 
@@ -691,24 +739,75 @@ export function SimulateRethonTab({
   );
 }
 
+/** A graph ring as `graphNodeVisuals` draws it: solid, or dashed for a change. */
+const ring = (stroke, dash) => (
+  <svg width={14} height={14} aria-hidden="true" style={{ flexShrink: 0 }}>
+    <circle
+      cx={7}
+      cy={7}
+      r={5}
+      fill="none"
+      stroke={stroke}
+      strokeWidth={dash ? 1.5 : 2}
+      strokeDasharray={dash ? "3 2" : undefined}
+    />
+  </svg>
+);
+
+/**
+ * Which theory the scores are taken against, ringed on the graph until there
+ * is a result: the largest consistent set of the active principles and
+ * background theories (`largest_consistent_part` in the backend), confidence
+ * deciding only between equally large sets. Without this, a principle in open
+ * conflict counted for nothing and nothing said so.
+ *
+ * @param {Object}   props
+ * @param {string[]} props.theory - The scored theory's ids.
+ * @param {Object[]} props.held - The held principles and theories.
+ */
+function ScoredTheory({ theory, held }) {
+  const scored = new Set(theory);
+  const leftOut = held.filter((e) => !scored.has(e.id)).map((e) => e.id);
+  return (
+    <div
+      role="note"
+      style={{
+        display: "flex",
+        alignItems: "baseline",
+        gap: 6,
+        fontSize: 12,
+        lineHeight: 1.6,
+        color: C.dim,
+        marginBottom: 10,
+      }}
+    >
+      <span style={{ alignSelf: "center", display: "inline-flex" }}>
+        {ring(C.principle.accent, false)}
+      </span>
+      <span>
+        Ringed on the graph: the theory your scores are measured against, and
+        the one the simulation starts from — the largest set of your active
+        principles and background theories that your arguments allow holding
+        together.
+        {leftOut.length > 0 && (
+          <>
+            {" "}
+            Left out: <strong style={{ color: C.text }}>{leftOut.join(", ")}</strong>
+            . Keeping {leftOut.length > 1 ? "them" : "it"} would mean dropping
+            at least as many others; between equally large sets, the more
+            confident elements are kept.
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
 /**
  * What the rings on the graph mean while a result plays — drawn as
  * `graphNodeVisuals` draws them, since nothing else on screen names them.
  */
 function RingKey() {
-  const ring = (stroke, dash) => (
-    <svg width={14} height={14} aria-hidden="true" style={{ flexShrink: 0 }}>
-      <circle
-        cx={7}
-        cy={7}
-        r={5}
-        fill="none"
-        stroke={stroke}
-        strokeWidth={dash ? 1.5 : 2}
-        strokeDasharray={dash ? "3 2" : undefined}
-      />
-    </svg>
-  );
   const item = (icon, label) => (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
       {icon}
@@ -835,7 +934,7 @@ function DecisionBar({
               <span style={{ color: C.text }}>
                 {from.toFixed(3)} → {to.toFixed(3)}
               </span>
-              {fromIsHeld ? "" : " (from the simulation's own start)"}
+              {fromIsHeld ? "" : " (from the ringed theory, not all you hold)"}
             </div>
           </Tooltip>
         )}

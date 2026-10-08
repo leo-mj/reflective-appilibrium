@@ -11,6 +11,7 @@ import { render, screen, cleanup, act, fireEvent, within } from "@testing-librar
 
 vi.mock("../../utils/simulateRethonClient.js", () => ({
   simulateRethon: vi.fn(),
+  quickScore: vi.fn(async () => null),
 }));
 vi.mock("../graphs_shared/SimulateScoresChart.jsx", () => ({
   SimulateScoresChart: () => null,
@@ -30,7 +31,7 @@ vi.mock("../../hooks/useBackendCapabilities.js", () => ({
 
 import { SimulateRethonTab } from "./SimulateRethonTab.jsx";
 import { BASE_INTERVAL_MS } from "../../hooks/usePlayback.js";
-import { simulateRethon } from "../../utils/simulateRethonClient.js";
+import { quickScore, simulateRethon } from "../../utils/simulateRethonClient.js";
 
 afterEach(() => {
   cleanup();
@@ -300,8 +301,8 @@ describe("a result", () => {
     await press(/equilibrate/i);
 
     const rows = screen.getAllByRole("listitem").map((r) => r.textContent);
-    expect(rows[0]).toMatch(/your current commitments/i);
-    expect(rows[1]).toMatch(/the theory you hold/i);
+    expect(rows[0]).toMatch(/the elements you accept and reject now/i);
+    expect(rows[1]).toMatch(/your active principles and background theories/i);
     expect(rows[2]).toMatch(/−J3/);
     expect(rows[3]).toMatch(/no change/i);
   });
@@ -357,8 +358,8 @@ describe("playing a result on the graph", () => {
     const { log, step } = lastPreview(onPreview);
     expect(step).toBe(2);
     expect(log.map((l) => l.changes)).toEqual([
-      "Starts from your current commitments.",
-      "Starts from the theory you hold.",
+      "Starts from the elements you accept and reject now.",
+      "Starts from your active principles and background theories.",
       "Drops J3.",
       "No change.",
     ]);
@@ -381,6 +382,53 @@ describe("playing a result on the graph", () => {
     await press(/^accept$/i);
 
     expect(onPreview.mock.calls.at(-1)[0]).toBeNull();
+  });
+});
+
+describe("the theory the scores are taken against", () => {
+  // The held principles' largest consistent part (backend rethon_theory.py):
+  // a principle the arguments make inconsistent with those kept counts for
+  // nothing in the scores, and the graph rings what does count.
+  const withP4 = () => {
+    const state = aState();
+    state.elements.push(element("P4", "principle"));
+    return state;
+  };
+  const scoring = (theory) =>
+    quickScore.mockResolvedValue({ account: 0.9, systematicity: 0.8, theory });
+
+  it("is ringed on the graph before anything is run", async () => {
+    scoring(["P2"]);
+    const onPreview = vi.fn();
+    await act(async () => {
+      render(<SimulateRethonTab state={withP4()} onSetEquilibriumPreview={onPreview} />);
+    });
+
+    expect([...onPreview.mock.calls.at(-1)[0].theory]).toEqual(["P2"]);
+    expect(screen.getByRole("note").textContent).toMatch(/left out: P4/i);
+  });
+
+  it("names nothing left out when the whole held theory is scored", async () => {
+    scoring(["P2"]);
+    await act(async () => {
+      render(<SimulateRethonTab state={aState()} />);
+    });
+
+    expect(screen.getByRole("note").textContent).not.toMatch(/left out/i);
+  });
+
+  it("gives way to the run's own theory while a result plays", async () => {
+    scoring(["P2", "P4"]);
+    simulateRethon.mockResolvedValue(settles());
+    const onPreview = vi.fn();
+    render(<SimulateRethonTab state={withP4()} onSetEquilibriumPreview={onPreview} />);
+    await press(/equilibrate/i);
+
+    // Step 0 is the commitments alone: no theory yet.
+    expect([...onPreview.mock.calls.at(-1)[0].theory]).toEqual([]);
+    expect(screen.queryByRole("note")).toBeNull();
+    await press(/^reject$/i);
+    expect([...onPreview.mock.calls.at(-1)[0].theory]).toEqual(["P2", "P4"]);
   });
 });
 

@@ -67,12 +67,13 @@ def theory_sentences(lookup: dict) -> FrozenSet[int]:
 
 def held_theory(lookup: dict) -> Tuple[int, ...]:
     """Indices of the principles and background theories the user holds now —
-    active or revised — which is the theory position the scoring evaluates
+    active or revised — whose ``largest_consistent_part`` (``rethon_theory``)
+    is both the theory position the scoring evaluates
     (``_build_type_positions`` in ``rethon_scoring``) and the simulation's
     first theory.
 
-    In the order the start takes them when not all can be held together: most
-    confident first, ties by position in the pool."""
+    Most confident first, ties by position in the pool: the order that decides
+    between equally large consistent parts when not all can be held together."""
     return tuple(
         sorted(
             (
