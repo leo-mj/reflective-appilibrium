@@ -147,7 +147,7 @@ test.describe("Export and import", () => {
     await startFresh(page, "Throwaway");
     await openMenu(page);
     const chooserPromise = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: /Import/ }).click();
+    await page.getByRole("button", { name: /Import$/ }).click();
     const chooser = await chooserPromise;
     await chooser.setFiles(file);
     await park(page);
@@ -190,7 +190,7 @@ test.describe("Export and import", () => {
     await startFresh(page, "Throwaway");
     await openMenu(page);
     const chooserPromise = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: /Import/ }).click();
+    await page.getByRole("button", { name: /Import$/ }).click();
     // An empty process has nothing to replace, so there is no confirmation.
     await (await chooserPromise).setFiles(file);
     await park(page);
