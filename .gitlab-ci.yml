@@ -1,11 +1,13 @@
 # GitLab pipeline — the same checks as .github/workflows/ci.yml, for whoever
 # reviews or hosts the project from GitLab without opening the GitHub repo.
 # The deploys — the demo to GitHub Pages, the AI version to Cloudflare,
-# the backend to Cloud Run — have no counterpart here; the images job instead
-# pushes the two containers to this project's registry, which is what a host pulls.
+# the backend to Cloud Run — have no counterpart here; the image jobs instead
+# push the two containers to this project's registry, which is what a host pulls.
 #
 # Keep the two in step by hand: a check added to one belongs in the other. The
-# container checks already share one script, ci/check-stack.sh.
+# exception is starting the two containers together and checking them over
+# HTTP (ci/check-stack.sh), which needs a Docker daemon and so runs on GitHub
+# only; see the image jobs below.
 
 workflow:
   rules:
@@ -141,43 +143,50 @@ frontend-e2e:
 
 # ── Containers ──────────────────────────────────────────────────────────────────
 
-# Builds both images, starts them as docker-compose.yml wires them, and checks
-# the pair over HTTP. On the default branch it then pushes them to this
-# project's registry, tagged with the commit and as `latest`.
+# Builds the two images and, on the default branch, pushes them to this
+# project's registry as $CI_REGISTRY_IMAGE/backend and /frontend, tagged with
+# the commit and as `latest`. On other branches it only builds, which is still
+# the check that both Dockerfiles do.
 #
-# Needs a runner that can run Docker-in-Docker, which means a privileged one.
-# This instance's shared runners are not: the dind service stops at "mount:
-# permission denied" and its daemon never starts. So the job is manual until
-# a privileged runner exists — press ▶ in the pipeline to run it then — and it
-# cannot fail a pipeline meanwhile. The stack it would check is checked on
-# every push by the `stack` job in .github/workflows/ci.yml, from the same
-# ci/check-stack.sh.
-images:
+# Buildah rather than Docker: it needs no daemon, so no Docker-in-Docker and no
+# privileged runner, which this instance's runners are not (the dind service
+# stopped at "mount: permission denied"). chroot isolation and the vfs storage
+# driver are what let it run unprivileged; vfs copies each layer whole, which
+# is slow and disk-hungry but asks nothing of the kernel. No Compose either:
+# it was only building here. Starting the pair and checking it over HTTP is
+# the `stack` job in .github/workflows/ci.yml.
+#
+# Both Dockerfiles name their base images with the registry (docker.io/…),
+# which Buildah requires when no registries.conf supplies a default.
+.image:
   stage: images
-  image: docker:27
-  services:
-    - docker:27-dind
+  image: quay.io/buildah/stable:latest
   variables:
-    DOCKER_TLS_CERTDIR: /certs
-  timeout: 25m
-  rules:
-    - when: manual
-  allow_failure: true
-  before_script:
-    - apk add --no-cache curl
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+    # Docker's manifest format, which every host that pulls these understands;
+    # it also keeps the HEALTHCHECK, which the OCI format drops.
+    BUILDAH_FORMAT: docker
+  timeout: 30m
   script:
-    - docker compose up -d --build
-    # Published ports live on the dind service, not on this container.
-    - ci/check-stack.sh http://docker:8080
+    - ref="$CI_REGISTRY_IMAGE/$NAME"
+    - buildah build --tag "$ref:$CI_COMMIT_SHORT_SHA" "$CONTEXT"
     - |
       if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
-        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-        for name in backend frontend; do
-          for tag in "$CI_COMMIT_SHORT_SHA" latest; do
-            docker tag "appilibrium-$name" "$CI_REGISTRY_IMAGE/$name:$tag"
-            docker push "$CI_REGISTRY_IMAGE/$name:$tag"
-          done
-        done
+        echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+        buildah tag "$ref:$CI_COMMIT_SHORT_SHA" "$ref:latest"
+        buildah push "$ref:$CI_COMMIT_SHORT_SHA"
+        buildah push "$ref:latest"
       fi
-  after_script:
-    - docker compose logs || true
+
+image-backend:
+  extends: .image
+  variables:
+    NAME: backend
+    CONTEXT: .
+
+image-frontend:
+  extends: .image
+  variables:
+    NAME: frontend
+    CONTEXT: app
