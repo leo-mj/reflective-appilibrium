@@ -8,6 +8,8 @@ import { TutorialOverlay } from "./TutorialOverlay.jsx";
 import { ModalShell } from "./user_edits/ModalShell.jsx";
 import { MergeModal } from "./user_edits/MergeModal.jsx";
 import { ExportModal } from "./user_edits/ExportModal.jsx";
+import { TextImportModal } from "./user_edits/TextImportModal.jsx";
+import { importArgdownFromFile } from "../utils/importArgdown.js";
 import { SampleEditsNotice } from "./app_header/SampleEditsNotice.jsx";
 import {
   ASSIST_TABS,
@@ -173,6 +175,23 @@ export function AppHeader({
   };
   const handleMergeClick = () => mergeInputRef.current.click();
 
+  // A map pasted from an LLM's reply goes the way a picked .argdown file goes,
+  // but is read first: a reply that does not parse keeps the dialog, and the
+  // paste, open with the parser's message rather than losing both to an error
+  // box after "replace?" has been answered.
+  const [textImportOpen, setTextImportOpen] = useState(false);
+  const submitPastedMap = async (file, mode) => {
+    if (mode === "merge") {
+      setPendingMerge(await onPrepareMerge(file));
+    } else if (hasExistingState) {
+      await importArgdownFromFile(file);
+      setImportConfirmPending(file);
+    } else {
+      await onImportFile(file);
+    }
+    setTextImportOpen(false);
+  };
+
   // The second sample process, brought in without a trip through the file
   // system. Offered on the sample process only: in someone's own process a
   // demo's judgments are not a merge anyone asked for. Imported on the press
@@ -252,6 +271,13 @@ export function AppHeader({
           }
         />
       )}
+      {textImportOpen && (
+        <TextImportModal
+          canMerge={canMerge}
+          onSubmit={submitPastedMap}
+          onCancel={() => setTextImportOpen(false)}
+        />
+      )}
       {importError && (
         <ModalShell
           title="Could not read file"
@@ -312,6 +338,7 @@ export function AppHeader({
     allExpanded,
     onExpandAll,
     handleImportClick,
+    handleTextImportClick: () => setTextImportOpen(true),
     handleMergeClick: canMerge ? handleMergeClick : null,
     handleMergeSampleClick: canMergeSample ? handleMergeSampleClick : null,
     onDownload: () => setExportOpen(true),
