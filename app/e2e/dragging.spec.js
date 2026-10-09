@@ -119,7 +119,7 @@ test.describe("Dragging a node", () => {
     await startFresh(page, "Throwaway");
     await openMenu(page);
     const chooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: /Import/ }).click();
+    await page.getByRole("button", { name: /Import$/ }).click();
     await (await chooser).setFiles(file);
     await park(page);
     await expect(page.locator("body")).toContainText("A judgment to drag.");

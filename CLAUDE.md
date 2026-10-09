@@ -500,6 +500,21 @@ its members, of any type, under one `# Groups` heading, and the rest go under
 carry `{isGroup: false}`, so neither Argdown's maps nor the import read them as
 groups.
 
+**Import from text** (☰ → Session) is the way in for a text nobody has mapped
+yet: `TextImportModal` hands the reader a prompt (`utils/argdownPrompt.js`) to
+copy into a chat with any LLM along with the text, and takes the reply back —
+the `argdown` block is picked out of it — to go the way a picked `.argdown`
+file goes, Import or Merge. **The app calls no model for this**, so it works in
+the demo build and sends nothing anywhere; the dialog says so. The prompt asks
+only for what the importer reads — type tags (every empirical premise a
+theory), valid premise-conclusion structures with unstated premises marked
+`// unstated`, loose `+>` and `->`, the exporter's `not X` / `><` — and tells
+the model to mark nothing withdrawn or rejected, that being the reader's call.
+Its example is imported by `argdownPrompt.test.js`, so the prompt cannot teach
+a syntax the importer has stopped reading; change the two together. A reply
+that does not parse keeps the dialog and the paste open with the parser's
+message.
+
 The export (`utils/exportArgdown.js`) reaches the reader as the Argdown section
 of the Markdown export, a fenced `argdown` block. It writes loose mode: `supports` and
 `conflicts` as `+>` and `->`, arguments as premise-conclusion structures.

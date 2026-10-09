@@ -58,6 +58,7 @@ export function SettingsMenuItems({
   allExpanded,
   onExpandAll,
   handleImportClick,
+  handleTextImportClick,
   handleMergeClick,
   handleMergeSampleClick,
   onDownload,
@@ -225,6 +226,12 @@ export function SettingsMenuItems({
           <button onClick={leaving(handleImportClick)} style={itemStyle}>
             <span style={menuIconStyle}>↑</span>
             {MENU_LABELS.import}
+          </button>
+        </Tooltip>
+        <Tooltip text={MENU_TOOLTIPS.textImport}>
+          <button onClick={leaving(handleTextImportClick)} style={itemStyle}>
+            <span style={menuIconStyle}>¶</span>
+            {MENU_LABELS.textImport}
           </button>
         </Tooltip>
         {handleMergeClick && (
