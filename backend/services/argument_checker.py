@@ -162,6 +162,11 @@ def _sentence_indices(f: LogicalForm) -> set:
     return set().union(*(_sentence_indices(sub) for sub in f[1:]))
 
 
+def sentences_in_form(text: str) -> set:
+    """The sentence indices a logical-form string mentions (raises FormParseError)."""
+    return _sentence_indices(parse_form(text))
+
+
 def _eval(f: LogicalForm, assignment: Dict[int, bool]) -> bool:
     op = f[0]
     if op == "sentence":

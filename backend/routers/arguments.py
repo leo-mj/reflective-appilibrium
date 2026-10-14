@@ -90,6 +90,7 @@ async def detect_arguments(
             llm_response.added_premises,
             verify=request.verify,
             pool_indices=initial_lookup.keys(),
+            pool_texts={n: e.text for n, e in initial_lookup.items()},
         )
         if rejected:
             logger.info(f"Rejected {rejected} argument(s) in formal verification.")

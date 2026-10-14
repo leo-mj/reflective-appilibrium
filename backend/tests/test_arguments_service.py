@@ -278,3 +278,165 @@ def test_partition_verify_true_drops_args_on_discarded_premises():
     )
     assert [1, 3, 2] not in kept
     assert rejected >= 1
+
+
+# ── Repeated premises and restating postulates ────────────────────────────────
+
+NON_IDENTITY = (
+    "The non-identity problem shows that specific future individuals are "
+    "metaphysically indeterminate, but future people as a class are not."
+)
+OBLIGATION = (
+    "Yes, we have moral obligations to future people as a class, even if "
+    "specific individuals are indeterminate."
+)
+POOL_TEXTS = {1: NON_IDENTITY, 2: OBLIGATION, 3: "Unrelated sentence."}
+
+
+def _premise(index, text, role="premise", form=None, etype="principle"):
+    from backend.routers.arguments_schemas import AddedPremise
+
+    return AddedPremise(index=index, type=etype, text=text, role=role, form=form)
+
+
+def test_the_reported_argument_is_rejected():
+    # As a model returned it: premise 4 copies sentence 1 word for word, and
+    # the postulate is "If <1>, then <2>". It surfaced as 1 + 4 → 2, valid
+    # given the bare conditional, with the same claim shown twice.
+    from backend.services.arguments import partition_arguments
+
+    premises = [
+        _premise(4, NON_IDENTITY.lower()),
+        _premise(
+            5,
+            f"If {NON_IDENTITY[:-1].lower()}, then {OBLIGATION[0].lower()}{OBLIGATION[1:]}",
+            role="postulate",
+            form="(1 & 4) -> 2",
+        ),
+    ]
+    kept, postulates, used, rejected = partition_arguments(
+        [[1, 4, 5, 2]],
+        premises,
+        verify=True,
+        pool_indices={1, 2, 3},
+        pool_texts=POOL_TEXTS,
+    )
+    assert kept == []
+    assert used == []
+    assert rejected == 1
+
+
+def test_a_repeated_premise_is_read_as_the_sentence_it_repeats():
+    from backend.services.arguments import identify_repeated_premises
+
+    args, premises = identify_repeated_premises(
+        [[1, 4, 5, 2], [3, -4, 2]],
+        [
+            _premise(4, f"  {NON_IDENTITY.upper()} "),
+            _premise(5, "A bridge.", role="postulate", form="(1 & 4) -> 2"),
+        ],
+        POOL_TEXTS,
+    )
+    assert args == [[1, 5, 2], [3, -1, 2]]
+    assert [p.index for p in premises] == [5]
+    assert premises[0].form == "(1 & 1) -> 2"
+
+
+def test_a_premise_repeating_the_conclusion_makes_the_argument_circular():
+    from backend.services.arguments import partition_arguments
+
+    premises = [
+        _premise(4, OBLIGATION),
+        _premise(5, "A bridge.", role="postulate", form="(1 & 4) -> 2"),
+    ]
+    kept, _, _, rejected = partition_arguments(
+        [[1, 4, 5, 2]],
+        premises,
+        verify=True,
+        pool_indices={1, 2, 3},
+        pool_texts=POOL_TEXTS,
+    )
+    assert kept == []
+    assert rejected == 1
+
+
+def test_two_added_premises_with_one_wording_are_one_premise():
+    from backend.services.arguments import identify_repeated_premises
+
+    args, premises = identify_repeated_premises(
+        [[1, 4, 5, 2]],
+        [_premise(4, "A new claim."), _premise(5, "a new claim")],
+        POOL_TEXTS,
+    )
+    assert args == [[1, 4, 2]]
+    assert [p.index for p in premises] == [4]
+
+
+def test_a_paraphrasing_postulate_still_licenses_the_step():
+    # The shape of every sample postulate: the same form, in other words.
+    from backend.services.arguments import partition_arguments
+
+    premises = [
+        _premise(
+            4,
+            "Obligations can attach de dicto to whoever will exist.",
+        ),
+        _premise(
+            5,
+            "If obligations attach de dicto, an indeterminate class of future "
+            "people can still be owed them.",
+            role="postulate",
+            form="(1 & 4) -> 2",
+        ),
+    ]
+    kept, postulates, used, rejected = partition_arguments(
+        [[1, 4, 5, 2]],
+        premises,
+        verify=True,
+        pool_indices={1, 2, 3},
+        pool_texts=POOL_TEXTS,
+    )
+    assert kept == [[1, 4, 2]]
+    assert rejected == 0
+    assert [p.index for p in used] == [4]
+
+
+def test_restates_inference_needs_every_sentence_quoted_whole():
+    from backend.services.arguments import restates_inference
+
+    texts = {1: "Lying is wrong.", 2: "Lying to the murderer is wrong."}
+    bare = _premise(
+        5,
+        "If lying is wrong, then lying to the murderer is wrong.",
+        role="postulate",
+        form="1 -> 2",
+    )
+    assert restates_inference(bare, texts)
+    # One sentence quoted, the other paraphrased.
+    half = _premise(
+        5,
+        "If lying is wrong, then so is deceiving a murderer.",
+        role="postulate",
+        form="1 -> 2",
+    )
+    assert not restates_inference(half, texts)
+    # A quote inside a longer word is no quote.
+    inside = _premise(
+        5,
+        "Belying is wrong, so lying to the murderer is wrong.",
+        role="postulate",
+        form="1 -> 2",
+    )
+    assert not restates_inference(inside, {**texts, 1: "Lying is wrong."})
+    # A sentence the texts do not hold cannot be found quoted.
+    unknown = _premise(
+        5,
+        "If lying is wrong, then lying to the murderer is wrong.",
+        role="postulate",
+        form="1 -> 9",
+    )
+    assert not restates_inference(unknown, texts)
+
+
+def test_the_prompt_forbids_repeating_a_sentence():
+    assert "Never add a premise that repeats a pool sentence" in build_prompt(LOOKUP)

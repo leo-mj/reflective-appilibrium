@@ -1,15 +1,20 @@
 """Arguments service — LLM argument detection, deduplication, and prompt building."""
 
-from typing import List, Dict, Tuple, Set
+from typing import List, Dict, Optional, Tuple, Set
 import json
 import logging
+import re
 
 from pydantic import ValidationError
 
 from ..models.re_state import REElement, RERelation
 from ..services.llm import LLMService
 from ..services.response_schemas import ARGUMENTS_SCHEMA
-from ..services.argument_checker import verify_argument
+from ..services.argument_checker import (
+    FormParseError,
+    sentences_in_form,
+    verify_argument,
+)
 from ..routers.arguments_schemas import (
     AddedPremise,
     DetectArgumentsResponse,
@@ -210,6 +215,7 @@ Constraints:
 - No redundant premises: every premise must be needed for validity.
 - Premises must be jointly consistent (no arguments from contradiction).
 - No restatement premises (see "Added premises must be substantive" above): if the only bridge you can find merely re-encodes the inference as a conditional and is not true in virtue of meaning, omit the argument.
+- Never add a premise that repeats a pool sentence or another added premise: to use that claim, cite its index.
 
 Output: each argument is a list of integers whose final member is the conclusion and all previous members are premises. For example, in [{s1}, {next_index}, {next_index + 1}, {s2}], the conclusion is sentence {s2} and the premises are pool sentence {s1}, substantive premise {next_index}, and postulate {next_index + 1}. In [{s3}, {next_index + 2}, -{s1}], the conclusion is ¬sentence-{s1}. Premises may also be negated (e.g. -{s3}).
 
@@ -515,7 +521,7 @@ def dummy_detect_arguments(
     ]
 
     verified, postulates, used_premises, rejected = verify_and_partition(
-        candidates, premises
+        candidates, premises, {n: e.text for n, e in initial_lookup.items()}
     )
     lookup_w_premises = add_new_premises_to_lookup(
         added_premises=[p.model_dump() for p in used_premises],
@@ -548,9 +554,94 @@ def dummy_detect_arguments(
     )
 
 
+def _normalized(text: str) -> str:
+    """Wording compared without case, punctuation or spacing."""
+    return " ".join(re.sub(r"[\W_]+", " ", (text or "").lower()).split())
+
+
+def identify_repeated_premises(
+    detected: List[List[int]],
+    added_premises: List[AddedPremise],
+    pool_texts: Dict[int, str],
+) -> Tuple[List[List[int]], List[AddedPremise]]:
+    """Read an added premise that repeats a sentence word for word as that sentence.
+
+    The checker treats every index as an independent atom, so a model that
+    copies pool sentence 3 into a "new" premise 9 gets two claims where there
+    is one: 3 and 9 are free to differ in truth value, and a postulate
+    ``(3 & 9) -> 7`` then looks like a two-premise argument. Surfaced, the same
+    claim stood twice in the argument, once as an added element. Identical
+    wording (case, punctuation and spacing aside) is the same claim, so the
+    copy's index is rewritten to the original's throughout — in the arguments
+    and in every form — and the copy is dropped. A premise repeated among the
+    argument's premises is kept once; one repeating the conclusion makes the
+    argument circular, and the checker rejects it as such.
+
+    Only substantive premises are identified: a postulate's role is to connect
+    sentences, and one worded as a pool sentence is left to the checker.
+
+    Returns the rewritten arguments and the remaining added premises.
+    """
+    seen = {_normalized(t): n for n, t in pool_texts.items() if _normalized(t)}
+    alias: Dict[int, int] = {}
+    kept: List[AddedPremise] = []
+    for p in added_premises:
+        key = _normalized(p.text)
+        if p.role == "premise" and key in seen:
+            alias[p.index] = seen[key]
+            continue
+        if p.role == "premise" and key:
+            seen[key] = p.index
+        kept.append(p)
+    if not alias:
+        return detected, added_premises
+    logger.info(f"Identified {len(alias)} added premise(s) repeating a sentence.")
+
+    def same(n: int) -> int:
+        return alias.get(abs(n), abs(n)) * (1 if n > 0 else -1)
+
+    rewritten: List[List[int]] = []
+    for arg in detected:
+        premises: List[int] = []
+        for n in arg[:-1]:
+            if same(n) not in premises:
+                premises.append(same(n))
+        rewritten.append(premises + [same(arg[-1])] if arg else [])
+
+    def same_in(form: str) -> str:
+        return re.sub(r"\d+", lambda m: str(same(int(m.group()))), form)
+
+    return rewritten, [
+        p.model_copy(update={"form": same_in(p.form)}) if p.form else p for p in kept
+    ]
+
+
+def restates_inference(postulate: AddedPremise, texts: Dict[int, str]) -> bool:
+    """Whether a postulate's text only quotes the sentences its form connects.
+
+    "If <premise>, then <conclusion>", with both sentences copied in word for
+    word, is the bare conditional the prompt forbids: it re-encodes the
+    inference rather than licensing it, and makes any step valid. The form
+    cannot tell it apart — every postulate has the shape ``premises ->
+    conclusion`` — but the wording can: every sentence the form mentions appears
+    whole in the postulate's text. A paraphrase passes; so does a postulate
+    whose sentences' texts are not all known.
+    """
+    try:
+        indices = sentences_in_form(postulate.form or "")
+    except FormParseError:
+        return False
+    quoted = [_normalized(texts.get(i, "")) for i in indices]
+    if len(quoted) < 2 or not all(quoted):
+        return False
+    wording = f" {_normalized(postulate.text)} "
+    return all(f" {q} " in wording for q in quoted)
+
+
 def verify_and_partition(
     detected: List[List[int]],
     added_premises: List[AddedPremise],
+    pool_texts: Optional[Dict[int, str]] = None,
 ) -> Tuple[List[List[int]], List[List[str]], List[AddedPremise], int]:
     """Formally verify each detected argument and separate meaning postulates from premises.
 
@@ -565,12 +656,15 @@ def verify_and_partition(
     the verified numeric arguments (postulates stripped), the parallel list of
     postulate texts each argument relies on, the ``role="premise"`` added
     premises actually used by a kept argument, and the number of proposals
-    rejected as formally invalid (or as resting on postulates alone).
+    rejected as formally invalid (or as resting on postulates alone, or on a
+    postulate that only restates the inference — see ``restates_inference``,
+    which needs ``pool_texts`` to recognise a quoted pool sentence).
     """
     logger.info(f"Checking {len(detected)} arguments.")
 
     forms = {p.index: p.form for p in added_premises if p.form}
     by_index = {p.index: p for p in added_premises}
+    texts = {**(pool_texts or {}), **{p.index: p.text for p in added_premises}}
     # Trim preference: when a postulate and a substantive premise are
     # interchangeable, drop the postulate — keeping the substantive version
     # keeps the contestable commitment visible as a rejectable element (the
@@ -597,11 +691,16 @@ def verify_and_partition(
         if trimmed != arg:
             logger.info(f"Auto-trimmed argument {arg} to {trimmed}.")
 
-        postulate_texts = [
-            by_index[abs(n)].text
+        postulates = [
+            by_index[abs(n)]
             for n in trimmed[:-1]
             if abs(n) in by_index and by_index[abs(n)].role == "postulate"
         ]
+        if any(restates_inference(p, texts) for p in postulates):
+            logger.info(f"Rejected argument {arg}: its postulate only restates it.")
+            rejected += 1
+            continue
+        postulate_texts = [p.text for p in postulates]
         stripped = [
             n
             for n in trimmed[:-1]
@@ -625,6 +724,7 @@ def partition_arguments(
     added_premises: List[AddedPremise],
     verify: bool,
     pool_indices,
+    pool_texts: Optional[Dict[int, str]] = None,
 ) -> Tuple[List[List[int]], List[List[str]], List[AddedPremise], int]:
     """Dispatch to formal verification or the checker-disabled passthrough.
 
@@ -642,9 +742,17 @@ def partition_arguments(
     treated as a pool element, since without verification there is no basis for
     stripping meaning postulates or trimming redundant premises.
 
+    Given ``pool_texts``, an added premise repeating a sentence word for word
+    is first read as that sentence (``identify_repeated_premises``), in either
+    mode: it is the same claim whether or not anything checks the argument.
+
     Returns the same ``(kept_args, postulates_per_arg, used_premises,
     rejected)`` shape either way, so the router treats both paths uniformly.
     """
+    if pool_texts:
+        detected, added_premises = identify_repeated_premises(
+            detected, added_premises, pool_texts
+        )
     valid = set(pool_indices) | {p.index for p in added_premises}
     resolvable = [arg for arg in detected if all(abs(n) in valid for n in arg)]
     unresolved = len(detected) - len(resolvable)
@@ -656,7 +764,7 @@ def partition_arguments(
 
     if verify:
         kept, postulates, used, rejected = verify_and_partition(
-            resolvable, added_premises
+            resolvable, added_premises, pool_texts
         )
         return kept, postulates, used, rejected + unresolved
 
