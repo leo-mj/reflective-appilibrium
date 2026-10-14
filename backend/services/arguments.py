@@ -199,7 +199,7 @@ For each added premise, supply:
     - "theory" — a background theory: a claim that is not itself moral. EVERY empirical premise is a "theory" — about causes, consequences, what an act brings about, what people will be or do — and so is a metaphysical, scientific or meta-ethical one. Never type an empirical claim as a "judgment", however particular it is.
 - "text": the premise in natural language.
 - "role": "premise" or "postulate", as above.
-- "form": REQUIRED for a "postulate", OMITTED for a "premise". The postulate's logical content as a propositional formula over the OTHER indices — pool sentences and the substantive premises of the same argument — using ~ (not), & (and), | (or), -> (if-then). Example: "({s1} & {next_index}) -> {s2}". The form must never mention the postulate's own index.
+- "form": REQUIRED for a "postulate", null for a "premise". The postulate's logical content as a propositional formula over the OTHER indices of its argument. Write it as the bridge: the argument's other premises joined by &, then ->, then the conclusion. Example: "({s1} & {next_index}) -> {s2}". A negated member keeps its sign, written with ~: for premise -{s3} write ~{s3}; for conclusion -{s1} write ~{s1}. Use only digits, ~ & | -> ( ) and spaces: no words, and no ¬ ∧ ∨ → symbols. The form must never mention the postulate's own index.
 
 Added premises must be substantive, not restatements.
 The lazy way to force validity is to add the bare conditional "If <premise>, then <conclusion>" — text that just strings the argument's own premise and conclusion together with "if … then". Such a premise re-encodes the inference instead of justifying it; it is worthless. Never produce one.
@@ -216,6 +216,13 @@ Constraints:
 - Premises must be jointly consistent (no arguments from contradiction).
 - No restatement premises (see "Added premises must be substantive" above): if the only bridge you can find merely re-encodes the inference as a conditional and is not true in virtue of meaning, omit the argument.
 - Never add a premise that repeats a pool sentence or another added premise: to use that claim, cite its index.
+
+Bookkeeping — every argument is checked by machine, and one failing any of these points is discarded unread, wasting the work that went into it:
+  1. The argument's list includes the index of its postulate.
+  2. The postulate's form mentions exactly the argument's other indices — every pool sentence and substantive premise in the list, and nothing that is not in it — with the conclusion after the -> and its sign matching.
+  3. Every index in the list is a pool sentence or an added premise defined in "added_premises", and each added premise has an index of its own.
+  4. Give each argument its own postulate; do not reuse one across arguments.
+Before answering, check every argument against these four points, and fix or drop any that fails.
 
 Output: each argument is a list of integers whose final member is the conclusion and all previous members are premises. For example, in [{s1}, {next_index}, {next_index + 1}, {s2}], the conclusion is sentence {s2} and the premises are pool sentence {s1}, substantive premise {next_index}, and postulate {next_index + 1}. In [{s3}, {next_index + 2}, -{s1}], the conclusion is ¬sentence-{s1}. Premises may also be negated (e.g. -{s3}).
 

@@ -46,3 +46,12 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   before it. `main.py` re-enables the `backend` tree after the router imports —
   keep that block *after* them, or the assist routers go silent again.
 - Target LLMs: Qwen3 30B quantized (consumer GPU), DeepSeek-V3.2 / GPT-OSS-120B (high-end)
+- **Argument detection wastes what the checker rejects**, so the prompt
+  (`build_prompt` in `services/arguments.py`) spells out the bookkeeping the
+  checker tests — each postulate's form is the bridge from its argument's other
+  indices to the conclusion — and asks the model to check every argument
+  against it before answering; `test_the_prompt_example_passes_the_checker`
+  holds the prompt's own example to it. To see what a prompt change does,
+  `python -m backend.scripts.eval_argument_prompt export.md --base-url … --model …`
+  (key in `LLM_API_KEY`) runs detection on an exported process and tallies the
+  rejections by the reasons the pipeline logs. Every run is a paid call.

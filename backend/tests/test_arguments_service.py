@@ -440,3 +440,30 @@ def test_restates_inference_needs_every_sentence_quoted_whole():
 
 def test_the_prompt_forbids_repeating_a_sentence():
     assert "Never add a premise that repeats a pool sentence" in build_prompt(LOOKUP)
+
+
+def test_the_prompt_example_passes_the_checker():
+    # The model copies the example's shapes, so the example has to be one the
+    # checker accepts in full.
+    import json
+    from backend.services.arguments import parse_added_premises, partition_arguments
+
+    prompt = build_prompt(LOOKUP)
+    start = prompt.index("in exactly this format:\n") + len("in exactly this format:\n")
+    example = json.loads(prompt[start : prompt.index("\n\nIf no substantive")])
+    kept, postulates, used, rejected = partition_arguments(
+        example["arguments"],
+        parse_added_premises(example["added_premises"]),
+        verify=True,
+        pool_indices=LOOKUP.keys(),
+        pool_texts={n: e.text for n, e in LOOKUP.items()},
+    )
+    assert rejected == 0
+    assert len(kept) == len(example["arguments"])
+    assert all(len(p) == 1 for p in postulates)
+
+
+def test_the_prompt_spells_out_the_bookkeeping():
+    prompt = build_prompt(LOOKUP)
+    assert "Write it as the bridge" in prompt
+    assert "Before answering, check every argument" in prompt

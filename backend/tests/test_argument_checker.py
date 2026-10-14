@@ -304,3 +304,9 @@ def test_interchangeable_postulate_dropped_in_favor_of_premise():
 
 def test_empty_input():
     assert verify_and_partition([], []) == ([], [], [], 0)
+
+
+def test_parse_reads_logic_symbols_as_their_ascii_operators():
+    assert parse_form("(1 ∧ ¬2) → 3") == parse_form("(1 & ~2) -> 3")
+    assert parse_form("1 ∨ 2 ⇒ 3") == parse_form("1 | 2 -> 3")
+    assert parse_form("1 => 3") == parse_form("1 -> 3")

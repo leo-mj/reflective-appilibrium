@@ -26,7 +26,8 @@ tightest-binding to loosest-binding, plus parentheses to override the order:
     |   or
     ->  if-then   (nested conditionals group to the right)
 
-Whitespace is ignored.  Binding order means ``1 & 2 -> 3`` is read as
+Whitespace is ignored, and ``¬ ∧ ∨ →`` (and ``⇒``, ``=>``) are read as
+``~ & | ->``: models write them despite being asked not to.  Binding order means ``1 & 2 -> 3`` is read as
 ``(1 & 2) -> 3`` — "if 1 and 2, then 3" — not as ``1 & (2 -> 3)``; and
 ``1 -> 2 -> 3`` is read as ``1 -> (2 -> 3)``.  Typical bridge premise:
 ``"(3 & 4) -> 7"``.  (The exact accepted syntax is documented in
@@ -59,6 +60,10 @@ LogicalForm = Tuple
 # (2^16 rows).
 MAX_SENTENCES = 16
 
+# The logic symbols a model writes despite being asked for ASCII: read rather
+# than refused, since a form spelled with them says exactly the same thing.
+_SYMBOLS = str.maketrans({"¬": "~", "∧": "&", "∨": "|", "→": "->", "⇒": "->"})
+
 _TOKEN_RE = re.compile(r"\s*(->|[()&|~-]|\d+)")
 
 
@@ -88,6 +93,7 @@ def parse_form(text: str) -> LogicalForm:
     recursion on the right is what makes ``&``/``|`` bind before ``->`` and
     makes ``->`` group to the right.
     """
+    text = text.translate(_SYMBOLS).replace("=>", "->")
     tokens: List[str] = []
     pos = 0
     while pos < len(text):
