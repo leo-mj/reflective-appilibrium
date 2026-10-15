@@ -1,6 +1,6 @@
 """Arguments service — LLM argument detection, deduplication, and prompt building."""
 
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict, NamedTuple, Optional, Tuple, Set
 import json
 import logging
 import re
@@ -17,6 +17,7 @@ from ..services.argument_checker import (
 )
 from ..routers.arguments_schemas import (
     AddedPremise,
+    ArgumentCheckFailure,
     DetectArgumentsResponse,
     LLMArgumentsResponse,
     translate_from_lookup,
@@ -217,7 +218,7 @@ Constraints:
 - No restatement premises (see "Added premises must be substantive" above): if the only bridge you can find merely re-encodes the inference as a conditional and is not true in virtue of meaning, omit the argument.
 - Never add a premise that repeats a pool sentence or another added premise: to use that claim, cite its index.
 
-Bookkeeping — every argument is checked by machine, and one failing any of these points is discarded unread, wasting the work that went into it:
+Bookkeeping — every argument is checked by machine, and one failing any of these points is shown to the user marked as failing the check:
   1. The argument's list includes the index of its postulate.
   2. The postulate's form mentions exactly the argument's other indices — every pool sentence and substantive premise in the list, and nothing that is not in it — with the conclusion after the -> and its sign matching.
   3. Every index in the list is a pool sentence or an added premise defined in "added_premises", and each added premise has an index of its own.
@@ -514,7 +515,7 @@ def dummy_detect_arguments(
 
     Uses the same verification, postulate-stripping, and state-deduplication
     steps as the live LLM path, so the fixture doubles as an end-to-end check
-    of the checker: every sample argument must verify with zero rejections.
+    of the checker: every sample argument must pass it.
     Arguments referencing elements missing from the current (possibly
     truncated) state are skipped.
     """
@@ -527,37 +528,66 @@ def dummy_detect_arguments(
         if all(abs(n) in initial_lookup or abs(n) in premise_indices for n in arg)
     ]
 
-    verified, postulates, used_premises, rejected = verify_and_partition(
+    checked = verify_and_partition(
         candidates, premises, {n: e.text for n, e in initial_lookup.items()}
     )
-    lookup_w_premises = add_new_premises_to_lookup(
-        added_premises=[p.model_dump() for p in used_premises],
+    return surface_arguments(
+        checked,
         lookup=initial_lookup,
         elements=elements,
+        relations=relations,
         round=round,
         model="claude-fable-5",
     )
 
+
+def surface_arguments(
+    partition: "Partition",
+    lookup: Dict[int, REElement],
+    elements: List[REElement],
+    relations: List[RERelation],
+    round: str,
+    model: str,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+) -> DetectArgumentsResponse:
+    """The response for a partition: its added premises given element ids, the
+    arguments the state already holds left out, the rest translated.
+
+    The deduplication runs after postulate-stripping, so that a re-detected
+    argument matches its stored (postulate-free) form, and keeps the postulate
+    and failure lists parallel to the arguments.
+    """
+    lookup_w_premises = add_new_premises_to_lookup(
+        added_premises=[p.model_dump() for p in partition.premises],
+        lookup=lookup,
+        elements=elements,
+        round=round,
+        model=model,
+    )
     reverse_lookup = {e.id: n for n, e in lookup_w_premises.items()}
     existing = existing_arg_fingerprints(relations, reverse_lookup)
-    kept_pairs = [
-        (arg, post)
-        for arg, post in zip(verified, postulates)
-        if arg_fingerprint(arg) not in existing
+    kept = [
+        row
+        for row in zip(partition.arguments, partition.postulates, partition.failures)
+        if arg_fingerprint(row[0]) not in existing
     ]
-    num_arguments = [arg for arg, _ in kept_pairs]
-    argument_postulates = [post for _, post in kept_pairs]
-
-    translated = translate_arguments(
-        detected_arguments=num_arguments, lookup=lookup_w_premises
-    )
+    if len(kept) < len(partition.arguments):
+        logger.info(
+            f"Filtered out {len(partition.arguments) - len(kept)} argument(s) "
+            "already present in the state."
+        )
+    num_arguments = [arg for arg, _, _ in kept]
     return DetectArgumentsResponse(
         num_arguments=num_arguments,
-        translated_arguments=translated,
+        translated_arguments=translate_arguments(num_arguments, lookup_w_premises),
         lookup=lookup_w_premises,
-        argument_postulates=argument_postulates,
-        rejected_count=rejected,
-        model="claude-fable-5",
+        argument_postulates=[post for _, post, _ in kept],
+        argument_failures=[failure for _, _, failure in kept],
+        dropped_count=partition.dropped,
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
     )
 
 
@@ -645,27 +675,78 @@ def restates_inference(postulate: AddedPremise, texts: Dict[int, str]) -> bool:
     return all(f" {q} " in wording for q in quoted)
 
 
+#: What the reader is told about an argument that failed the checker, by code.
+CHECK_FAILURES: Dict[str, str] = {
+    "invalid": "Not formally valid: the premises do not entail the conclusion.",
+    "circular": "Circular: the conclusion is among its own premises.",
+    "inconsistent": (
+        "The premises contradict one another, so they would entail anything."
+    ),
+    "unparseable": (
+        "A bridging premise's logical form could not be read, so validity "
+        "could not be checked."
+    ),
+    "self_reference": (
+        "A bridging premise's logical form mentions that premise itself, so "
+        "validity could not be checked."
+    ),
+    "postulates_only": (
+        "It rests on meaning postulates alone: no premise has content of its own."
+    ),
+    "restatement": (
+        "Its bridging premise only restates the inference, as "
+        "“if <premises>, then <conclusion>”."
+    ),
+}
+
+
+def check_failure(code: str) -> ArgumentCheckFailure:
+    """The failure record for ``code``, worded for the reader."""
+    return ArgumentCheckFailure(code=code, reason=CHECK_FAILURES[code])
+
+
+class Partition(NamedTuple):
+    """Detected arguments sorted for surfacing.
+
+    ``arguments``, ``postulates`` and ``failures`` are parallel: each argument,
+    the meaning-postulate texts it was verified with, and why it failed the
+    checker (``None`` when it passed or was not checked). ``premises`` are the
+    added premises the surfaced arguments use, which enter the pool;
+    ``dropped`` counts the proposals that could not be surfaced at all.
+    """
+
+    arguments: List[List[int]]
+    postulates: List[List[str]]
+    failures: List[Optional[ArgumentCheckFailure]]
+    premises: List[AddedPremise]
+    dropped: int
+
+
 def verify_and_partition(
     detected: List[List[int]],
     added_premises: List[AddedPremise],
     pool_texts: Optional[Dict[int, str]] = None,
-) -> Tuple[List[List[int]], List[List[str]], List[AddedPremise], int]:
-    """Formally verify each detected argument and separate meaning postulates from premises.
+) -> Partition:
+    """Check each detected argument, and tag rather than drop the ones that fail.
 
     Each argument is checked by ``services.argument_checker`` (using the added
-    premises' ``form`` strings), auto-trimmed of redundant premises, and then
-    stripped of meaning-postulate indices — a postulate licenses the inference
-    but does not enter the element pool, so the surfaced argument runs directly
-    from its substantive premises to its conclusion, with the postulate texts
-    reported separately.
+    premises' ``form`` strings). One that **passes** is auto-trimmed of
+    redundant premises and stripped of its meaning postulates — a postulate
+    licenses the inference but does not enter the element pool, so the
+    surfaced argument runs directly from its substantive premises to its
+    conclusion, with the postulate texts reported separately ("Valid given").
 
-    Returns ``(kept_args, postulates_per_arg, used_premises, rejected_count)``:
-    the verified numeric arguments (postulates stripped), the parallel list of
-    postulate texts each argument relies on, the ``role="premise"`` added
-    premises actually used by a kept argument, and the number of proposals
-    rejected as formally invalid (or as resting on postulates alone, or on a
-    postulate that only restates the inference — see ``restates_inference``,
-    which needs ``pool_texts`` to recognise a quoted pool sentence).
+    One that **fails** — formally invalid, uninformative, unreadable, resting
+    on postulates alone, or on a postulate that only restates it (see
+    ``restates_inference``, which needs ``pool_texts`` to recognise a quoted
+    pool sentence) — is surfaced as proposed, tagged with the reason. Its
+    postulates stay among its premises and enter the pool like any added
+    premise: folding a bridge into "Valid given" is what passing earns, and
+    left in plain sight a bridge can be read and rejected. Passing arguments
+    come first.
+
+    Only an argument with no premise at all is dropped, there being nothing to
+    surface.
     """
     logger.info(f"Checking {len(detected)} arguments.")
 
@@ -679,51 +760,47 @@ def verify_and_partition(
     trim_priority = {
         p.index: (0 if p.role == "postulate" else 1) for p in added_premises
     }
+    is_postulate = (
+        lambda n: abs(n) in by_index and by_index[abs(n)].role == "postulate"
+    )  # noqa: E731
 
-    kept_args: List[List[int]] = []
-    postulates_per_arg: List[List[str]] = []
-    used_premise_indices: Set[int] = set()
-    rejected = 0
+    passed: List[Tuple[List[int], List[str]]] = []
+    failed: List[Tuple[List[int], str]] = []
+    dropped = 0
 
     for arg in detected:
         result = verify_argument(arg, forms, trim_priority)
-        if not result.accepted:
-            # Up to the colon: "unparseable form: …" goes on to quote the form,
-            # which is model-written and may carry words rather than indices.
-            reason = (result.reason or "").split(":")[0]
-            logger.info(f"Rejected argument {arg}: {reason}")
-            rejected += 1
+        if result.code == "too_few":
+            logger.info(f"Dropped argument {arg}: it has no premise.")
+            dropped += 1
             continue
-        trimmed = result.argument
-        if trimmed != arg:
-            logger.info(f"Auto-trimmed argument {arg} to {trimmed}.")
+        failure = None if result.accepted else result.code
+        if not failure:
+            trimmed = result.argument
+            if trimmed != arg:
+                logger.info(f"Auto-trimmed argument {arg} to {trimmed}.")
+            postulates = [by_index[abs(n)] for n in trimmed[:-1] if is_postulate(n)]
+            stripped = [n for n in trimmed[:-1] if not is_postulate(n)] + [trimmed[-1]]
+            if any(restates_inference(p, texts) for p in postulates):
+                failure = "restatement"
+            elif len(stripped) < 2:
+                failure = "postulates_only"
+            else:
+                passed.append((stripped, [p.text for p in postulates]))
+        if failure:
+            logger.info(f"Argument {arg} failed the check: {failure}")
+            # As proposed, a premise listed twice kept once.
+            failed.append((list(dict.fromkeys(arg[:-1])) + [arg[-1]], failure))
 
-        postulates = [
-            by_index[abs(n)]
-            for n in trimmed[:-1]
-            if abs(n) in by_index and by_index[abs(n)].role == "postulate"
-        ]
-        if any(restates_inference(p, texts) for p in postulates):
-            logger.info(f"Rejected argument {arg}: its postulate only restates it.")
-            rejected += 1
-            continue
-        postulate_texts = [p.text for p in postulates]
-        stripped = [
-            n
-            for n in trimmed[:-1]
-            if not (abs(n) in by_index and by_index[abs(n)].role == "postulate")
-        ] + [trimmed[-1]]
-        if len(stripped) < 2:
-            logger.info(f"Rejected argument {arg}: rests on meaning postulates alone.")
-            rejected += 1
-            continue
-
-        kept_args.append(stripped)
-        postulates_per_arg.append(postulate_texts)
-        used_premise_indices |= {abs(n) for n in stripped[:-1] if abs(n) in by_index}
-
-    used_premises = [by_index[i] for i in sorted(used_premise_indices)]
-    return kept_args, postulates_per_arg, used_premises, rejected
+    surfaced = [arg for arg, _ in passed] + [arg for arg, _ in failed]
+    used = {abs(n) for arg in surfaced for n in arg[:-1] if abs(n) in by_index}
+    return Partition(
+        arguments=surfaced,
+        postulates=[post for _, post in passed] + [[] for _ in failed],
+        failures=[None for _ in passed] + [check_failure(code) for _, code in failed],
+        premises=[by_index[i] for i in sorted(used)],
+        dropped=dropped,
+    )
 
 
 def partition_arguments(
@@ -732,29 +809,26 @@ def partition_arguments(
     verify: bool,
     pool_indices,
     pool_texts: Optional[Dict[int, str]] = None,
-) -> Tuple[List[List[int]], List[List[str]], List[AddedPremise], int]:
-    """Dispatch to formal verification or the checker-disabled passthrough.
+) -> Partition:
+    """Dispatch to the checker or the checker-disabled passthrough.
 
     First, in either mode, any argument referencing an index that is neither a
     pool sentence (``pool_indices``) nor a surviving added premise is dropped
     outright.  This covers arguments built on a premise that was discarded as
-    malformed (see ``parse_added_premises``): without its bridge premise such
-    an argument is unsound, and its index would not resolve in the lookup — so
-    it must go, not be handed to the checker as a bare atom.  Dropped arguments
-    are counted toward ``rejected``.
+    malformed (see ``parse_added_premises``): its index would not resolve in
+    the lookup, so there is no claim to show in its place.  Dropped arguments
+    are counted in ``dropped``.
 
-    When ``verify`` is true the survivors go through ``verify_and_partition``.
-    When it is false the checker is bypassed: every surviving argument is
-    surfaced as proposed and every added premise — postulates included — is
-    treated as a pool element, since without verification there is no basis for
-    stripping meaning postulates or trimming redundant premises.
+    When ``verify`` is true the survivors go through ``verify_and_partition``,
+    which tags those that fail. When it is false the checker is bypassed: every
+    surviving argument is surfaced as proposed, untagged, and every added
+    premise — postulates included — is treated as a pool element, since without
+    verification there is no basis for stripping meaning postulates or
+    trimming redundant premises.
 
     Given ``pool_texts``, an added premise repeating a sentence word for word
     is first read as that sentence (``identify_repeated_premises``), in either
     mode: it is the same claim whether or not anything checks the argument.
-
-    Returns the same ``(kept_args, postulates_per_arg, used_premises,
-    rejected)`` shape either way, so the router treats both paths uniformly.
     """
     if pool_texts:
         detected, added_premises = identify_repeated_premises(
@@ -770,12 +844,16 @@ def partition_arguments(
         )
 
     if verify:
-        kept, postulates, used, rejected = verify_and_partition(
-            resolvable, added_premises, pool_texts
-        )
-        return kept, postulates, used, rejected + unresolved
+        checked = verify_and_partition(resolvable, added_premises, pool_texts)
+        return checked._replace(dropped=checked.dropped + unresolved)
 
-    return resolvable, [[] for _ in resolvable], list(added_premises), unresolved
+    return Partition(
+        arguments=resolvable,
+        postulates=[[] for _ in resolvable],
+        failures=[None for _ in resolvable],
+        premises=list(added_premises),
+        dropped=unresolved,
+    )
 
 
 def parse_added_premises(raw) -> List[AddedPremise]:

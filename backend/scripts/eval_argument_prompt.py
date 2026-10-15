@@ -1,9 +1,10 @@
-"""How many of a model's proposed arguments the checker rejects, and why.
+"""How many of a model's proposed arguments fail the checker, and why.
 
 Runs the Arguments tab's detection on a process exported from the app, several
 times, through the same prompt, checker and partitioning the router uses, and
-tallies each run's proposals by outcome. For judging a change to the prompt by
-what it does rather than by how it reads: run it before and after.
+tallies each run's proposals by outcome: passed, failed (by the checker's
+reason) or dropped. For judging a change to the prompt by what it does rather
+than by how it reads: run it before and after.
 
     LLM_API_KEY=... python -m backend.scripts.eval_argument_prompt export.md \\
         --base-url https://api.anthropic.com --model <model> --runs 5
@@ -11,15 +12,11 @@ what it does rather than by how it reads: run it before and after.
 ``export.md`` is a Markdown export with its Full history (``re-state``) block.
 Every run is a paid model call. Nothing is written anywhere; the tally goes to
 standard output.
-
-The reasons are read off the pipeline's own log lines, so they are the
-reasons it gave, not a second classification that could disagree with it.
 """
 
 import argparse
 import asyncio
 import json
-import logging
 import os
 import re
 import sys
@@ -28,24 +25,6 @@ from collections import Counter
 from ..models.re_state import REState
 from ..services.arguments import get_arguments_from_llm, partition_arguments
 from ..services.llm import LLMConfig, LLMService
-
-_REJECTED = re.compile(r"^Rejected argument \[[^\]]*\]: (.+)$")
-_DROPPED = re.compile(r"^Dropped (\d+) argument")
-
-
-class _Tally(logging.Handler):
-    """Counts the pipeline's rejection reasons as it logs them."""
-
-    def __init__(self) -> None:
-        super().__init__(logging.INFO)
-        self.reasons: Counter = Counter()
-
-    def emit(self, record: logging.LogRecord) -> None:
-        message = record.getMessage()
-        if m := _REJECTED.match(message):
-            self.reasons[m.group(1).rstrip(".")] += 1
-        elif m := _DROPPED.match(message):
-            self.reasons["references an undefined index"] += int(m.group(1))
 
 
 def read_state(path: str) -> REState:
@@ -69,17 +48,13 @@ async def run(args: argparse.Namespace) -> None:
             max_tokens=args.max_tokens,
         )
     )
-    tally = _Tally()
-    logger = logging.getLogger("backend.services.arguments")
-    logger.addHandler(tally)
-    logger.setLevel(logging.INFO)
-
-    proposed = kept = 0
+    outcomes: Counter = Counter()
+    proposed = passed = 0
     for i in range(args.runs):
         response = await get_arguments_from_llm(
             lookup, llm, state.relations, state.topic
         )
-        survivors, _, _, rejected = partition_arguments(
+        partition = partition_arguments(
             response.detected_arguments,
             response.added_premises,
             verify=True,
@@ -87,17 +62,23 @@ async def run(args: argparse.Namespace) -> None:
             pool_texts={n: e.text for n, e in lookup.items()},
         )
         n = len(response.detected_arguments)
+        ok = sum(f is None for f in partition.failures)
+        failed = len(partition.failures) - ok
         proposed += n
-        kept += len(survivors)
+        passed += ok
+        outcomes.update(f.code for f in partition.failures if f is not None)
+        if partition.dropped:
+            outcomes["dropped: no premise, or an undefined index"] += partition.dropped
         print(
-            f"run {i + 1}: {n} proposed, {len(survivors)} kept, {rejected} rejected "
+            f"run {i + 1}: {n} proposed, {ok} passed, {failed} failed, "
+            f"{partition.dropped} dropped "
             f"({response.input_tokens} in / {response.output_tokens} out tokens)"
         )
 
-    print(f"\n{args.runs} runs: {proposed} proposed, {kept} kept", end="")
-    print(f" ({kept / proposed:.0%})" if proposed else "")
-    for reason, count in tally.reasons.most_common():
-        print(f"  {count:4}  {reason}")
+    print(f"\n{args.runs} runs: {proposed} proposed, {passed} passed", end="")
+    print(f" ({passed / proposed:.0%})" if proposed else "")
+    for outcome, count in outcomes.most_common():
+        print(f"  {count:4}  {outcome}")
 
 
 def main() -> None:

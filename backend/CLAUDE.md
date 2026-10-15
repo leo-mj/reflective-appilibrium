@@ -46,12 +46,21 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   before it. `main.py` re-enables the `backend` tree after the router imports —
   keep that block *after* them, or the assist routers go silent again.
 - Target LLMs: Qwen3 30B quantized (consumer GPU), DeepSeek-V3.2 / GPT-OSS-120B (high-end)
-- **Argument detection wastes what the checker rejects**, so the prompt
-  (`build_prompt` in `services/arguments.py`) spells out the bookkeeping the
-  checker tests — each postulate's form is the bridge from its argument's other
-  indices to the conclusion — and asks the model to check every argument
-  against it before answering; `test_the_prompt_example_passes_the_checker`
-  holds the prompt's own example to it. To see what a prompt change does,
+- **The argument checker tags; it does not reject.** An argument that fails
+  (`verify_and_partition` in `services/arguments.py`) is surfaced as proposed,
+  its meaning postulates among its premises, with a code and a reason worded
+  for the reader (`CHECK_FAILURES`, `argument_failures` in the response,
+  parallel to `num_arguments`); the Arguments tab marks it, and accepting it
+  writes the reason into the relation's explanation. Folding a postulate into
+  "Valid given" and auto-trimming are what passing earns. Only a proposal with
+  nothing to show is dropped — citing an index nothing defines, or no premise
+  (`dropped_count`). An added premise worded as an existing sentence is read as
+  that sentence first, in either mode (`identify_repeated_premises`).
+- **The prompt spells out the bookkeeping the checker tests** (`build_prompt`)
+  — each postulate's form is the bridge from its argument's other indices to
+  the conclusion — and asks the model to check every argument against it before
+  answering; `test_the_prompt_example_passes_the_checker` holds the prompt's
+  own example to it. To see what a prompt change does,
   `python -m backend.scripts.eval_argument_prompt export.md --base-url … --model …`
   (key in `LLM_API_KEY`) runs detection on an exported process and tallies the
-  rejections by the reasons the pipeline logs. Every run is a paid call.
+  proposals as passed, failed (by reason) or dropped. Every run is a paid call.

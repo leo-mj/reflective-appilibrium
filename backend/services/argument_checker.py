@@ -216,12 +216,15 @@ class VerificationResult:
     ``accepted`` means the argument is both formally valid and informative;
     ``argument`` is then the (possibly auto-trimmed) argument, otherwise the
     original input.  ``reason`` is set on rejection and distinguishes genuine
-    invalidity from valid-but-uninformative rejections.
+    invalidity from valid-but-uninformative rejections; ``code`` names it for
+    a program: ``too_few``, ``circular``, ``self_reference``,
+    ``inconsistent``, ``invalid`` or ``unparseable``.
     """
 
     accepted: bool
     argument: List[int]
     reason: Optional[str] = None
+    code: Optional[str] = None
 
 
 def _form_for_index(n: int, parsed_forms: Dict[int, LogicalForm]) -> LogicalForm:
@@ -253,7 +256,9 @@ def verify_argument(
     from the mapping are dropped last).
     """
     if len(arg) < 2:
-        return VerificationResult(False, arg, "argument needs at least one premise")
+        return VerificationResult(
+            False, arg, "argument needs at least one premise", "too_few"
+        )
 
     premises, conclusion = arg[:-1], arg[-1]
     if conclusion in premises:
@@ -262,6 +267,7 @@ def verify_argument(
             arg,
             "circular: the conclusion appears among the premises "
             "(valid, but excludes no position — uninformative)",
+            "circular",
         )
 
     try:
@@ -276,6 +282,7 @@ def verify_argument(
                     arg,
                     f"form of premise {i} references its own index — "
                     "a form must state the premise's content in terms of the other sentences",
+                    "self_reference",
                 )
         premise_forms = [_form_for_index(n, parsed_forms) for n in premises]
         conclusion_form = _form_for_index(conclusion, parsed_forms)
@@ -286,9 +293,10 @@ def verify_argument(
                 arg,
                 "ex falso: the premises are jointly inconsistent "
                 "(valid, but excludes no minimally consistent position — uninformative)",
+                "inconsistent",
             )
         if not entails(premise_forms, conclusion_form):
-            return VerificationResult(False, arg, "not formally valid")
+            return VerificationResult(False, arg, "not formally valid", "invalid")
 
         # Auto-trim: drop premises not needed for validity, until minimal.
         # Removal candidates are tried in trim_priority order so that, when
@@ -313,6 +321,6 @@ def verify_argument(
                     changed = True
                     break
     except FormParseError as e:
-        return VerificationResult(False, arg, f"unparseable form: {e}")
+        return VerificationResult(False, arg, f"unparseable form: {e}", "unparseable")
 
     return VerificationResult(True, [n for n, _ in kept] + [conclusion])

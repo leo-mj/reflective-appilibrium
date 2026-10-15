@@ -11,7 +11,6 @@ from backend.services.argument_checker import (
 from backend.services.arguments import verify_and_partition
 from backend.routers.arguments_schemas import AddedPremise
 
-
 # ── Parser ────────────────────────────────────────────────────────────────────
 
 
@@ -239,30 +238,57 @@ def _premise(index, form, role, text=None):
 
 def test_postulate_stripped_from_argument():
     premises = [_premise(30, "16 -> 10", "postulate", "Meaning link 16→10.")]
-    kept, postulates, used, rejected = verify_and_partition([[16, 30, 10]], premises)
-    assert kept == [[16, 10]]
-    assert postulates == [["Meaning link 16→10."]]
-    assert used == [] and rejected == 0
+    out = verify_and_partition([[16, 30, 10]], premises)
+    assert out.arguments == [[16, 10]]
+    assert out.postulates == [["Meaning link 16→10."]]
+    assert out.failures == [None]
+    assert out.premises == [] and out.dropped == 0
 
 
 def test_substantive_premise_kept_in_argument():
     premises = [_premise(30, "14 -> 1", "premise")]
-    kept, postulates, used, rejected = verify_and_partition([[14, 30, 1]], premises)
-    assert kept == [[14, 30, 1]]
-    assert postulates == [[]]
-    assert [p.index for p in used] == [30] and rejected == 0
+    out = verify_and_partition([[14, 30, 1]], premises)
+    assert out.arguments == [[14, 30, 1]]
+    assert out.postulates == [[]]
+    assert [p.index for p in out.premises] == [30] and out.dropped == 0
 
 
-def test_argument_resting_on_postulates_alone_rejected():
+def test_argument_resting_on_postulates_alone_is_tagged_with_its_postulate_shown():
     premises = [_premise(30, "10", "postulate")]
-    kept, _, _, rejected = verify_and_partition([[30, 10]], premises)
-    assert kept == [] and rejected == 1
+    out = verify_and_partition([[30, 10]], premises)
+    assert out.arguments == [[30, 10]]
+    assert [f.code for f in out.failures] == ["postulates_only"]
+    # Failing, the postulate is not folded away: it is a premise the reader sees.
+    assert out.postulates == [[]]
+    assert [p.index for p in out.premises] == [30]
 
 
-def test_invalid_argument_counted():
+def test_invalid_argument_tagged_and_placed_after_the_valid_ones():
     premises = [_premise(30, "14 -> 1", "premise")]
-    kept, _, _, rejected = verify_and_partition([[14, 30, 1], [14, 2]], premises)
-    assert kept == [[14, 30, 1]] and rejected == 1
+    out = verify_and_partition([[14, 2], [14, 30, 1]], premises)
+    assert out.arguments == [[14, 30, 1], [14, 2]]
+    assert out.failures[0] is None
+    assert out.failures[1].code == "invalid"
+    assert out.failures[1].reason.startswith("Not formally valid")
+    assert out.dropped == 0
+
+
+def test_a_failing_argument_keeps_its_premises_as_proposed():
+    # No auto-trim for an argument that failed: trimming is part of what
+    # passing earns, and the reader should see what was proposed.
+    premises = [
+        _premise(30, "14 -> 1", "premise"),
+        _premise(31, "(14 & 30) -> 2", "postulate", "A bridge."),
+    ]
+    out = verify_and_partition([[14, 30, 31, 3]], premises)
+    assert out.arguments == [[14, 30, 31, 3]]
+    assert out.postulates == [[]]
+    assert [p.index for p in out.premises] == [30, 31]
+
+
+def test_an_argument_without_premises_is_dropped():
+    out = verify_and_partition([[10]], [])
+    assert out.arguments == [] and out.dropped == 1
 
 
 def test_unused_premises_not_returned():
@@ -270,8 +296,8 @@ def test_unused_premises_not_returned():
         _premise(30, "14 -> 1", "premise"),
         _premise(31, "2 -> 3", "premise"),
     ]
-    _, _, used, _ = verify_and_partition([[14, 30, 1]], premises)
-    assert [p.index for p in used] == [30]
+    out = verify_and_partition([[14, 30, 1]], premises)
+    assert [p.index for p in out.premises] == [30]
 
 
 def test_mixed_roles_chained_argument():
@@ -281,10 +307,10 @@ def test_mixed_roles_chained_argument():
         _premise(30, "3 -> 4", "premise"),
         _premise(31, "4 -> 7", "postulate", "Meaning link 4→7."),
     ]
-    kept, postulates, used, rejected = verify_and_partition([[3, 30, 31, 7]], premises)
-    assert kept == [[3, 30, 7]]
-    assert postulates == [["Meaning link 4→7."]]
-    assert [p.index for p in used] == [30] and rejected == 0
+    out = verify_and_partition([[3, 30, 31, 7]], premises)
+    assert out.arguments == [[3, 30, 7]]
+    assert out.postulates == [["Meaning link 4→7."]]
+    assert [p.index for p in out.premises] == [30] and out.failures == [None]
 
 
 def test_interchangeable_postulate_dropped_in_favor_of_premise():
@@ -296,14 +322,21 @@ def test_interchangeable_postulate_dropped_in_favor_of_premise():
         _premise(30, "3 -> 1", "premise"),
         _premise(31, "3 -> 1", "postulate", "Redundant meaning link."),
     ]
-    kept, postulates, used, _ = verify_and_partition([[3, 30, 31, 1]], premises)
-    assert kept == [[3, 30, 1]]
-    assert postulates == [[]]
-    assert [p.index for p in used] == [30]
+    out = verify_and_partition([[3, 30, 31, 1]], premises)
+    assert out.arguments == [[3, 30, 1]]
+    assert out.postulates == [[]]
+    assert [p.index for p in out.premises] == [30]
+
+
+def test_every_failure_code_has_a_reason_for_the_reader():
+    from backend.services.arguments import CHECK_FAILURES
+
+    codes = {"invalid", "circular", "inconsistent", "unparseable", "self_reference"}
+    assert codes | {"postulates_only", "restatement"} == set(CHECK_FAILURES)
 
 
 def test_empty_input():
-    assert verify_and_partition([], []) == ([], [], [], 0)
+    assert verify_and_partition([], []) == ([], [], [], [], 0)
 
 
 def test_parse_reads_logic_symbols_as_their_ascii_operators():

@@ -12,7 +12,7 @@ EXPORT = (
 )
 
 
-def test_tallies_kept_and_rejected_proposals_by_reason(monkeypatch, capsys):
+def test_tallies_proposals_by_outcome(monkeypatch, capsys):
     async def canned(lookup, llm, relations, topic):
         bridge = AddedPremise(
             index=len(lookup) + 1,
@@ -23,9 +23,9 @@ def test_tallies_kept_and_rejected_proposals_by_reason(monkeypatch, capsys):
         )
         return LLMArgumentsResponse(
             detected_arguments=[
-                [1, bridge.index, 2],  # kept
+                [1, bridge.index, 2],  # passes
                 [1, bridge.index, 3],  # not formally valid
-                [1, 999, 2],  # undefined index
+                [1, 999, 2],  # undefined index: dropped
             ],
             added_premises=[bridge],
             input_tokens=10,
@@ -42,7 +42,7 @@ def test_tallies_kept_and_rejected_proposals_by_reason(monkeypatch, capsys):
     )
     asyncio.run(script.run(args))
     out = capsys.readouterr().out
-    assert "run 1: 3 proposed, 1 kept, 2 rejected" in out
-    assert "2 runs: 6 proposed, 2 kept (33%)" in out
-    assert "2  not formally valid" in out
-    assert "2  references an undefined index" in out
+    assert "run 1: 3 proposed, 1 passed, 1 failed, 1 dropped" in out
+    assert "2 runs: 6 proposed, 2 passed (33%)" in out
+    assert "2  invalid" in out
+    assert "2  dropped: no premise, or an undefined index" in out

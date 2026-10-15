@@ -41,7 +41,7 @@ export const MENU_TOOLTIPS = {
   llm: "Your provider, model and API key.",
   privacy: "What leaves your browser, and what is kept.",
   relations: "Adds supports, conflicts and undermines.",
-  checker: "Detected arguments are tested for validity first.",
+  checker: "Detected arguments are tested for validity; failures are marked.",
   processTags: "Letters marking which merged process each element came from.",
   resetLayout: "Release every node you have dragged back to the automatic layout.",
   closeRound: "Make the changes since the last close one round; the next change starts a new one.",
