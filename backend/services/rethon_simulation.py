@@ -1,10 +1,10 @@
 """Core RE simulation service — builds dialectical structures, runs RE processes, and translates results."""
 
-from fastapi import HTTPException
 from typing import Iterable, List, Dict, Optional, Union
 import logging
 import time
 
+from . import rethon_import  # noqa: F401 — must precede rethon; see that module
 from theodias import Position, StandardPosition, BDDDialecticalStructure
 from rethon import (
     StandardLocalReflectiveEquilibrium,
@@ -12,13 +12,10 @@ from rethon import (
     REState,
 )
 from ..models.re_state import REElement, RERelation
-from .rethon_caps import (  # noqa: F401 — enforce_element_cap re-exported for the routers
-    NEGATING_TYPES,
-    NO_CAPS,
-    RETHON_ARGUMENT_TYPES,
-    ElementCaps,
-    enforce_element_cap,
-    rethon_arguments,
+from .rethon_tasks import (  # noqa: F401 — moved there; re-exported for callers here
+    SimulationFinished,
+    build_numerical_arguments,
+    validate_and_build,
 )
 from .rethon_theory import held_theory, make_re, theory_sentences
 from ..routers.arguments_schemas import DetectArgumentsResponse, translate_from_lookup
@@ -34,45 +31,6 @@ logger = logging.getLogger(__name__)
 REProcess = Union[
     StandardLocalReflectiveEquilibrium, StandardGlobalReflectiveEquilibrium
 ]
-
-
-def build_numerical_arguments(
-    elements: List[REElement],
-    relations: List[RERelation],
-) -> DetectArgumentsResponse:
-    """Build rethon-compatible lookup and argument lists from frontend relations."""
-    lookup: Dict[int, REElement] = {i + 1: el for i, el in enumerate(elements)}
-    id_to_index: Dict[str, int] = {el.id: i + 1 for i, el in enumerate(elements)}
-
-    numerical_arguments: List[List[int]] = []
-    for arg_rels in rethon_arguments(relations):
-        conclusion_idx = id_to_index.get(arg_rels[0].to_id)
-        premise_indices = [id_to_index.get(rel.from_id) for rel in arg_rels]
-        if conclusion_idx is None or any(idx is None for idx in premise_indices):
-            logger.warning("Skipping argument with unknown element IDs.")
-            continue
-        if arg_rels[0].type in NEGATING_TYPES:
-            conclusion_idx = -conclusion_idx
-        numerical_arguments.append(
-            [idx for idx in premise_indices if idx is not None] + [conclusion_idx]
-        )
-
-    translated_arguments = [
-        translate_from_lookup(arg, lookup) for arg in numerical_arguments
-    ]
-    return DetectArgumentsResponse(
-        num_arguments=numerical_arguments,
-        translated_arguments=translated_arguments,
-        lookup=lookup,
-    )
-
-
-def _add_negated_to_lookup(lookup: Dict) -> Dict:
-    """Extend the lookup with negated copies of every element (negative key → ``negated=True``)."""
-    return {
-        **lookup,
-        **{-k: e.model_copy(update={"negated": True}) for k, e in lookup.items()},
-    }
 
 
 def max_steps_for(n: int) -> int:
@@ -317,48 +275,6 @@ def translate_re_state(
     return result
 
 
-def validate_and_build(
-    elements: List[REElement],
-    relations: List[RERelation],
-    sentence_pool_minimum: int = 3,
-    caps: ElementCaps = NO_CAPS,
-) -> tuple[DetectArgumentsResponse, Dict[int, REElement], int]:
-    """Validate the request payload and build the numerical argument structures.
-
-    Raises HTTPException on invalid input.  Returns the built arguments, the
-    negated lookup, and the sentence pool size.
-
-    ``caps`` is passed in rather than read from settings so this stays a
-    pure function of its arguments — which is what lets it be called from a
-    worker process without carrying configuration across the pipe.
-    """
-    n = len(elements)
-    enforce_element_cap(elements, relations, caps)
-    if n < sentence_pool_minimum:
-        raise HTTPException(
-            status_code=422,
-            detail=f"There are fewer than {sentence_pool_minimum} elements forming the sentence pool.",
-        )
-    arg_relations = [r for r in relations if r.type in RETHON_ARGUMENT_TYPES]
-    if not arg_relations:
-        raise HTTPException(
-            status_code=422,
-            detail="No argument relations found. Accept arguments in the Detect Arguments tab first.",
-        )
-    built_arguments = build_numerical_arguments(
-        elements=elements, relations=arg_relations
-    )
-    # The theory is made of these (see rethon_theory), so without one there is
-    # no theory to find — rethon would fail with no candidates at all.
-    if not theory_sentences(built_arguments.lookup):
-        raise HTTPException(
-            status_code=422,
-            detail="Add a principle or background theory first: the simulation builds its theory from them.",
-        )
-    lookup_w_negated = _add_negated_to_lookup(lookup=built_arguments.lookup)
-    return built_arguments, lookup_w_negated, n
-
-
 # ── Worker entry points ───────────────────────────────────────────────────────
 #
 # /simulate and /step run these in the simulation pool (see process_pool.py).
@@ -366,14 +282,6 @@ def validate_and_build(
 # can refuse a request runs here, and each returns the finished response rather
 # than the REProcess: that object does pickle, but it carries the whole BDD
 # manager, which would be serialised across the pipe only to be thrown away.
-
-
-class SimulationFinished(Exception):
-    """A step was asked of a process that has already reached its fixed point.
-
-    Raised in a worker in place of an ``HTTPException``, which cannot be
-    unpickled; the router turns it back into a 400.
-    """
 
 
 def _index_by_id(elements: List[REElement]) -> Dict[str, int]:

@@ -8,7 +8,7 @@ CHROME := /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 SHOT := --headless --disable-gpu --hide-scrollbars
 BRANDING := file://$(CURDIR)/app/branding
 
-.PHONY: start stop og-image icons branding
+.PHONY: start stop measure-startup og-image icons branding
 
 branding: og-image icons
 
@@ -37,3 +37,11 @@ stop:
 	else \
 		echo "No PID file found — is the server running?"; \
 	fi
+
+# How long the backend takes to start and what it loads to get there: the bytes
+# `import backend.main` reads, the server's time to answer /api/health, and the
+# first score and simulation. ARGS=--cold drops the packages from the file
+# cache first (Linux; on macOS run `sudo purge` before). See the module's
+# docstring for which numbers to trust.
+measure-startup:
+	python -m backend.tools.measure_startup $(ARGS)

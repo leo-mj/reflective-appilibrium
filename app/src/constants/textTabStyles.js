@@ -106,6 +106,14 @@ export const cardIdentity = {
  * there is nothing left for a narrow screen to do differently.
  */
 /**
+ * The claim itself — an element's statement, a relation's explanation, the
+ * premises spelled out under an argument. A notch under the chrome around it
+ * (headers at 12, chips at 10) so that a panel showing two dozen cards fits
+ * more of them on screen without the text dropping to chip size.
+ */
+export const CONTENT_FONT_SIZE = 11;
+
+/**
  * A grid rather than a row, so the fields line up *down* the list as well as
  * across one card. Packed in a row, every field's position depends on the width
  * of the text before it — "Moderate" is wider than "High", so a column of cards
@@ -123,10 +131,17 @@ export const cardIdentity = {
  * is what the ellipsis needs to measure against. `alignItems: start` because a
  * field whose value wraps — the covered judgments — must not centre itself
  * against the single-line ones beside it.
+ *
+ * The minimum is in characters of the values' own size, not pixels, because
+ * what it has to hold is a phrase: "Round 12 · Step 140", "Withdrawn · Step
+ * 37", a model's name as an origin. At 110px "Round 3 · Step 14" lost its step
+ * to the ellipsis, and a pixel minimum would lose it again in a wider font.
  */
 export const cardStats = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+  // Only the column measure reads this: every field sets its own size.
+  fontSize: CONTENT_FONT_SIZE,
+  gridTemplateColumns: "repeat(auto-fill, minmax(22ch, 1fr))",
   alignItems: "start",
   columnGap: 10,
   rowGap: 8,
@@ -170,14 +185,6 @@ export const META_LABEL_STYLE = {
   marginTop: 5,
   lineHeight: 1.5,
 };
-
-/**
- * The claim itself — an element's statement, a relation's explanation, the
- * premises spelled out under an argument. A notch under the chrome around it
- * (headers at 12, chips at 10) so that a panel showing two dozen cards fits
- * more of them on screen without the text dropping to chip size.
- */
-export const CONTENT_FONT_SIZE = 11;
 
 export const CLUSTER_CARD_STYLE = {
   display: "flex",
