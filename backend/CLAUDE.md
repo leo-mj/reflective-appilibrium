@@ -62,6 +62,12 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   is no longer imported at a fixed point in the server, the repair travels with
   the import: `services/rethon_import.py` imports rethon and re-enables the
   `backend` tree, and every module using rethon imports it first.
+- **The server logs one line as it stops** (`activity.py`, from `main.lifespan`):
+  uptime, requests served and how long since the last. A hosted instance is
+  stopped some while after its last request — Cloud Run sends SIGTERM first,
+  which uvicorn receives because the image `exec`s it — and how long it
+  survives idle is not a documented constant, so this is where it is read off.
+  Counts and times only.
 - `make measure-startup` (`backend/tools/measure_startup.py`) reports what
   `import backend.main` loads and how long the server, the warm-up and the
   first computations take. Compare the bytes across a change; times only on one

@@ -38,6 +38,7 @@ from .routers import (
     arguments,
 )
 from .logging_setup import configure_backend_logging
+from .activity import ActivityMiddleware, shutdown_summary
 from .process_pool import shutdown_pools
 from .security_headers import SecurityHeadersMiddleware
 
@@ -55,12 +56,14 @@ configure_backend_logging()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    """Stop the simulation workers on shutdown.
+    """Stop the simulation workers on shutdown, and say how long it was idle.
 
     Only shutdown: the pool is created lazily on first use, not here, because the
-    test suite never runs startup — see process_pool.
+    test suite never runs startup — see process_pool. The log line is how long a
+    hosted instance survives without requests can be read off (see activity).
     """
     yield
+    logging.getLogger("backend.main").info(shutdown_summary())
     shutdown_pools()
 
 
@@ -102,6 +105,9 @@ app.add_middleware(
 )
 # Added last so it is outermost, and a CORS preflight answer carries the headers too.
 app.add_middleware(SecurityHeadersMiddleware)
+# Outside even that, so that every request counts as activity — a preflight or a
+# refused one keeps a hosted instance awake as much as any other.
+app.add_middleware(ActivityMiddleware)
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 
