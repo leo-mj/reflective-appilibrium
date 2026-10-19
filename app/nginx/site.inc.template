@@ -1,0 +1,70 @@
+# What both servers in default.conf serve, included into each. A template like
+# that file: ${BACKEND_UPSTREAM}, ${NGINX_LOCAL_RESOLVERS} and ${BASE_PATH} are
+# filled in when the container starts (see app/Dockerfile). Named .inc rather
+# than .conf so that nginx.conf, which includes conf.d/*.conf at the top level,
+# leaves it alone.
+
+server_name _;
+root /usr/share/nginx/html;
+
+server_tokens off;
+
+gzip on;
+gzip_min_length 1024;
+gzip_types text/css application/javascript application/json image/svg+xml;
+
+# The path the page was built for (BASE_PATH), when the proxy in front
+# passes it on rather than removing it: /prefix/assets/x.js is served as
+# /assets/x.js, and /prefix/api/… reaches the backend as /api/…. A request
+# without the prefix is left as it is, so a proxy that removes it works
+# too. Built for the root, BASE_PATH is / and this changes nothing.
+rewrite ^${BASE_PATH}(.*)$ /$1 break;
+
+# ── /api → the backend ───────────────────────────────────────────────────
+
+location /api/ {
+    # A variable in proxy_pass makes nginx resolve the name per request, so
+    # a restarted backend on a new address is found rather than 502ing
+    # until this container restarts too. The path passes as it stands once
+    # the prefix above is gone: /api/….
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
+    set $backend http://${BACKEND_UPSTREAM};
+    proxy_pass $backend;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    # Replaced, not appended to: $remote_addr is the visitor as settled in
+    # default.conf, and anything a visitor put in the header themselves stops
+    # here.
+    proxy_set_header X-Forwarded-For $remote_addr;
+
+    # A simulation may run for 60s when hosted, and a provider call for 90s
+    # plus a retry. A stopped simulation still ends at once: when the browser
+    # hangs up, nginx closes the backend connection, and the backend kills
+    # the computation (routers/simulate_rethon.py).
+    proxy_read_timeout 300s;
+
+    # A discussion carries the whole RE state and every earlier turn. The
+    # same 10 MiB the backend refuses above when hosted
+    # (MAX_REQUEST_BODY_BYTES, backend/config.py): change the two together.
+    client_max_body_size 10m;
+}
+
+# ── The page ─────────────────────────────────────────────────────────────
+
+# Built files carry a content hash in their name, so a changed file is a new
+# URL and these can be kept for a year.
+location /assets/ {
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    try_files $uri =404;
+}
+
+# Everything else: a real file if there is one, otherwise the app itself.
+# index.html is revalidated on every load, so a deploy reaches visitors at
+# once rather than when a cached copy expires.
+location / {
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Cache-Control "no-cache" always;
+    try_files $uri /index.html;
+}

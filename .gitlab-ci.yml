@@ -17,6 +17,9 @@ workflow:
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
     - if: $CI_COMMIT_BRANCH
+    # A tag: a version, whose images are pushed under its name (see the image
+    # jobs below).
+    - if: $CI_COMMIT_TAG
 
 stages:
   - test
@@ -143,10 +146,18 @@ frontend-e2e:
 
 # ── Containers ──────────────────────────────────────────────────────────────────
 
-# Builds the two images and, on the default branch, pushes them to this
-# project's registry as $CI_REGISTRY_IMAGE/backend and /frontend, tagged with
-# the commit and as `latest`. On other branches it only builds, which is still
-# the check that both Dockerfiles do.
+# Every pipeline builds the two images and pushes them to this project's
+# registry, as $CI_REGISTRY_IMAGE/backend and /frontend, tagged with the commit
+# (`3f2a9c1`) and with one name that says where they came from:
+#
+#   image          a branch or merge request: the branch (`fix-proxy`)
+#   image:default  the default branch: `latest`
+#   image:release  a Git tag: the version (`v0.2`), from `git tag v0.2`
+#
+# One job per kind of pipeline, chosen by rules, rather than one job asking the
+# shell. Each runs once per image (parallel:matrix). The registry's cleanup
+# policy (Settings → Packages and registries) is what keeps branch images from
+# piling up.
 #
 # Buildah rather than Docker: it needs no daemon, so no Docker-in-Docker and no
 # privileged runner, which this instance's runners are not (the dind service
@@ -158,6 +169,18 @@ frontend-e2e:
 #
 # Both Dockerfiles name their base images with the registry (docker.io/…),
 # which Buildah requires when no registries.conf supplies a default.
+#
+# Where the frontend is served is decided when it is built, by two CI/CD
+# variables (Settings → CI/CD → Variables), so the image in the registry is the
+# one the host runs:
+#
+#   FRONTEND_BASE_PATH            the path it is served from, with a slash at
+#                                 each end; unset, the root
+#   FRONTEND_PROXY_PROTOCOL_FROM  the address of a proxy speaking PROXY
+#                                 protocol to port 8081; unset, nobody
+#
+# Both are build arguments of app/Dockerfile, which says what they do. The
+# backend's Dockerfile declares neither and has no use for them.
 .image:
   stage: images
   image: quay.io/buildah/stable:latest
@@ -167,26 +190,50 @@ frontend-e2e:
     # Docker's manifest format, which every host that pulls these understands;
     # it also keeps the HEALTHCHECK, which the OCI format drops.
     BUILDAH_FORMAT: docker
+  parallel:
+    matrix:
+      - NAME: backend
+        CONTEXT: .
+      - NAME: frontend
+        CONTEXT: app
   timeout: 30m
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
     - ref="$CI_REGISTRY_IMAGE/$NAME"
-    - buildah build --tag "$ref:$CI_COMMIT_SHORT_SHA" "$CONTEXT"
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
-        echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-        buildah tag "$ref:$CI_COMMIT_SHORT_SHA" "$ref:latest"
-        buildah push "$ref:$CI_COMMIT_SHORT_SHA"
-        buildah push "$ref:latest"
-      fi
+    - >
+      buildah build
+      --build-arg BASE_PATH="${FRONTEND_BASE_PATH:-/}"
+      --build-arg PROXY_PROTOCOL_FROM="${FRONTEND_PROXY_PROTOCOL_FROM:-127.0.0.1}"
+      --label org.opencontainers.image.revision="$CI_COMMIT_SHA"
+      --label org.opencontainers.image.source="$CI_PROJECT_URL"
+      --tag "$ref:$CI_COMMIT_SHORT_SHA"
+      --tag "$ref:$IMAGE_TAG"
+      "$CONTEXT"
+    - buildah push "$ref:$CI_COMMIT_SHORT_SHA"
+    - buildah push "$ref:$IMAGE_TAG"
 
-image-backend:
+image:
   extends: .image
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: never
+    - when: on_success
   variables:
-    NAME: backend
-    CONTEXT: .
+    IMAGE_TAG: $CI_COMMIT_REF_SLUG
 
-image-frontend:
+image:default:
   extends: .image
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   variables:
-    NAME: frontend
-    CONTEXT: app
+    IMAGE_TAG: latest
+
+image:release:
+  extends: .image
+  rules:
+    - if: $CI_COMMIT_TAG
+  variables:
+    IMAGE_TAG: $CI_COMMIT_TAG
