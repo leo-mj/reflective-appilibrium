@@ -174,10 +174,10 @@ export function stepLog(steps) {
     const parts = [];
     const plain = (els) => els.filter((e) => !e.negated);
     const negated = (els) => els.filter((e) => e.negated);
-    if (index === 0) parts.push("Starts from your current commitments.");
+    if (index === 0) parts.push("Starts from the elements you accept and reject now.");
     else if (kind === "theory") {
       if (index === 1 && !joined.length && !left.length)
-        parts.push("Starts from the theory you hold.");
+        parts.push("Starts from your active principles and background theories.");
       const verb = (els, one, many) => (els.length > 1 ? many : one);
       if (joined.length)
         parts.push(`${listed(joined)} ${verb(joined, "joins", "join")} the theory.`);

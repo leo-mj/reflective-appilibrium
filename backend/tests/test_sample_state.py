@@ -54,3 +54,23 @@ def test_the_sample_validates_as_a_quick_score_request(sample):
     QuickScoreRequest.model_validate(
         {"elements": sample["elements"], "relations": sample["relations"]}
     )
+
+
+def test_the_samples_account_responds_to_its_judgments(sample):
+    # The sample's principles conflict (P2 + P3 → J5, P5 + P10 → ¬J5), which
+    # once made the scored theory inconsistent: account 0, and every card's
+    # "if withdrawn" bar 0.000. P1 entails J3, so withdrawing J3 must cost.
+    from backend.services.rethon_scoring import (
+        compute_quick_score,
+        compute_score_changes,
+    )
+
+    req = QuickScoreRequest.model_validate(
+        {"elements": sample["elements"], "relations": sample["relations"]}
+    )
+    assert compute_quick_score(req.elements, req.relations).account > 0
+    deltas = {
+        d.element_id: d.delta_account
+        for d in compute_score_changes(req.elements, req.relations).withdrawal_deltas
+    }
+    assert deltas["J3"] < 0

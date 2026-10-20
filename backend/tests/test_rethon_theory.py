@@ -16,6 +16,7 @@ from backend.services.rethon_simulation import validate_and_build
 from backend.services.rethon_theory import (
     TheoryRestrictedGlobalRE,
     held_theory,
+    largest_consistent_part,
     make_re,
     theory_sentences,
 )
@@ -149,13 +150,27 @@ def test_an_unseeded_local_start_can_settle_short_of_the_held_theory():
 @pytest.mark.parametrize("local", [True, False])
 def test_an_inconsistent_held_theory_starts_from_its_largest_consistent_part(local):
     # P1 → ¬P2 makes the two held principles inconsistent together, and a
-    # theory must be consistent. The start keeps what it can, in the order
-    # held_theory gives — most confident first — rather than dropping to
-    # rethon's own start, which began the demo from one principle.
+    # theory must be consistent. The start keeps what it can rather than
+    # dropping to rethon's own start, which began the demo from one principle;
+    # the two parts are equally large, so the order held_theory gives — most
+    # confident first — decides.
     first = _seeded_run(local, (4, 5), SEEDED_ARGUMENTS + [[4, -5]]).evolution[1]
     assert first.as_set() == {4}
     first = _seeded_run(local, (5, 4), SEEDED_ARGUMENTS + [[4, -5]]).evolution[1]
     assert first.as_set() == {5}
+
+
+def test_the_largest_consistent_part_is_largest_by_count():
+    # P1 conflicts with P2 and with P3, which are consistent together. Taken
+    # most confident first and kept while consistent, P1 alone would stand;
+    # the largest part is P2 and P3, however confident P1 is.
+    ds = BDDDialecticalStructure.from_arguments(
+        arguments=[[4, -5], [4, -6]], n_unnegated_sentence_pool=6
+    )
+    assert largest_consistent_part(ds, (4, 5, 6), 6) == {5, 6}
+    # Consistent as a whole, it is kept whole; nothing held, nothing kept.
+    assert largest_consistent_part(ds, (5, 6), 6) == {5, 6}
+    assert largest_consistent_part(ds, (), 6) == set()
 
 
 @pytest.mark.parametrize("local", [True, False])
@@ -178,7 +193,7 @@ def test_the_held_theory_is_what_the_scoring_takes_as_the_theory():
 
 
 def test_the_held_theory_comes_most_confident_first():
-    # The order the start keeps principles in when not all can be held.
+    # The order that decides between equally large consistent parts.
     lookup = {
         1: _element("P1", "principle").model_copy(update={"confidence": 0.3}),
         2: _element("P2", "principle").model_copy(update={"confidence": 1.0}),

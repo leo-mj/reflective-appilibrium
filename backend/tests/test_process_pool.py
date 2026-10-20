@@ -166,6 +166,10 @@ def test_a_simulation_is_identical_in_a_worker(fn):
 # ── The point of the exercise ─────────────────────────────────────────────────
 
 
+def _fail_to_warm() -> None:
+    raise RuntimeError("no rethon here")
+
+
 def _hold_the_gil(n: int) -> int:
     """One long C-level call, which keeps the GIL for its whole duration.
 
@@ -251,12 +255,13 @@ def test_a_worker_logs(capfd):
     """A spawned worker runs none of main.py, and rethon's import disables every
     logger that exists before it — process_pool's own among them. The initializer
     is what undoes that; without it this line never appears."""
-    pool = process_pool.create_pool(1)
+    pool = process_pool.create_pool(1, "scoring")
     try:
         pool.submit(_hold_the_gil, 0).result(timeout=60)
     finally:
         pool.shutdown(wait=True)
-    assert "Simulation worker ready." in capfd.readouterr().err
+    # Named for its own pool: both pools used to call their worker "Simulation".
+    assert "Scoring worker ready." in capfd.readouterr().err
 
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -546,3 +551,55 @@ def test_the_timeout_follows_the_deployment(overrides, expected):
 def test_worker_counts_must_be_at_least_one(field):
     with pytest.raises(Exception):
         make_settings(**{field: 0})
+
+
+# ── Warming up ────────────────────────────────────────────────────────────────
+
+
+def test_warming_starts_each_worker_once():
+    """The start page sends /warm so that a worker's start — most of a cold
+    instance's wait now that the server process keeps rethon out — happens while
+    the reader is there. It must start exactly one worker per pool, and a second
+    call must find them up rather than start more."""
+    process_pool.shutdown_pools()
+    try:
+        client = TestClient(app)
+        first = client.post("/api/simulate_rethon/warm")
+        assert first.status_code == 200
+        assert first.json()["ready"] is True
+        assert len(_worker_processes("scoring")) == 1
+        assert len(_worker_processes("simulation")) == 1
+
+        again = client.post("/api/simulate_rethon/warm").json()
+        assert again["ready"] is True
+        assert again["seconds"] < 1
+        assert len(_worker_processes("scoring")) == 1
+        assert len(_worker_processes("simulation")) == 1
+    finally:
+        process_pool.shutdown_pools()
+
+
+def test_a_warmed_worker_answers_the_first_score():
+    """What the warm-up is for: the score that follows does not start a worker."""
+    process_pool.shutdown_pools()
+    try:
+        client = TestClient(app)
+        assert client.post("/api/simulate_rethon/warm").json()["ready"] is True
+        (worker,) = _worker_processes("scoring")
+        res = client.post("/api/simulate_rethon/quick_score", json=_payload())
+        assert res.status_code == 200
+        assert _worker_processes("scoring") == [worker]
+    finally:
+        process_pool.shutdown_pools()
+
+
+def test_a_failed_warm_up_says_not_ready_rather_than_failing_the_request():
+    """The warm-up's first computation can fail like any other; /warm is best
+    effort, so that reads as "not ready" and the real computation reports it."""
+    process_pool.shutdown_pools()
+    try:
+        ready = asyncio.run(process_pool.warm_pool("scoring", _fail_to_warm))
+        assert ready is False
+        assert len(_worker_processes("scoring")) == 1
+    finally:
+        process_pool.shutdown_pools()
