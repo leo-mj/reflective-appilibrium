@@ -3,8 +3,8 @@
 #
 #   ci/check-stack.sh http://127.0.0.1:8080
 #
-# Shared by the GitHub and GitLab pipelines so the two cannot drift. Plain sh
-# with busybox-compatible tools, since GitLab runs it in the Alpine docker image.
+# Run by the `stack` job in .github/workflows/ci.yml. Plain sh with
+# busybox-compatible tools, so it also runs from an Alpine image.
 #
 # Each thing the stack promises fails silently when it breaks — a wrong base
 # path is a blank page, a missing fallback is a 404 on reload, a policy naming

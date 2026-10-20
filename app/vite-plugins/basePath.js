@@ -4,12 +4,13 @@
  * Every asset URL in the built page is prefixed with it, so a build served from
  * a path it was not built for 404s every asset and renders a blank page.
  *
- * `VITE_BASE_PATH` says it outright, and wins: a site served from its root
- * (a university host, pages.dev) sets `/`. Without it the path is derived as it
- * always was — GitHub Pages serves a project site from `/<repo>/`, and Actions
- * sets GITHUB_REPOSITORY to "owner/repo" — which is right only on GitHub, since
- * no other CI sets that variable. The literal repo name is the fallback for a
- * Pages-bound build run outside CI.
+ * `VITE_BASE_PATH` says it outright, and wins: a site served from the root of
+ * its host (pages.dev, say) sets `/`, and one served from a path sets that
+ * path. Without it the path is derived as it always was — GitHub Pages serves
+ * a project site from `/<repo>/`, and Actions sets GITHUB_REPOSITORY to
+ * "owner/repo" — which is right only on GitHub, since no other CI sets that
+ * variable. The literal repo name is the fallback for a Pages-bound build run
+ * outside CI.
  *
  * @module vite-plugins/basePath
  */

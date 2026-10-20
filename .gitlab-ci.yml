@@ -1,11 +1,13 @@
 # GitLab pipeline — the same checks as .github/workflows/ci.yml, for whoever
 # reviews or hosts the project from GitLab without opening the GitHub repo.
 # The deploys — the demo to GitHub Pages, the AI version to Cloudflare,
-# the backend to Cloud Run — have no counterpart here; the images job instead
-# pushes the two containers to this project's registry, which is what a host pulls.
+# the backend to Cloud Run — have no counterpart here; the image jobs instead
+# push the two containers to this project's registry, which is what a host pulls.
 #
 # Keep the two in step by hand: a check added to one belongs in the other. The
-# container checks already share one script, ci/check-stack.sh.
+# exception is starting the two containers together and checking them over
+# HTTP (ci/check-stack.sh), which needs a Docker daemon and so runs on GitHub
+# only; see the image jobs below.
 
 workflow:
   rules:
@@ -15,6 +17,9 @@ workflow:
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
     - if: $CI_COMMIT_BRANCH
+    # A tag: a version, whose images are pushed under its name (see the image
+    # jobs below).
+    - if: $CI_COMMIT_TAG
 
 stages:
   - test
@@ -111,7 +116,7 @@ frontend-e2e:
   # nothing is downloaded at run time. The tag must match @playwright/test in
   # app/package-lock.json exactly; after a bump, a mismatch fails with
   # "Executable doesn't exist", which is the cue to update it here.
-  image: mcr.microsoft.com/playwright:v1.62.1-noble
+  image: mcr.microsoft.com/playwright:v1.63.0-noble
   # Generous next to a green run, but retries: 2 in playwright.config.js mean a
   # genuinely failing suite takes three passes.
   timeout: 25m
@@ -141,43 +146,94 @@ frontend-e2e:
 
 # ── Containers ──────────────────────────────────────────────────────────────────
 
-# Builds both images, starts them as docker-compose.yml wires them, and checks
-# the pair over HTTP. On the default branch it then pushes them to this
-# project's registry, tagged with the commit and as `latest`.
+# Every pipeline builds the two images and pushes them to this project's
+# registry, as $CI_REGISTRY_IMAGE/backend and /frontend, tagged with the commit
+# (`3f2a9c1`) and with one name that says where they came from:
 #
-# Needs a runner that can run Docker-in-Docker, which means a privileged one.
-# This instance's shared runners are not: the dind service stops at "mount:
-# permission denied" and its daemon never starts. So the job is manual until
-# a privileged runner exists — press ▶ in the pipeline to run it then — and it
-# cannot fail a pipeline meanwhile. The stack it would check is checked on
-# every push by the `stack` job in .github/workflows/ci.yml, from the same
-# ci/check-stack.sh.
-images:
+#   image:branch   a branch or merge request: the branch (`fix-proxy`)
+#   image:default  the default branch: `latest`
+#   image:release  a Git tag: the version (`v0.2`), from `git tag v0.2`
+#
+# One job per kind of pipeline, chosen by rules, rather than one job asking the
+# shell. Each runs once per image (parallel:matrix). The registry's cleanup
+# policy (Settings → Packages and registries) is what keeps branch images from
+# piling up.
+#
+# Buildah rather than Docker: it needs no daemon, so no Docker-in-Docker and no
+# privileged runner, which this instance's runners are not (the dind service
+# stopped at "mount: permission denied"). chroot isolation and the vfs storage
+# driver are what let it run unprivileged; vfs copies each layer whole, which
+# is slow and disk-hungry but asks nothing of the kernel. No Compose either:
+# it was only building here. Starting the pair and checking it over HTTP is
+# the `stack` job in .github/workflows/ci.yml.
+#
+# Both Dockerfiles name their base images with the registry (docker.io/…),
+# which Buildah requires when no registries.conf supplies a default.
+#
+# Where the frontend is served is decided when it is built, by two CI/CD
+# variables (Settings → CI/CD → Variables), so the image in the registry is the
+# one the host runs:
+#
+#   FRONTEND_BASE_PATH            the path it is served from, with a slash at
+#                                 each end; unset, the root
+#   FRONTEND_PROXY_PROTOCOL_FROM  the address of a proxy speaking PROXY
+#                                 protocol to port 8081; unset, nobody
+#
+# Both are build arguments of app/Dockerfile, which says what they do. The
+# backend's Dockerfile declares neither and has no use for them.
+.image:
   stage: images
-  image: docker:27
-  services:
-    - docker:27-dind
+  image: quay.io/buildah/stable:latest
   variables:
-    DOCKER_TLS_CERTDIR: /certs
-  timeout: 25m
-  rules:
-    - when: manual
-  allow_failure: true
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+    # Docker's manifest format, which every host that pulls these understands;
+    # it also keeps the HEALTHCHECK, which the OCI format drops.
+    BUILDAH_FORMAT: docker
+  parallel:
+    matrix:
+      - NAME: backend
+        CONTEXT: .
+      - NAME: frontend
+        CONTEXT: app
+  timeout: 30m
   before_script:
-    - apk add --no-cache curl
+    - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
-    - docker compose up -d --build
-    # Published ports live on the dind service, not on this container.
-    - ci/check-stack.sh http://docker:8080
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
-        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-        for name in backend frontend; do
-          for tag in "$CI_COMMIT_SHORT_SHA" latest; do
-            docker tag "appilibrium-$name" "$CI_REGISTRY_IMAGE/$name:$tag"
-            docker push "$CI_REGISTRY_IMAGE/$name:$tag"
-          done
-        done
-      fi
-  after_script:
-    - docker compose logs || true
+    - ref="$CI_REGISTRY_IMAGE/$NAME"
+    - >
+      buildah build
+      --build-arg BASE_PATH="${FRONTEND_BASE_PATH:-/}"
+      --build-arg PROXY_PROTOCOL_FROM="${FRONTEND_PROXY_PROTOCOL_FROM:-127.0.0.1}"
+      --label org.opencontainers.image.revision="$CI_COMMIT_SHA"
+      --label org.opencontainers.image.source="$CI_PROJECT_URL"
+      --tag "$ref:$CI_COMMIT_SHORT_SHA"
+      --tag "$ref:$IMAGE_TAG"
+      "$CONTEXT"
+    - buildah push "$ref:$CI_COMMIT_SHORT_SHA"
+    - buildah push "$ref:$IMAGE_TAG"
+
+image:branch:
+  extends: .image
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: never
+    - when: on_success
+  variables:
+    IMAGE_TAG: $CI_COMMIT_REF_SLUG
+
+image:default:
+  extends: .image
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    IMAGE_TAG: latest
+
+image:release:
+  extends: .image
+  rules:
+    - if: $CI_COMMIT_TAG
+  variables:
+    IMAGE_TAG: $CI_COMMIT_TAG

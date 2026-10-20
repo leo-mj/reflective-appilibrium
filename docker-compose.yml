@@ -10,7 +10,6 @@
 services:
   backend:
     build: .
-    # Named so CI can tag and push what it built (.gitlab-ci.yml).
     image: appilibrium-backend
     environment:
       DEPLOYMENT: hosted
