@@ -150,7 +150,7 @@ frontend-e2e:
 # registry, as $CI_REGISTRY_IMAGE/backend and /frontend, tagged with the commit
 # (`3f2a9c1`) and with one name that says where they came from:
 #
-#   image          a branch or merge request: the branch (`fix-proxy`)
+#   image:branch   a branch or merge request: the branch (`fix-proxy`)
 #   image:default  the default branch: `latest`
 #   image:release  a Git tag: the version (`v0.2`), from `git tag v0.2`
 #
@@ -213,7 +213,7 @@ frontend-e2e:
     - buildah push "$ref:$CI_COMMIT_SHORT_SHA"
     - buildah push "$ref:$IMAGE_TAG"
 
-image:
+image:branch:
   extends: .image
   rules:
     - if: $CI_COMMIT_TAG
