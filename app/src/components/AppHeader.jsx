@@ -150,9 +150,9 @@ export function AppHeader({
   const [importError, setImportError] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
 
-  const doImport = async (file) => {
+  const doImport = async (file, options) => {
     try {
-      await onImportFile(file);
+      await onImportFile(file, options);
     } catch (e) {
       setImportError(e.message);
     }
@@ -178,16 +178,20 @@ export function AppHeader({
   // A map pasted from an LLM's reply goes the way a picked .argdown file goes,
   // but is read first: a reply that does not parse keeps the dialog, and the
   // paste, open with the parser's message rather than losing both to an error
-  // box after "replace?" has been answered.
+  // box after "replace?" has been answered. Its #withdrawn and #rejected are
+  // ignored: which claims to hold is the reader's call, not the model's, nor
+  // the text's it was handed. A picked file keeps them, being most often an
+  // earlier process of the reader's own.
   const [textImportOpen, setTextImportOpen] = useState(false);
   const submitPastedMap = async (file, mode) => {
+    const options = { statusTags: false };
     if (mode === "merge") {
-      setPendingMerge(await onPrepareMerge(file));
+      setPendingMerge(await onPrepareMerge(file, options));
     } else if (hasExistingState) {
-      await importArgdownFromFile(file);
-      setImportConfirmPending(file);
+      await importArgdownFromFile(file, options);
+      setImportConfirmPending({ file, options });
     } else {
-      await onImportFile(file);
+      await onImportFile(file, options);
     }
     setTextImportOpen(false);
   };
@@ -236,9 +240,9 @@ export function AppHeader({
           subtitle="Importing will replace your current session."
           onCancel={() => setImportConfirmPending(null)}
           onSave={() => {
-            const file = importConfirmPending;
+            const { file, options } = importConfirmPending;
             setImportConfirmPending(null);
-            doImport(file);
+            doImport(file, options);
           }}
           saveLabel="Replace"
           saveDisabled={false}
@@ -302,7 +306,7 @@ export function AppHeader({
           e.target.value = "";
           if (!file) return;
           if (hasExistingState) {
-            setImportConfirmPending(file);
+            setImportConfirmPending({ file });
           } else {
             doImport(file);
           }

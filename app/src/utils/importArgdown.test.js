@@ -353,6 +353,38 @@ model:
     expect(state.log[0].findings).not.toContain("contradiction");
   });
 
+  describe("status tags", () => {
+    const MAP = `[A]: Never lie. #principle #withdrawn
+
+[B]: Lying to the murderer is permissible. #rejected
+
+[C]: Honesty matters. #principle
+`;
+
+    it("set the status by default, as for an exported process", async () => {
+      const state = await read(MAP);
+      expect(byText(state, "Never lie.").status).toBe("withdrawn");
+      expect(byText(state, "Lying to the murderer is permissible.").status).toBe(
+        "rejected",
+      );
+      expect(state.log[0].findings).not.toMatch(/status tag/);
+    });
+
+    it("are ignored, and counted, when the caller says so", async () => {
+      const state = await importArgdownFromFile(
+        new File([MAP], "reply.argdown", { type: "text/plain" }),
+        { statusTags: false },
+      );
+      expect(state.elements.map((e) => e.status)).toEqual([
+        "active",
+        "active",
+        "active",
+      ]);
+      expect(state.elements.every((e) => !e.history)).toBe(true);
+      expect(state.log[0].findings).toMatch(/2 status tags .* ignored/);
+    });
+  });
+
   it("refuses a file with a syntax error, naming the line", async () => {
     await expect(
       read("[a]: Fine.\n\n(1) [b]: Premise\n----\n"),

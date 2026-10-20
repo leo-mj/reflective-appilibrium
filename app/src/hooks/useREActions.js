@@ -214,12 +214,17 @@ export function useREActions(initialState) {
     setRecentlyAdded,
   });
 
-  /** An exported process, or an Argdown map read into a fresh one. */
-  const readStateFile = (file) =>
-    isArgdownFile(file) ? importArgdownFromFile(file) : importStateFromFile(file);
+  /**
+   * An exported process, or an Argdown map read into a fresh one. `options`
+   * go to the Argdown reader: `{ statusTags: false }` for a map an LLM wrote.
+   */
+  const readStateFile = (file, options) =>
+    isArgdownFile(file)
+      ? importArgdownFromFile(file, options)
+      : importStateFromFile(file);
 
-  const handleImportFile = async (file) => {
-    const newState = await readStateFile(file);
+  const handleImportFile = async (file, options) => {
+    const newState = await readStateFile(file, options);
     dispatch({ type: "replace", state: newState });
     setSelected(null);
     setSelectedRel(null);
@@ -230,10 +235,11 @@ export function useREActions(initialState) {
    * doing it. Throws, with a message for the reader, if it cannot be merged.
    *
    * @param {File} file
+   * @param {{ statusTags?: boolean }} [options] - As for `readStateFile`.
    * @returns {Promise<{ incoming: Object, label: string, preview: ReturnType<typeof previewMerge> }>}
    */
-  const handlePrepareMerge = async (file) => {
-    const incoming = await readStateFile(file);
+  const handlePrepareMerge = async (file, options) => {
+    const incoming = await readStateFile(file, options);
     assertMergeable(state, incoming);
     const label = file.name.replace(/\.(md|argdown|ad)$/i, "");
     return { incoming, label, preview: previewMerge(state, incoming, { label }) };

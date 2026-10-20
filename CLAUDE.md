@@ -510,6 +510,11 @@ only for what the importer reads — type tags (every empirical premise a
 theory), valid premise-conclusion structures with unstated premises marked
 `// unstated`, loose `+>` and `->`, the exporter's `not X` / `><` — and tells
 the model to mark nothing withdrawn or rejected, that being the reader's call.
+**A pasted map's `#withdrawn` and `#rejected` are ignored all the same**
+(`statusTags: false`, counted in the import's log entry): the prompt is a
+request, and a model — or an instruction planted in the text it was handed —
+can disregard it. A picked `.argdown` file keeps them, being most often an
+earlier process exported.
 Its example is imported by `argdownPrompt.test.js`, so the prompt cannot teach
 a syntax the importer has stopped reading; change the two together. A reply
 that does not parse keeps the dialog and the paste open with the parser's

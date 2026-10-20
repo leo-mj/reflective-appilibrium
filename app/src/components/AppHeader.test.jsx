@@ -863,6 +863,32 @@ describe("Import from text", () => {
     );
   });
 
+  // The model writing the map, or the text it was handed, does not decide
+  // which claims the reader holds; a picked file, often their own, does.
+  it("has the status tags ignored, on import and on merge alike", async () => {
+    const onImportFile = vi.fn(async () => {});
+    const { unmount } = render(
+      <AppHeader {...PROPS} onImportFile={onImportFile} />,
+    );
+    open();
+    paste(MAP);
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    await vi.waitFor(() => expect(onImportFile).toHaveBeenCalled());
+    expect(onImportFile.mock.calls[0][1]).toEqual({ statusTags: false });
+    unmount();
+
+    const onPrepareMerge = vi.fn().mockResolvedValue(null);
+    render(
+      <AppHeader {...PROPS} hasExistingState onPrepareMerge={onPrepareMerge} />,
+    );
+    open();
+    paste(MAP);
+    fireEvent.click(screen.getByRole("radio", { name: "Merge into this process" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    await vi.waitFor(() => expect(onPrepareMerge).toHaveBeenCalled());
+    expect(onPrepareMerge.mock.calls[0][1]).toEqual({ statusTags: false });
+  });
+
   it("asks before replacing an open process, and only once the map reads", async () => {
     const onImportFile = vi.fn(async () => {});
     render(<AppHeader {...PROPS} hasExistingState onImportFile={onImportFile} />);
@@ -876,5 +902,6 @@ describe("Import from text", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import" }));
     fireEvent.click(await screen.findByRole("button", { name: "Replace" }));
     await vi.waitFor(() => expect(onImportFile).toHaveBeenCalled());
+    expect(onImportFile.mock.calls[0][1]).toEqual({ statusTags: false });
   });
 });

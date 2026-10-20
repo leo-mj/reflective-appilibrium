@@ -18,7 +18,9 @@
  * Two choices in the wording:
  *
  * - **No statuses.** A model is told not to mark claims withdrawn or rejected:
- *   which claims to hold is the reader's decision, made in the app.
+ *   which claims to hold is the reader's decision, made in the app. Being only
+ *   asked, the import of a pasted map ignores any it marks anyway
+ *   (`statusTags: false`, passed by `AppHeader`).
  * - **Valid arguments, unstated premises marked.** The inferential relations
  *   are what the rethon simulation reads as entailment, so an argument has to
  *   be deductively valid; a reconstruction gets there by adding premises, and
