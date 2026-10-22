@@ -216,7 +216,7 @@ export function useREActions(initialState) {
 
   /**
    * An exported process, or an Argdown map read into a fresh one. `options`
-   * go to the Argdown reader: `{ statusTags: false }` for a map an LLM wrote.
+   * go to the Argdown reader: `PASTED_MAP_OPTIONS` for a map an LLM wrote.
    */
   const readStateFile = (file, options) =>
     isArgdownFile(file)

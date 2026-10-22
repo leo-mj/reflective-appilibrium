@@ -10,6 +10,7 @@ import { MergeModal } from "./user_edits/MergeModal.jsx";
 import { ExportModal } from "./user_edits/ExportModal.jsx";
 import { TextImportModal } from "./user_edits/TextImportModal.jsx";
 import { importArgdownFromFile } from "../utils/importArgdown.js";
+import { PASTED_MAP_OPTIONS } from "../utils/argdownPrompt.js";
 import { SampleEditsNotice } from "./app_header/SampleEditsNotice.jsx";
 import {
   ASSIST_TABS,
@@ -178,13 +179,13 @@ export function AppHeader({
   // A map pasted from an LLM's reply goes the way a picked .argdown file goes,
   // but is read first: a reply that does not parse keeps the dialog, and the
   // paste, open with the parser's message rather than losing both to an error
-  // box after "replace?" has been answered. Its #withdrawn and #rejected are
-  // ignored: which claims to hold is the reader's call, not the model's, nor
-  // the text's it was handed. A picked file keeps them, being most often an
-  // earlier process of the reader's own.
+  // box after "replace?" has been answered. It is read as a model's
+  // (PASTED_MAP_OPTIONS): statuses ignored, since which claims to hold is the
+  // reader's call, and every item stamped with an LLM origin. A picked file
+  // is read as it says, being most often an earlier process of the reader's.
   const [textImportOpen, setTextImportOpen] = useState(false);
   const submitPastedMap = async (file, mode) => {
-    const options = { statusTags: false };
+    const options = PASTED_MAP_OPTIONS;
     if (mode === "merge") {
       setPendingMerge(await onPrepareMerge(file, options));
     } else if (hasExistingState) {

@@ -20,7 +20,11 @@
  * - **No statuses.** A model is told not to mark claims withdrawn or rejected:
  *   which claims to hold is the reader's decision, made in the app. Being only
  *   asked, the import of a pasted map ignores any it marks anyway
- *   (`statusTags: false`, passed by `AppHeader`).
+ *   ({@link PASTED_MAP_OPTIONS}).
+ * - **The model's, not the reader's.** Everything a pasted map brings in is
+ *   stamped with the generic `LLM` origin — which model wrote it the app cannot
+ *   know — so a process review does not read a reconstruction as the reader's
+ *   own moves. Whatever origin the map claims is ignored, as its statuses are.
  * - **Valid arguments, unstated premises marked.** The inferential relations
  *   are what the rethon simulation reads as entailment, so an argument has to
  *   be deductively valid; a reconstruction gets there by adding premises, and
@@ -28,6 +32,18 @@
  *
  * @module utils/argdownPrompt
  */
+
+import { LLM_ORIGIN } from "./stateUtils.js";
+
+/**
+ * How the importer reads a map pasted from a chat: every element active, and
+ * everything stamped as an LLM's. A picked `.argdown` file is read without
+ * these, being most often an earlier process the reader exported.
+ */
+export const PASTED_MAP_OPTIONS = Object.freeze({
+  statusTags: false,
+  origin: LLM_ORIGIN,
+});
 
 /**
  * A small map in exactly the forms the prompt asks for: a joint argument, one
@@ -109,24 +125,69 @@ The text to reconstruct follows this prompt, pasted or attached. If there is non
 `;
 
 /**
+ * The fenced blocks at the top level of `text`, by CommonMark's rules: a
+ * fence is three or more backticks or tildes, indented at most three spaces;
+ * it closes on a line of the same character, at least as long, with nothing
+ * after it; and one left open runs to the end, as a reply cut short does.
+ * Scanned line by line rather than matched by one pattern, which is also what
+ * keeps a long reply full of unclosed fences linear.
+ *
+ * @param {string} text
+ * @returns {{ lang: string, body: string }[]}
+ */
+function fencedBlocks(text) {
+  const blocks = [];
+  let open = null; // { char, length, lang, lines }
+  for (const line of text.split("\n")) {
+    const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!open) {
+      // A backtick fence's info string may not hold a backtick.
+      if (fence && !(fence[1][0] === "`" && fence[2].includes("`")))
+        open = {
+          char: fence[1][0],
+          length: fence[1].length,
+          lang: (fence[2].trim().split(/\s/)[0] ?? "").toLowerCase(),
+          lines: [],
+        };
+    } else if (
+      fence &&
+      fence[1][0] === open.char &&
+      fence[1].length >= open.length &&
+      !fence[2].trim()
+    ) {
+      blocks.push({ lang: open.lang, body: open.lines.join("\n") });
+      open = null;
+    } else open.lines.push(line);
+  }
+  if (open) blocks.push({ lang: open.lang, body: open.lines.join("\n") });
+  return blocks;
+}
+
+const isArgdownBlock = (b) => b.lang === "argdown" || b.lang === "ad";
+
+/** The first `argdown` block among `blocks`, looking inside the others too. */
+function argdownBlock(blocks) {
+  for (const b of blocks) if (isArgdownBlock(b)) return b;
+  for (const b of blocks) {
+    const inner = argdownBlock(fencedBlocks(b.body));
+    if (inner) return inner;
+  }
+  return null;
+}
+
+/**
  * The Argdown in a chat reply: the first fenced block marked `argdown` (or
- * `ad`), else the first fenced block, else the whole reply — so a reply pasted
- * whole, with the model's notes around the map, reads the same as the map
- * copied alone.
+ * `ad`), even inside a block wrapping the whole answer, else the first fenced
+ * block, else the whole reply — so a reply pasted whole, with the model's
+ * notes around the map, reads the same as the map copied alone.
  *
  * @param {string} reply
  * @returns {string}
  */
 export function argdownFromReply(reply) {
   const text = (reply ?? "").replace(/\r\n?/g, "\n");
-  const fence =
-    /^[ \t]*(`{3,}|~{3,})[ \t]*([\w-]*)[^\n]*\n([\s\S]*?)^[ \t]*\1[ \t]*$/gm;
-  const blocks = [...text.matchAll(fence)].map((m) => ({
-    lang: m[2].toLowerCase(),
-    body: m[3],
-  }));
-  const block =
-    blocks.find((b) => b.lang === "argdown" || b.lang === "ad") ?? blocks[0];
+  const blocks = fencedBlocks(text);
+  const block = argdownBlock(blocks) ?? blocks[0];
   return (block ? block.body : text).trim() + "\n";
 }
 

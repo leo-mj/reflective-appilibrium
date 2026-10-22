@@ -22,6 +22,7 @@ import { AppHeader } from "./AppHeader.jsx";
 import { TAB_LABELS } from "../constants/tabConstants.jsx";
 import { TOUR_Z } from "./tour/tourZ.js";
 import { EXPORT_SECTIONS } from "../utils/exportMarkdown.js";
+import { PASTED_MAP_OPTIONS } from "../utils/argdownPrompt.js";
 
 afterEach(() => {
   cleanup();
@@ -864,8 +865,9 @@ describe("Import from text", () => {
   });
 
   // The model writing the map, or the text it was handed, does not decide
-  // which claims the reader holds; a picked file, often their own, does.
-  it("has the status tags ignored, on import and on merge alike", async () => {
+  // which claims the reader holds, nor pass its claims off as the reader's; a
+  // picked file, often their own, is read as it says.
+  it("is read as a model's map, on import and on merge alike", async () => {
     const onImportFile = vi.fn(async () => {});
     const { unmount } = render(
       <AppHeader {...PROPS} onImportFile={onImportFile} />,
@@ -874,7 +876,7 @@ describe("Import from text", () => {
     paste(MAP);
     fireEvent.click(screen.getByRole("button", { name: "Import" }));
     await vi.waitFor(() => expect(onImportFile).toHaveBeenCalled());
-    expect(onImportFile.mock.calls[0][1]).toEqual({ statusTags: false });
+    expect(onImportFile.mock.calls[0][1]).toBe(PASTED_MAP_OPTIONS);
     unmount();
 
     const onPrepareMerge = vi.fn().mockResolvedValue(null);
@@ -886,7 +888,7 @@ describe("Import from text", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Merge into this process" }));
     fireEvent.click(screen.getByRole("button", { name: "Merge" }));
     await vi.waitFor(() => expect(onPrepareMerge).toHaveBeenCalled());
-    expect(onPrepareMerge.mock.calls[0][1]).toEqual({ statusTags: false });
+    expect(onPrepareMerge.mock.calls[0][1]).toBe(PASTED_MAP_OPTIONS);
   });
 
   it("asks before replacing an open process, and only once the map reads", async () => {
@@ -902,6 +904,6 @@ describe("Import from text", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import" }));
     fireEvent.click(await screen.findByRole("button", { name: "Replace" }));
     await vi.waitFor(() => expect(onImportFile).toHaveBeenCalled());
-    expect(onImportFile.mock.calls[0][1]).toEqual({ statusTags: false });
+    expect(onImportFile.mock.calls[0][1]).toBe(PASTED_MAP_OPTIONS);
   });
 });

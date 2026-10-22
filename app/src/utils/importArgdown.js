@@ -13,7 +13,9 @@
  *   model allows at any generality. `#withdrawn` and `#rejected` set the status,
  *   unless the caller passes `statusTags: false` — a map an LLM wrote has no
  *   say in which claims the reader holds — and `{confidence: 0.8}` the
- *   confidence (default 0.67, the add form's).
+ *   confidence (default 0.67, the add form's). `{origin: "…"}` names who
+ *   introduced it (default `"user"`), unless the caller passes an `origin`,
+ *   which then goes on every element and relation.
  * - **Arguments with a premise-conclusion structure** become inferential
  *   relations, one argument per inference step: one premise is `entails`,
  *   several `jointly_entails`. A step's premises are the statements since the
@@ -159,11 +161,11 @@ function canonicalText(node) {
 }
 
 /**
- * Type, status and confidence from a node's tags and data. With `statusTags`
- * false every node is active, and the status tags it carried are counted in
- * `ignored`.
+ * Type, status, confidence and origin from a node's tags and data. With
+ * `statusTags` false every node is active, and the status tags it carried are
+ * counted in `ignored`; an `origin` given replaces whatever the data says.
  */
-function readAttributes(node, title, notes, statusTags, ignored) {
+function readAttributes(node, title, notes, { statusTags, origin }, ignored) {
   const tags = (node.tags ?? []).map((t) => t.toLowerCase());
   const types = TYPE_TAGS.filter((t) => tags.includes(t));
   if (types.length > 1)
@@ -180,11 +182,17 @@ function readAttributes(node, title, notes, statusTags, ignored) {
     Number.isFinite(raw) && node.data?.confidence !== ""
       ? Math.min(1, Math.max(0, raw))
       : DEFAULT_CONFIDENCE;
-  const origin =
+  const said =
     typeof node.data?.origin === "string" && node.data.origin.trim()
       ? node.data.origin.trim().slice(0, 200)
       : "user";
-  return { type, status, confidence, origin, typed: types.length > 0 };
+  return {
+    type,
+    status,
+    confidence,
+    origin: origin ?? said,
+    typed: types.length > 0,
+  };
 }
 
 /**
@@ -257,11 +265,17 @@ function inferenceSteps(pcs) {
  *
  * @param {Object} model - Argdown's response, from `parseArgdown`.
  * @param {string} fallbackTopic - Used when the front matter has no title.
- * @param {{ statusTags?: boolean }} [options] - `statusTags: false` reads
- *   every element as active, whatever `#withdrawn` or `#rejected` says.
+ * @param {{ statusTags?: boolean, origin?: string }} [options] -
+ *   `statusTags: false` reads every element as active, whatever `#withdrawn`
+ *   or `#rejected` says; `origin` stamps every element and relation with it,
+ *   whatever the map's `{origin: …}` says.
  * @returns {REState}
  */
-export function modelToState(model, fallbackTopic, { statusTags = true } = {}) {
+export function modelToState(
+  model,
+  fallbackTopic,
+  { statusTags = true, origin } = {},
+) {
   const statements = model.statements ?? {};
   const args = model.arguments ?? {};
   const notes = [];
@@ -289,7 +303,7 @@ export function modelToState(model, fallbackTopic, { statusTags = true } = {}) {
       })),
   ].map((n) => ({
     ...n,
-    ...readAttributes(n.node, n.title, notes, statusTags, ignored),
+    ...readAttributes(n.node, n.title, notes, { statusTags, origin }, ignored),
   }));
   if (ignored.statusTags)
     notes.push(
@@ -407,7 +421,7 @@ export function modelToState(model, fallbackTopic, { statusTags = true } = {}) {
     if (rel.from === rel.to || seen.has(key)) return;
     seen.add(key);
     if (rel.argumentId) argued.add(`${rel.from} ${rel.type} ${rel.to}`);
-    relations.push(rel);
+    relations.push(origin ? { ...rel, origin } : rel);
   };
 
   // Arguments with a structure: one argument per inference step.
@@ -533,14 +547,15 @@ export function modelToState(model, fallbackTopic, { statusTags = true } = {}) {
  * Reads an Argdown File into a fresh RE state.
  *
  * @param {File} file
- * @param {{ statusTags?: boolean }} [options] - As for `modelToState`.
+ * @param {{ statusTags?: boolean, origin?: string }} [options] - As for
+ *   `modelToState`.
  * @returns {Promise<REState>}
  * @throws {Error} With a user-readable message on any failure.
  */
 export async function importArgdownFromFile(file, options) {
   if (file.size > MAX_FILE_SIZE)
     throw new Error(
-      `File too large (max 500 KB, got ${Math.round(file.size / 1024)} KB).`,
+      `Too large to import (max 500 KB, got ${Math.round(file.size / 1024)} KB).`,
     );
   const model = await parseArgdown(await file.text());
   const state = modelToState(

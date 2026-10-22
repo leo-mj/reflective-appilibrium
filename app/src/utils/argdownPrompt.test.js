@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   ARGDOWN_IMPORT_PROMPT,
   ARGDOWN_PROMPT_EXAMPLE,
+  PASTED_MAP_OPTIONS,
   argdownFromReply,
   pastedArgdownFile,
 } from "./argdownPrompt.js";
@@ -51,6 +52,26 @@ describe("the prompt's example", () => {
     expect(state.relations).toHaveLength(7);
   });
 
+  it("arrives as the model's, all of it active, when pasted", async () => {
+    const tagged = ARGDOWN_PROMPT_EXAMPLE.replace(
+      "#principle",
+      '#principle #rejected {origin: "user"}',
+    );
+    const state = await importArgdownFromFile(
+      pastedArgdownFile(tagged),
+      PASTED_MAP_OPTIONS,
+    );
+    expect(new Set(state.elements.map((e) => e.status))).toEqual(
+      new Set(["active"]),
+    );
+    expect(new Set(state.elements.map((e) => e.origin))).toEqual(
+      new Set(["LLM"]),
+    );
+    expect(new Set(state.relations.map((r) => r.origin))).toEqual(
+      new Set(["LLM"]),
+    );
+  });
+
   it("is in the prompt", () => {
     expect(ARGDOWN_IMPORT_PROMPT).toContain(ARGDOWN_PROMPT_EXAMPLE.trimEnd());
   });
@@ -78,6 +99,42 @@ describe("argdownFromReply", () => {
   it("takes an unmarked block, or the whole reply when there is none", () => {
     expect(argdownFromReply("```\n[A]: x\n```")).toBe("[A]: x\n");
     expect(argdownFromReply("[A]: x\r\n  +> [B]")).toBe("[A]: x\n  +> [B]\n");
+  });
+});
+
+describe("argdownFromReply follows CommonMark's fences", () => {
+  it("closes a fence only on one at least as long", () => {
+    const reply = "````argdown\n[A]: Quote ``` here\n```\n[B]: y\n`````\n";
+    expect(argdownFromReply(reply)).toBe("[A]: Quote ``` here\n```\n[B]: y\n");
+  });
+
+  it("finds the argdown block inside a block wrapping the whole answer", () => {
+    const wrapped = [
+      "````markdown",
+      "Here is the map:",
+      "```argdown",
+      "[A]: x",
+      "```",
+      "Notes.",
+      "````",
+    ].join("\n");
+    expect(argdownFromReply(wrapped)).toBe("[A]: x\n");
+    // Wrapped in a fence of the same length, the inner close ends the outer
+    // block, and the argdown block inside it is left open: still found.
+    const same = wrapped.replace(/````/g, "```");
+    expect(argdownFromReply(same)).toBe("[A]: x\n");
+  });
+
+  it("reads a block left open, as a reply cut short leaves it, to the end", () => {
+    expect(argdownFromReply("Map:\n```argdown\n[A]: x\n[B]: y")).toBe(
+      "[A]: x\n[B]: y\n",
+    );
+  });
+
+  it("takes tildes, an indent of up to three, and words after the language", () => {
+    expect(argdownFromReply("   ~~~argdown {x}\n[A]: x\n   ~~~\n")).toBe(
+      "[A]: x\n",
+    );
   });
 });
 
