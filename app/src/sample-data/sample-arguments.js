@@ -203,7 +203,7 @@ const BASE_POOL_SIZE = 22;
  * @param {Array} elements
  * @param {string|number} round
  * @param {Array} [relations=[]]
- * @returns {{ num_arguments: number[][], translated_arguments: Array[], argument_postulates: string[][], lookup: Object, model: string, rejected_count: number, input_tokens: number, output_tokens: number }}
+ * @returns {{ num_arguments: number[][], translated_arguments: Array[], argument_postulates: string[][], argument_failures: Array<null>, lookup: Object, model: string, dropped_count: number, input_tokens: number, output_tokens: number }}
  */
 export function getSampleArguments(elements, round, relations = []) {
   const baseLookup = Object.fromEntries(elements.map((e, i) => [i + 1, e]));
@@ -253,9 +253,12 @@ export function getSampleArguments(elements, round, relations = []) {
     num_arguments: numArguments,
     translated_arguments: translatedArguments,
     argument_postulates: argumentPostulates,
+    // Every sample argument passes the checker, as the backend's test of the
+    // same fixture requires.
+    argument_failures: numArguments.map(() => null),
     lookup,
     model: "claude-fable-5",
-    rejected_count: 0,
+    dropped_count: 0,
     input_tokens: 0,
     output_tokens: 0,
   };

@@ -168,12 +168,13 @@ def _sample_state_elements():
     return [_element(eid, etype, f"Sample sentence {eid}.") for eid, etype in specs]
 
 
-def test_sample_fixture_verifies_with_zero_rejections():
+def test_sample_fixture_passes_the_checker():
     from backend.services.arguments import dummy_detect_arguments
 
     response = dummy_detect_arguments(_sample_state_elements(), "8")
-    # Every fixture argument must survive formal verification untrimmed.
-    assert response.rejected_count == 0
+    # Every fixture argument must pass the checker untrimmed.
+    assert response.dropped_count == 0
+    assert response.argument_failures == [None] * 15
     # The response names the (sample) generating model, mirroring live output so
     # the UI's AI-disclosure banner can show it.
     assert response.model == "claude-fable-5"
@@ -220,14 +221,13 @@ def test_partition_verify_true_delegates_to_checker():
     from backend.services.arguments import partition_arguments
     from backend.routers.arguments_schemas import AddedPremise
 
-    # 1 & 3 -> 3 needs the bridge premise 3 (form "1 -> 3") to be valid.
+    # The bridge premise 3 has the form "1 -> 3", which names its own index —
+    # so the checker cannot read it, and says so rather than dropping it.
     premises = [AddedPremise(index=3, type="principle", text="bridge", form="1 -> 3")]
-    kept, postulates, used, rejected = partition_arguments(
-        [[1, 3, 2]], premises, verify=True, pool_indices={1, 2}
-    )
-    # An invalid argument (1, bridge ⊬ 2) is rejected by the checker.
-    assert kept == []
-    assert rejected == 1
+    out = partition_arguments([[1, 3, 2]], premises, verify=True, pool_indices={1, 2})
+    assert out.arguments == [[1, 3, 2]]
+    assert [f.code for f in out.failures] == ["self_reference"]
+    assert out.dropped == 0
 
 
 def test_partition_verify_false_surfaces_invalid_arguments():
@@ -235,17 +235,16 @@ def test_partition_verify_false_surfaces_invalid_arguments():
     from backend.routers.arguments_schemas import AddedPremise
 
     # Formally invalid: sentence 1 does not entail sentence 2. With the checker
-    # off it is surfaced as-is, nothing rejected.
+    # off it is surfaced as-is, untagged: nothing checked it.
     premises = [AddedPremise(index=3, type="principle", text="p", role="postulate")]
-    kept, postulates, used, rejected = partition_arguments(
-        [[1, 2]], premises, verify=False, pool_indices={1, 2}
-    )
-    assert kept == [[1, 2]]
-    assert rejected == 0
+    out = partition_arguments([[1, 2]], premises, verify=False, pool_indices={1, 2})
+    assert out.arguments == [[1, 2]]
+    assert out.failures == [None]
+    assert out.dropped == 0
     # No postulate stripping: every argument reports an empty postulate list...
-    assert postulates == [[]]
+    assert out.postulates == [[]]
     # ...and every added premise (postulate included) is kept for the pool.
-    assert used == premises
+    assert out.premises == premises
 
 
 def test_partition_verify_false_drops_unknown_indices():
@@ -253,12 +252,12 @@ def test_partition_verify_false_drops_unknown_indices():
 
     # Index 9 is neither a pool sentence nor an added premise, so the argument
     # is dropped to keep translations resolvable; the clean one survives and
-    # the drop is counted toward rejected.
-    kept, postulates, used, rejected = partition_arguments(
+    # the drop is counted.
+    out = partition_arguments(
         [[1, 9, 2], [1, 2]], [], verify=False, pool_indices={1, 2}
     )
-    assert kept == [[1, 2]]
-    assert rejected == 1
+    assert out.arguments == [[1, 2]]
+    assert out.dropped == 1
 
 
 def test_partition_verify_true_drops_args_on_discarded_premises():
@@ -273,8 +272,201 @@ def test_partition_verify_true_drops_args_on_discarded_premises():
         [{"index": 3, "type": "postulate", "text": "bridge", "form": "1 -> 3"}]
     )
     assert premises == []
-    kept, postulates, used, rejected = partition_arguments(
+    out = partition_arguments(
         [[1, 3, 2], [1, 2]], premises, verify=True, pool_indices={1, 2}
     )
-    assert [1, 3, 2] not in kept
-    assert rejected >= 1
+    assert out.arguments == [[1, 2]]
+    assert [f.code for f in out.failures] == ["invalid"]
+    assert out.dropped == 1
+
+
+# ── Repeated premises and restating postulates ────────────────────────────────
+
+NON_IDENTITY = (
+    "The non-identity problem shows that specific future individuals are "
+    "metaphysically indeterminate, but future people as a class are not."
+)
+OBLIGATION = (
+    "Yes, we have moral obligations to future people as a class, even if "
+    "specific individuals are indeterminate."
+)
+POOL_TEXTS = {1: NON_IDENTITY, 2: OBLIGATION, 3: "Unrelated sentence."}
+
+
+def _premise(index, text, role="premise", form=None, etype="principle"):
+    from backend.routers.arguments_schemas import AddedPremise
+
+    return AddedPremise(index=index, type=etype, text=text, role=role, form=form)
+
+
+def test_the_reported_argument_is_tagged_as_a_restatement():
+    # As a model returned it: premise 4 copies sentence 1 word for word, and
+    # the postulate is "If <1>, then <2>". It surfaced as 1 + 4 → 2, valid
+    # given the bare conditional, with the same claim shown twice.
+    from backend.services.arguments import partition_arguments
+
+    premises = [
+        _premise(4, NON_IDENTITY.lower()),
+        _premise(
+            5,
+            f"If {NON_IDENTITY[:-1].lower()}, then {OBLIGATION[0].lower()}{OBLIGATION[1:]}",
+            role="postulate",
+            form="(1 & 4) -> 2",
+        ),
+    ]
+    out = partition_arguments(
+        [[1, 4, 5, 2]],
+        premises,
+        verify=True,
+        pool_indices={1, 2, 3},
+        pool_texts=POOL_TEXTS,
+    )
+    # The copy is read as sentence 1, and the bridge is shown as a premise,
+    # tagged, rather than folded away as "Valid given".
+    assert out.arguments == [[1, 5, 2]]
+    assert [f.code for f in out.failures] == ["restatement"]
+    assert [p.index for p in out.premises] == [5]
+
+
+def test_a_repeated_premise_is_read_as_the_sentence_it_repeats():
+    from backend.services.arguments import identify_repeated_premises
+
+    args, premises = identify_repeated_premises(
+        [[1, 4, 5, 2], [3, -4, 2]],
+        [
+            _premise(4, f"  {NON_IDENTITY.upper()} "),
+            _premise(5, "A bridge.", role="postulate", form="(1 & 4) -> 2"),
+        ],
+        POOL_TEXTS,
+    )
+    assert args == [[1, 5, 2], [3, -1, 2]]
+    assert [p.index for p in premises] == [5]
+    assert premises[0].form == "(1 & 1) -> 2"
+
+
+def test_a_premise_repeating_the_conclusion_makes_the_argument_circular():
+    from backend.services.arguments import partition_arguments
+
+    premises = [
+        _premise(4, OBLIGATION),
+        _premise(5, "A bridge.", role="postulate", form="(1 & 4) -> 2"),
+    ]
+    out = partition_arguments(
+        [[1, 4, 5, 2]],
+        premises,
+        verify=True,
+        pool_indices={1, 2, 3},
+        pool_texts=POOL_TEXTS,
+    )
+    assert [f.code for f in out.failures] == ["circular"]
+    # Shown as proposed, the copy read as the conclusion it repeats.
+    assert out.arguments == [[1, 2, 5, 2]]
+
+
+def test_two_added_premises_with_one_wording_are_one_premise():
+    from backend.services.arguments import identify_repeated_premises
+
+    args, premises = identify_repeated_premises(
+        [[1, 4, 5, 2]],
+        [_premise(4, "A new claim."), _premise(5, "a new claim")],
+        POOL_TEXTS,
+    )
+    assert args == [[1, 4, 2]]
+    assert [p.index for p in premises] == [4]
+
+
+def test_a_paraphrasing_postulate_still_licenses_the_step():
+    # The shape of every sample postulate: the same form, in other words.
+    from backend.services.arguments import partition_arguments
+
+    premises = [
+        _premise(
+            4,
+            "Obligations can attach de dicto to whoever will exist.",
+        ),
+        _premise(
+            5,
+            "If obligations attach de dicto, an indeterminate class of future "
+            "people can still be owed them.",
+            role="postulate",
+            form="(1 & 4) -> 2",
+        ),
+    ]
+    out = partition_arguments(
+        [[1, 4, 5, 2]],
+        premises,
+        verify=True,
+        pool_indices={1, 2, 3},
+        pool_texts=POOL_TEXTS,
+    )
+    assert out.arguments == [[1, 4, 2]]
+    assert out.failures == [None]
+    assert [p.index for p in out.premises] == [4]
+
+
+def test_restates_inference_needs_every_sentence_quoted_whole():
+    from backend.services.arguments import restates_inference
+
+    texts = {1: "Lying is wrong.", 2: "Lying to the murderer is wrong."}
+    bare = _premise(
+        5,
+        "If lying is wrong, then lying to the murderer is wrong.",
+        role="postulate",
+        form="1 -> 2",
+    )
+    assert restates_inference(bare, texts)
+    # One sentence quoted, the other paraphrased.
+    half = _premise(
+        5,
+        "If lying is wrong, then so is deceiving a murderer.",
+        role="postulate",
+        form="1 -> 2",
+    )
+    assert not restates_inference(half, texts)
+    # A quote inside a longer word is no quote.
+    inside = _premise(
+        5,
+        "Belying is wrong, so lying to the murderer is wrong.",
+        role="postulate",
+        form="1 -> 2",
+    )
+    assert not restates_inference(inside, {**texts, 1: "Lying is wrong."})
+    # A sentence the texts do not hold cannot be found quoted.
+    unknown = _premise(
+        5,
+        "If lying is wrong, then lying to the murderer is wrong.",
+        role="postulate",
+        form="1 -> 9",
+    )
+    assert not restates_inference(unknown, texts)
+
+
+def test_the_prompt_forbids_repeating_a_sentence():
+    assert "Never add a premise that repeats a pool sentence" in build_prompt(LOOKUP)
+
+
+def test_the_prompt_example_passes_the_checker():
+    # The model copies the example's shapes, so the example has to be one the
+    # checker accepts in full.
+    import json
+    from backend.services.arguments import parse_added_premises, partition_arguments
+
+    prompt = build_prompt(LOOKUP)
+    start = prompt.index("in exactly this format:\n") + len("in exactly this format:\n")
+    example = json.loads(prompt[start : prompt.index("\n\nIf no substantive")])
+    out = partition_arguments(
+        example["arguments"],
+        parse_added_premises(example["added_premises"]),
+        verify=True,
+        pool_indices=LOOKUP.keys(),
+        pool_texts={n: e.text for n, e in LOOKUP.items()},
+    )
+    assert out.failures == [None] * len(example["arguments"])
+    assert out.dropped == 0
+    assert all(len(p) == 1 for p in out.postulates)
+
+
+def test_the_prompt_spells_out_the_bookkeeping():
+    prompt = build_prompt(LOOKUP)
+    assert "Write it as the bridge" in prompt
+    assert "Before answering, check every argument" in prompt

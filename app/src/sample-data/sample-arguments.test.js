@@ -26,7 +26,8 @@ describe("getSampleArguments", () => {
     const res = getSampleArguments(elements, "8");
     expect(res.num_arguments).toHaveLength(15);
     expect(res.model).toBe("claude-fable-5");
-    expect(res.rejected_count).toBe(0);
+    expect(res.dropped_count).toBe(0);
+    expect(res.argument_failures).toEqual(res.num_arguments.map(() => null));
   });
 
   it("returns argument_postulates parallel to num_arguments, one bridge each", () => {

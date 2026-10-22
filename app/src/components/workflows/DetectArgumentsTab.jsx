@@ -14,6 +14,7 @@ import {
   nextElementId,
   argumentRelationType,
   argumentPostulateExplanation,
+  argumentFailureExplanation,
   newArgumentId,
   withUserEdit,
   llmOrigin,
@@ -158,6 +159,8 @@ function ArgumentRow({ element, isAdded, draft, onDraftChange }) {
  * @param {Array}    props.argument
  * @param {Set}      props.addedIds
  * @param {string[]} props.postulates  Meaning-postulate texts this argument relies on.
+ * @param {{code:string, reason:string}|null} [props.failure]  Why the argument
+ *   checker failed it; null when it passed or was not checked.
  * @param {{status:'accepted'|'rejected', argumentId?:string}|undefined} props.decision
  * @param {Object|null} props.editingDrafts  Map premiseId→text, or null if not editing.
  *   Covers every premise, added and existing alike: an existing premise may need
@@ -173,6 +176,7 @@ function ArgumentCard({
   argument,
   addedIds,
   postulates = [],
+  failure = null,
   decision,
   editingDrafts,
   onAccept,
@@ -190,9 +194,16 @@ function ArgumentCard({
 
   return (
     <div
+      data-check={failure ? "failed" : undefined}
       style={{
         background: isAccepted ? C.supports + "12" : C.panel,
-        border: `1px solid ${isAccepted ? C.supports + "55" : C.border}`,
+        border: `1px solid ${
+          isAccepted
+            ? C.supports + "55"
+            : failure
+              ? C.theory.accent + "88"
+              : C.border
+        }`,
         borderRadius: 6,
         padding: "8px 10px",
         marginBottom: 6,
@@ -236,6 +247,26 @@ function ArgumentCard({
         >
           <span style={{ fontWeight: "bold" }}>Valid given: </span>
           {postulates.join(" ")}
+        </div>
+      )}
+
+      {/* Tagged rather than dropped: the reader decides what a failed check
+          is worth. Amber, the colour the Export dialog's warning wears. */}
+      {failure && (
+        <div
+          role="note"
+          style={{
+            fontSize: 10,
+            color: C.theory.text,
+            lineHeight: 1.5,
+            marginTop: 6,
+            paddingLeft: BADGE_W / 2 - 3,
+          }}
+        >
+          <span style={{ fontWeight: "bold" }}>
+            Failed the argument checker:{" "}
+          </span>
+          {failure.reason}
         </div>
       )}
 
@@ -436,18 +467,24 @@ export function DetectArgumentsTab({
     // Add one relation per premise → conclusion, grouped by a shared argumentId.
     // Single-premise args use entails/precludes; multi-premise use jointly_entails/jointly_precludes.
     const argumentId = newArgumentId();
-    if (premises.length > 0) {
-      const conclusionId = resolveId(conclusion);
+    const conclusionId = resolveId(conclusion);
+    // A circular argument lists its conclusion among its premises, which only a
+    // failed check lets through; a relation from an element to itself says
+    // nothing, so that premise draws no link.
+    const linked = premises.filter((p) => resolveId(p) !== conclusionId);
+    if (linked.length > 0) {
       const relationType = argumentRelationType(
-        premises.length,
+        linked.length,
         conclusion.negated,
       );
       // Fold the meaning postulates this argument relies on into the relation
-      // explanation, so the inferential bridge stays visible after acceptance.
-      const explanation = argumentPostulateExplanation(
-        result.argument_postulates?.[argIndex],
-      );
-      for (const premise of premises) {
+      // explanation, so the inferential bridge stays visible after acceptance —
+      // or, for an argument that failed the checker, why it failed.
+      const failure = result.argument_failures?.[argIndex];
+      const explanation = failure
+        ? argumentFailureExplanation(failure)
+        : argumentPostulateExplanation(result.argument_postulates?.[argIndex]);
+      for (const premise of linked) {
         onAddRelation?.(
           {
             from: resolveId(premise),
@@ -486,6 +523,8 @@ export function DetectArgumentsTab({
       return n;
     });
   };
+
+  const failedCount = (result?.argument_failures ?? []).filter(Boolean).length;
 
   // `suggestionsDisabled` too, as every other tab's run button: without it a
   // press in a reader's own process fetched the demo's recorded arguments.
@@ -606,8 +645,14 @@ export function DetectArgumentsTab({
               title="Arguments"
               count={result.translated_arguments.length}
             />
-            {verifyArguments && result.rejected_count > 0 && (
-              <Tooltip text="Proposals the argument checker could not verify — formally invalid, resting on meaning postulates alone, or relying on a premise that was discarded — are dropped rather than surfaced.">
+            {failedCount > 0 && (
+              <div style={{ fontSize: 11, color: C.dim, marginBottom: 8 }}>
+                {failedCount} of {result.translated_arguments.length} failed
+                the argument checker, and say why; they come last.
+              </div>
+            )}
+            {result.dropped_count > 0 && (
+              <Tooltip text="A proposal citing a premise the model never defined, or one with no premise at all, has nothing to show, so it is left out.">
                 <div
                   style={{
                     fontSize: 11,
@@ -617,9 +662,8 @@ export function DetectArgumentsTab({
                     cursor: "help",
                   }}
                 >
-                  {result.rejected_count} proposal
-                  {result.rejected_count !== 1 ? "s" : ""} rejected by the
-                  argument checker
+                  {result.dropped_count} proposal
+                  {result.dropped_count !== 1 ? "s" : ""} could not be shown
                 </div>
               </Tooltip>
             )}
@@ -634,6 +678,7 @@ export function DetectArgumentsTab({
                   argument={arg}
                   addedIds={addedIds}
                   postulates={result.argument_postulates?.[i] ?? []}
+                  failure={result.argument_failures?.[i] ?? null}
                   decision={decisions[i]}
                   editingDrafts={
                     editing?.argIndex === i ? editing.drafts : null
