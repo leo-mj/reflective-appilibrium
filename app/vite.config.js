@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { contentSecurityPolicy } from "./vite-plugins/contentSecurityPolicy.js";
 import { basePath } from "./vite-plugins/basePath.js";
+import { impressum } from "./vite-plugins/impressum.js";
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -13,7 +14,9 @@ export default defineConfig(({ mode }) => ({
     githubRepository: process.env.GITHUB_REPOSITORY,
   }),
   // The CSP is written into built pages only; see vite-plugins/contentSecurityPolicy.js.
-  plugins: [react(), contentSecurityPolicy()],
+  // The Impressum page exists only for a build that sets VITE_IMPRESSUM; see
+  // vite-plugins/impressum.js.
+  plugins: [react(), contentSecurityPolicy(), impressum()],
   test: {
     environment: "node",
     // Tests run as the demo build, as they do in CI, where there is no .env

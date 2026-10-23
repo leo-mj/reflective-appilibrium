@@ -16,7 +16,7 @@
 
 import { C } from "../../constants/colors.js";
 import { useTheme } from "../../hooks/useTheme.js";
-import { BACKEND_ENABLED, BYOK_ENABLED } from "../../config.js";
+import { BACKEND_ENABLED, BYOK_ENABLED, IMPRESSUM_URL } from "../../config.js";
 import { useLLMSettings } from "../../utils/llmKey.js";
 import {
   menuIconStyle,
@@ -169,6 +169,21 @@ export function SettingsMenuItems({
             {MENU_LABELS.privacy}
           </button>
         </Tooltip>
+        {/* A page, not a dialog, so a link; see vite-plugins/impressum.js. */}
+        {IMPRESSUM_URL && (
+          <Tooltip text={MENU_TOOLTIPS.impressum}>
+            <a
+              href={IMPRESSUM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={closeMenu}
+              style={{ ...itemStyle, textDecoration: "none" }}
+            >
+              <span style={menuIconStyle}>§</span>
+              {MENU_LABELS.impressum}
+            </a>
+          </Tooltip>
+        )}
 
         <div style={menuDividerStyle} />
         <div style={menuHeadingStyle}>{MENU_HEADINGS.appearance}</div>

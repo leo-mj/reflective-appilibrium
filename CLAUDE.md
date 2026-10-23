@@ -27,6 +27,12 @@ defines what the backend URL may say, including `/` for the case where one host
 serves the page and routes `/api` to the backend. Don't write a host's name into
 the app: the workflows hold the examples, and they read repository variables.
 
+**Who provides a build is chosen at build time too.** `VITE_IMPRESSUM=tuhh`
+writes `impressum.html` from `app/legal/impressum.tuhh.html` and links it from
+the landing page and ☰ (`app/vite-plugins/impressum.js`); a build without it
+has neither, so a build published elsewhere does not borrow TU Hamburg's. The
+TU Hamburg instance sets it; the GitHub Pages demo does not.
+
 **Nothing is stored on a server, in either build.** The working state is
 autosaved to the browser (`localStorage`, offered back as "Continue where you
 left off") and Markdown export is the only way out of it. There is one draft

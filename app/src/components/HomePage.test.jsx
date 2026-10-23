@@ -6,6 +6,14 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
+const flags = vi.hoisted(() => ({ impressum: null }));
+vi.mock("../config.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  get IMPRESSUM_URL() {
+    return flags.impressum;
+  },
+}));
+
 vi.mock("../utils/exportMarkdown.js", async (importOriginal) => ({
   ...(await importOriginal()),
   downloadMarkdown: vi.fn(),
@@ -24,6 +32,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  flags.impressum = null;
   localStorage.clear();
   vi.clearAllMocks();
 });
@@ -152,5 +161,20 @@ describe("exporting the draft from the dialog", () => {
     const markdown = buildMarkdown(state, positions, sections);
     expect(markdown).toContain("```re-state");
     expect(markdown).toContain("## Elements");
+  });
+});
+
+describe("the Impressum link", () => {
+  it("is offered under the institute's credit when the build has one", () => {
+    flags.impressum = "/impressum.html";
+    renderHome();
+    expect(
+      screen.getByRole("link", { name: "Impressum" }).getAttribute("href"),
+    ).toBe("/impressum.html");
+  });
+
+  it("is absent from a build without one", () => {
+    renderHome();
+    expect(screen.queryByRole("link", { name: "Impressum" })).toBeNull();
   });
 });

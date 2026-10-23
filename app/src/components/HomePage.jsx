@@ -15,6 +15,7 @@ import {
   loadDraft,
 } from "../utils/draftStorage.js";
 import { currentRound } from "../utils/stateUtils.js";
+import { IMPRESSUM_URL } from "../config.js";
 import {
   DEFAULT_EXPORT_SECTIONS,
   downloadMarkdown,
@@ -548,6 +549,17 @@ export function HomePage({
             Institute for Ethics in Technology (TUHH)
           </a>
         </span>
+        {/* Only where the build names its provider; see vite-plugins/impressum.js. */}
+        {IMPRESSUM_URL && (
+          <a
+            href={IMPRESSUM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: C.dim, marginTop: "1em" }}
+          >
+            Impressum
+          </a>
+        )}
       </div>
     </main>
   );

@@ -12,7 +12,11 @@ imports that rather than reading the variable, which is what keeps the clients a
 `vite-plugins/contentSecurityPolicy.js` agreeing on one address. `/` there means
 the backend is behind the page's own host, so `connect-src` stays `'self'` and no
 CORS is involved. **No hosting provider is named anywhere in `src/`**; a deployment
-is those three values and the server's `CORS_ORIGINS`. Mock data is a _runtime_ choice, not a flag: the assist
+is those three values and the server's `CORS_ORIGINS`, plus `VITE_IMPRESSUM` where
+the build names its provider: `vite-plugins/impressum.js` writes `impressum.html`
+from `legal/impressum.<name>.html` — a page rather than a dialog, so it has an
+address and reads without JavaScript, styled from a file because `_headers`
+allows no inline style — and `src/` learns only `IMPRESSUM_URL`, null without it. Mock data is a _runtime_ choice, not a flag: the assist
 panel's "use sample suggestions" checkbox passes `useDummy` down to
 `llmClientFactory`, which also falls back to samples whenever `LLM_ENABLED` is false.
 **Samples are the demo process's only** (`suggestionsAreSample` in `GraphPanel`):

@@ -10,11 +10,14 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 // Read through a getter so a test can flip the backend on without reloading the
 // module graph — re-importing would give this file a second copy of React.
-const flags = vi.hoisted(() => ({ backend: false }));
+const flags = vi.hoisted(() => ({ backend: false, impressum: null }));
 vi.mock("../config.js", async (importOriginal) => ({
   ...(await importOriginal()),
   get BACKEND_ENABLED() {
     return flags.backend;
+  },
+  get IMPRESSUM_URL() {
+    return flags.impressum;
   },
 }));
 
@@ -26,6 +29,7 @@ import { EXPORT_SECTIONS } from "../utils/exportMarkdown.js";
 afterEach(() => {
   cleanup();
   flags.backend = false;
+  flags.impressum = null;
 });
 
 const noop = () => {};
@@ -835,4 +839,23 @@ describe("the two layouts agree", () => {
       });
     }
   }
+});
+
+// The page is written only for a build naming its provider (VITE_IMPRESSUM);
+// any other build must not link to a page it does not have.
+describe("the Impressum row", () => {
+  it.each([true, false])("links to the page in a new tab when there is one (wide: %s)", (isWide) => {
+    flags.impressum = "/impressum.html";
+    render(<AppHeader {...PROPS} isWide={isWide} />);
+    openSettings();
+    const link = screen.getByRole("link", { name: /Impressum/ });
+    expect(link.getAttribute("href")).toBe("/impressum.html");
+    expect(link.getAttribute("target")).toBe("_blank");
+  });
+
+  it.each([true, false])("is absent from a build without one (wide: %s)", (isWide) => {
+    render(<AppHeader {...PROPS} isWide={isWide} />);
+    openSettings();
+    expect(screen.queryByRole("link", { name: /Impressum/ })).toBeNull();
+  });
 });

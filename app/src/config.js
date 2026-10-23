@@ -32,6 +32,15 @@ export const BYOK_ENABLED = BACKEND_ENABLED;
  */
 export const BACKEND_URL = resolveBackendUrl(import.meta.env.VITE_BACKEND_URL);
 
+/**
+ * The provider's Impressum, or null for a build that names none. The page is
+ * written by `vite-plugins/impressum.js` from the text VITE_IMPRESSUM selects;
+ * the app only links to it, so who the provider is stays out of `src/`.
+ */
+export const IMPRESSUM_URL = import.meta.env.VITE_IMPRESSUM
+  ? `${import.meta.env.BASE_URL}impressum.html`
+  : null;
+
 export const DEFAULT_PROVIDER = import.meta.env.VITE_DEFAULT_PROVIDER ?? "";
 export const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL ?? "";
 
