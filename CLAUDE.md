@@ -37,7 +37,9 @@ on offer (`ReplaceDraftDialog` in `HomePage.jsx`), offering its export first.
 sections of `EXPORT_SECTIONS` in `utils/exportMarkdown.js` — elements,
 relations, graph, clusters, the log, an Argdown rendering and so on — leaving
 out any with nothing to say, and remembers the choice in the browser. **Full
-history** is the `re-state` block, the only part Import and Merge read: a file
+history** is the `re-state` block, the only part Import and Merge read
+(`importStateFromFile`, which takes its fences only as lines of their own,
+since wording may hold ``` and the Argdown section writes it unescaped): a file
 without it is a report, not a way back in, and the dialog says so when it is
 unticked. The defaults are the export as it was before the choice existed,
 Argdown off. The same dialog's **Download .argdown** writes the Argdown map
@@ -499,6 +501,31 @@ its members, of any type, under one `# Groups` heading, and the rest go under
 `# Judgments` and the other type headings. `# Groups` and the type headings
 carry `{isGroup: false}`, so neither Argdown's maps nor the import read them as
 groups.
+
+**Import from text** (☰ → Session) is the way in for a text nobody has mapped
+yet: `TextImportModal` hands the reader a prompt (`utils/argdownPrompt.js`) to
+copy into a chat with any LLM along with the text, and takes the reply back —
+the `argdown` block is picked out of it — to go the way a picked `.argdown`
+file goes, Import or Merge. **The app calls no model for this**, so it works in
+the demo build and sends nothing anywhere; the dialog says so. The prompt asks
+only for what the importer reads — type tags (every empirical premise a
+theory), valid premise-conclusion structures with unstated premises marked
+`// unstated`, loose `+>` and `->`, the exporter's `not X` / `><` — and tells
+the model to mark nothing withdrawn or rejected, that being the reader's call.
+**A pasted map is read as a model's** (`PASTED_MAP_OPTIONS`): its
+`#withdrawn` and `#rejected` are ignored all the same, counted in the import's
+log entry — the prompt is a request, and a model, or an instruction planted in
+the text it was handed, can disregard it — and every element and relation
+carries the generic `LLM` origin, whatever `{origin: …}` the map claims, so a
+process review does not read a reconstruction as the reader's own moves. A
+picked `.argdown` file is read as it says, being most often an earlier process
+exported. The reply's map is found by CommonMark's fence rules
+(`fencedBlocks`), inside a block wrapping the whole answer too, and one left
+open by a reply cut short runs to the end.
+Its example is imported by `argdownPrompt.test.js`, so the prompt cannot teach
+a syntax the importer has stopped reading; change the two together. A reply
+that does not parse keeps the dialog and the paste open with the parser's
+message.
 
 The export (`utils/exportArgdown.js`) reaches the reader as the Argdown section
 of the Markdown export, a fenced `argdown` block. It writes loose mode: `supports` and

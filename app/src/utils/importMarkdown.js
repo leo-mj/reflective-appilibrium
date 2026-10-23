@@ -367,6 +367,7 @@ function validateRelation(r, i) {
   if (r.history != null) result.history = history(r.history, `${ctx}.history`);
   if (r.rejectedRound != null)
     result.rejectedRound = num(r.rejectedRound, `${ctx}.rejectedRound`);
+  if (r.origin != null) result.origin = str(r.origin, `${ctx}.origin`, 200);
   if (r.argumentId != null)
     result.argumentId = str(r.argumentId, `${ctx}.argumentId`, 200);
   // The argument that replaced this premise link (stateUtils, isSupersededAt).
@@ -586,24 +587,26 @@ export async function importStateFromFile(file) {
 
   const text = await file.text();
 
-  // Locate the re-state block using plain string search — no regex, no backtracking.
-  const OPEN = "```re-state";
-  const CLOSE = "```";
-  const openIdx = text.indexOf(OPEN);
-  if (openIdx === -1)
+  // Locate the re-state block using plain string search — no regex, no
+  // backtracking. A fence counts only as a line of its own: wording may hold
+  // ``` or even "```re-state" — the Argdown section writes it unescaped, ahead
+  // of this block — and the JSON carries that wording, but never at the start
+  // of a line, JSON.stringify having escaped every newline in it.
+  const lines = text.split("\n");
+  const isFence = (line, info) => line.trim() === "```" + info;
+  const open = lines.findIndex((line) => isFence(line, "re-state"));
+  if (open === -1)
     throw new Error(
       "This file has no full history, so the process cannot be read from it. Export it again with “Full history” ticked.",
     );
-  const lineEnd = text.indexOf("\n", openIdx + OPEN.length);
-  if (lineEnd === -1)
-    throw new Error(
-      "Malformed re-state block (no newline after opening fence).",
-    );
-  const closeIdx = text.indexOf(CLOSE, lineEnd + 1);
-  if (closeIdx === -1)
+  const close = lines.findIndex((line, i) => i > open && isFence(line, ""));
+  if (close === -1)
     throw new Error("Malformed re-state block (missing closing fence).");
 
-  const json = text.slice(lineEnd + 1, closeIdx).trim();
+  const json = lines
+    .slice(open + 1, close)
+    .join("\n")
+    .trim();
 
   let raw;
   try {

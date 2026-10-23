@@ -22,6 +22,7 @@ import { AppHeader } from "./AppHeader.jsx";
 import { TAB_LABELS } from "../constants/tabConstants.jsx";
 import { TOUR_Z } from "./tour/tourZ.js";
 import { EXPORT_SECTIONS } from "../utils/exportMarkdown.js";
+import { PASTED_MAP_OPTIONS } from "../utils/argdownPrompt.js";
 
 afterEach(() => {
   cleanup();
@@ -835,4 +836,74 @@ describe("the two layouts agree", () => {
       });
     }
   }
+});
+
+describe("Import from text", () => {
+  // A pasted map goes the way a picked .argdown file goes, but is read before
+  // "replace?" is asked, so a reply that does not parse keeps the paste open.
+  const MAP = "```argdown\n===\ntitle: Lying\n===\n\n[A]: Never lie. #principle\n```";
+  const open = () => {
+    fireEvent.click(screen.getByLabelText("Settings menu"));
+    fireEvent.click(screen.getByText("Import from text"));
+  };
+  const paste = (text) =>
+    fireEvent.change(screen.getByRole("textbox", { name: /Paste the reply/ }), {
+      target: { value: text },
+    });
+
+  it("imports straight away when no process is open", async () => {
+    const onImportFile = vi.fn(async () => {});
+    render(<AppHeader {...PROPS} onImportFile={onImportFile} />);
+    open();
+    paste(MAP);
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    await vi.waitFor(() => expect(onImportFile).toHaveBeenCalled());
+    expect(onImportFile.mock.calls[0][0].name).toBe("Lying.argdown");
+    await vi.waitFor(() =>
+      expect(screen.queryByText("Import from text")).toBeNull(),
+    );
+  });
+
+  // The model writing the map, or the text it was handed, does not decide
+  // which claims the reader holds, nor pass its claims off as the reader's; a
+  // picked file, often their own, is read as it says.
+  it("is read as a model's map, on import and on merge alike", async () => {
+    const onImportFile = vi.fn(async () => {});
+    const { unmount } = render(
+      <AppHeader {...PROPS} onImportFile={onImportFile} />,
+    );
+    open();
+    paste(MAP);
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    await vi.waitFor(() => expect(onImportFile).toHaveBeenCalled());
+    expect(onImportFile.mock.calls[0][1]).toBe(PASTED_MAP_OPTIONS);
+    unmount();
+
+    const onPrepareMerge = vi.fn().mockResolvedValue(null);
+    render(
+      <AppHeader {...PROPS} hasExistingState onPrepareMerge={onPrepareMerge} />,
+    );
+    open();
+    paste(MAP);
+    fireEvent.click(screen.getByRole("radio", { name: "Merge into this process" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    await vi.waitFor(() => expect(onPrepareMerge).toHaveBeenCalled());
+    expect(onPrepareMerge.mock.calls[0][1]).toBe(PASTED_MAP_OPTIONS);
+  });
+
+  it("asks before replacing an open process, and only once the map reads", async () => {
+    const onImportFile = vi.fn(async () => {});
+    render(<AppHeader {...PROPS} hasExistingState onImportFile={onImportFile} />);
+    open();
+    paste("(1) [b]: Premise\n----\n");
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/syntax error/i);
+    expect(screen.queryByText("Replace session?")).toBeNull();
+
+    paste(MAP);
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Replace" }));
+    await vi.waitFor(() => expect(onImportFile).toHaveBeenCalled());
+    expect(onImportFile.mock.calls[0][1]).toBe(PASTED_MAP_OPTIONS);
+  });
 });

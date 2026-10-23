@@ -1048,6 +1048,12 @@ What it draws sits beside it — `TourSection`, `TourControls` (progress bar,
 sheet handle, column edge) and `Spotlight`, whose rings `useTourRing` measures —
 and `tourHelpers.js` drops sections the state cannot carry.
 
+**The header's ? toggles it**: pressed while the tour runs, it closes it as
+the tour's own Close does (`restoreAfterTour` in `tourHelpers.js`, which both
+call), and its name says which a press will do. The dim takes no clicks, so
+the button stays reachable at the wide width; on a phone it is in the ☰ menu,
+which the tour holds shut.
+
 **Never fork the script.** A phone used to get a separate nine-card tour that
 walked the ☰ menu and never mentioned reflective equilibrium — the one thing a
 first-time visitor is there to find out. What may legitimately differ between

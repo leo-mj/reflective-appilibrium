@@ -216,6 +216,17 @@ describe("the guided tour", () => {
     expect(tourShown()).toBe(true);
   });
 
+  it("closes from the ? button too, putting the chrome back", () => {
+    sessionStorage.setItem("startTour", "1");
+    open();
+    expect(tourShown()).toBe(true);
+    expect(tabBarShown()).toBe(false);
+    fireEvent.click(screen.getByLabelText("Close the tour"));
+    expect(tourShown()).toBe(false);
+    expect(tabBarShown()).toBe(true);
+    expect(screen.getByLabelText("Start the step-by-step tour")).toBeTruthy();
+  });
+
   /** Presses Next until the tour is reading the section matching `title`. */
   const walkTourTo = (title) => {
     for (let i = 0; i < 40; i++) {

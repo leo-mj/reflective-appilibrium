@@ -6,6 +6,19 @@
  * @module components/tour/tourHelpers
  */
 
+/**
+ * What the tour puts back as it closes, however it is closed — its own Close,
+ * Finish and Escape, or the header's ? pressed again: no selection, the app's
+ * chrome, and the graph framed by the reader rather than by a section.
+ *
+ * @param {{ onSelectNode: Function, onSetChrome: Function, onFocusGraph: Function }} app
+ */
+export function restoreAfterTour({ onSelectNode, onSetChrome, onFocusGraph }) {
+  onSelectNode(() => null);
+  onSetChrome({ chrome: true, text: true, menu: false, addBar: false });
+  onFocusGraph(null);
+}
+
 /** Gap left above the sheet when it scrolls a ringed control clear of it. */
 const REVEAL_PAD = 12;
 

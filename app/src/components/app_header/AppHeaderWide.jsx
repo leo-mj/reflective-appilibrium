@@ -51,6 +51,7 @@ export function AppHeaderWide({
   assistSidePanel,
   setAssistSidePanel,
   handleImportClick,
+  handleTextImportClick,
   handleMergeClick,
   handleMergeSampleClick,
   onDownload,
@@ -66,6 +67,7 @@ export function AppHeaderWide({
   onStartWorkflow,
   onStopWorkflow,
   onStartStepper,
+  tourActive,
   showTabNav,
   setShowTabNav,
   allExpanded,
@@ -141,6 +143,7 @@ export function AppHeaderWide({
     allExpanded,
     onExpandAll,
     handleImportClick,
+    handleTextImportClick,
     handleMergeClick,
     handleMergeSampleClick,
     onDownload,
@@ -285,10 +288,14 @@ export function AppHeaderWide({
 
           <div style={inlineDividerStyle} />
 
-          <Tooltip text="Start the guided tour.">
+          <Tooltip
+            text={tourActive ? "Close the guided tour." : "Start the guided tour."}
+          >
             <button
               onClick={onStartStepper}
-              aria-label="Start the step-by-step tour"
+              aria-label={
+                tourActive ? "Close the tour" : "Start the step-by-step tour"
+              }
               style={{
                 ...btn(false),
                 color: C.dim,

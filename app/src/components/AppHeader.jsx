@@ -8,6 +8,9 @@ import { TutorialOverlay } from "./TutorialOverlay.jsx";
 import { ModalShell } from "./user_edits/ModalShell.jsx";
 import { MergeModal } from "./user_edits/MergeModal.jsx";
 import { ExportModal } from "./user_edits/ExportModal.jsx";
+import { TextImportModal } from "./user_edits/TextImportModal.jsx";
+import { importArgdownFromFile } from "../utils/importArgdown.js";
+import { PASTED_MAP_OPTIONS } from "../utils/argdownPrompt.js";
 import { SampleEditsNotice } from "./app_header/SampleEditsNotice.jsx";
 import {
   ASSIST_TABS,
@@ -69,10 +72,11 @@ import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
  * @param {boolean}  props.canRedo
  * @param {boolean}  props.tourActive  - Whether the guided tour is running. Held
  *   by REState because the tour drives the graph, not just the header — at
- *   either width. All this header does with it is lift the ☰ menu over the
- *   tour's dim while the tour is describing what is inside it.
+ *   either width. The header lifts the ☰ menu over the tour's dim while the
+ *   tour is describing what is inside it, and names the ? button for what a
+ *   press does: start the tour, or close it.
  * @param {function} props.onStartTour - Behind the header's ? button, and the
- *   matching ☰ entry at narrow widths.
+ *   matching ☰ entry at narrow widths; closes the tour while it runs.
  * @param {boolean}  props.hideTabBar  - Set while the wide tour's opening
  *   chapters read against a bare graph. There is no tab bar to hide at narrow
  *   widths, where the same chapters are read against the ☰ menu staying shut.
@@ -148,9 +152,9 @@ export function AppHeader({
   const [importError, setImportError] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
 
-  const doImport = async (file) => {
+  const doImport = async (file, options) => {
     try {
-      await onImportFile(file);
+      await onImportFile(file, options);
     } catch (e) {
       setImportError(e.message);
     }
@@ -172,6 +176,27 @@ export function AppHeader({
     }
   };
   const handleMergeClick = () => mergeInputRef.current.click();
+
+  // A map pasted from an LLM's reply goes the way a picked .argdown file goes,
+  // but is read first: a reply that does not parse keeps the dialog, and the
+  // paste, open with the parser's message rather than losing both to an error
+  // box after "replace?" has been answered. It is read as a model's
+  // (PASTED_MAP_OPTIONS): statuses ignored, since which claims to hold is the
+  // reader's call, and every item stamped with an LLM origin. A picked file
+  // is read as it says, being most often an earlier process of the reader's.
+  const [textImportOpen, setTextImportOpen] = useState(false);
+  const submitPastedMap = async (file, mode) => {
+    const options = PASTED_MAP_OPTIONS;
+    if (mode === "merge") {
+      setPendingMerge(await onPrepareMerge(file, options));
+    } else if (hasExistingState) {
+      await importArgdownFromFile(file, options);
+      setImportConfirmPending({ file, options });
+    } else {
+      await onImportFile(file, options);
+    }
+    setTextImportOpen(false);
+  };
 
   // The second sample process, brought in without a trip through the file
   // system. Offered on the sample process only: in someone's own process a
@@ -217,9 +242,9 @@ export function AppHeader({
           subtitle="Importing will replace your current session."
           onCancel={() => setImportConfirmPending(null)}
           onSave={() => {
-            const file = importConfirmPending;
+            const { file, options } = importConfirmPending;
             setImportConfirmPending(null);
-            doImport(file);
+            doImport(file, options);
           }}
           saveLabel="Replace"
           saveDisabled={false}
@@ -252,6 +277,13 @@ export function AppHeader({
           }
         />
       )}
+      {textImportOpen && (
+        <TextImportModal
+          canMerge={canMerge}
+          onSubmit={submitPastedMap}
+          onCancel={() => setTextImportOpen(false)}
+        />
+      )}
       {importError && (
         <ModalShell
           title="Could not read file"
@@ -276,7 +308,7 @@ export function AppHeader({
           e.target.value = "";
           if (!file) return;
           if (hasExistingState) {
-            setImportConfirmPending(file);
+            setImportConfirmPending({ file });
           } else {
             doImport(file);
           }
@@ -312,6 +344,7 @@ export function AppHeader({
     allExpanded,
     onExpandAll,
     handleImportClick,
+    handleTextImportClick: () => setTextImportOpen(true),
     handleMergeClick: canMerge ? handleMergeClick : null,
     handleMergeSampleClick: canMergeSample ? handleMergeSampleClick : null,
     onDownload: () => setExportOpen(true),
@@ -385,6 +418,7 @@ export function AppHeader({
         visibleSubTabs={visibleSubTabs}
         hideTabBar={hideTabBar}
         tourMenuOpen={tourMenuOpen}
+        tourActive={tourActive}
       />
       {sampleNotice}
     </>

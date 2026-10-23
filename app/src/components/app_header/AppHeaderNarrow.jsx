@@ -66,6 +66,7 @@ export function AppHeaderNarrow({
   ANALYZE_TABS,
   isTabVisible,
   handleImportClick,
+  handleTextImportClick,
   handleMergeClick,
   handleMergeSampleClick,
   onDownload,
@@ -444,6 +445,7 @@ export function AppHeaderNarrow({
                 allExpanded={allExpanded}
                 onExpandAll={onExpandAll}
                 handleImportClick={handleImportClick}
+                handleTextImportClick={handleTextImportClick}
                 handleMergeClick={handleMergeClick}
                 handleMergeSampleClick={handleMergeSampleClick}
                 onDownload={onDownload}
