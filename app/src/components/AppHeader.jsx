@@ -72,10 +72,11 @@ import { AppHeaderWide } from "./app_header/AppHeaderWide.jsx";
  * @param {boolean}  props.canRedo
  * @param {boolean}  props.tourActive  - Whether the guided tour is running. Held
  *   by REState because the tour drives the graph, not just the header — at
- *   either width. All this header does with it is lift the ☰ menu over the
- *   tour's dim while the tour is describing what is inside it.
+ *   either width. The header lifts the ☰ menu over the tour's dim while the
+ *   tour is describing what is inside it, and names the ? button for what a
+ *   press does: start the tour, or close it.
  * @param {function} props.onStartTour - Behind the header's ? button, and the
- *   matching ☰ entry at narrow widths.
+ *   matching ☰ entry at narrow widths; closes the tour while it runs.
  * @param {boolean}  props.hideTabBar  - Set while the wide tour's opening
  *   chapters read against a bare graph. There is no tab bar to hide at narrow
  *   widths, where the same chapters are read against the ☰ menu staying shut.
@@ -417,6 +418,7 @@ export function AppHeader({
         visibleSubTabs={visibleSubTabs}
         hideTabBar={hideTabBar}
         tourMenuOpen={tourMenuOpen}
+        tourActive={tourActive}
       />
       {sampleNotice}
     </>

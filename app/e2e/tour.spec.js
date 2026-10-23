@@ -20,6 +20,22 @@ import { TOUR_Z } from "../src/components/tour/tourZ.js";
 const RING_PAD = 5;
 
 test.describe("The guided tour", () => {
+  // Pressed again while the tour runs, the header's ? closes it — reachable
+  // through the dim, which takes no clicks. Wide only: on a phone the ? is in
+  // the ☰ menu, which the tour holds shut.
+  test("closes from the header's ? button", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the ? is in the ☰ menu at this width");
+    await gotoHome(page);
+    await page.locator('button:text-is("Guided tour")').click();
+    const tour = page.getByRole("complementary", { name: "Guided tour" });
+    await expect(tour).toBeVisible();
+    await page.getByRole("button", { name: "Close the tour" }).click();
+    await expect(tour).toBeHidden();
+    await expect(
+      page.getByRole("button", { name: "Start the step-by-step tour" }),
+    ).toBeVisible();
+  });
+
   test("rings every control it names, on screen and uncovered", async ({
     page,
     isMobile,

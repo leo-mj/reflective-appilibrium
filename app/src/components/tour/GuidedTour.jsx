@@ -39,7 +39,7 @@ import {
 import { buildTourSections } from "./tourSections.js";
 import { TOUR_Z, sheetHeight } from "./tourZ.js";
 import { useTourWidth } from "./tourWidth.js";
-import { applicableSections } from "./tourHelpers.js";
+import { applicableSections, restoreAfterTour } from "./tourHelpers.js";
 import { ColumnResizer, ProgressBar, SheetHandle } from "./TourControls.jsx";
 import { TourSection } from "./TourSection.jsx";
 import { Spotlight } from "./Spotlight.jsx";
@@ -281,9 +281,7 @@ export function GuidedTour({
 
   // ── Leaving ───────────────────────────────────────────────────────────────
   const handleClose = useCallback(() => {
-    onSelectNode(() => null);
-    onSetChrome({ chrome: true, text: true, menu: false, addBar: false });
-    onFocusGraph(null);
+    restoreAfterTour({ onSelectNode, onSetChrome, onFocusGraph });
     onClose();
   }, [onClose, onSelectNode, onSetChrome, onFocusGraph]);
 
