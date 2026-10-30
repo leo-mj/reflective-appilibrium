@@ -107,7 +107,6 @@ jobs:
       - name: Build and start
         run: docker compose up -d --build
 
-      # The same script .gitlab-ci.yml runs, so the two pipelines check one thing.
       - name: Check the page and the proxy
         run: ci/check-stack.sh http://127.0.0.1:8080
 

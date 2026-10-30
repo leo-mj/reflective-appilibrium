@@ -135,6 +135,8 @@ The app runs at `http://localhost:5173` with all backend features enabled, calli
 
 `docker compose up --build` from the repo root runs the backend and a frontend container that serves the app and forwards `/api` to it, at `http://localhost:8080`. The backend runs `hosted` there, so it lends no server-side keys: enter your own in the LLM settings modal.
 
+Behind a host's proxy, the frontend image takes two build arguments: `BASE_PATH`, when the site is served from a path rather than the root of its host, and `PROXY_PROTOCOL_FROM`, the address of a proxy that speaks PROXY protocol. Such a proxy connects to port 8081; port 8080 stays plain HTTP. Whether the proxy passes the path on or removes it, both work. `app/Dockerfile` has the details, and `.gitlab-ci.yml` builds and pushes both images, setting the two arguments from CI/CD variables.
+
 ### Where your work lives
 
 The working state is written to the browser's `localStorage` as you go, and the

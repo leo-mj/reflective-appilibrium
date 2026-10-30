@@ -164,7 +164,7 @@ _HOSTED_COMPUTATION_TIMEOUT = 60.0
 # its state. The largest any route's own caps admit, short of the state's nested
 # histories, is /api/llm/complete — 100 messages of 100,000 characters, just
 # under 10 MB. 10 MiB covers that, and matches client_max_body_size in the
-# compose stack's nginx (app/nginx/default.conf.template), so the two agree.
+# compose stack's nginx (app/nginx/site.inc.template), so the two agree.
 _HOSTED_MAX_BODY_BYTES = 10 * 1024 * 1024
 
 
