@@ -48,7 +48,8 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   uvicorn's loggers were switched off the same way, which hid every exception
   that escaped the app; the same call turns `uvicorn` and `uvicorn.error` back
   on through our handler (uvicorn's own would quote exception messages) and
-  keeps `uvicorn.access` off.
+  keeps `uvicorn.access` off. Python warnings go through it too
+  (`py.warnings`), so a JSON collector gets them as one entry.
 - **Logs never quote content.** `ContentFreeFormatter` prints a traceback's
   frames and exception types but no message, since messages quote input;
   `test_log_privacy.py` holds every path to that. `LOG_FORMAT=json` (set on

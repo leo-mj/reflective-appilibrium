@@ -23,7 +23,9 @@ from typing import Optional
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-_FORMAT = "%(levelname)-8s %(name)s: %(message)s"
+# With the time: `docker compose logs` and a plain terminal print none of their own.
+_FORMAT = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
+_DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 
 class ContentFreeFormatter(logging.Formatter):
@@ -110,7 +112,9 @@ class JsonFormatter(ContentFreeFormatter):
 
 
 def make_formatter(log_format: str) -> logging.Formatter:
-    return JsonFormatter() if log_format == "json" else ContentFreeFormatter(_FORMAT)
+    if log_format == "json":
+        return JsonFormatter()
+    return ContentFreeFormatter(_FORMAT, _DATEFMT)
 
 
 # ── Request ids ───────────────────────────────────────────────────────────────
@@ -195,6 +199,10 @@ def configure_backend_logging(log_format: Optional[str] = None) -> None:
     has been: the platform's proxy keeps a record of every request already, and
     the score badges alone make a request per edit.
 
+    Python's warnings — rethon's numpy raises one on most simulations — come
+    through the handler too, rather than printed straight to stderr, where a
+    collector reading JSON took each of their two lines for an entry of its own.
+
     So this must run *after* rethon has been imported, and it configures these
     loggers rather than logging globally. Safe to call more than once: the
     handler is created only the first time.
@@ -226,3 +234,9 @@ def configure_backend_logging(log_format: Optional[str] = None) -> None:
     logging.getLogger("uvicorn.error").disabled = False
     # Said here rather than left to rethon, which is how it came to be off.
     logging.getLogger("uvicorn.access").disabled = True
+
+    logging.captureWarnings(True)
+    warnings_logger = logging.getLogger("py.warnings")
+    warnings_logger.handlers = [_handler]
+    warnings_logger.propagate = False
+    warnings_logger.disabled = False  # rethon again, if it existed by then

@@ -9,7 +9,9 @@ id, and the exceptions uvicorn reports are no longer switched off by rethon.
 import json
 import logging
 import logging.config
+import re
 import sys
+import warnings
 
 import pytest
 from fastapi import FastAPI
@@ -161,7 +163,7 @@ def test_the_app_assigns_request_ids():
 @pytest.fixture
 def uvicorn_as_served(monkeypatch):
     """uvicorn's logging as it stands once rethon's import has switched it off."""
-    names = ("uvicorn", "uvicorn.error", "uvicorn.access")
+    names = ("uvicorn", "uvicorn.error", "uvicorn.access", "py.warnings")
     saved = {
         n: (lg.handlers[:], lg.propagate, lg.disabled, lg.level)
         for n, lg in ((n, logging.getLogger(n)) for n in names)
@@ -171,12 +173,16 @@ def uvicorn_as_served(monkeypatch):
     for n in names:
         logging.getLogger(n).disabled = True
     monkeypatch.setattr(logging_setup, "_handler", None)
+    # Importing the app already hooked warnings, and pytest has since swapped
+    # the hook out for its own; unhook so configuring hooks them afresh.
+    logging.captureWarnings(False)
     yield
     for n, (handlers, propagate, disabled, level) in saved.items():
         lg = logging.getLogger(n)
         lg.handlers, lg.propagate, lg.disabled = handlers, propagate, disabled
         lg.setLevel(level)
     logging.getLogger("backend").handlers = backend_handlers
+    logging.captureWarnings(False)
 
 
 def test_an_exception_escaping_the_app_is_logged_again(uvicorn_as_served, capsys):
@@ -202,3 +208,32 @@ def test_the_access_log_stays_off(uvicorn_as_served):
     configure_backend_logging("json")
 
     assert logging.getLogger("uvicorn.access").disabled
+
+
+# ── Readable everywhere else ──────────────────────────────────────────────────
+
+
+def test_text_lines_say_when(uvicorn_as_served, capsys):
+    configure_backend_logging("text")
+
+    logging.getLogger("backend.x").warning("something happened")
+
+    line = capsys.readouterr().err.strip()
+    assert re.fullmatch(
+        r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d WARNING  backend\.x: something happened", line
+    ), line
+
+
+def test_a_python_warning_is_one_entry_like_any_other(uvicorn_as_served, capsys):
+    configure_backend_logging("json")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("always")
+        warnings.warn("divide by zero encountered", RuntimeWarning)
+
+    lines = capsys.readouterr().err.splitlines()
+    assert len(lines) == 1, lines
+    entry = json.loads(lines[0])
+    assert entry["logger"] == "py.warnings"
+    assert entry["severity"] == "WARNING"
+    assert "RuntimeWarning: divide by zero encountered" in entry["message"]
