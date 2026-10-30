@@ -79,11 +79,11 @@ async def elicit_judgments(
     llm: Annotated[LLMService, Depends(get_llm_service)],
 ) -> ElicitJudgmentsResponse:
     """Ask the LLM for questions and thought experiments to elicit new judgments."""
+    prompt = build_judgments_prompt(request.topic, request.elements, request.log)
     logger.info(
         f"Requesting judgment elicitation from model '{llm.model}' "
         f"with {len(request.elements)} elements."
     )
-    prompt = build_judgments_prompt(request.topic, request.elements, request.log)
     result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.6,
