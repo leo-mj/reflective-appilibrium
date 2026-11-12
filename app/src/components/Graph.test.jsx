@@ -174,7 +174,7 @@ const modalValues = (container) => pickerValues(container);
 describe("half-written forms", () => {
   /** Opens a dialog from the graph's own toolbar. */
   const open = (container, label) =>
-    fireEvent.click(container.querySelector(`[aria-label="${label}"]`));
+    fireEvent.click(container.querySelector(`[aria-label^="${label},"]`));
   const statement = (container) => container.querySelector("textarea");
 
   it("keeps what was typed when the dialog is dismissed and reopened", () => {
@@ -759,7 +759,7 @@ describe("groups", () => {
     const onEditGroupRequest = vi.fn();
     const { container } = setup({ state: GROUP_STATE, onEditGroupRequest });
 
-    fireEvent.click(container.querySelector('[aria-label="New group"]'));
+    fireEvent.click(container.querySelector('[aria-label="New group, Grp"]'));
     expect(onEditGroupRequest).toHaveBeenCalledWith();
   });
 
