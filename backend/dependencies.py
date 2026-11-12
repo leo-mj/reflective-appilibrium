@@ -166,13 +166,13 @@ def _warn_if_proxy_untrusted(forwarded_for: Optional[str], peer: str) -> None:
     if _proxy_warning_logged or not untrusted_proxy_evident(forwarded_for, peer):
         return
     _proxy_warning_logged = True
+    # No address in the line: without a proxy in front, the peer is a visitor.
     logger.warning(
-        "Request from %s carries x-forwarded-for, but uvicorn is not trusting it: "
+        "A request carries x-forwarded-for, but uvicorn is not trusting it: "
         "every visitor behind this proxy shares one rate-limit allowance. Set "
         "TRUSTED_PROXY_HOPS to the number of proxies in front (1 on Cloud Run), or "
         "run uvicorn with --forwarded-allow-ips=<proxy address>. (A client sending "
         "the header directly, with no proxy in front, also triggers this once.)",
-        peer,
     )
 
 

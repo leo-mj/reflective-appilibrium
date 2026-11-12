@@ -35,6 +35,7 @@ import { AppHeader } from "./AppHeader.jsx";
 import { TextPanel } from "./TextPanel.jsx";
 import { GraphPanel } from "./GraphPanel.jsx";
 import { GuidedTour } from "./tour/GuidedTour.jsx";
+import { restoreAfterTour } from "./tour/tourHelpers.js";
 import { sheetHeight } from "./tour/tourZ.js";
 import { useTourResizing, useTourWidth } from "./tour/tourWidth.js";
 import { EditModals } from "./user_edits/EditModals.jsx";
@@ -213,10 +214,19 @@ export default function REState({
   const tourInPlace =
     isSample && state.model !== "questionnaire" && state === initialState;
   const [tourLeaving, setTourLeaving] = useState(false);
-  const requestTour = () =>
-    tourInPlace || !onStartDemoTour
-      ? setTourActive(true)
-      : setTourLeaving(true);
+  // The header's ? opens the tour and, pressed while it runs, closes it — the
+  // way its own Close does, putting back what it had moved.
+  const requestTour = () => {
+    if (tourActive) {
+      restoreAfterTour({
+        onSelectNode: handleSelectNode,
+        onSetChrome: setTourChrome,
+        onFocusGraph: focusGraph,
+      });
+      setTourActive(false);
+    } else if (tourInPlace || !onStartDemoTour) setTourActive(true);
+    else setTourLeaving(true);
+  };
 
   useEffect(() => {
     const onKeyDown = (e) => {
