@@ -12,6 +12,7 @@ import { TextImportModal } from "./user_edits/TextImportModal.jsx";
 import { importArgdownFromFile } from "../utils/importArgdown.js";
 import { PASTED_MAP_OPTIONS } from "../utils/argdownPrompt.js";
 import { SampleEditsNotice } from "./app_header/SampleEditsNotice.jsx";
+import { ServerWakeNotice } from "./app_header/ServerWakeNotice.jsx";
 import {
   ASSIST_TABS,
   SIMULATE_TABS,
@@ -402,6 +403,7 @@ export function AppHeader({
           }
         />
         {sampleNotice}
+        <ServerWakeNotice />
       </>
     );
   }
@@ -421,6 +423,7 @@ export function AppHeader({
         tourActive={tourActive}
       />
       {sampleNotice}
+      <ServerWakeNotice />
     </>
   );
 }

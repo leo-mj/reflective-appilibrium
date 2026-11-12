@@ -9,9 +9,14 @@ vi.mock("../config.js", () => ({
   BACKEND_URL: "http://localhost:8000",
 }));
 
-const { useBackendCapabilities, resetBackendCapabilities } = await import(
-  "./useBackendCapabilities.js"
-);
+const {
+  useBackendCapabilities,
+  prefetchBackendCapabilities,
+  recheckBackendCapabilities,
+  resetBackendCapabilities,
+  HEALTH_RETRY_FOR_MS,
+  HEALTH_RETRY_EVERY_MS,
+} = await import("./useBackendCapabilities.js");
 
 beforeEach(() => {
   // The health check is cached for the life of the page now — one per load,
@@ -21,13 +26,20 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-const respondWith = (body, ok = true) =>
-  fetch.mockResolvedValue({ ok, json: async () => body });
+const respondWith = (body, ok = true, status = ok ? 200 : 404) =>
+  fetch.mockResolvedValue({ ok, status, json: async () => body });
+
+const answer = (body, status = 200) => ({
+  ok: status < 400,
+  status,
+  json: async () => body,
+});
 
 describe("useBackendCapabilities", () => {
   it("starts unloaded and offering nothing", () => {
@@ -45,19 +57,69 @@ describe("useBackendCapabilities", () => {
     expect(result.current.reachable).toBe(true);
   });
 
-  it("treats a backend that is down as offering nothing", async () => {
+  it("treats a backend that is down as offering nothing, once the retries run out", async () => {
+    vi.useFakeTimers();
     fetch.mockRejectedValue(new Error("connection refused"));
     const { result } = renderHook(() => useBackendCapabilities());
-    await waitFor(() => expect(result.current.loaded).toBe(true));
+    await vi.advanceTimersByTimeAsync(HEALTH_RETRY_FOR_MS - 10_000);
+    expect(result.current.loaded).toBe(false);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(result.current.loaded).toBe(true);
     expect(result.current.reachable).toBe(false);
     expect(result.current.maxElements).toBe(0);
+    const asked = fetch.mock.calls.length;
+    // One at once, then one every interval to the end of the window.
+    expect(asked).toBe(Math.floor(HEALTH_RETRY_FOR_MS / HEALTH_RETRY_EVERY_MS) + 1);
+    await vi.advanceTimersByTimeAsync(HEALTH_RETRY_FOR_MS);
+    expect(fetch).toHaveBeenCalledTimes(asked);
   });
 
-  it("treats a non-OK response as unreachable", async () => {
-    respondWith({}, false);
+  // What Cloud Run did to the first request while an instance was starting: a
+  // 500 of the platform's own, which the browser sees as a network failure
+  // because it carries no CORS header. Settled on it, the page kept "no depth
+  // cap known" until reloaded.
+  it("asks again while a starting server cannot answer", async () => {
+    vi.useFakeTimers();
+    fetch
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(answer({}, 500))
+      .mockResolvedValueOnce(answer({}, 429))
+      .mockResolvedValue(answer({ status: "ok", max_neighbourhood_depth: 2 }));
+    const { result } = renderHook(() => useBackendCapabilities());
+    await vi.advanceTimersByTimeAsync(2 * HEALTH_RETRY_EVERY_MS);
+    expect(result.current.loaded).toBe(false);
+    await vi.advanceTimersByTimeAsync(HEALTH_RETRY_EVERY_MS);
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(result.current.loaded).toBe(true);
+    expect(result.current.reachable).toBe(true);
+    expect(result.current.maxDepth).toBe(2);
+  });
+
+  // The server counts a page load by the flag. A retry is the same load still
+  // asking to be counted; a re-check after a server scaled to zero is not a
+  // new one, and counting it would count every long visit twice.
+  it("asks to be counted until the server answers, and not again", async () => {
+    vi.useFakeTimers();
+    fetch
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(answer({}, 500))
+      .mockResolvedValue(answer({ status: "ok" }));
+    renderHook(() => useBackendCapabilities());
+    await vi.advanceTimersByTimeAsync(2 * HEALTH_RETRY_EVERY_MS);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    for (const [url] of fetch.mock.calls) expect(url).toMatch(/\?session=1$/);
+
+    await recheckBackendCapabilities();
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(fetch.mock.calls[3][0]).toMatch(/\/api\/health$/);
+  });
+
+  it("treats a non-OK response that is not about starting as unreachable, at once", async () => {
+    respondWith({}, false, 404);
     const { result } = renderHook(() => useBackendCapabilities());
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.reachable).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("asks the health endpoint exactly once", async () => {
@@ -65,7 +127,7 @@ describe("useBackendCapabilities", () => {
     const { result } = renderHook(() => useBackendCapabilities());
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health$/);
+    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health\?session=1$/);
   });
 
   // Replaces an abort-on-unmount test. Aborting was right while each mount
@@ -121,5 +183,38 @@ describe("useBackendCapabilities", () => {
     const { result } = renderHook(() => useBackendCapabilities());
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.maxElements).toBe(0);
+  });
+});
+
+// The start page calls this so that a backend scaled to zero starts while the
+// reader is still on it. It must be the editor's own request, started early —
+// not a second one.
+describe("prefetchBackendCapabilities", () => {
+  it("starts the health check with no component subscribed", () => {
+    respondWith({ status: "ok" });
+    prefetchBackendCapabilities();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health\?session=1$/);
+  });
+
+  it("is the request later callers join, not an extra one", async () => {
+    respondWith({ status: "ok", max_simulation_elements: 20 });
+    prefetchBackendCapabilities();
+    prefetchBackendCapabilities();
+    const { result } = renderHook(() => useBackendCapabilities());
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(result.current.maxElements).toBe(20);
+  });
+
+  it("hands its answer to a caller that arrives after it settled", async () => {
+    respondWith({ status: "ok", deployment: "hosted" });
+    prefetchBackendCapabilities();
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    const { result } = renderHook(() => useBackendCapabilities());
+    expect(result.current.loaded).toBe(true);
+    expect(result.current.deployment).toBe("hosted");
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

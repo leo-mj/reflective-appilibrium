@@ -41,8 +41,52 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   itself recommends, and confirmation is our own title/author/year check.
 - `CROSSREF_MAILTO` is the *operator's* address for Crossref's polite pool, set
   in `.env` and empty by default. Never populate it from whoever is using the app.
-- `import rethon` (via `routers/simulate_rethon`) configures logging with
-  `disable_existing_loggers` at its default, switching off every logger created
-  before it. `main.py` re-enables the `backend` tree after the router imports —
-  keep that block *after* them, or the assist routers go silent again.
+- **The server process never loads the rethon stack** (rethon, theodias,
+  numba, llvmlite, numpy, pandas, …). It was most of what a cold instance read
+  before it could answer — 263 MB of native libraries, about 25 s on Cloud Run
+  — and the server never computes with it: every simulation and score runs in a
+  worker (`process_pool.py`). So the router imports `services/rethon_tasks.py`
+  (validation, `SimulationFinished`, and stand-ins for the worker entry points
+  that import the real computation only inside a worker), never
+  `rethon_simulation` or `rethon_scoring`. `test_startup_imports.py` fails if
+  `import backend.main` loads any of it again.
+- **The workers are warmed from the start page** (`POST
+  /api/simulate_rethon/warm`, `warm_pool`), inside a request on purpose:
+  request-based billing gives an instance CPU only while a request is open.
+  Each worker also runs a small score or simulation (`services/rethon_warmup.py`):
+  theodias's numba functions are compiled on a worker's first call, not cached,
+  which cost the first real computation 1–2 s. `test_rethon_warmup.py` holds
+  that the small process compiles everything a larger one needs.
+- `import rethon` configures logging with `disable_existing_loggers` at its
+  default, switching off every logger that exists at that moment. Since rethon
+  is no longer imported at a fixed point in the server, the repair travels with
+  the import: `services/rethon_import.py` imports rethon and calls
+  `configure_backend_logging` again, and every module using rethon imports it
+  first. The same call gives `uvicorn` and `uvicorn.error` our handler —
+  uvicorn's own would quote exception messages — and keeps `uvicorn.access`
+  off, so the server needs it with rethon gone too: `main.py` calls it on
+  import. Python warnings go through it as well (`py.warnings`), so a JSON
+  collector gets them as one entry.
+- **The server logs one line as it stops** (`activity.py`, from `main.lifespan`):
+  uptime, requests served and how long since the last. A hosted instance is
+  stopped some while after its last request — Cloud Run sends SIGTERM first,
+  which uvicorn receives because the image `exec`s it — and how long it
+  survives idle is not a documented constant, so this is where it is read off.
+  Counts and times only.
+- `make measure-startup` (`backend/tools/measure_startup.py`) reports what
+  `import backend.main` loads and how long the server, the warm-up and the
+  first computations take. Compare the bytes across a change; times only on one
+  machine.
+- **Logs never quote content.** `ContentFreeFormatter` prints a traceback's
+  frames and exception types but no message, since messages quote input;
+  `test_log_privacy.py` holds every path to that. `LOG_FORMAT=json` (set on
+  Cloud Run by `deploy-backend`) writes one JSON object per line, with
+  `severity`, and `request_id` — the trace id the platform's proxy gave the
+  request, so a line can be found from the request log, or a fresh one.
+- **No visitor addresses are kept.** The rate limiter holds one in memory for
+  its minute, and no log line names one; the deployed service also excludes
+  Cloud Run's request log (`deploy-backend` setup in `ci.yml`). Usage is
+  counted instead by `/api/health?session=1`, which the app's health check
+  asks for until the server first answers — once per page load — and which
+  writes an identifier-free line to `backend.sessions`.
 - Target LLMs: Qwen3 30B quantized (consumer GPU), DeepSeek-V3.2 / GPT-OSS-120B (high-end)

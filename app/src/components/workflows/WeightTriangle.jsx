@@ -21,12 +21,14 @@
  *   f − a   = (px − CX) / (R·sin60)
  *   a, f    = ((1−s) ∓ (f−a)) / 2
  *
- * Points dragged outside the triangle are projected onto its boundary by
+ * A drag starts only from a press inside the triangle or on the handle; once
+ * started, points dragged outside it are projected onto its boundary by
  * clamping any negative coordinate to 0 and renormalising.
  */
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { C } from "../../constants/colors.js";
+import { Tooltip } from "../Tooltip.jsx";
 import { DEFAULT_WEIGHTS } from "../../constants/simulationWeights.js";
 
 // ─── Geometry ─────────────────────────────────────────────────────────────────
@@ -35,14 +37,14 @@ const W = 220;
 /** How wide the triangle draws itself, for whatever has to make room for it. */
 export const WEIGHT_TRIANGLE_WIDTH = W;
 const H = 200;
-const CX = W / 2;      // horizontal centre
-const CY = 112;        // vertical centre, shifted down to leave room for the top label
-const R = 72;          // circumradius
+const CX = W / 2; // horizontal centre
+const CY = 112; // vertical centre, shifted down to leave room for the top label
+const R = 72; // circumradius
 const SIN60 = Math.sqrt(3) / 2;
 
-const VS = { x: CX,             y: CY - R };        // Systematicity (top)
-const VA = { x: CX - R * SIN60, y: CY + R / 2 };   // Account       (bottom-left)
-const VF = { x: CX + R * SIN60, y: CY + R / 2 };   // Faithfulness  (bottom-right)
+const VS = { x: CX, y: CY - R }; // Systematicity (top)
+const VA = { x: CX - R * SIN60, y: CY + R / 2 }; // Account       (bottom-left)
+const VF = { x: CX + R * SIN60, y: CY + R / 2 }; // Faithfulness  (bottom-right)
 
 const TRI_PATH = `M ${VS.x},${VS.y} L ${VA.x},${VA.y} L ${VF.x},${VF.y} Z`;
 
@@ -74,12 +76,35 @@ function toPixel({ account: a, systematicity: s, faithfulness: f }) {
   };
 }
 
-/** SVG pixel position → barycentric weights (clamped to the triangle). */
-function fromPixel(px, py) {
+/** SVG pixel position → barycentric weights, unclamped: negative outside. */
+function barycentric(px, py) {
   const s = 1 / 3 - (2 / 3) * ((py - CY) / R);
   const fMinusA = (px - CX) / (R * SIN60);
-  const aRaw = ((1 - s) - fMinusA) / 2;
-  const fRaw = ((1 - s) + fMinusA) / 2;
+  return {
+    a: (1 - s - fMinusA) / 2,
+    s,
+    f: (1 - s + fMinusA) / 2,
+  };
+}
+
+/** Radius of the drag handle, and of the area a press on it is taken in. */
+const DOT_R = 7;
+
+/**
+ * Whether a press at this pixel may start a drag: inside the triangle, or on
+ * the handle, which overhangs the border when a weight is 0. Only the start is
+ * held to this — a drag already under way may leave the triangle and is
+ * projected back onto it.
+ */
+function startsDrag(px, py, dot) {
+  const { a, s, f } = barycentric(px, py);
+  if (Math.min(a, s, f) >= 0) return true;
+  return Math.hypot(px - dot.x, py - dot.y) <= DOT_R + 2;
+}
+
+/** SVG pixel position → barycentric weights (clamped to the triangle). */
+function fromPixel(px, py) {
+  const { a: aRaw, s, f: fRaw } = barycentric(px, py);
 
   // Clamp negatives to 0; this projects outside-triangle positions to the
   // nearest point on the triangle boundary.
@@ -87,8 +112,13 @@ function fromPixel(px, py) {
   const sv = Math.max(0, s);
   const f = Math.max(0, fRaw);
   const total = a + sv + f;
-  if (total === 0) return { account: 1 / 3, systematicity: 1 / 3, faithfulness: 1 / 3 };
-  return { account: a / total, systematicity: sv / total, faithfulness: f / total };
+  if (total === 0)
+    return { account: 1 / 3, systematicity: 1 / 3, faithfulness: 1 / 3 };
+  return {
+    account: a / total,
+    systematicity: sv / total,
+    faithfulness: f / total,
+  };
 }
 
 // ─── Vertex metadata ─────────────────────────────────────────────────────────
@@ -101,7 +131,7 @@ const VERTICES = [
     // label offset from vertex tip (dy[0] = label row, dy[1] = value row)
     labelDy: [-18, -7],
     tooltip:
-      "Systematising power of the theory — favour using fewer principles and background theories to cover more elements.",
+      "How much the principles and background theories imply, relative to how many there are. Higher values favour fewer of them implying more.",
   },
   {
     vertex: VA,
@@ -109,7 +139,7 @@ const VERTICES = [
     label: "Account",
     labelDy: [17, 28],
     tooltip:
-      "How well the principles and background theories account for the current elements. Higher values push toward a theory that explains more of your accepted elements.",
+      "How well the principles and background theories account for the commitments. Higher values push toward a theory that implies what you accept, and the negation of what you reject, contradicting neither.",
   },
   {
     vertex: VF,
@@ -117,7 +147,7 @@ const VERTICES = [
     label: "Faithfulness",
     labelDy: [17, 28],
     tooltip:
-      "How closely the revised commitments stay to the initial ones. Higher values resist dropping elements that were initially accepted.",
+      "How close the commitments stay to the position the simulation started from. Higher values resist giving up or reversing a commitment; taking up a new one costs nothing.",
   },
 ];
 
@@ -134,11 +164,13 @@ const ACCENT = C.principle.accent;
  */
 export function WeightTriangle({ weights, onChange, weightsChanged = false }) {
   const svgRef = useRef(null);
-  const dragging = useRef(false);
+  // State rather than a ref, because the cursor follows it: a drag carried
+  // out of the triangle keeps the crosshair.
+  const [dragging, setDragging] = useState(false);
 
-  function handlePointerEvent(e) {
+  function pointAt(e) {
     const rect = svgRef.current.getBoundingClientRect();
-    onChange(fromPixel(e.clientX - rect.left, e.clientY - rect.top));
+    return [e.clientX - rect.left, e.clientY - rect.top];
   }
 
   const dot = toPixel(weights);
@@ -150,24 +182,30 @@ export function WeightTriangle({ weights, onChange, weightsChanged = false }) {
       height={H}
       style={{
         display: "block",
-        cursor: "crosshair",
+        // Off the triangle a press does nothing, so only the triangle and the
+        // handle show the crosshair (each sets its own), except mid-drag.
+        cursor: dragging ? "crosshair" : "default",
         userSelect: "none",
         touchAction: "none",
       }}
       onPointerDown={(e) => {
-        dragging.current = true;
+        const [px, py] = pointAt(e);
+        if (!startsDrag(px, py, dot)) return;
+        setDragging(true);
         e.currentTarget.setPointerCapture(e.pointerId);
-        handlePointerEvent(e);
+        onChange(fromPixel(px, py));
       }}
       onPointerMove={(e) => {
-        if (dragging.current) handlePointerEvent(e);
+        if (dragging) onChange(fromPixel(...pointAt(e)));
       }}
-      onPointerUp={() => {
-        dragging.current = false;
-      }}
+      onPointerUp={() => setDragging(false)}
+      onPointerCancel={() => setDragging(false)}
     >
-      {/* Triangle fill */}
-      <path d={TRI_PATH} style={{ fill: C.panel, stroke: "none" }} />
+      {/* Triangle fill — the press target */}
+      <path
+        d={TRI_PATH}
+        style={{ fill: C.panel, stroke: "none", cursor: "crosshair" }}
+      />
 
       {/* Grid lines */}
       {GRID_LINES.map(([p1, p2], i) => (
@@ -177,29 +215,42 @@ export function WeightTriangle({ weights, onChange, weightsChanged = false }) {
           y1={p1.y}
           x2={p2.x}
           y2={p2.y}
-          style={{ stroke: C.border, strokeWidth: 0.5, opacity: 0.7 }}
+          style={{
+            stroke: C.border,
+            strokeWidth: 0.5,
+            opacity: 0.7,
+            pointerEvents: "none",
+          }}
         />
       ))}
 
       {/* Triangle border */}
       <path
         d={TRI_PATH}
-        style={{ fill: "none", stroke: C.border, strokeWidth: 1.5 }}
+        style={{
+          fill: "none",
+          stroke: C.border,
+          strokeWidth: 1.5,
+          pointerEvents: "none",
+        }}
       />
 
       {/* Vertex labels + current values */}
       {VERTICES.map(({ vertex, key, label, labelDy, tooltip }) => (
         <g key={key}>
-          <text
-            x={vertex.x}
-            y={vertex.y + labelDy[0]}
-            textAnchor="middle"
-            fontSize={10}
-            style={{ fill: C.dim, pointerEvents: "none" }}
-          >
-            <title>{tooltip}</title>
-            {label}
-          </text>
+          {/* The app's own tooltip rather than an SVG <title>, which drew the
+              browser's box — and never did, the label taking no pointer. */}
+          <Tooltip text={tooltip}>
+            <text
+              x={vertex.x}
+              y={vertex.y + labelDy[0]}
+              textAnchor="middle"
+              fontSize={10}
+              style={{ fill: C.dim }}
+            >
+              {label}
+            </text>
+          </Tooltip>
           <text
             x={vertex.x}
             y={vertex.y + labelDy[1]}
@@ -234,20 +285,32 @@ export function WeightTriangle({ weights, onChange, weightsChanged = false }) {
       <circle
         cx={dot.x}
         cy={dot.y}
-        r={7}
+        r={DOT_R}
         style={{ fill: ACCENT, opacity: 0.9, pointerEvents: "none" }}
       />
       <circle
         cx={dot.x}
         cy={dot.y}
-        r={7}
-        style={{ fill: "none", stroke: "white", strokeWidth: 1.5, pointerEvents: "none" }}
+        r={DOT_R}
+        style={{
+          fill: "none",
+          stroke: "white",
+          strokeWidth: 1.5,
+          pointerEvents: "none",
+        }}
       />
       <circle
         cx={dot.x}
         cy={dot.y}
         r={2}
         style={{ fill: "white", pointerEvents: "none" }}
+      />
+      {/* The handle's hover area, for the part of it overhanging the border */}
+      <circle
+        cx={dot.x}
+        cy={dot.y}
+        r={DOT_R + 2}
+        style={{ fill: "transparent", cursor: "crosshair" }}
       />
     </svg>
   );

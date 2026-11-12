@@ -164,7 +164,7 @@ _HOSTED_COMPUTATION_TIMEOUT = 60.0
 # its state. The largest any route's own caps admit, short of the state's nested
 # histories, is /api/llm/complete — 100 messages of 100,000 characters, just
 # under 10 MB. 10 MiB covers that, and matches client_max_body_size in the
-# compose stack's nginx (app/nginx/default.conf.template), so the two agree.
+# compose stack's nginx (app/nginx/site.inc.template), so the two agree.
 _HOSTED_MAX_BODY_BYTES = 10 * 1024 * 1024
 
 
@@ -284,6 +284,13 @@ class Settings(BaseSettings):
     # at the same time, at a core each.
     simulation_workers: int = Field(default=1, ge=1)
     scoring_workers: int = Field(default=1, ge=1)
+
+    # ── Logging ───────────────────────────────────────────────────────────────
+
+    # "text" for a person reading a terminal; "json" for a log collector — one
+    # object per line, with a severity it can filter on and a traceback kept in
+    # one entry. See logging_setup. Either way no exception's message is printed.
+    log_format: Literal["text", "json"] = "text"
 
     # ── Provider mechanics ────────────────────────────────────────────────────
 

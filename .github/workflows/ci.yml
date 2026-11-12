@@ -107,7 +107,6 @@ jobs:
       - name: Build and start
         run: docker compose up -d --build
 
-      # The same script .gitlab-ci.yml runs, so the two pipelines check one thing.
       - name: Check the page and the proxy
         run: ci/check-stack.sh http://127.0.0.1:8080
 
@@ -484,6 +483,17 @@ jobs:
   # notice, say €1: the free tier covers normal use, and the alert is what says
   # when that stops being true.
   #
+  # And keep no visitor addresses. Cloud Run logs every request with the
+  # caller's IP and user agent; this drops those entries before they are stored.
+  # The backend's own lines stay, and Cloud Monitoring still charts request
+  # counts, latency and errors, none of which holds an address:
+  #
+  #   gcloud logging sinks update _Default --add-exclusion='name=no-request-logs,filter=LOG_ID("run.googleapis.com/requests") AND resource.labels.service_name="appilibrium-backend"'
+  #
+  # Usage is counted without them: the web app's health check writes one
+  # "Session started." line per page load (health in backend/main.py). Logs
+  # Explorer: jsonPayload.logger="backend.sessions".
+  #
   # The run's summary prints the service URL, which is the VITE_BACKEND_URL the
   # deploy-cloudflare job needs.
   deploy-backend:
@@ -570,6 +580,8 @@ jobs:
           #   price is a few seconds' cold start after an idle spell.
           # TRUSTED_PROXY_HOPS=1: Cloud Run's front end appends the caller's
           #   address to x-forwarded-for, and that entry is the one to believe.
+          # LOG_FORMAT=json: Cloud Logging reads each line's severity, and keeps
+          #   a traceback as one entry instead of one per line.
           # The ^##^ prefix makes ## the separator, so CORS_ORIGINS may list
           #   several comma-separated origins.
           gcloud run deploy appilibrium-backend \
@@ -583,7 +595,7 @@ jobs:
             --max-instances 1 \
             --concurrency 40 \
             --timeout 300 \
-            --set-env-vars "^##^DEPLOYMENT=hosted##TRUSTED_PROXY_HOPS=1##CORS_ORIGINS=${{ vars.BACKEND_CORS_ORIGINS }}"
+            --set-env-vars "^##^DEPLOYMENT=hosted##TRUSTED_PROXY_HOPS=1##LOG_FORMAT=json##CORS_ORIGINS=${{ vars.BACKEND_CORS_ORIGINS }}"
 
       - name: Check it answers
         run: |
