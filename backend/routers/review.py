@@ -68,11 +68,11 @@ async def analyze_process(
 ) -> ReviewResponse:
     """Ask the LLM for a macro-level review of the process so far."""
     state = request.state
+    prompt = build_review_prompt(state)
     logger.info(
         f"Requesting process review from model '{llm.model}' at step {state.round} "
         f"({len(state.elements)} elements, {len(state.reviews)} earlier reviews)."
     )
-    prompt = build_review_prompt(state)
     result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,

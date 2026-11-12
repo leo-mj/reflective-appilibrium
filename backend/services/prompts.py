@@ -550,7 +550,7 @@ def _history_events(item: Union[REElement, RERelation]) -> list[dict[str, Any]]:
                 "round": item.revised_round,
                 "type": "revised",
                 "reason": None,
-                "previous_text": item.previous_text,
+                "previous_text": getattr(item, "previous_text", None),
             }
         )
     if item.rejected_round:

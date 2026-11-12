@@ -360,6 +360,22 @@ describe("buildMarkdown sections", () => {
     expect(back.topic).toBe("Test topic");
   });
 
+  it("reopens a file whose wording holds a fence, with every section ticked", async () => {
+    const text = "Quoting ``` and ```re-state inside a statement";
+    const state = makeState({
+      elements: [{ ...makeState().elements[0], text }],
+    });
+    const md = buildMarkdown(
+      state,
+      {},
+      new Set(EXPORT_SECTIONS.map((s) => s.key)),
+    );
+    const back = await importStateFromFile(
+      new File([md], "re.md", { type: "text/markdown" }),
+    );
+    expect(back.elements[0].text).toBe(text);
+  });
+
   it("offers groups, merged processes and reviews only where there are some", () => {
     const keys = (state) => exportSectionsFor(state).map((s) => s.key);
     for (const k of ["groups", "processes", "reviews"])

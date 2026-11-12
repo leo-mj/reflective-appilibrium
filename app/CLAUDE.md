@@ -438,6 +438,12 @@ settings one level down:
   opens it on Settings, where the wide ☰'s entries are at that width;
   `tourSections.test.js` holds every section ringing one of them to it.
 
+**Session leads with Import and Export**, under one `data-tutorial="menu-files"`
+wrapper, and the other ways in (Import from text, the merges) follow outside
+it. The tour rings that wrapper on a phone, where the strip above its sheet is
+about 230px; the whole group outgrew it once Import from text joined. A row
+added to Session goes after the wrapper, not into it.
+
 **Every tile name is one line.** A name that wraps pushes its icon up and its
 last line through the border. So the Merge tile is "Merge" whether it runs the
 file merge or, on the sample, the demo one — its tooltip says which — and the
@@ -1091,6 +1097,12 @@ padding itself by whichever edge it has given away (`TOUR_W`, `sheetHeight()`).
 What it draws sits beside it — `TourSection`, `TourControls` (progress bar,
 sheet handle, column edge) and `Spotlight`, whose rings `useTourRing` measures —
 and `tourHelpers.js` drops sections the state cannot carry.
+
+**The header's ? toggles it**: pressed while the tour runs, it closes it as
+the tour's own Close does (`restoreAfterTour` in `tourHelpers.js`, which both
+call), and its name says which a press will do. The dim takes no clicks, so
+the button stays reachable at the wide width; on a phone it is in the ☰ menu,
+which the tour holds shut.
 
 **Never fork the script.** A phone used to get a separate nine-card tour that
 walked the ☰ menu and never mentioned reflective equilibrium — the one thing a

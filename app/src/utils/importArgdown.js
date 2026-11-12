@@ -11,7 +11,11 @@
  * - **Statements** become elements. `#judgment`, `#principle` and `#theory`
  *   choose the type; an untagged statement is a judgment, which the domain
  *   model allows at any generality. `#withdrawn` and `#rejected` set the status,
- *   and `{confidence: 0.8}` the confidence (default 0.67, the add form's).
+ *   unless the caller passes `statusTags: false` — a map an LLM wrote has no
+ *   say in which claims the reader holds — and `{confidence: 0.8}` the
+ *   confidence (default 0.67, the add form's). `{origin: "…"}` names who
+ *   introduced it (default `"user"`), unless the caller passes an `origin`,
+ *   which then goes on every element and relation.
  * - **Arguments with a premise-conclusion structure** become inferential
  *   relations, one argument per inference step: one premise is `entails`,
  *   several `jointly_entails`. A step's premises are the statements since the
@@ -156,8 +160,12 @@ function canonicalText(node) {
   return "";
 }
 
-/** Type, status and confidence from a node's tags and data. */
-function readAttributes(node, title, notes) {
+/**
+ * Type, status, confidence and origin from a node's tags and data. With
+ * `statusTags` false every node is active, and the status tags it carried are
+ * counted in `ignored`; an `origin` given replaces whatever the data says.
+ */
+function readAttributes(node, title, notes, { statusTags, origin }, ignored) {
   const tags = (node.tags ?? []).map((t) => t.toLowerCase());
   const types = TYPE_TAGS.filter((t) => tags.includes(t));
   if (types.length > 1)
@@ -165,18 +173,26 @@ function readAttributes(node, title, notes) {
       `[${title}] is tagged ${types.map((t) => `#${t}`).join(" and ")}; read as a ${types[0]}.`,
     );
   const type = types[0] ?? "judgment";
-  const status = STATUS_TAGS.find((t) => tags.includes(t)) ?? "active";
+  const statusTag = STATUS_TAGS.find((t) => tags.includes(t));
+  if (statusTag && !statusTags) ignored.statusTags++;
+  const status = (statusTags && statusTag) || "active";
 
   const raw = Number(node.data?.confidence);
   const confidence =
     Number.isFinite(raw) && node.data?.confidence !== ""
       ? Math.min(1, Math.max(0, raw))
       : DEFAULT_CONFIDENCE;
-  const origin =
+  const said =
     typeof node.data?.origin === "string" && node.data.origin.trim()
       ? node.data.origin.trim().slice(0, 200)
       : "user";
-  return { type, status, confidence, origin, typed: types.length > 0 };
+  return {
+    type,
+    status,
+    confidence,
+    origin: origin ?? said,
+    typed: types.length > 0,
+  };
 }
 
 /**
@@ -249,12 +265,21 @@ function inferenceSteps(pcs) {
  *
  * @param {Object} model - Argdown's response, from `parseArgdown`.
  * @param {string} fallbackTopic - Used when the front matter has no title.
+ * @param {{ statusTags?: boolean, origin?: string }} [options] -
+ *   `statusTags: false` reads every element as active, whatever `#withdrawn`
+ *   or `#rejected` says; `origin` stamps every element and relation with it,
+ *   whatever the map's `{origin: …}` says.
  * @returns {REState}
  */
-export function modelToState(model, fallbackTopic) {
+export function modelToState(
+  model,
+  fallbackTopic,
+  { statusTags = true, origin } = {},
+) {
   const statements = model.statements ?? {};
   const args = model.arguments ?? {};
   const notes = [];
+  const ignored = { statusTags: 0 };
   const negations = findNegations(statements);
 
   // Every node that becomes an element, in document order: statements first,
@@ -276,7 +301,14 @@ export function modelToState(model, fallbackTopic) {
         node,
         isArgument: true,
       })),
-  ].map((n) => ({ ...n, ...readAttributes(n.node, n.title, notes) }));
+  ].map((n) => ({
+    ...n,
+    ...readAttributes(n.node, n.title, notes, { statusTags, origin }, ignored),
+  }));
+  if (ignored.statusTags)
+    notes.push(
+      `${ignored.statusTags} status tag${ignored.statusTags === 1 ? "" : "s"} (#withdrawn, #rejected) ignored: every element arrives active, which claims to hold being the reader's decision.`,
+    );
 
   // A title that is already a well-formed id of the element's type keeps it;
   // everything else is numbered after those, so nothing is taken twice.
@@ -389,7 +421,7 @@ export function modelToState(model, fallbackTopic) {
     if (rel.from === rel.to || seen.has(key)) return;
     seen.add(key);
     if (rel.argumentId) argued.add(`${rel.from} ${rel.type} ${rel.to}`);
-    relations.push(rel);
+    relations.push(origin ? { ...rel, origin } : rel);
   };
 
   // Arguments with a structure: one argument per inference step.
@@ -515,16 +547,22 @@ export function modelToState(model, fallbackTopic) {
  * Reads an Argdown File into a fresh RE state.
  *
  * @param {File} file
+ * @param {{ statusTags?: boolean, origin?: string }} [options] - As for
+ *   `modelToState`.
  * @returns {Promise<REState>}
  * @throws {Error} With a user-readable message on any failure.
  */
-export async function importArgdownFromFile(file) {
+export async function importArgdownFromFile(file, options) {
   if (file.size > MAX_FILE_SIZE)
     throw new Error(
-      `File too large (max 500 KB, got ${Math.round(file.size / 1024)} KB).`,
+      `Too large to import (max 500 KB, got ${Math.round(file.size / 1024)} KB).`,
     );
   const model = await parseArgdown(await file.text());
-  const state = modelToState(model, file.name.replace(/\.(argdown|ad)$/i, ""));
+  const state = modelToState(
+    model,
+    file.name.replace(/\.(argdown|ad)$/i, ""),
+    options,
+  );
   if (!state.elements.length)
     throw new Error("No statements or arguments found in that Argdown file.");
   return state;
