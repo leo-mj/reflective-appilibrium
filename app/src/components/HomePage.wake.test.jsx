@@ -52,7 +52,9 @@ describe("the start page in the backend build", () => {
   it("asks for the backend's health as it appears, then warms its workers", async () => {
     renderHome();
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(fetch.mock.calls[0][0]).toBe("https://backend.test/api/health");
+    expect(fetch.mock.calls[0][0]).toBe(
+      "https://backend.test/api/health?session=1",
+    );
     expect(fetch.mock.calls[1][0]).toBe(
       "https://backend.test/api/simulate_rethon/warm",
     );

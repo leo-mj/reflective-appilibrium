@@ -12,6 +12,7 @@ vi.mock("../config.js", () => ({
 const {
   useBackendCapabilities,
   prefetchBackendCapabilities,
+  recheckBackendCapabilities,
   resetBackendCapabilities,
   HEALTH_RETRY_FOR_MS,
   HEALTH_RETRY_EVERY_MS,
@@ -94,6 +95,25 @@ describe("useBackendCapabilities", () => {
     expect(result.current.maxDepth).toBe(2);
   });
 
+  // The server counts a page load by the flag. A retry is the same load still
+  // asking to be counted; a re-check after a server scaled to zero is not a
+  // new one, and counting it would count every long visit twice.
+  it("asks to be counted until the server answers, and not again", async () => {
+    vi.useFakeTimers();
+    fetch
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(answer({}, 500))
+      .mockResolvedValue(answer({ status: "ok" }));
+    renderHook(() => useBackendCapabilities());
+    await vi.advanceTimersByTimeAsync(2 * HEALTH_RETRY_EVERY_MS);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    for (const [url] of fetch.mock.calls) expect(url).toMatch(/\?session=1$/);
+
+    await recheckBackendCapabilities();
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(fetch.mock.calls[3][0]).toMatch(/\/api\/health$/);
+  });
+
   it("treats a non-OK response that is not about starting as unreachable, at once", async () => {
     respondWith({}, false, 404);
     const { result } = renderHook(() => useBackendCapabilities());
@@ -107,7 +127,7 @@ describe("useBackendCapabilities", () => {
     const { result } = renderHook(() => useBackendCapabilities());
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health$/);
+    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health\?session=1$/);
   });
 
   // Replaces an abort-on-unmount test. Aborting was right while each mount
@@ -174,7 +194,7 @@ describe("prefetchBackendCapabilities", () => {
     respondWith({ status: "ok" });
     prefetchBackendCapabilities();
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health$/);
+    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/health\?session=1$/);
   });
 
   it("is the request later callers join, not an extra one", async () => {

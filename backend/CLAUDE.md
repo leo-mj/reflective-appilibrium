@@ -60,8 +60,13 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
 - `import rethon` configures logging with `disable_existing_loggers` at its
   default, switching off every logger that exists at that moment. Since rethon
   is no longer imported at a fixed point in the server, the repair travels with
-  the import: `services/rethon_import.py` imports rethon and re-enables the
-  `backend` tree, and every module using rethon imports it first.
+  the import: `services/rethon_import.py` imports rethon and calls
+  `configure_backend_logging` again, and every module using rethon imports it
+  first. The same call gives `uvicorn` and `uvicorn.error` our handler —
+  uvicorn's own would quote exception messages — and keeps `uvicorn.access`
+  off, so the server needs it with rethon gone too: `main.py` calls it on
+  import. Python warnings go through it as well (`py.warnings`), so a JSON
+  collector gets them as one entry.
 - **The server logs one line as it stops** (`activity.py`, from `main.lifespan`):
   uptime, requests served and how long since the last. A hosted instance is
   stopped some while after its last request — Cloud Run sends SIGTERM first,
@@ -72,4 +77,16 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   `import backend.main` loads and how long the server, the warm-up and the
   first computations take. Compare the bytes across a change; times only on one
   machine.
+- **Logs never quote content.** `ContentFreeFormatter` prints a traceback's
+  frames and exception types but no message, since messages quote input;
+  `test_log_privacy.py` holds every path to that. `LOG_FORMAT=json` (set on
+  Cloud Run by `deploy-backend`) writes one JSON object per line, with
+  `severity`, and `request_id` — the trace id the platform's proxy gave the
+  request, so a line can be found from the request log, or a fresh one.
+- **No visitor addresses are kept.** The rate limiter holds one in memory for
+  its minute, and no log line names one; the deployed service also excludes
+  Cloud Run's request log (`deploy-backend` setup in `ci.yml`). Usage is
+  counted instead by `/api/health?session=1`, which the app's health check
+  asks for until the server first answers — once per page load — and which
+  writes an identifier-free line to `backend.sessions`.
 - Target LLMs: Qwen3 30B quantized (consumer GPU), DeepSeek-V3.2 / GPT-OSS-120B (high-end)

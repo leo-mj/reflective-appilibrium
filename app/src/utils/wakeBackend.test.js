@@ -60,7 +60,7 @@ describe("wakeBackend", () => {
     expect(phase(result)).toBe("starting");
     expect(net.fetchMock).toHaveBeenCalledTimes(1);
     expect(net.fetchMock.mock.calls[0][0]).toBe(
-      "https://backend.test/api/health",
+      "https://backend.test/api/health?session=1",
     );
 
     await net.answer("/api/health", { status: "ok" });

@@ -90,7 +90,7 @@ def get_rethon_final_state(
     re.set_model_parameters(neighbourhood_depth=neighbourhood_depth)
     re.re_process(max_steps=max_steps_for(n_unnegated_sentence_pool))
     end = time.time()
-    logger.info(f"Completed rethon simulation in {end - start:.2f} seconds'")
+    logger.info(f"Completed rethon simulation in {end - start:.2f} seconds.")
     return re
 
 

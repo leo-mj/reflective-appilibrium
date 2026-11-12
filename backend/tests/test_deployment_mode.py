@@ -211,6 +211,32 @@ def test_health_needs_no_token_even_when_one_is_configured():
         app.dependency_overrides.clear()
 
 
+# ── Sessions are counted, visitors are not identified ─────────────────────────
+
+
+def test_the_apps_health_check_counts_a_session(caplog):
+    client = _client_with(make_settings(deployment="hosted"))
+    try:
+        with caplog.at_level("INFO", logger="backend.sessions"):
+            client.get("/api/health")  # an uptime check
+            client.get(
+                "/api/health?session=1",
+                headers={
+                    "user-agent": "Mozilla/5.0 (Visitor's Browser)",
+                    "x-forwarded-for": "203.0.113.7",
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    lines = [r for r in caplog.records if r.name == "backend.sessions"]
+    assert len(lines) == 1, "the uptime check is not a session"
+    # The record itself, not just its message: a formatter can print any field.
+    written = str(vars(lines[0]))
+    for identifying in ("203.0.113.7", "testclient", "Visitor's Browser"):
+        assert identifying not in written
+
+
 # ── Rate-limit identity ───────────────────────────────────────────────────────
 
 
@@ -364,6 +390,8 @@ def test_an_untrusted_proxy_is_logged_exactly_once(fresh_proxy_warning, caplog):
             assert _identity(s, "10.0.0.2", headers=headers) == "ip:10.0.0.2"
     warnings = [r for r in caplog.records if "forwarded-allow-ips" in r.message]
     assert len(warnings) == 1
+    # Without a proxy in front, the peer is a visitor's address.
+    assert "10.0.0.2" not in warnings[0].getMessage()
 
 
 def test_a_local_instance_does_not_warn_about_proxies(fresh_proxy_warning, caplog):

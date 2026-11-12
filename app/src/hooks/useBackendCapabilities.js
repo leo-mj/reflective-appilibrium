@@ -79,10 +79,19 @@ const isRetryable = (status) => status === 429 || status >= 500;
 
 let retryTimer = null;
 
+// Whether the server has counted this page load yet. `session=1` makes a health
+// check the server's count of sessions, and nothing in it says whose (see
+// health in backend/main.py). Asked for until the server answers, so a retry
+// after a failure still asks, and a later re-check — a page whose server
+// scaled to zero behind it — does not count the same visit again.
+let sessionCounted = false;
+
 function askHealth() {
-  return fetch(`${BACKEND_URL}/api/health`).then(async (res) => {
-    if (res.ok) return { data: await res.json(), retry: false };
-    return { data: null, retry: isRetryable(res.status) };
+  const url = `${BACKEND_URL}/api/health${sessionCounted ? "" : "?session=1"}`;
+  return fetch(url).then(async (res) => {
+    if (!res.ok) return { data: null, retry: isRetryable(res.status) };
+    sessionCounted = true;
+    return { data: await res.json(), retry: false };
   });
 }
 
@@ -194,6 +203,7 @@ export function resetBackendCapabilities() {
   retryTimer = null;
   inFlight = null;
   pending = false;
+  sessionCounted = false;
   current = BACKEND_ENABLED ? UNAVAILABLE : { ...UNAVAILABLE, loaded: true };
   listeners.clear();
 }
