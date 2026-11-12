@@ -9,6 +9,7 @@ import { ModalShell } from "./user_edits/ModalShell.jsx";
 import { MergeModal } from "./user_edits/MergeModal.jsx";
 import { ExportModal } from "./user_edits/ExportModal.jsx";
 import { SampleEditsNotice } from "./app_header/SampleEditsNotice.jsx";
+import { ServerWakeNotice } from "./app_header/ServerWakeNotice.jsx";
 import {
   ASSIST_TABS,
   SIMULATE_TABS,
@@ -369,6 +370,7 @@ export function AppHeader({
           }
         />
         {sampleNotice}
+        <ServerWakeNotice />
       </>
     );
   }
@@ -387,6 +389,7 @@ export function AppHeader({
         tourMenuOpen={tourMenuOpen}
       />
       {sampleNotice}
+      <ServerWakeNotice />
     </>
   );
 }
