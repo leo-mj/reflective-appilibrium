@@ -190,14 +190,16 @@ def configure_backend_logging(log_format: Optional[str] = None) -> None:
     routers.simulate_rethon, the assist routers among them, including the error
     logs that say a model returned unparseable JSON.
 
-    uvicorn's loggers exist before the app is imported, so they were switched
-    off too — among them the one that reports an exception escaping the app,
-    which left a crash with a 500 and no traceback anywhere. ``uvicorn`` and
-    ``uvicorn.error`` are switched back on here, through our handler: uvicorn's
-    own would quote each exception's message, which is the server's one way
-    for a stranger's text to reach the log. ``uvicorn.access`` stays off, as it
-    has been: the platform's proxy keeps a record of every request already, and
-    the score badges alone make a request per edit.
+    uvicorn's loggers exist before the app is imported, so while the server
+    imported rethon they were switched off too — among them the one that
+    reports an exception escaping the app, which left a crash with a 500 and no
+    traceback anywhere. The server no longer imports it (services/rethon_tasks),
+    which left them on with uvicorn's own handler, and that one quotes each
+    exception's message: the server's one way for a stranger's text to reach
+    the log. So ``uvicorn`` and ``uvicorn.error`` are switched on here, through
+    our handler, either way. ``uvicorn.access`` is kept off: the platform's
+    proxy keeps a record of every request already, and the score badges alone
+    make a request per edit.
 
     Python's warnings — rethon's numpy raises one on most simulations — come
     through the handler too, rather than printed straight to stderr, where a

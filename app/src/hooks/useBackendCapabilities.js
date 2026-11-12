@@ -1,5 +1,5 @@
 /**
- * @fileoverview Asks the backend what it can actually do, once per mount.
+ * @fileoverview Asks the backend what it can actually do, once per page load.
  *
  * Build-time flags say whether a backend exists; they cannot say what that
  * backend is configured to allow. The element cap in particular is a server
@@ -60,15 +60,68 @@ function settle(next) {
   listeners.forEach((fn) => fn());
 }
 
+/**
+ * How long a health check that fails keeps being retried, and how often.
+ *
+ * A hosted backend that has scaled to zero takes tens of seconds to start, and
+ * the platform does not always hold the first request that long: Cloud Run
+ * answered one with a 500 of its own, carrying no CORS header, which a browser
+ * reports as a network failure. Settled on that single failure, the page held
+ * "unreachable" until it was reloaded — no depth cap known, so the Simulate tab
+ * offered a choice the server then refused. So a failure that a starting server
+ * explains is asked again, for longer than a start takes.
+ */
+export const HEALTH_RETRY_FOR_MS = 90_000;
+export const HEALTH_RETRY_EVERY_MS = 3_000;
+
+/** A 404 or 401 says something about the server, not about it starting. */
+const isRetryable = (status) => status === 429 || status >= 500;
+
+let retryTimer = null;
+
+// Whether the server has counted this page load yet. `session=1` makes a health
+// check the server's count of sessions, and nothing in it says whose (see
+// health in backend/main.py). Asked for until the server answers, so a retry
+// after a failure still asks, and a later re-check — a page whose server
+// scaled to zero behind it — does not count the same visit again.
+let sessionCounted = false;
+
+function askHealth() {
+  const url = `${BACKEND_URL}/api/health${sessionCounted ? "" : "?session=1"}`;
+  return fetch(url).then(async (res) => {
+    if (!res.ok) return { data: null, retry: isRetryable(res.status) };
+    sessionCounted = true;
+    return { data: await res.json(), retry: false };
+  });
+}
+
+// Whether the check in flight has settled. A settled one is still `inFlight`,
+// so that later callers reuse its answer; a re-check replaces it.
+let pending = false;
+
 function load() {
   if (!BACKEND_ENABLED || inFlight) return inFlight;
-  // A backend that is simply down must not leave the page waiting: a failed
-  // check settles as "nothing available", which is the state the demo build is
-  // in permanently.
-  // `session=1` makes this the server's count of sessions: one per tab, and
-  // nothing in it says whose (see health in backend/main.py).
-  inFlight = fetch(`${BACKEND_URL}/api/health?session=1`)
-    .then((res) => (res.ok ? res.json() : null))
+  pending = true;
+  const giveUpAt = Date.now() + HEALTH_RETRY_FOR_MS;
+  // A network failure is retried too: the platform's own error reaches the page
+  // as one, having no CORS header.
+  const attempt = () =>
+    askHealth()
+      .catch(() => ({ data: null, retry: true }))
+      .then(({ data, retry }) =>
+        retry && Date.now() + HEALTH_RETRY_EVERY_MS <= giveUpAt
+          ? new Promise((resolve) => {
+              retryTimer = setTimeout(
+                () => resolve(attempt()),
+                HEALTH_RETRY_EVERY_MS,
+              );
+            })
+          : data,
+      );
+  // A backend that is simply down must not leave the page waiting for ever: once
+  // the retries run out it settles as "nothing available", which is the state
+  // the demo build is in permanently.
+  inFlight = attempt()
     .then((data) =>
       settle({
         loaded: true,
@@ -80,8 +133,52 @@ function load() {
         maxDepth: data?.max_neighbourhood_depth ?? 0,
       }),
     )
-    .catch(() => settle({ ...UNAVAILABLE, loaded: true }));
+    .catch(() => settle({ ...UNAVAILABLE, loaded: true }))
+    .finally(() => {
+      pending = false;
+    })
+    // Resolves to what was settled, for callers that act on the answer rather
+    // than render it (utils/wakeBackend.js).
+    .then(() => current);
   return inFlight;
+}
+
+/**
+ * Asks again, with the same retries, unless a check is already under way.
+ *
+ * For a page that has been open a while: a hosted backend that scaled to zero
+ * behind it restarts on the next request, and the answer the page holds — or
+ * the "unreachable" it settled on — is about a server that is no longer there.
+ * What is known stays in place until the new answer arrives, so nothing that
+ * reads it blinks off in the meantime.
+ *
+ * @returns {Promise<BackendCapabilities>|null}
+ */
+export function recheckBackendCapabilities() {
+  if (!BACKEND_ENABLED) return null;
+  if (pending) return inFlight;
+  inFlight = null;
+  return load();
+}
+
+/**
+ * Starts the shared health check without waiting for a component to want it.
+ *
+ * The check doubles as the backend's wake-up call: a hosted backend that has
+ * scaled to zero starts an instance when the first request reaches it, and
+ * that takes tens of seconds. Left to the first subscriber, the request went
+ * out only once the editor opened, so the whole start-up landed on the reader's
+ * first minute in it. Called from the start page, the start-up happens while
+ * they are still reading it.
+ *
+ * It is the same request the app makes anyway — later subscribers join it —
+ * so it costs nothing extra, and in the demo build it does nothing.
+ *
+ * @returns {Promise<BackendCapabilities>|null} The settled capabilities, or
+ *   null in the demo build, where nothing is asked.
+ */
+export function prefetchBackendCapabilities() {
+  return load();
 }
 
 /**
@@ -102,7 +199,11 @@ export function useBackendCapabilities() {
 
 /** Forgets the cached health check. For tests. */
 export function resetBackendCapabilities() {
+  clearTimeout(retryTimer);
+  retryTimer = null;
   inFlight = null;
+  pending = false;
+  sessionCounted = false;
   current = BACKEND_ENABLED ? UNAVAILABLE : { ...UNAVAILABLE, loaded: true };
   listeners.clear();
 }

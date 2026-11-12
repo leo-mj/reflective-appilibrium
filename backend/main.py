@@ -38,15 +38,18 @@ from .routers import (
     arguments,
 )
 from .logging_setup import RequestIdMiddleware, configure_backend_logging
+from .activity import ActivityMiddleware, shutdown_summary
 from .process_pool import shutdown_pools
 from .security_headers import SecurityHeadersMiddleware
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
-# Must stay after the router imports: `import rethon`, reached through
-# routers.simulate_rethon, disables every logger created before it, and this is
-# what switches ours back on. See logging_setup for the whole story — the
-# simulation workers call the same function, so the two cannot drift.
+# Gives the backend's loggers their handler, and uvicorn's — whose own would
+# quote exception messages. It also used to undo `import rethon`, which disables
+# every logger created before it and was reached through the router; the server
+# process no longer imports rethon at all, and the repair now travels with the
+# import (services/rethon_import.py). See logging_setup — the simulation workers
+# call the same function, so the two cannot drift.
 configure_backend_logging()
 
 # ── App ────────────────────────────────────────────────────────────────────────
@@ -54,12 +57,14 @@ configure_backend_logging()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    """Stop the simulation workers on shutdown.
+    """Stop the simulation workers on shutdown, and say how long it was idle.
 
     Only shutdown: the pool is created lazily on first use, not here, because the
-    test suite never runs startup — see process_pool.
+    test suite never runs startup — see process_pool. The log line is how long a
+    hosted instance survives without requests can be read off (see activity).
     """
     yield
+    logging.getLogger("backend.main").info(shutdown_summary())
     shutdown_pools()
 
 
@@ -101,8 +106,11 @@ app.add_middleware(
 )
 # Added outside CORS, so a CORS preflight answer carries the headers too.
 app.add_middleware(SecurityHeadersMiddleware)
-# Outside even that, so every line any request causes carries its id — uvicorn's
-# report of an exception that escaped the app included.
+# Outside even that, so that every request counts as activity — a preflight or a
+# refused one keeps a hosted instance awake as much as any other.
+app.add_middleware(ActivityMiddleware)
+# Outermost, so every line any request causes carries its id — uvicorn's report
+# of an exception that escaped the app included.
 app.add_middleware(RequestIdMiddleware)
 
 # ── Routers ────────────────────────────────────────────────────────────────────
@@ -190,8 +198,10 @@ async def health(
     Deliberately outside the access-token gate so an uptime check needs no
     credential.
 
-    ``?session=1`` is the web app's own check, made once per tab when a process
-    opens, and each one writes a line to ``backend.sessions``: what the operator
+    ``?session=1`` is the web app's own check, asked for once per page load —
+    from the start page, until the server first answers (the check's retries
+    while a cold instance starts carry it; a later re-check does not) — and
+    each one answered writes a line to ``backend.sessions``: what the operator
     counts usage by. A count and nothing else — no address, no browser, nothing
     kept on the visitor's device — so a returning visitor counts again, which is
     the price of not recognising anyone. Uptime checks leave the flag off and

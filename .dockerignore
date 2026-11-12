@@ -17,3 +17,6 @@ backend/**/*.pyc
 backend/*.log
 backend/.server.pid
 backend/.pytest_cache/
+
+# Developer tooling, never imported by the server.
+backend/tools/
