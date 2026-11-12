@@ -220,14 +220,29 @@ export function SettingsMenuItems({
 
       <div style={menuDividerStyle} />
 
-      <div style={menuGroupStyle} data-tutorial="menu-files">
-        <div style={menuHeadingStyle}>{MENU_HEADINGS.session}</div>
-        <Tooltip text={MENU_TOOLTIPS.import}>
-          <button onClick={leaving(handleImportClick)} style={itemStyle}>
-            <span style={menuIconStyle}>↑</span>
-            {MENU_LABELS.import}
-          </button>
-        </Tooltip>
+      <div style={menuGroupStyle}>
+        {/* Import and Export first, together: they are the round trip the tour's
+            "Saving your progress" rings, and the ring has to fit the strip a
+            phone leaves above the tour's sheet — the whole group, with Import
+            from text and the merges, is taller than that. */}
+        <div style={menuGroupStyle} data-tutorial="menu-files">
+          <div style={menuHeadingStyle}>{MENU_HEADINGS.session}</div>
+          <Tooltip text={MENU_TOOLTIPS.import}>
+            <button onClick={leaving(handleImportClick)} style={itemStyle}>
+              <span style={menuIconStyle}>↑</span>
+              {MENU_LABELS.import}
+            </button>
+          </Tooltip>
+          <Tooltip text={MENU_TOOLTIPS.export}>
+            <button
+              onClick={leaving(onDownload)}
+              style={{ ...itemStyle, color: C.theory.text }}
+            >
+              <span style={menuIconStyle}>↓</span>
+              {MENU_LABELS.export}
+            </button>
+          </Tooltip>
+        </div>
         <Tooltip text={MENU_TOOLTIPS.textImport}>
           <button onClick={leaving(handleTextImportClick)} style={itemStyle}>
             <span style={menuIconStyle}>¶</span>
@@ -259,15 +274,6 @@ export function SettingsMenuItems({
             </button>
           </Tooltip>
         )}
-        <Tooltip text={MENU_TOOLTIPS.export}>
-          <button
-            onClick={leaving(onDownload)}
-            style={{ ...itemStyle, color: C.theory.text }}
-          >
-            <span style={menuIconStyle}>↓</span>
-            {MENU_LABELS.export}
-          </button>
-        </Tooltip>
       </div>
     </>
   );

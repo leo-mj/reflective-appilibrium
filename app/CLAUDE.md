@@ -438,6 +438,12 @@ settings one level down:
   opens it on Settings, where the wide ☰'s entries are at that width;
   `tourSections.test.js` holds every section ringing one of them to it.
 
+**Session leads with Import and Export**, under one `data-tutorial="menu-files"`
+wrapper, and the other ways in (Import from text, the merges) follow outside
+it. The tour rings that wrapper on a phone, where the strip above its sheet is
+about 230px; the whole group outgrew it once Import from text joined. A row
+added to Session goes after the wrapper, not into it.
+
 **Every tile name is one line.** A name that wraps pushes its icon up and its
 last line through the border. So the Merge tile is "Merge" whether it runs the
 file merge or, on the sample, the demo one — its tooltip says which — and the
