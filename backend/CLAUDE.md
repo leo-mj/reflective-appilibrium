@@ -56,6 +56,12 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   nothing to show is dropped — citing an index nothing defines, or no premise
   (`dropped_count`). An added premise worded as an existing sentence is read as
   that sentence first, in either mode (`identify_repeated_premises`).
+  **A bridge that only restates the inference** — "If <premises>, then
+  <conclusion>", quoting them whole (`restates_inference`) — is neither failed
+  nor folded into "Valid given": it is no meaning postulate, but such a
+  conditional can be plausible or worth defending in a later round, so it is
+  surfaced as a substantive premise, a new element like any other. The prompt
+  still asks the model not to write them, so they do not crowd the suggestions.
 - **The prompt spells out the bookkeeping the checker tests** (`build_prompt`)
   — each postulate's form is the bridge from its argument's other indices to
   the conclusion — and asks the model to check every argument against it before

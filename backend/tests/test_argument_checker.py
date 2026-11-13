@@ -332,7 +332,7 @@ def test_every_failure_code_has_a_reason_for_the_reader():
     from backend.services.arguments import CHECK_FAILURES
 
     codes = {"invalid", "circular", "inconsistent", "unparseable", "self_reference"}
-    assert codes | {"postulates_only", "restatement"} == set(CHECK_FAILURES)
+    assert codes | {"postulates_only"} == set(CHECK_FAILURES)
 
 
 def test_empty_input():

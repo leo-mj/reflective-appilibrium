@@ -299,7 +299,7 @@ def _premise(index, text, role="premise", form=None, etype="principle"):
     return AddedPremise(index=index, type=etype, text=text, role=role, form=form)
 
 
-def test_the_reported_argument_is_tagged_as_a_restatement():
+def test_a_bridge_restating_the_inference_is_surfaced_as_a_premise():
     # As a model returned it: premise 4 copies sentence 1 word for word, and
     # the postulate is "If <1>, then <2>". It surfaced as 1 + 4 → 2, valid
     # given the bare conditional, with the same claim shown twice.
@@ -321,11 +321,14 @@ def test_the_reported_argument_is_tagged_as_a_restatement():
         pool_indices={1, 2, 3},
         pool_texts=POOL_TEXTS,
     )
-    # The copy is read as sentence 1, and the bridge is shown as a premise,
-    # tagged, rather than folded away as "Valid given".
+    # The copy is read as sentence 1. The bridge is no meaning postulate but
+    # may be a claim worth holding, so the argument passes with it as a
+    # premise of its own — an element the reader can accept, reject or argue
+    # about — rather than folded away as "Valid given" or failed.
     assert out.arguments == [[1, 5, 2]]
-    assert [f.code for f in out.failures] == ["restatement"]
-    assert [p.index for p in out.premises] == [5]
+    assert out.failures == [None]
+    assert out.postulates == [[]]
+    assert [(p.index, p.role) for p in out.premises] == [(5, "premise")]
 
 
 def test_a_repeated_premise_is_read_as_the_sentence_it_repeats():

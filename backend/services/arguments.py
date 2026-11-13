@@ -657,12 +657,14 @@ def restates_inference(postulate: AddedPremise, texts: Dict[int, str]) -> bool:
     """Whether a postulate's text only quotes the sentences its form connects.
 
     "If <premise>, then <conclusion>", with both sentences copied in word for
-    word, is the bare conditional the prompt forbids: it re-encodes the
-    inference rather than licensing it, and makes any step valid. The form
-    cannot tell it apart — every postulate has the shape ``premises ->
-    conclusion`` — but the wording can: every sentence the form mentions appears
-    whole in the postulate's text. A paraphrase passes; so does a postulate
-    whose sentences' texts are not all known.
+    word, is the bare conditional the prompt asks the model not to write. It is
+    no meaning postulate — nothing about the words makes it true — but it can
+    still be a plausible claim, or one worth defending in a later round, so
+    ``verify_and_partition`` surfaces it as a substantive premise rather than
+    failing the argument. The form cannot tell it apart — every postulate has
+    the shape ``premises -> conclusion`` — but the wording can: every sentence
+    the form mentions appears whole in the postulate's text. A paraphrase is
+    not caught; nor is a postulate whose sentences' texts are not all known.
     """
     try:
         indices = sentences_in_form(postulate.form or "")
@@ -692,10 +694,6 @@ CHECK_FAILURES: Dict[str, str] = {
     ),
     "postulates_only": (
         "It rests on meaning postulates alone: no premise has content of its own."
-    ),
-    "restatement": (
-        "Its bridging premise only restates the inference, as "
-        "“if <premises>, then <conclusion>”."
     ),
 }
 
@@ -736,10 +734,16 @@ def verify_and_partition(
     surfaced argument runs directly from its substantive premises to its
     conclusion, with the postulate texts reported separately ("Valid given").
 
-    One that **fails** — formally invalid, uninformative, unreadable, resting
-    on postulates alone, or on a postulate that only restates it (see
-    ``restates_inference``, which needs ``pool_texts`` to recognise a quoted
-    pool sentence) — is surfaced as proposed, tagged with the reason. Its
+    A postulate that only restates the inference — "if <premises>, then
+    <conclusion>" (``restates_inference``, which needs ``pool_texts`` to
+    recognise a quoted pool sentence) — is not true in virtue of meaning, so it
+    is read as a substantive premise: its form still checks the argument, but
+    it stays among the premises and enters the pool, where the reader can
+    accept, reject or argue about it like any other.
+
+    One that **fails** — formally invalid, uninformative, unreadable, or
+    resting on postulates alone — is surfaced as proposed, tagged with the
+    reason. Its
     postulates stay among its premises and enter the pool like any added
     premise: folding a bridge into "Valid given" is what passing earns, and
     left in plain sight a bridge can be read and rejected. Passing arguments
@@ -750,9 +754,17 @@ def verify_and_partition(
     """
     logger.info(f"Checking {len(detected)} arguments.")
 
+    texts = {**(pool_texts or {}), **{p.index: p.text for p in added_premises}}
+    added_premises = [
+        (
+            p.model_copy(update={"role": "premise"})
+            if p.role == "postulate" and restates_inference(p, texts)
+            else p
+        )
+        for p in added_premises
+    ]
     forms = {p.index: p.form for p in added_premises if p.form}
     by_index = {p.index: p for p in added_premises}
-    texts = {**(pool_texts or {}), **{p.index: p.text for p in added_premises}}
     # Trim preference: when a postulate and a substantive premise are
     # interchangeable, drop the postulate — keeping the substantive version
     # keeps the contestable commitment visible as a rejectable element (the
@@ -781,9 +793,7 @@ def verify_and_partition(
                 logger.info(f"Auto-trimmed argument {arg} to {trimmed}.")
             postulates = [by_index[abs(n)] for n in trimmed[:-1] if is_postulate(n)]
             stripped = [n for n in trimmed[:-1] if not is_postulate(n)] + [trimmed[-1]]
-            if any(restates_inference(p, texts) for p in postulates):
-                failure = "restatement"
-            elif len(stripped) < 2:
+            if len(stripped) < 2:
                 failure = "postulates_only"
             else:
                 passed.append((stripped, [p.text for p in postulates]))
