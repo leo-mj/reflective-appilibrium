@@ -373,6 +373,10 @@ function validateRelation(r, i) {
   // The argument that replaced this premise link (stateUtils, isSupersededAt).
   if (r.supersededBy != null)
     result.supersededBy = str(r.supersededBy, `${ctx}.supersededBy`, 200);
+  // Why the argument checker failed this link's argument, which the reader
+  // accepted anyway (DetectArgumentsTab).
+  if (r.checkFailure != null)
+    result.checkFailure = str(r.checkFailure, `${ctx}.checkFailure`, 50);
 
   return result;
 }

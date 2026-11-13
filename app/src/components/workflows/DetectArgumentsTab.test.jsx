@@ -142,7 +142,22 @@ describe("an argument that failed the checker", () => {
       to: "J1",
       type: "entails",
       explanation: `Failed the argument checker: ${FAILURE.reason}`,
+      checkFailure: "invalid",
     });
+  });
+
+  it("tags no relation of an argument that passed", async () => {
+    const onAddRelation = vi.fn();
+    await detectWith(
+      {
+        translated_arguments: [[T1, J1]],
+        argument_postulates: [[]],
+        argument_failures: [null],
+      },
+      { onAddRelation },
+    );
+    fireEvent.click(screen.getByRole("button", { name: /accept/i }));
+    expect(onAddRelation.mock.calls[0][0]).not.toHaveProperty("checkFailure");
   });
 
   it("draws no link from a circular argument's conclusion to itself", async () => {

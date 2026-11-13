@@ -493,6 +493,8 @@ export function DetectArgumentsTab({
             argumentId,
             explanation,
             origin: llmOrigin(false, result.model),
+            // Kept for later analysis, not drawn: the reader already saw why.
+            ...(failure && { checkFailure: failure.code }),
           },
           { select: false, pinRecent: true },
         );

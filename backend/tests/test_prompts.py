@@ -636,6 +636,29 @@ def test_a_replaced_argument_link_is_accepted():
     assert state.relations[0].superseded_by == "a2"
 
 
+# An argument accepted although it failed the argument checker carries the
+# checker's code on its links; refused here, every AI request from a process
+# holding one would fail.
+def test_a_link_tagged_by_the_argument_checker_is_accepted():
+    state = REState(
+        round=2,
+        elements=[el("J1"), el("J2")],
+        relations=[
+            RERelation(
+                **{
+                    "from": "J1",
+                    "to": "J2",
+                    "type": "entails",
+                    "addedRound": 1,
+                    "argumentId": "a1",
+                    "checkFailure": "invalid",
+                }
+            )
+        ],
+    )
+    assert state.relations[0].check_failure == "invalid"
+
+
 # ── A new process ────────────────────────────────────────────────────────────
 
 

@@ -160,6 +160,17 @@ adds is a theory. The demo's T3 was J14 until that showed. `make_re(…, None)` 
 model, unrestricted and unseeded, for comparison with published rethon runs;
 no route uses it.
 
+**An argument accepted although it failed the argument checker carries
+`checkFailure`** on each of its links: the checker's code (`invalid`,
+`circular`, … — `CHECK_FAILURES` in `backend/services/arguments.py`). It is a
+record kept for later analysis, not a view: nothing draws it, the reason the
+reader saw is already in the explanation, and the simulation reads the
+argument as any other — that was decided, not overlooked. It records the
+check as the argument was proposed, so a revision in place keeps it and a
+revision that replaces the argument starts without it, the new one never
+having been checked. The `re-state` block, the autosave and a merge carry it;
+the Argdown export does not.
+
 #### Revising an argument
 
 Revise on an argument opens `ReviseArgumentModal`, which works on its premises:
@@ -555,7 +566,7 @@ naming the original type is for a human reader; the parser drops comments.
     furtherArguments: Array,
   },
   elements: [{ id, type, status, confidence, origin, text, addedRound, ?history, ?previousText, ?revisedRound, ?reason, ?rejectedRound, ?questionnaireIndex, ?sources }],
-  relations: [{ from, to, type, explanation, addedRound, ?origin, ?status, ?history, ?argumentId, ?revisedRound, ?supersededBy }],
+  relations: [{ from, to, type, explanation, addedRound, ?origin, ?status, ?history, ?argumentId, ?revisedRound, ?supersededBy, ?checkFailure }],
   coherence: { tensions: [], orphans: [], clusters: [] },
   ?groups: [{ id, label, members: [elementId], collapsed }],
   ?pins: { [elementId]: { x, y } },  // offsets from the layout's centre
