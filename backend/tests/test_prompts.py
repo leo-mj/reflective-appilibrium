@@ -217,6 +217,25 @@ def test_review_prompt_migrates_the_legacy_scalar_history():
     assert "Step 3: withdrawn J1" in prompt
 
 
+def test_review_prompt_migrates_a_relation_revised_before_history():
+    # Unlike an element, a relation has no top-level previous_text: its old
+    # wording lives only in history events, so the legacy shape has none to show.
+    relation = RERelation(
+        **{
+            "from": "J1",
+            "to": "J2",
+            "type": "supports",
+            "addedRound": 1,
+            "status": "revised",
+            "revisedRound": 2,
+        }
+    )
+    prompt = build_review_prompt(
+        REState(round=3, elements=[el("J1"), el("J2")], relations=[relation])
+    )
+    assert "step 2 revised" in prompt
+
+
 def test_review_prompt_carries_origin_for_the_method_section():
     # The `method` part reports whether suggestions were reworded before being
     # accepted, which is only knowable from `origin`.

@@ -67,11 +67,11 @@ async def suggest_principles(
     judgments = [e for e in active if e.type == "judgment"]
     existing_principles = [e for e in active if e.type == "principle"]
 
+    prompt = build_principles_prompt(request.topic, judgments, existing_principles)
     logger.info(
         f"Requesting principle suggestions from model '{llm.model}' for {len(judgments)} judgments "
         f"and {len(existing_principles)} existing principles."
     )
-    prompt = build_principles_prompt(request.topic, judgments, existing_principles)
     result = await llm.complete_with_usage(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,

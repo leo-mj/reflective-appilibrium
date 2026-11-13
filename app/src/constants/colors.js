@@ -107,8 +107,8 @@ export const C = {
   onAmber: INK_ON_LIGHT_FILL,
   // Destructive actions and error surfaces.
   danger: "#dc2626",
-  dangerSurface: "#7c1d1d44",
-  dangerInk: "#fca5a5",
+  dangerSurface: "var(--c-danger-surface)",
+  dangerInk: "var(--c-danger-ink)",
   supports: "#06b6d4",
   /** `supports` as a foreground — the edge teal is illegible on the light panel. */
   supportsText: "var(--c-supports-text)",

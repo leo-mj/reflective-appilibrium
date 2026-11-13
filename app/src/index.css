@@ -25,6 +25,10 @@
   --c-principle-text: #c4b5fd; /* 7.92:1 on panel */
   --c-theory-text: #fcd34d; /* 10.15:1 on panel */
   --c-supports-text: #06b6d4; /* 6.03:1 on panel */
+  /* Error banners. Pale red on a dark red wash; the light theme needs the
+     opposite way round, and fixed values here left it pale pink on pale pink. */
+  --c-danger-surface: #7c1d1d44;
+  --c-danger-ink: #fca5a5;
   /* Cluster tints as labels. The fills they pair with are fixed hues; these are
      the same hues lightened to stay readable as type. Four of the six fills
      failed AA here. */
@@ -50,6 +54,8 @@
   /* The edge teal is the one that swings furthest: #06b6d4 is fine on the dark
      panel and 2.22:1 on this one. */
   --c-supports-text: #0e7490; /* 4.89:1 on panel */
+  --c-danger-surface: #fee2e2;
+  --c-danger-ink: #991b1b; /* 6.80:1 on its surface */
   --c-cluster-0-text: #0e7490;
   --c-cluster-1-text: #6d28d9;
   --c-cluster-2-text: #854d0e;

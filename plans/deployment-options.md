@@ -125,10 +125,13 @@ already stateless. Ephemeral container disk is not a compromise here, it is the
 whole design, which is one fewer thing to configure and one fewer thing holding
 a participant's reasoning.
 
-The cold start is survivable for a reason worth recording: the app fetches
-`/api/health` on page load, so the wake begins when a reader opens the tab and
-finishes while they are on the intro and tutorial screens, rather than when they
-press Simulate.
+*Corrected 2026-10-03.* This paragraph used to say the app fetched
+`/api/health` on page load, so the wake began when a reader opened the tab. That
+was untrue of the build deployed: the health check was sent only once an editor
+component asked for it, and a reader on the start page woke nothing — observed on
+the live site, where the instance started only after "Skip guided tour". Since
+`cold-start` the start page sends the health check and then a warm-up request as
+it appears; see "Cold start — 2026-10-03" below.
 
 ### Oracle Cloud Always Free — the alternative
 
@@ -281,9 +284,10 @@ URL is the demo" true.
 - **`CORS_ORIGINS` names the Cloudflare origin only.** The demo never calls the
   backend.
 - **Cloud Run**, as recommended above: `--max-instances=1`, 1 GiB, startup CPU
-  boost, a budget alert, and no minimum instance — the `/api/health` fetch on
-  page load already hides the cold start, and an always-on instance would
-  spend the free tier idling. Plus `TRUSTED_PROXY_HOPS=1`, below.
+  boost, a budget alert, and no minimum instance — the start page's wake-up
+  hides most of the cold start (see "Cold start — 2026-10-03"; when this was
+  written the fetch it relied on did not yet happen on page load), and an
+  always-on instance would spend the free tier idling. Plus `TRUSTED_PROXY_HOPS=1`, below.
 - Cloud Run is deployed from CI, but only by hand: `deploy-backend` runs from
   the Actions tab, never on a push. The two static sites deploy on every push
   to `deploy` (`deploy` and `deploy-cloudflare`), the Cloudflare one reading the
@@ -317,3 +321,109 @@ unlock server keys through a proxy even if someone reinstates the `*`.
 
 Order of work: that fix; the `_headers` output; `ci.yml`; Cloud Run; then
 `RELEASING.md` rewritten for three targets.
+
+## Cold start — 2026-10-03
+
+Observed on Cloud Run: about **25 s** from "Starting new instance" to "STARTUP
+TCP probe succeeded", startup CPU boost on. The image is streamed lazily, so
+the cost is mostly reading files, and the server read a great many: importing
+`backend.main` imported the whole rethon stack (numba, llvmlite, pandas, …)
+through the routers, although only the workers compute with it.
+
+Three changes on the `cold-start` branch:
+
+1. **The server no longer loads rethon.** The routers import
+   `services/rethon_tasks.py`, which holds the request validation and light
+   stand-ins that the pools pickle by reference; the workers import the heavy
+   modules on their first task. `backend/tests/test_startup_imports.py` fails if
+   `import backend.main` loads any of the heavy packages again.
+2. **The start page wakes the backend**: `/api/health`, then
+   `POST /api/simulate_rethon/warm`, which starts both worker pools and answers
+   when they are up. It runs *inside* a request because Cloud Run's
+   request-based billing gives an instance CPU only while a request is in
+   flight; warming in the background after start-up would not progress.
+3. **The editor says when it is still waiting** (`ServerWakeNotice`): after two
+   seconds, which phase (server starting, or workers loading rethon) and the
+   seconds elapsed.
+
+Measured in this repository's cloud container with `make measure-startup
+ARGS=--cold` (Linux; `--cold` evicts the package files from the page cache, the
+nearest local analogue of a lazily streamed image):
+
+| | before | after |
+| --- | --- | --- |
+| native libraries the server maps at import | 263 MB | **5.4 MB** |
+| Python modules the server reads at import | 37.3 MB | **12.7 MB** |
+| heavy packages loaded by the server | all 8 | **none** |
+| `/api/health` answering, cold | 3.88 s | **2.38 s** |
+| `/api/health` answering, warm cache | 2.64 s | 1.93 s |
+| server RSS, idle | 219 MB | **97 MB** |
+| process tree RSS after a score and a simulation | 670 MB | 548 MB |
+| first score / first simulation, no warm-up | 3.37 / 2.30 s | 2.08 / 1.60 s — noise, see below |
+| `/warm`, cold | — | 2.48 s |
+| first score / first simulation after `/warm` | — | **0.71 / 0.63 s** |
+
+Those are single runs, and one row did not survive repeating. Re-run on
+2026-10-05 in a fresh container, the two versions alternated, four runs each
+without the warm-up and three with it:
+
+| | before | after |
+| --- | --- | --- |
+| `/api/health` answering, cold | 4.8–6.1 s | 3.0–4.0 s |
+| first score, no warm-up | 3.1–3.7 s | 3.0–3.7 s |
+| first simulation, no warm-up | 3.1–3.9 s | 3.6–4.4 s |
+| `/warm`, cold | — | 3.2–3.7 s |
+| first score / simulation after `/warm` | — | 1.1–1.3 s |
+
+**The split does not make the first computation faster; the warm-up moves its
+cost.** The workers are spawned, not forked, so each always imported rethon for
+itself, whether or not the server had. Keeping rethon out of the server shortens
+the server's start; `/warm` then pays the workers' import while the reader is on
+the start page, so a computation that comes after it does not.
+
+These are local numbers; the container reads from a local disk. What carries
+over to Cloud Run is the ratio of bytes read before the server can answer,
+roughly 300 MB down to 18 MB, not the seconds. The real figure has to be read
+off the Cloud Run logs after the next deploy.
+
+What is left of the server's import is mostly the LLM SDKs (`anthropic` ≈ 0.9 s,
+`openai` ≈ 0.4 s, through `services/llm.py`). Importing them lazily is the next
+step if the deployed cold start is still long; the tests patch
+`backend.services.llm.AsyncOpenAI` and `AsyncAnthropic`, so that needs care.
+
+**Follow-up, the same day.** Two more things, found on the live site and by
+profiling a worker's first call:
+
+- **A worker's first computation compiled numba code.** theodias's position
+  functions are `@jit(nopython=True)` without `cache=True`, so each new worker
+  compiled them on its first call: 2.0 s for a score and 0.86 s for a
+  simulation, in a fresh process, against 0.001–0.005 s after. `/warm` now has
+  each worker run a small score or simulation (`services/rethon_warmup.py`).
+  Measured with `--cold`: `/warm` 4.2–4.7 s, then the first score and
+  simulation 0.01–0.02 s (they were 1.1–1.3 s after a warm-up that only started
+  the workers).
+- **Cloud Run answered a cold start's first `/api/health` with a 500.** It came
+  from the platform, not the app, so it had no CORS header and the browser
+  reported it as a CORS failure. The app took that single failure as "server
+  unreachable" for the rest of the page load, which also meant "no depth limit
+  known": the Simulate tab offered depths 1–4 starting at 3, and the server,
+  limited to 2, refused the run with a 422. The health check is now retried
+  every 3 s for up to 90 s on a network error, a 429 or a 5xx, and the Simulate
+  tab neither offers a depth nor runs until the server has answered. The
+  request log in Cloud Run gives the platform's own message for such a 500.
+- **A request that reaches no server now fails one of two ways.** Shortly
+  after start-up — the page-load wake-up before the server first answers, the
+  workers' warm-up, and 30 s after — it is `ServerStartingError`, worded as a
+  wait and shown in amber. At any other time it is `ServerUnreachableError`,
+  the serious one, in red. Either starts the wake-up over, so the header notice
+  returns: "Trying to reach the server" until it answers, since a failure
+  alone does not show that the server is restarting rather than down. That
+  covers an instance that scaled to zero while the page stayed open, which the
+  start page's wake-up cannot. Same-host deployments see the platform's
+  502/503/504 instead, and one without the app's own `detail` is read the same
+  way.
+- **Why the 500 left no trace in the app's logs**: it never reached the app —
+  look in the request log (`run.googleapis.com/requests`). Separately, on
+  `main` `import rethon` disables uvicorn's own loggers (`uvicorn.error`,
+  `uvicorn.access`) as well as ours, and only `backend.*` is switched back on;
+  with rethon out of the server process that no longer happens here.

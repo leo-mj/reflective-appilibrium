@@ -15,6 +15,7 @@ import {
   DeltaBar,
   HistoryRoundBanner,
 } from "./TextTabPrimitives.jsx";
+import { tooltipText } from "../tooltipTestUtils.js";
 
 afterEach(cleanup);
 
@@ -266,6 +267,25 @@ describe("DeltaBar", () => {
       />,
     );
     expect(width(container)).toBe("100%");
+  });
+
+  it("defines the measure on its name, and reads the change on the bar and number", () => {
+    const { container, getByText } = render(
+      <DeltaBar
+        label="Account"
+        labelTitle="What account is"
+        value={-0.048}
+        text="-0.048"
+        scale={0.2}
+        color="#000"
+        title="What this change means"
+      />,
+    );
+    expect(tooltipText(getByText("Account"))).toBe("What account is");
+    expect(tooltipText(getByText("-0.048"))).toBe("What this change means");
+    expect(tooltipText(container.querySelector('[aria-hidden="true"]'))).toBe(
+      "What this change means",
+    );
   });
 });
 
