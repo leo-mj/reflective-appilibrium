@@ -299,7 +299,7 @@ def _premise(index, text, role="premise", form=None, etype="principle"):
     return AddedPremise(index=index, type=etype, text=text, role=role, form=form)
 
 
-def test_a_bridge_restating_the_inference_is_surfaced_as_a_premise():
+def test_a_bridge_restating_the_inference_is_taken_as_tagged():
     # As a model returned it: premise 4 copies sentence 1 word for word, and
     # the postulate is "If <1>, then <2>". It surfaced as 1 + 4 → 2, valid
     # given the bare conditional, with the same claim shown twice.
@@ -321,14 +321,14 @@ def test_a_bridge_restating_the_inference_is_surfaced_as_a_premise():
         pool_indices={1, 2, 3},
         pool_texts=POOL_TEXTS,
     )
-    # The copy is read as sentence 1. The bridge is no meaning postulate but
-    # may be a claim worth holding, so the argument passes with it as a
-    # premise of its own — an element the reader can accept, reject or argue
-    # about — rather than folded away as "Valid given" or failed.
-    assert out.arguments == [[1, 5, 2]]
+    # The copy is read as sentence 1. The bridge only restates the step, but
+    # the wording cannot tell a conditional true by meaning from a substantive
+    # one: tagged a postulate, it is folded into "Valid given" — shown, not
+    # failed, and not made an element of the reader's position.
+    assert out.arguments == [[1, 2]]
     assert out.failures == [None]
-    assert out.postulates == [[]]
-    assert [(p.index, p.role) for p in out.premises] == [(5, "premise")]
+    assert out.postulates == [[premises[1].text]]
+    assert out.premises == []
 
 
 def test_a_repeated_premise_is_read_as_the_sentence_it_repeats():
@@ -405,43 +405,6 @@ def test_a_paraphrasing_postulate_still_licenses_the_step():
     assert out.arguments == [[1, 4, 2]]
     assert out.failures == [None]
     assert [p.index for p in out.premises] == [4]
-
-
-def test_restates_inference_needs_every_sentence_quoted_whole():
-    from backend.services.arguments import restates_inference
-
-    texts = {1: "Lying is wrong.", 2: "Lying to the murderer is wrong."}
-    bare = _premise(
-        5,
-        "If lying is wrong, then lying to the murderer is wrong.",
-        role="postulate",
-        form="1 -> 2",
-    )
-    assert restates_inference(bare, texts)
-    # One sentence quoted, the other paraphrased.
-    half = _premise(
-        5,
-        "If lying is wrong, then so is deceiving a murderer.",
-        role="postulate",
-        form="1 -> 2",
-    )
-    assert not restates_inference(half, texts)
-    # A quote inside a longer word is no quote.
-    inside = _premise(
-        5,
-        "Belying is wrong, so lying to the murderer is wrong.",
-        role="postulate",
-        form="1 -> 2",
-    )
-    assert not restates_inference(inside, {**texts, 1: "Lying is wrong."})
-    # A sentence the texts do not hold cannot be found quoted.
-    unknown = _premise(
-        5,
-        "If lying is wrong, then lying to the murderer is wrong.",
-        role="postulate",
-        form="1 -> 9",
-    )
-    assert not restates_inference(unknown, texts)
 
 
 def test_the_prompt_forbids_repeating_a_sentence():

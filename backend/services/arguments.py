@@ -10,11 +10,7 @@ from pydantic import ValidationError
 from ..models.re_state import REElement, RERelation
 from ..services.llm import LLMService
 from ..services.response_schemas import ARGUMENTS_SCHEMA
-from ..services.argument_checker import (
-    FormParseError,
-    sentences_in_form,
-    verify_argument,
-)
+from ..services.argument_checker import verify_argument
 from ..routers.arguments_schemas import (
     AddedPremise,
     ArgumentCheckFailure,
@@ -528,9 +524,7 @@ def dummy_detect_arguments(
         if all(abs(n) in initial_lookup or abs(n) in premise_indices for n in arg)
     ]
 
-    checked = verify_and_partition(
-        candidates, premises, {n: e.text for n, e in initial_lookup.items()}
-    )
+    checked = verify_and_partition(candidates, premises)
     return surface_arguments(
         checked,
         lookup=initial_lookup,
@@ -653,30 +647,6 @@ def identify_repeated_premises(
     ]
 
 
-def restates_inference(postulate: AddedPremise, texts: Dict[int, str]) -> bool:
-    """Whether a postulate's text only quotes the sentences its form connects.
-
-    "If <premise>, then <conclusion>", with both sentences copied in word for
-    word, is the bare conditional the prompt asks the model not to write. It is
-    no meaning postulate — nothing about the words makes it true — but it can
-    still be a plausible claim, or one worth defending in a later round, so
-    ``verify_and_partition`` surfaces it as a substantive premise rather than
-    failing the argument. The form cannot tell it apart — every postulate has
-    the shape ``premises -> conclusion`` — but the wording can: every sentence
-    the form mentions appears whole in the postulate's text. A paraphrase is
-    not caught; nor is a postulate whose sentences' texts are not all known.
-    """
-    try:
-        indices = sentences_in_form(postulate.form or "")
-    except FormParseError:
-        return False
-    quoted = [_normalized(texts.get(i, "")) for i in indices]
-    if len(quoted) < 2 or not all(quoted):
-        return False
-    wording = f" {_normalized(postulate.text)} "
-    return all(f" {q} " in wording for q in quoted)
-
-
 #: What the reader is told about an argument that failed the checker, by code.
 CHECK_FAILURES: Dict[str, str] = {
     "invalid": "Not formally valid: the premises do not entail the conclusion.",
@@ -723,7 +693,6 @@ class Partition(NamedTuple):
 def verify_and_partition(
     detected: List[List[int]],
     added_premises: List[AddedPremise],
-    pool_texts: Optional[Dict[int, str]] = None,
 ) -> Partition:
     """Check each detected argument, and tag rather than drop the ones that fail.
 
@@ -734,12 +703,12 @@ def verify_and_partition(
     surfaced argument runs directly from its substantive premises to its
     conclusion, with the postulate texts reported separately ("Valid given").
 
-    A postulate that only restates the inference — "if <premises>, then
-    <conclusion>" (``restates_inference``, which needs ``pool_texts`` to
-    recognise a quoted pool sentence) — is not true in virtue of meaning, so it
-    is read as a substantive premise: its form still checks the argument, but
-    it stays among the premises and enters the pool, where the reader can
-    accept, reject or argue about it like any other.
+    A postulate is taken as the model tagged it, including one that only
+    restates the inference — "if <premises>, then <conclusion>". The wording
+    cannot tell such a conditional true by meaning from a substantive one, and
+    the role is the model's claim that it is the first. The prompt asks it not
+    to write them; folded into "Valid given", one still shows on the card
+    before the reader accepts the argument, and in its relations after.
 
     One that **fails** — formally invalid, uninformative, unreadable, or
     resting on postulates alone — is surfaced as proposed, tagged with the
@@ -754,15 +723,6 @@ def verify_and_partition(
     """
     logger.info(f"Checking {len(detected)} arguments.")
 
-    texts = {**(pool_texts or {}), **{p.index: p.text for p in added_premises}}
-    added_premises = [
-        (
-            p.model_copy(update={"role": "premise"})
-            if p.role == "postulate" and restates_inference(p, texts)
-            else p
-        )
-        for p in added_premises
-    ]
     forms = {p.index: p.form for p in added_premises if p.form}
     by_index = {p.index: p for p in added_premises}
     # Trim preference: when a postulate and a substantive premise are
@@ -854,7 +814,7 @@ def partition_arguments(
         )
 
     if verify:
-        checked = verify_and_partition(resolvable, added_premises, pool_texts)
+        checked = verify_and_partition(resolvable, added_premises)
         return checked._replace(dropped=checked.dropped + unresolved)
 
     return Partition(

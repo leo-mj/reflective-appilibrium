@@ -101,11 +101,16 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   (`dropped_count`). An added premise worded as an existing sentence is read as
   that sentence first, in either mode (`identify_repeated_premises`).
   **A bridge that only restates the inference** — "If <premises>, then
-  <conclusion>", quoting them whole (`restates_inference`) — is neither failed
-  nor folded into "Valid given": it is no meaning postulate, but such a
-  conditional can be plausible or worth defending in a later round, so it is
-  surfaced as a substantive premise, a new element like any other. The prompt
-  still asks the model not to write them, so they do not crowd the suggestions.
+  <conclusion>" — is taken as the model tags it, and a postulate is folded
+  into "Valid given" like any other. Two alternatives were tried and dropped:
+  failing the argument threw away conditionals that are plausible, or worth
+  defending in a later round; surfacing every one as a premise made the
+  analytic ones — a conclusion following from a premise by what its words
+  mean — into near-duplicate elements, which the folding exists to avoid. The
+  wording cannot tell those two kinds apart; the role is the model's claim
+  about which it is. The prompt asks it not to write them, so they do not
+  crowd the suggestions, and a folded one still shows on the card before the
+  reader accepts the argument.
 - **The prompt spells out the bookkeeping the checker tests** (`build_prompt`)
   — each postulate's form is the bridge from its argument's other indices to
   the conclusion — and asks the model to check every argument against it before
