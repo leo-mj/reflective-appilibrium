@@ -672,6 +672,19 @@ export function argumentPostulateExplanation(postulates) {
   return `Valid given: ${postulates.join(" ")}`;
 }
 
+/**
+ * The explanation an argument that failed the argument checker carries once
+ * accepted: the reader took it knowing it failed, and the record says why, in
+ * the export as on the card.
+ *
+ * @param {{ code: string, reason: string }} [failure] - From the detect
+ *   endpoint's `argument_failures`.
+ * @returns {string} `"Failed the argument checker: …"`, or `""` without one.
+ */
+export function argumentFailureExplanation(failure) {
+  return failure ? `Failed the argument checker: ${failure.reason}` : "";
+}
+
 // ─── Origin helpers ───────────────────────────────────────────────────────────
 
 /**

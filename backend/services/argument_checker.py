@@ -26,7 +26,8 @@ tightest-binding to loosest-binding, plus parentheses to override the order:
     |   or
     ->  if-then   (nested conditionals group to the right)
 
-Whitespace is ignored.  Binding order means ``1 & 2 -> 3`` is read as
+Whitespace is ignored, and ``¬ ∧ ∨ →`` (and ``⇒``, ``=>``) are read as
+``~ & | ->``: models write them despite being asked not to.  Binding order means ``1 & 2 -> 3`` is read as
 ``(1 & 2) -> 3`` — "if 1 and 2, then 3" — not as ``1 & (2 -> 3)``; and
 ``1 -> 2 -> 3`` is read as ``1 -> (2 -> 3)``.  Typical bridge premise:
 ``"(3 & 4) -> 7"``.  (The exact accepted syntax is documented in
@@ -59,6 +60,10 @@ LogicalForm = Tuple
 # (2^16 rows).
 MAX_SENTENCES = 16
 
+# The logic symbols a model writes despite being asked for ASCII: read rather
+# than refused, since a form spelled with them says exactly the same thing.
+_SYMBOLS = str.maketrans({"¬": "~", "∧": "&", "∨": "|", "→": "->", "⇒": "->"})
+
 _TOKEN_RE = re.compile(r"\s*(->|[()&|~-]|\d+)")
 
 
@@ -88,6 +93,7 @@ def parse_form(text: str) -> LogicalForm:
     recursion on the right is what makes ``&``/``|`` bind before ``->`` and
     makes ``->`` group to the right.
     """
+    text = text.translate(_SYMBOLS).replace("=>", "->")
     tokens: List[str] = []
     pos = 0
     while pos < len(text):
@@ -205,12 +211,15 @@ class VerificationResult:
     ``accepted`` means the argument is both formally valid and informative;
     ``argument`` is then the (possibly auto-trimmed) argument, otherwise the
     original input.  ``reason`` is set on rejection and distinguishes genuine
-    invalidity from valid-but-uninformative rejections.
+    invalidity from valid-but-uninformative rejections; ``code`` names it for
+    a program: ``too_few``, ``circular``, ``self_reference``,
+    ``inconsistent``, ``invalid`` or ``unparseable``.
     """
 
     accepted: bool
     argument: List[int]
     reason: Optional[str] = None
+    code: Optional[str] = None
 
 
 def _form_for_index(n: int, parsed_forms: Dict[int, LogicalForm]) -> LogicalForm:
@@ -242,7 +251,9 @@ def verify_argument(
     from the mapping are dropped last).
     """
     if len(arg) < 2:
-        return VerificationResult(False, arg, "argument needs at least one premise")
+        return VerificationResult(
+            False, arg, "argument needs at least one premise", "too_few"
+        )
 
     premises, conclusion = arg[:-1], arg[-1]
     if conclusion in premises:
@@ -251,6 +262,7 @@ def verify_argument(
             arg,
             "circular: the conclusion appears among the premises "
             "(valid, but excludes no position — uninformative)",
+            "circular",
         )
 
     try:
@@ -265,6 +277,7 @@ def verify_argument(
                     arg,
                     f"form of premise {i} references its own index — "
                     "a form must state the premise's content in terms of the other sentences",
+                    "self_reference",
                 )
         premise_forms = [_form_for_index(n, parsed_forms) for n in premises]
         conclusion_form = _form_for_index(conclusion, parsed_forms)
@@ -275,9 +288,10 @@ def verify_argument(
                 arg,
                 "ex falso: the premises are jointly inconsistent "
                 "(valid, but excludes no minimally consistent position — uninformative)",
+                "inconsistent",
             )
         if not entails(premise_forms, conclusion_form):
-            return VerificationResult(False, arg, "not formally valid")
+            return VerificationResult(False, arg, "not formally valid", "invalid")
 
         # Auto-trim: drop premises not needed for validity, until minimal.
         # Removal candidates are tried in trim_priority order so that, when
@@ -302,6 +316,6 @@ def verify_argument(
                     changed = True
                     break
     except FormParseError as e:
-        return VerificationResult(False, arg, f"unparseable form: {e}")
+        return VerificationResult(False, arg, f"unparseable form: {e}", "unparseable")
 
     return VerificationResult(True, [n for n, _ in kept] + [conclusion])

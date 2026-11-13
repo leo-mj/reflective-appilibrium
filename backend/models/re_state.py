@@ -186,6 +186,11 @@ class RERelation(BaseModel):
     # the argument that replaced it. Withdrawn at that step, and kept so History
     # can show the argument as it was — see "Revising an argument" in CLAUDE.md.
     superseded_by: Optional[str] = Field(None, alias="supersededBy", max_length=200)
+    # On every link of an argument the reader accepted although it failed the
+    # argument checker: the checker's code (CHECK_FAILURES in
+    # services/arguments). A plain string, so a state stays readable when a
+    # code is retired.
+    check_failure: Optional[str] = Field(None, alias="checkFailure", max_length=50)
     origin: Optional[str] = Field(None, max_length=200)
 
     status: Optional[Status] = None

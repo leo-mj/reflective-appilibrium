@@ -51,6 +51,14 @@ class AddedPremise(BaseModel):
     role: Literal["premise", "postulate"] = "premise"
 
 
+class ArgumentCheckFailure(BaseModel):
+    """Why an argument failed the checker: a ``code`` for a program and a
+    ``reason`` for the reader (``CHECK_FAILURES`` in ``services.arguments``)."""
+
+    code: str
+    reason: str
+
+
 class LLMArgumentsResponse(BaseModel):
     """Raw argument data returned by the LLM, before verification, deduplication, and translation."""
 
@@ -68,16 +76,21 @@ class DetectArgumentsResponse(BaseModel):
     every integer index (positive and negative) to an REElement so callers can perform
     further translations without re-requesting.  ``argument_postulates`` is parallel to
     ``num_arguments``: the meaning-postulate texts each argument relies on (usually
-    empty).  ``rejected_count`` is the number of LLM proposals that failed formal
-    verification and were dropped.  ``model`` is the model that generated the
-    arguments (mirrors the other assist endpoints, so the UI can disclose it).
+    empty).  ``argument_failures`` is parallel too: ``None`` for an argument that
+    passed the checker (or was not checked), else why it failed — a failing
+    argument is surfaced as proposed, its postulates among its premises, rather
+    than dropped.  ``dropped_count`` is the number of proposals that could not
+    be surfaced at all: citing an index nothing defines, or having no premise.
+    ``model`` is the model that generated the arguments (mirrors the other
+    assist endpoints, so the UI can disclose it).
     """
 
     num_arguments: List[List[int]]
     translated_arguments: List[List[REElement]] = []
     lookup: Dict
     argument_postulates: List[List[str]] = []
-    rejected_count: int = 0
+    argument_failures: List[Optional[ArgumentCheckFailure]] = []
+    dropped_count: int = 0
     model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0

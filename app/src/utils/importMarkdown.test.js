@@ -659,6 +659,26 @@ describe("importStateFromFile — relation: origin", () => {
   });
 });
 
+// The argument checker's code on an argument accepted although it failed:
+// nothing draws it, so a file, a merge or a restored draft dropping it would
+// lose it unseen.
+describe("importStateFromFile — relation: checkFailure", () => {
+  it("preserves checkFailure", async () => {
+    const state = {
+      ...MINIMAL_STATE,
+      relations: [{ ...BASE_REL, checkFailure: "circular" }],
+    };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.relations[0].checkFailure).toBe("circular");
+  });
+
+  it("does not set checkFailure when absent", async () => {
+    const state = { ...MINIMAL_STATE, relations: [{ ...BASE_REL }] };
+    const result = await importStateFromFile(makeFile(wrapInMarkdown(state)));
+    expect(result.relations[0]).not.toHaveProperty("checkFailure");
+  });
+});
+
 describe("importStateFromFile — relation: argumentId", () => {
   it("preserves argumentId", async () => {
     const state = {
