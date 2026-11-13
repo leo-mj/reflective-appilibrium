@@ -526,7 +526,37 @@ export function DetectArgumentsTab({
     });
   };
 
-  const failedCount = (result?.argument_failures ?? []).filter(Boolean).length;
+  // Passing arguments first, then those that failed the checker under a
+  // heading of their own. Indices stay the server's, which `decisions` and
+  // `editing` are keyed by.
+  const argIndices = (result?.translated_arguments ?? []).map((_, i) => i);
+  const failedAt = (i) => Boolean(result?.argument_failures?.[i]);
+  const passedIndices = argIndices.filter((i) => !failedAt(i));
+  const failedIndices = argIndices.filter(failedAt);
+  const failedCount = failedIndices.length;
+
+  const renderCard = (i) => (
+    <ArgumentCard
+      key={i}
+      argument={result.translated_arguments[i]}
+      addedIds={addedIds}
+      postulates={result.argument_postulates?.[i] ?? []}
+      failure={result.argument_failures?.[i] ?? null}
+      decision={decisions[i]}
+      editingDrafts={editing?.argIndex === i ? editing.drafts : null}
+      onAccept={(drafts) => handleAccept(i, drafts)}
+      onReject={() => handleReject(i)}
+      onModify={() => setEditing({ argIndex: i, drafts: {} })}
+      onModifyChange={(premiseId, text) =>
+        setEditing((prev) => ({
+          ...prev,
+          drafts: { ...prev.drafts, [premiseId]: text },
+        }))
+      }
+      onModifyCancel={() => setEditing(null)}
+      onUndo={() => handleUndo(i)}
+    />
+  );
 
   // `suggestionsDisabled` too, as every other tab's run button: without it a
   // press in a reader's own process fetched the demo's recorded arguments.
@@ -649,8 +679,8 @@ export function DetectArgumentsTab({
             />
             {failedCount > 0 && (
               <div style={{ fontSize: 11, color: C.dim, marginBottom: 8 }}>
-                {failedCount} of {result.translated_arguments.length} failed
-                the argument checker, and say why; they come last.
+                {failedCount} of {result.translated_arguments.length} failed the
+                argument checker; they are listed last, with the reason.
               </div>
             )}
             {result.dropped_count > 0 && (
@@ -674,30 +704,16 @@ export function DetectArgumentsTab({
                 No arguments detected.
               </div>
             ) : (
-              result.translated_arguments.map((arg, i) => (
-                <ArgumentCard
-                  key={i}
-                  argument={arg}
-                  addedIds={addedIds}
-                  postulates={result.argument_postulates?.[i] ?? []}
-                  failure={result.argument_failures?.[i] ?? null}
-                  decision={decisions[i]}
-                  editingDrafts={
-                    editing?.argIndex === i ? editing.drafts : null
-                  }
-                  onAccept={(drafts) => handleAccept(i, drafts)}
-                  onReject={() => handleReject(i)}
-                  onModify={() => setEditing({ argIndex: i, drafts: {} })}
-                  onModifyChange={(premiseId, text) =>
-                    setEditing((prev) => ({
-                      ...prev,
-                      drafts: { ...prev.drafts, [premiseId]: text },
-                    }))
-                  }
-                  onModifyCancel={() => setEditing(null)}
-                  onUndo={() => handleUndo(i)}
-                />
-              ))
+              <>
+                {passedIndices.map(renderCard)}
+                {failedCount > 0 && (
+                  <SectionHead
+                    title="Failed the argument checker"
+                    count={failedCount}
+                  />
+                )}
+                {failedIndices.map(renderCard)}
+              </>
             )}
           </>
         )}

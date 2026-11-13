@@ -94,8 +94,9 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   (`verify_and_partition` in `services/arguments.py`) is surfaced as proposed,
   its meaning postulates among its premises, with a code and a reason worded
   for the reader (`CHECK_FAILURES`, `argument_failures` in the response,
-  parallel to `num_arguments`); the Arguments tab marks it, and accepting it
-  writes the reason into the relation's explanation. Folding a postulate into
+  parallel to `num_arguments`); the Arguments tab lists it below the passing
+  ones, under a heading of its own, and accepting it writes the reason into
+  the relation's explanation. Folding a postulate into
   "Valid given" and auto-trimming are what passing earns. Only a proposal with
   nothing to show is dropped — citing an index nothing defines, or no premise
   (`dropped_count`). An added premise worded as an existing sentence is read as

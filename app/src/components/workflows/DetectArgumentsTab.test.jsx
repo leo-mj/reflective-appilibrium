@@ -125,6 +125,46 @@ describe("an argument that failed the checker", () => {
     expect(document.body.textContent).toContain("Valid given: A bridge.");
   });
 
+  it("is listed below the passing ones, under a heading of its own", async () => {
+    // Failed first, as no server sends them: the tab sorts for itself.
+    const onAddRelation = vi.fn();
+    await detectWith(
+      {
+        translated_arguments: [
+          [T1, J1],
+          [P1, J1],
+        ],
+        argument_postulates: [[], []],
+        argument_failures: [FAILURE, null],
+      },
+      { onAddRelation },
+    );
+    const text = document.body.textContent;
+    const heading = text.indexOf("Failed the argument checker · 1");
+    expect(heading).toBeGreaterThan(-1);
+    expect(text.indexOf("A principle")).toBeLessThan(heading);
+    expect(text.indexOf("A theory")).toBeGreaterThan(heading);
+
+    // The last card is the failed one, and accepting it acts on it.
+    const accepts = screen.getAllByRole("button", { name: /accept/i });
+    fireEvent.click(accepts[accepts.length - 1]);
+    expect(onAddRelation.mock.calls[0][0]).toMatchObject({
+      from: "T1",
+      checkFailure: "invalid",
+    });
+  });
+
+  it("has no heading when every argument passed", async () => {
+    await detectWith({
+      translated_arguments: [[P1, J1]],
+      argument_postulates: [[]],
+      argument_failures: [null],
+    });
+    expect(document.body.textContent).not.toContain(
+      "Failed the argument checker",
+    );
+  });
+
   it("records the failure in the relation it becomes", async () => {
     const onAddRelation = vi.fn();
     await detectWith(
