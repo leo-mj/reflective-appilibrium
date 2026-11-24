@@ -465,18 +465,22 @@ export async function exportDownload(page) {
  *   is the compliant path. **Pass this only when auditing the default mode.** In
  *   high-contrast mode the headers sit on a chip and must clear AA like anything
  *   else, which is what `a11y.spec.js` holds them to.
+ * @param {string[]} [opts.include]  CSS selectors to audit instead of the whole
+ *   page, for a test about one part of a view that has older, unrelated
+ *   findings elsewhere. Each must match something: axe refuses an empty context.
  */
 export async function axeViolations(
   page,
-  { ignoreDimmed = false, ignoreGraphAccents = false } = {},
+  { ignoreDimmed = false, ignoreGraphAccents = false, include = null } = {},
 ) {
   await page.addScriptTag({
     path: new URL("../node_modules/axe-core/axe.min.js", import.meta.url)
       .pathname,
   });
   return page.evaluate(
-    async ({ ignoreDimmed, ignoreGraphAccents }) => {
-      const r = await window.axe.run(document, { resultTypes: ["violations"] });
+    async ({ ignoreDimmed, ignoreGraphAccents, include }) => {
+      const context = include ? { include: include.map((s) => [s]) } : document;
+      const r = await window.axe.run(context, { resultTypes: ["violations"] });
 
       const elementFor = (node) => {
         const selector = Array.isArray(node.target[0])
@@ -540,7 +544,7 @@ export async function axeViolations(
           }))
       );
     },
-    { ignoreDimmed, ignoreGraphAccents },
+    { ignoreDimmed, ignoreGraphAccents, include },
   );
 }
 

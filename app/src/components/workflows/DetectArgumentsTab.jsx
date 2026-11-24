@@ -492,7 +492,12 @@ export function DetectArgumentsTab({
             type: relationType,
             argumentId,
             explanation,
-            origin: llmOrigin(false, result.model),
+            // Its own author where the response names one per argument (the
+            // demo's samples have more than one), else the response's model.
+            origin: llmOrigin(
+              false,
+              result.argument_models?.[argIndex] ?? result.model,
+            ),
             // Kept for later analysis, not drawn: the reader already saw why.
             ...(failure && { checkFailure: failure.code }),
           },

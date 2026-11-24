@@ -82,7 +82,10 @@ class DetectArgumentsResponse(BaseModel):
     than dropped.  ``dropped_count`` is the number of proposals that could not
     be surfaced at all: citing an index nothing defines, or having no premise.
     ``model`` is the model that generated the arguments (mirrors the other
-    assist endpoints, so the UI can disclose it).
+    assist endpoints, so the UI can disclose it). ``argument_models``, parallel
+    to ``num_arguments`` when given, names each argument's own author: only the
+    sample fixture sets it, its arguments having more than one (see
+    ``dummy_detect_arguments``); empty, every argument is ``model``'s.
     """
 
     num_arguments: List[List[int]]
@@ -92,6 +95,7 @@ class DetectArgumentsResponse(BaseModel):
     argument_failures: List[Optional[ArgumentCheckFailure]] = []
     dropped_count: int = 0
     model: str = ""
+    argument_models: List[str] = []
     input_tokens: int = 0
     output_tokens: int = 0
 

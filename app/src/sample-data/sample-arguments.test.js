@@ -22,20 +22,51 @@ const elements = [
 ];
 
 describe("getSampleArguments", () => {
-  it("surfaces all 15 audited arguments over the full pool", () => {
+  it("surfaces all 17 arguments over the full pool, the two that fail last", () => {
     const res = getSampleArguments(elements, "8");
-    expect(res.num_arguments).toHaveLength(15);
-    expect(res.model).toBe("claude-fable-5");
+    expect(res.num_arguments).toHaveLength(17);
     expect(res.dropped_count).toBe(0);
-    expect(res.argument_failures).toEqual(res.num_arguments.map(() => null));
+    expect(res.argument_failures.slice(0, 15)).toEqual(Array(15).fill(null));
+    expect(res.argument_failures.slice(15).map((f) => f.code)).toEqual([
+      "invalid",
+      "circular",
+    ]);
+    expect(res.num_arguments.slice(15)).toEqual([
+      [19, 7],
+      [21, 9, 9],
+    ]);
+  });
+
+  it("credits each argument to who wrote it, and the notice to both", () => {
+    const res = getSampleArguments(elements, "8");
+    expect(res.model).toBe("claude-fable-5 & claude-opus-5-5");
+    expect(res.argument_models).toHaveLength(res.num_arguments.length);
+    const by = (arg) =>
+      res.argument_models[
+        res.num_arguments.findIndex((a) => a.join() === arg.join())
+      ];
+    expect(by([14, 22, 1])).toBe("claude-fable-5");
+    expect(by([18, 24, 2])).toBe("claude-fable-5 & claude-opus-5-5");
+    expect(by([17, -15])).toBe("claude-fable-5 & claude-opus-5-5");
+    expect(by([19, 7])).toBe("claude-opus-5-5");
+    expect(by([21, 9, 9])).toBe("claude-opus-5-5");
+    // Every added premise was written by claude-fable-5.
+    const added = Object.values(res.lookup).filter(
+      (e) => !elements.includes(e),
+    );
+    expect(added.length).toBeGreaterThan(0);
+    expect(added.every((e) => e.origin === "claude-fable-5")).toBe(true);
   });
 
   it("returns argument_postulates parallel to num_arguments, one bridge each", () => {
     const res = getSampleArguments(elements, "8");
     expect(res.argument_postulates).toHaveLength(res.num_arguments.length);
     expect(res.translated_arguments).toHaveLength(res.num_arguments.length);
-    // Every surfaced argument relies on exactly one meaning postulate.
-    expect(res.argument_postulates.every((p) => p.length === 1)).toBe(true);
+    // Every passing argument relies on exactly one meaning postulate; a failed
+    // one is valid given nothing.
+    res.argument_postulates.forEach((p, i) =>
+      expect(p).toHaveLength(res.argument_failures[i] ? 0 : 1),
+    );
   });
 
   it("keeps the first surfaced argument in its postulate-stripped form", () => {
@@ -81,7 +112,10 @@ describe("getSampleArguments", () => {
 
   it("composes a 'Valid given: …' explanation from each argument's postulates", () => {
     const res = getSampleArguments(elements, "8");
-    for (const postulates of res.argument_postulates) {
+    const passed = res.argument_postulates.filter(
+      (_, i) => !res.argument_failures[i],
+    );
+    for (const postulates of passed) {
       const explanation = argumentPostulateExplanation(postulates);
       expect(explanation.startsWith("Valid given: ")).toBe(true);
       expect(explanation.length).toBeGreaterThan("Valid given: ".length);
@@ -95,8 +129,10 @@ describe("getSampleArguments", () => {
       { from: "T2", to: "P2", type: "jointly_entails", argumentId: "arg-sample-1" },
     ];
     const res = getSampleArguments(elements, "8", relations);
-    expect(res.num_arguments).toHaveLength(14);
-    expect(res.argument_postulates).toHaveLength(14);
+    expect(res.num_arguments).toHaveLength(16);
+    expect(res.argument_postulates).toHaveLength(16);
+    expect(res.argument_failures).toHaveLength(16);
+    expect(res.argument_models).toHaveLength(16);
     expect(res.num_arguments).not.toContainEqual([20, 21, 15]);
   });
 });

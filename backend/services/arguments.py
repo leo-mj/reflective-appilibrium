@@ -395,7 +395,7 @@ DUMMY_ADDED_PREMISES: List[Dict] = [
         "type": "principle",
         "role": "postulate",
         "form": "(18 & 24) -> 2",
-        "text": "If justice is owed to all who will be affected, and the people of 2100 and beyond will be affected by present climate policy, then climate policy owes their welfare consideration.",
+        "text": "Owing people justice in a decision includes accounting for their welfare in making it.",
     },
     {
         "index": 33,
@@ -409,7 +409,7 @@ DUMMY_ADDED_PREMISES: List[Dict] = [
         "type": "principle",
         "role": "postulate",
         "form": "18 -> 10",
-        "text": "Owing justice to people regardless of when they exist just is not discounting their interests for their temporal distance.",
+        "text": "Owing people justice regardless of when they come to exist rules out discounting their interests merely for their temporal distance.",
     },
     {
         "index": 35,
@@ -444,14 +444,14 @@ DUMMY_ADDED_PREMISES: List[Dict] = [
         "type": "principle",
         "role": "postulate",
         "form": "(17 & 26) -> ~1",
-        "text": "If only presently existing beings can be wronged and wrongness requires a wronged party, then an act harming only the not-yet-existing is not wrong.",
+        "text": "Being wronged is being owed an obligation that is violated. So if only beings who currently exist can be owed obligations, burying waste whose harm falls only on people not yet born wrongs no one — and, if wrongness requires a wronged party, is not wrong.",
     },
     {
         "index": 40,
         "type": "principle",
         "role": "postulate",
         "form": "17 -> ~15",
-        "text": "That only currently existing beings can bear obligations directly contradicts obligations existing toward merely probable future beings.",
+        "text": "If only beings who currently exist can be owed moral obligations, then none can be owed to a being whose existence is merely probable.",
     },
     {
         "index": 41,
@@ -499,6 +499,38 @@ DUMMY_ARGUMENTS: List[List[int]] = [
     [18, 28, 42, -5],  # P5 + full-weight → ¬J5
     [19, 7, 43, -10],  # P6 + J7 → ¬J10 (in sample state as arg-sample-5)
     [13, 29, 26, 44, -8],  # J13 + extinction-as-non-creation + person-affecting → ¬J8
+    # Two that fail the checker, so the demo shows what a failed argument looks
+    # like. Over existing elements only, so neither adds a premise.
+    [19, 7],  # P6 → J7: the bridge left unstated, so formally invalid
+    [21, 9, 9],  # T2 + J9 → J9: the conclusion among its own premises, so circular
+]
+
+FABLE = "claude-fable-5"
+OPUS = "claude-opus-5-5"
+FABLE_AND_OPUS = f"{FABLE} & {OPUS}"
+
+#: Who wrote each of DUMMY_ARGUMENTS, in order. claude-fable-5 wrote the set;
+#: claude-opus-5-5 made four of its bridges more precise (32, 34, 39, 40) and
+#: wrote the two that fail. Accepting an argument keeps its author as the
+#: relations' origin, so the credit has to be per argument.
+DUMMY_ARGUMENT_AUTHORS: List[str] = [
+    FABLE,
+    FABLE,
+    FABLE_AND_OPUS,
+    FABLE,
+    FABLE_AND_OPUS,
+    FABLE,
+    FABLE,
+    FABLE,
+    FABLE,
+    FABLE_AND_OPUS,
+    FABLE_AND_OPUS,
+    FABLE,
+    FABLE,
+    FABLE,
+    FABLE,
+    OPUS,
+    OPUS,
 ]
 
 
@@ -511,9 +543,13 @@ def dummy_detect_arguments(
 
     Uses the same verification, postulate-stripping, and state-deduplication
     steps as the live LLM path, so the fixture doubles as an end-to-end check
-    of the checker: every sample argument must pass it.
-    Arguments referencing elements missing from the current (possibly
-    truncated) state are skipped.
+    of the checker: every sample argument passes it, but for the two written
+    to fail it. Arguments referencing elements missing from the current
+    (possibly truncated) state are skipped.
+
+    Each argument names its author in ``argument_models``
+    (``DUMMY_ARGUMENT_AUTHORS``), and ``model`` names both, for the notice.
+    Added premises keep ``claude-fable-5``, who wrote all of them.
     """
     initial_lookup = {index + 1: e for index, e in enumerate(elements)}
     premises = [AddedPremise(**p) for p in DUMMY_ADDED_PREMISES]
@@ -525,13 +561,31 @@ def dummy_detect_arguments(
     ]
 
     checked = verify_and_partition(candidates, premises)
-    return surface_arguments(
+    response = surface_arguments(
         checked,
         lookup=initial_lookup,
         elements=elements,
         relations=relations,
         round=round,
-        model="claude-fable-5",
+        model=FABLE,
+    )
+    # Matched by the form each is surfaced in: a passing argument without its
+    # postulates, a failing one as proposed, a premise listed twice kept once.
+    postulates = {p.index for p in premises if p.role == "postulate"}
+
+    def surfaced(arg: List[int]) -> Tuple[int, ...]:
+        kept = [n for n in arg[:-1] if abs(n) not in postulates]
+        return tuple(dict.fromkeys(kept)) + (arg[-1],)
+
+    authors = {
+        surfaced(arg): who
+        for arg, who in zip(DUMMY_ARGUMENTS, DUMMY_ARGUMENT_AUTHORS, strict=True)
+    }
+    return response.model_copy(
+        update={
+            "model": FABLE_AND_OPUS,
+            "argument_models": [authors[tuple(a)] for a in response.num_arguments],
+        }
     )
 
 

@@ -6,7 +6,8 @@ import { ARGUMENT_PREMISES, PROMOTED_POSTULATES } from "./sample-argument-texts.
 // Mirrors the Python dummy_detect_arguments logic from backend/services/arguments.py.
 //
 // Each argument is stored in its FINAL, surfaced form: the postulate-stripped
-// output the backend pipeline produces after verify_and_partition. Because the
+// output the backend pipeline produces after verify_and_partition (the two that
+// fail it as proposed). Because the
 // numbered sentences are logically independent atoms, every argument relies on
 // a meaning postulate (Carnap 1952) that bridges the inferential gap. Those
 // postulates are verified and then folded out of the pool on the backend; here
@@ -54,6 +55,11 @@ const _SAMPLE_ARGUMENTS = [
   [18, 28, -5],     // P5 + P10 → ¬J5 (in the state as arg-sample-11) (justice owed to future people gives their welfare full weight despite uncertainty — counterpoint to P2 + P3 → J5)
   [19, 7, -10],     // P6 + J7 → ¬J10 (already in state as arg-sample-5; filtered at runtime)
   [13, 29, 26, -8], // J13 + J29 + P26 → ¬J8 (allowing extinction wrongs no one now alive or future, and wrongness requires a wronged party)
+  // Two that fail the checker, so the demo shows what a failed argument looks
+  // like — surfaced as proposed, listed last. Over existing elements only, so
+  // neither adds a premise.
+  [19, 7],          // P6 → J7: the bridge left unstated, so formally invalid
+  [21, 9, 9],       // T2 + J9 → J9: the conclusion among its own premises, so circular
 ];
 
 // Parallel to _SAMPLE_ARGUMENTS: the meaning-postulate text(s) each argument
@@ -62,19 +68,65 @@ const _SAMPLE_ARGUMENTS = [
 const _ARGUMENT_POSTULATES = [
   [PROMOTED_POSTULATES.sufficiencyWrong],
   [PROMOTED_POSTULATES.temporalDiscounting],
-  ["If justice is owed to all who will be affected, and the people of 2100 and beyond will be affected by present climate policy, then climate policy owes their welfare consideration."],
+  ["Owing people justice in a decision includes accounting for their welfare in making it."],
   [PROMOTED_POSTULATES.representation],
-  ["Owing justice to people regardless of when they exist just is not discounting their interests for their temporal distance."],
+  ["Owing people justice regardless of when they come to exist rules out discounting their interests merely for their temporal distance."],
   [PROMOTED_POSTULATES.wellBeingJustice],
   [PROMOTED_POSTULATES.deDicto],
   ["If moral patienthood needs no identity and future people form a determinate class, then obligations toward merely probable beings are possible."],
   ["If obligations can attach to probable beings and diminish only with existence-uncertainty, then slight discounting for genuine existence-uncertainty is permissible."],
-  ["If only presently existing beings can be wronged and wrongness requires a wronged party, then an act harming only the not-yet-existing is not wrong."],
-  ["That only currently existing beings can bear obligations directly contradicts obligations existing toward merely probable future beings."],
+  ["Being wronged is being owed an obligation that is violated. So if only beings who currently exist can be owed obligations, burying waste whose harm falls only on people not yet born wrongs no one — and, if wrongness requires a wronged party, is not wrong."],
+  ["If only beings who currently exist can be owed moral obligations, then none can be owed to a being whose existence is merely probable."],
   ["That obligations can exist toward probable future beings directly contradicts our having no obligations to those who do not yet exist."],
   [PROMOTED_POSTULATES.fullWeight],
   ["If temporal proximity modulates obligation strength and parental duties outrank duties to distant strangers, then interests may be discounted with temporal distance after all."],
   ["If wronging requires a wronged party, extinction wrongs no one now alive and merely fails to create future people, and non-creation wrongs no one, then allowing extinction is not wrong."],
+  // A failed argument is not "valid given" anything.
+  [],
+  [],
+];
+
+const FABLE = "claude-fable-5";
+const OPUS = "claude-opus-5-5";
+const FABLE_AND_OPUS = `${FABLE} & ${OPUS}`;
+
+// Parallel to _SAMPLE_ARGUMENTS: who wrote each, which accepting it keeps as
+// the relations' origin. claude-fable-5 wrote the set; claude-opus-5-5 made
+// four of its bridges more precise and wrote the two that fail. As
+// DUMMY_ARGUMENT_AUTHORS in backend/services/arguments.py.
+const _ARGUMENT_AUTHORS = [
+  FABLE,
+  FABLE,
+  FABLE_AND_OPUS,
+  FABLE,
+  FABLE_AND_OPUS,
+  FABLE,
+  FABLE,
+  FABLE,
+  FABLE,
+  FABLE_AND_OPUS,
+  FABLE_AND_OPUS,
+  FABLE,
+  FABLE,
+  FABLE,
+  FABLE,
+  OPUS,
+  OPUS,
+];
+
+// Parallel to _SAMPLE_ARGUMENTS: why the checker fails it, worded as
+// CHECK_FAILURES in backend/services/arguments.py words it (a backend test
+// holds the two to the same text), or null.
+const _ARGUMENT_FAILURES = [
+  ...Array(15).fill(null),
+  {
+    code: "invalid",
+    reason: "Not formally valid: the premises do not entail the conclusion.",
+  },
+  {
+    code: "circular",
+    reason: "Circular: the conclusion is among its own premises.",
+  },
 ];
 
 // Added premises the LLM proposes to close each inferential gap. Index 22 is
@@ -203,7 +255,7 @@ const BASE_POOL_SIZE = 22;
  * @param {Array} elements
  * @param {string|number} round
  * @param {Array} [relations=[]]
- * @returns {{ num_arguments: number[][], translated_arguments: Array[], argument_postulates: string[][], argument_failures: Array<null>, lookup: Object, model: string, dropped_count: number, input_tokens: number, output_tokens: number }}
+ * @returns {{ num_arguments: number[][], translated_arguments: Array[], argument_postulates: string[][], argument_failures: Array<{code: string, reason: string}|null>, argument_models: string[], lookup: Object, model: string, dropped_count: number, input_tokens: number, output_tokens: number }}
  */
 export function getSampleArguments(elements, round, relations = []) {
   const baseLookup = Object.fromEntries(elements.map((e, i) => [i + 1, e]));
@@ -225,7 +277,8 @@ export function getSampleArguments(elements, round, relations = []) {
     }
   }
 
-  const lookup = addNewPremisesToLookup(baseLookup, premisesToInject, elements, round, "claude-fable-5");
+  // claude-fable-5 wrote every added premise.
+  const lookup = addNewPremisesToLookup(baseLookup, premisesToInject, elements, round, FABLE);
   const remap = (n) => {
     const mapped = actualIndex[Math.abs(n)];
     return n < 0 ? -mapped : mapped;
@@ -237,6 +290,8 @@ export function getSampleArguments(elements, round, relations = []) {
   const kept = _SAMPLE_ARGUMENTS.map((arg, i) => ({
     arg: arg.map(remap),
     postulates: _ARGUMENT_POSTULATES[i] ?? [],
+    author: _ARGUMENT_AUTHORS[i],
+    failure: _ARGUMENT_FAILURES[i],
   })).filter(({ arg }) => {
     const fp = argFingerprint(arg, lookup);
     return fp !== null && !existingFingerprints.has(fp);
@@ -253,11 +308,11 @@ export function getSampleArguments(elements, round, relations = []) {
     num_arguments: numArguments,
     translated_arguments: translatedArguments,
     argument_postulates: argumentPostulates,
-    // Every sample argument passes the checker, as the backend's test of the
-    // same fixture requires.
-    argument_failures: numArguments.map(() => null),
+    argument_failures: kept.map((k) => k.failure),
+    argument_models: kept.map((k) => k.author),
     lookup,
-    model: "claude-fable-5",
+    // For the notice: everyone who wrote the set.
+    model: FABLE_AND_OPUS,
     dropped_count: 0,
     input_tokens: 0,
     output_tokens: 0,

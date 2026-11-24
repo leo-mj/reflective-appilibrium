@@ -186,6 +186,30 @@ describe("an argument that failed the checker", () => {
     });
   });
 
+  it("takes each argument's own author as its origin, when named", async () => {
+    const onAddRelation = vi.fn();
+    await detectWith(
+      {
+        translated_arguments: [
+          [P1, J1],
+          [T1, J1],
+        ],
+        argument_postulates: [[], []],
+        argument_failures: [null, null],
+        argument_models: ["model-a", "model-a & model-b"],
+        model: "model-a & model-b",
+      },
+      { onAddRelation },
+    );
+    const accepts = screen.getAllByRole("button", { name: /accept/i });
+    fireEvent.click(accepts[0]);
+    fireEvent.click(accepts[1]);
+    expect(onAddRelation.mock.calls.map((c) => c[0].origin)).toEqual([
+      "model-a",
+      "model-a & model-b",
+    ]);
+  });
+
   it("tags no relation of an argument that passed", async () => {
     const onAddRelation = vi.fn();
     await detectWith(

@@ -168,20 +168,24 @@ def _sample_state_elements():
     return [_element(eid, etype, f"Sample sentence {eid}.") for eid, etype in specs]
 
 
-def test_sample_fixture_passes_the_checker():
+def test_sample_fixture_passes_the_checker_but_for_the_two_written_to_fail():
     from backend.services.arguments import dummy_detect_arguments
 
     response = dummy_detect_arguments(_sample_state_elements(), "8")
-    # Every fixture argument must pass the checker untrimmed.
     assert response.dropped_count == 0
-    assert response.argument_failures == [None] * 15
-    # The response names the (sample) generating model, mirroring live output so
-    # the UI's AI-disclosure banner can show it.
-    assert response.model == "claude-fable-5"
-    assert len(response.num_arguments) == 15
-    # Postulates are stripped from every surfaced argument and reported
-    # separately — each fixture argument relies on exactly one postulate.
-    assert all(len(post) == 1 for post in response.argument_postulates)
+    assert len(response.num_arguments) == 17
+    # Every other fixture argument passes the checker untrimmed; the two
+    # written to fail it come last, as proposed.
+    assert response.argument_failures[:15] == [None] * 15
+    assert [f.code for f in response.argument_failures[15:]] == [
+        "invalid",
+        "circular",
+    ]
+    assert response.num_arguments[15:] == [[19, 7], [21, 9, 9]]
+    # Postulates are stripped from every passing argument and reported
+    # separately — each relies on exactly one postulate; the failing two on none.
+    assert all(len(post) == 1 for post in response.argument_postulates[:15])
+    assert response.argument_postulates[15:] == [[], []]
     postulate_indices = set(range(30, 45))
     for arg in response.num_arguments:
         assert not postulate_indices & {abs(n) for n in arg}
@@ -189,6 +193,42 @@ def test_sample_fixture_passes_the_checker():
     assert response.num_arguments[0] == [14, 22, 1]
     assert [17, 26, -1] in response.num_arguments
     assert [13, 29, 26, -8] in response.num_arguments
+
+
+def test_sample_fixture_credits_each_argument_to_who_wrote_it():
+    from backend.services.arguments import dummy_detect_arguments
+
+    response = dummy_detect_arguments(_sample_state_elements(), "8")
+    # The notice names both; each argument names its own author, which
+    # accepting it keeps as the relations' origin.
+    assert response.model == "claude-fable-5 & claude-opus-5-5"
+    by_argument = dict(
+        zip(map(tuple, response.num_arguments), response.argument_models)
+    )
+    assert by_argument[(14, 22, 1)] == "claude-fable-5"
+    assert by_argument[(18, 24, 2)] == "claude-fable-5 & claude-opus-5-5"
+    assert by_argument[(17, -15)] == "claude-fable-5 & claude-opus-5-5"
+    assert by_argument[(19, 7)] == "claude-opus-5-5"
+    assert by_argument[(21, 9, 9)] == "claude-opus-5-5"
+    # Added premises were all written by claude-fable-5.
+    added = [e for n, e in response.lookup.items() if n > 22]
+    assert added and all(e.origin == "claude-fable-5" for e in added)
+
+
+def test_the_frontend_fixture_words_its_failures_as_the_checker_does():
+    # app/src/sample-data/sample-arguments.js stores the failing samples'
+    # reasons rather than running the checker; a reworded reason here would
+    # leave the demo saying something the checker no longer says.
+    from pathlib import Path
+
+    from backend.services.arguments import CHECK_FAILURES
+
+    fixture = (
+        Path(__file__).resolve().parents[2] / "app/src/sample-data/sample-arguments.js"
+    ).read_text(encoding="utf-8")
+    for code in ("invalid", "circular"):
+        assert f'code: "{code}"' in fixture
+        assert CHECK_FAILURES[code] in fixture
 
 
 def test_sample_fixture_dedups_against_state_arguments():
@@ -201,7 +241,8 @@ def test_sample_fixture_dedups_against_state_arguments():
         _relation("T2", "P2", "jointly_entails", "arg-sample-1"),
     ]
     response = dummy_detect_arguments(elements, "8", rels)
-    assert len(response.num_arguments) == 14
+    assert len(response.num_arguments) == 16
+    assert len(response.argument_models) == 16
     assert [20, 21, 15] not in response.num_arguments
 
 

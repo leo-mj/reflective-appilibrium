@@ -221,6 +221,32 @@ test.describe("Accessibility", () => {
     await audit(page, "assist", { ignoreGraphAccents: true });
   });
 
+  // The demo's samples include two arguments that fail the checker, so the
+  // amber note saying why is on screen here and nowhere else in the suite.
+  // Narrowed to the notes: the tab's id badges are an older finding, in the
+  // judgment and principle colours as small type, that has nothing to do with
+  // them. Both themes, the note being amber text.
+  test("a failed argument's note is readable in both themes", async ({ page }) => {
+    await gotoHome(page);
+    await loadSample(page);
+    await page.locator('button:text-is("Assist")').click();
+    await page.locator('button:text-is("Arguments")').click();
+    await page.getByRole("button", { name: /^↺?\s*Detect$/ }).click();
+    await expect(page.locator("text=/Failed the argument checker · 2/")).toBeVisible();
+    await expect(page.locator('[role="note"]')).toHaveCount(2);
+    await park(page);
+    const notes = { include: ['[role="note"]'] };
+    await audit(page, "failed-argument notes/dark", notes);
+
+    await openMenu(page);
+    await page.locator('button:has-text("Dark mode")').click();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+      .toBe("light");
+    await park(page);
+    await audit(page, "failed-argument notes/light", notes);
+  });
+
   test("every assist tab header clears AA in high-contrast mode", async ({ page }) => {
     // The promise the design actually makes. Each header wears the graph
     // constant for what its tab produces, taken exactly, and several of those
