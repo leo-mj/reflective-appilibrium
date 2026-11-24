@@ -90,3 +90,33 @@ Python FastAPI server. Start/stop via `make start` / `make stop`.
   asks for until the server first answers — once per page load — and which
   writes an identifier-free line to `backend.sessions`.
 - Target LLMs: Qwen3 30B quantized (consumer GPU), DeepSeek-V3.2 / GPT-OSS-120B (high-end)
+- **The argument checker tags; it does not reject.** An argument that fails
+  (`verify_and_partition` in `services/arguments.py`) is surfaced as proposed,
+  its meaning postulates among its premises, with a code and a reason worded
+  for the reader (`CHECK_FAILURES`, `argument_failures` in the response,
+  parallel to `num_arguments`); the Arguments tab lists it below the passing
+  ones, under a heading of its own, and accepting it writes the reason into
+  the relation's explanation. Folding a postulate into
+  "Valid given" and auto-trimming are what passing earns. Only a proposal with
+  nothing to show is dropped — citing an index nothing defines, or no premise
+  (`dropped_count`). An added premise worded as an existing sentence is read as
+  that sentence first, in either mode (`identify_repeated_premises`).
+  **A bridge that only restates the inference** — "If <premises>, then
+  <conclusion>" — is taken as the model tags it, and a postulate is folded
+  into "Valid given" like any other. Two alternatives were tried and dropped:
+  failing the argument threw away conditionals that are plausible, or worth
+  defending in a later round; surfacing every one as a premise made the
+  analytic ones — a conclusion following from a premise by what its words
+  mean — into near-duplicate elements, which the folding exists to avoid. The
+  wording cannot tell those two kinds apart; the role is the model's claim
+  about which it is. The prompt asks it not to write them, so they do not
+  crowd the suggestions, and a folded one still shows on the card before the
+  reader accepts the argument.
+- **The prompt spells out the bookkeeping the checker tests** (`build_prompt`)
+  — each postulate's form is the bridge from its argument's other indices to
+  the conclusion — and asks the model to check every argument against it before
+  answering; `test_the_prompt_example_passes_the_checker` holds the prompt's
+  own example to it. To see what a prompt change does,
+  `python -m backend.scripts.eval_argument_prompt export.md --base-url … --model …`
+  (key in `LLM_API_KEY`) runs detection on an exported process and tallies the
+  proposals as passed, failed (by reason) or dropped. Every run is a paid call.

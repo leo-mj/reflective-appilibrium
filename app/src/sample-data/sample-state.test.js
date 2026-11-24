@@ -40,7 +40,7 @@ describe("the demo's arguments", () => {
     expect(loose.sort()).toEqual(["J13", "J2", "J4", "J8"]);
   });
 
-  it("leave the Arguments tab six of its twelve to offer", () => {
+  it("leave the Arguments tab six of its twelve to offer, and the two that fail", () => {
     const offered = getSampleArguments(
       SAMPLE_STATE.elements,
       SAMPLE_STATE.round,
@@ -49,7 +49,11 @@ describe("the demo's arguments", () => {
     const shown = offered.num_arguments.map((a) =>
       argFingerprint(a, offered.lookup),
     );
-    expect(shown).toHaveLength(6);
+    expect(shown).toHaveLength(8);
+    // Both failing samples reach the demo: neither is an argument it holds.
+    expect(
+      offered.argument_failures.filter(Boolean).map((f) => f.code),
+    ).toEqual(["invalid", "circular"]);
     // None of the six now in the state is offered again.
     for (const moved of [
       "P1,T3->J1",
