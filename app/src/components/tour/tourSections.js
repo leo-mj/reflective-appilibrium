@@ -316,7 +316,7 @@ function assistSections(cycle, llm) {
           // A first visit to the backend build: the features are on, but with
           // no key the tabs serve the same pre-set suggestions the demo does.
           keyless:
-            "Until you add an API key of your own — the last section of this chapter shows where — the Assist tabs show pre-set example suggestions from Claude Fable, made for this demo rather than read off what is on screen.",
+            "Until you add an API key of your own — the last section of this chapter shows where — the Assist tabs show pre-set example suggestions from Claude Fable, made for this demo.",
           live: "Your key is set, so suggestions are generated live and follow whatever you have on screen.",
         }[llm],
       ],

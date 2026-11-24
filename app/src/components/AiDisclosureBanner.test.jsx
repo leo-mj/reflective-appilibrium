@@ -39,7 +39,6 @@ describe("recorded suggestions", () => {
     expect(
       screen.getByText(/Pre-set: written by claude-fable-5 for this demo/),
     ).toBeTruthy();
-    expect(screen.getByText(/not from the position on screen/)).toBeTruthy();
   });
 
   it("are marked pre-set beside the model's name in the header", () => {

@@ -34,7 +34,6 @@ test.describe("Assist workflow", () => {
     await expect(
       page.getByText(/Pre-set: written by .+ for this demo/).first(),
     ).toBeVisible();
-    await expect(page.getByText(/not from the position on screen/).first()).toBeVisible();
     await expect(page.getByText(/· pre-set \(/).first()).toBeVisible();
   });
 

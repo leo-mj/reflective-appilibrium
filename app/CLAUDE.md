@@ -19,7 +19,7 @@ panel's "use sample suggestions" checkbox passes `useDummy` down to
 they are about its topic, so in a reader's own process, with no LLM or no key,
 the assist tabs are disabled instead and the key notice asks for a key. **And
 they say what they are**, in both builds: the AI notice reads "Pre-set:
-written by <model> for this demo, not from the position on screen" and the tab
+written by <model> for this demo" and the tab
 header "pre-set (<model>)" (`AiDisclosureBanner`, `SuggestionToolbar`, both
 reading `SampleSuggestionsContext`). The model named did write them, so an
 accepted one keeps it as its `origin`. **The Arguments tab's samples have more

@@ -344,9 +344,9 @@ export function AiDisclosureBanner({
       {sample ? (
         <>
           <span style={{ fontWeight: "bold", color: C.text }}>
-            Pre-set: written by {who} for this demo,
+            Pre-set: written by {who} for this demo.
           </span>{" "}
-          not from the position on screen. {note}
+          {note}
         </>
       ) : (
         <>
