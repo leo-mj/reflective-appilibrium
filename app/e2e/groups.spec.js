@@ -378,7 +378,7 @@ test.describe("Grouping nodes", () => {
     // Two controls open this dialog and share a name — the graph's toolbar
     // button and the panel section's "+". That is fine for a reader, since they
     // do the same thing; the locator just has to say which one it means.
-    await page.locator('button[aria-label="New group"]:has-text("Grp")').click();
+    await page.locator('button[aria-label="New group, Grp"]').click();
     const dialog = page.getByLabel("Group name").locator("..").locator("..");
     await expect(dialog).toContainText(/ctrl/i);
 

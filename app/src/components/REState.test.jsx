@@ -46,7 +46,7 @@ const open = (state = SAMPLE_STATE) =>
   );
 
 /** The graph's own add-buttons overlay, present wherever the graph is drawn. */
-const graphShown = () => screen.queryByLabelText("Add argument") !== null;
+const graphShown = () => screen.queryByLabelText("Add argument, Arg") !== null;
 /**
  * The Text/Graph/Focus side-panel toggle, which the header renders only on an
  * assist or simulate tab — so its absence means we are on an analyze tab.

@@ -55,9 +55,13 @@ export function NavBar({
             <Tooltip key={item.key} text={`Jump to ${name}`}>
               <button
                 onClick={() => onNavigate(item.key)}
+                // The pill's own letter too, where it is not the word: a name
+                // has to contain the visible label (WCAG 2.5.3).
                 aria-label={`Jump to ${item.name ?? item.label}${
-                  item.count != null ? `, ${item.count}` : ""
-                }`}
+                  item.name && item.name !== item.label.toLowerCase()
+                    ? `, ${item.label}`
+                    : ""
+                }${item.count != null ? `, ${item.count}` : ""}`}
                 aria-current={isActive ? "true" : undefined}
                 style={{
                   minHeight: 36,

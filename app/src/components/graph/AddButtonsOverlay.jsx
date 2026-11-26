@@ -62,7 +62,9 @@ export function AddButtonsOverlay({
         <Tooltip key={type} text={`Add ${type}`}>
           <button
             onClick={() => onAddEl(type)}
-            aria-label={`Add ${type}`}
+            // The words, then what the button shows: a name has to contain the
+            // visible label (WCAG 2.5.3), so "click J" works by voice too.
+            aria-label={`Add ${type}, ${label}`}
             style={{
               // Fill matches the nodes it adds, in whichever mode is on. The ink
               // does not: this is an HTML control, where AA is enforced and the
@@ -86,7 +88,7 @@ export function AddButtonsOverlay({
         <Tooltip text="Add relation">
           <button
             onClick={onAddRel}
-            aria-label="Add relation"
+            aria-label="Add relation, Rel"
             style={{
               background: C.border,
               border: "none",
@@ -104,7 +106,7 @@ export function AddButtonsOverlay({
       <Tooltip text="Add argument">
         <button
           onClick={onAddArg}
-          aria-label="Add argument"
+          aria-label="Add argument, Arg"
           style={{
             background: C.jointly_entails + "33",
             border: `1px solid ${C.jointly_entails}`,
@@ -125,7 +127,7 @@ export function AddButtonsOverlay({
       <Tooltip text="Bracket elements into a group, which can then collapse into one node. Ctrl/⌘-click nodes on the graph to group them there instead.">
         <button
           onClick={onAddGroup}
-          aria-label="New group"
+          aria-label="New group, Grp"
           style={{
             background: "transparent",
             border: `1px solid ${C.border}`,
