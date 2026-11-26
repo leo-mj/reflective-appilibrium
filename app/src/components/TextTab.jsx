@@ -507,7 +507,7 @@ export function TextTab({
               Object.values(withdrawalDeltas).some(Boolean) && (
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 12,
                     lineHeight: 1.4,
                     color: C.dim,
                     padding: "6px 4px 2px",
@@ -665,7 +665,7 @@ export function TextTab({
                   color: roundScoresLoading ? C.dim : C.text,
                   borderRadius: 6,
                   padding: "4px 10px",
-                  fontSize: 11,
+                  fontSize: 12,
                   cursor: roundScoresLoading ? "not-allowed" : "pointer",
                   width: "100%",
                 }}

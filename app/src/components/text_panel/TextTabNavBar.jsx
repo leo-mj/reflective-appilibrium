@@ -68,7 +68,7 @@ export function NavBar({
                   boxSizing: "border-box",
                   padding: "4px 8px",
                   borderRadius: 10,
-                  fontSize: 11,
+                  fontSize: 12,
                   cursor: "pointer",
                   border: `1px solid ${isActive ? C.text : C.border}`,
                   background: isActive ? C.border : "transparent",

@@ -30,7 +30,7 @@ function SortToggle({ value, onChange }) {
           className="tap-target"
           style={{
             ...GHOST_BTN_STYLE,
-            fontSize: 10,
+            fontSize: 11,
             padding: "1px 6px",
             letterSpacing: 0.5,
             // Weight and ink carry the selection, not opacity. At 10px, fading
@@ -104,7 +104,7 @@ export function HighlightedSection({
             <>
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: "bold",
                   letterSpacing: 1.5,
                   color: C.dim,

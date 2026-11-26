@@ -27,7 +27,7 @@ export function LogSection({ log, sectionRef, isCollapsed, onToggle, search }) {
           >
             <div
               style={{
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: "bold",
                 color: C.text,
                 marginBottom: 3,
@@ -35,7 +35,7 @@ export function LogSection({ log, sectionRef, isCollapsed, onToggle, search }) {
             >
               Round {l.round}
             </div>
-            <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.5 }}>
               <Highlight text={l.changes} query={search} />
             </div>
           </div>

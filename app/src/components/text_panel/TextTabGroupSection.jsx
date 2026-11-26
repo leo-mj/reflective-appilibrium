@@ -39,7 +39,7 @@ function GroupChip({ group, selected, onSelect }) {
       aria-pressed={isSelected}
       className="tap-target-sm"
       style={{
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: "bold",
         padding: "1px 7px",
         borderRadius: 4,
@@ -95,7 +95,7 @@ export function GroupSection({
       {!collapsed && groups.length === 0 && (
         <div
           style={{
-            fontSize: 12,
+            fontSize: 13,
             color: C.dim,
             lineHeight: 1.6,
             marginBottom: 12,
@@ -122,7 +122,7 @@ export function GroupSection({
               }}
             >
               <GroupChip group={g} selected={selected} onSelect={onSelect} />
-              <span style={{ fontSize: 11, color: C.dim }}>
+              <span style={{ fontSize: 12, color: C.dim }}>
                 {g.members.length} member{g.members.length === 1 ? "" : "s"} ·{" "}
                 {g.collapsed ? "collapsed" : "expanded"}
               </span>
@@ -174,7 +174,7 @@ export function GroupSection({
                           ...GHOST_BTN_STYLE,
                           border: "none",
                           padding: "0 6px",
-                          fontSize: 14,
+                          fontSize: 15,
                           lineHeight: 1,
                           flexShrink: 0,
                         }}

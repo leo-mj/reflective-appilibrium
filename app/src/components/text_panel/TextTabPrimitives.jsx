@@ -72,7 +72,7 @@ export function MetaChip({ color = C.dim, title, children }) {
     <Tooltip text={title}>
       <span
         style={{
-          fontSize: 10,
+          fontSize: 11,
           padding: "1px 4px",
           borderRadius: 4,
           border: `1px solid ${color.startsWith("#") ? `${color}55` : C.border}`,
@@ -117,7 +117,7 @@ export function SectionHeader({ title, onAdd, addLabel, collapsed, onToggle }) {
         <span
           aria-hidden="true"
           style={{
-            fontSize: 10,
+            fontSize: 11,
             transition: "transform 0.15s",
             display: "inline-block",
             transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
@@ -139,7 +139,7 @@ export function SectionHeader({ title, onAdd, addLabel, collapsed, onToggle }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: "bold",
         letterSpacing: 1.5,
         color: C.dim,
@@ -179,7 +179,7 @@ export function SectionHeader({ title, onAdd, addLabel, collapsed, onToggle }) {
             className="tap-target-square"
             style={{
               ...GHOST_BTN_STYLE,
-              fontSize: 13,
+              fontSize: 14,
               padding: "0 5px 1px",
               fontWeight: "bold",
               letterSpacing: 0,
@@ -228,7 +228,7 @@ export function Badge({ id, inert = false }) {
     return (
       <span
         style={{
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: "bold",
           padding: "1px 7px",
           marginRight: "5px",
@@ -259,7 +259,7 @@ export function Badge({ id, inert = false }) {
       aria-pressed={isSelected}
       className="tap-target-sm"
       style={{
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: "bold",
         padding: "1px 7px",
         marginRight: "5px",
@@ -336,7 +336,7 @@ export function StatusField({ tag }) {
  * the DOM keeps "Confidence", which is what a test or a copied selection reads.
  */
 const STAT_LABEL_STYLE = {
-  fontSize: 9,
+  fontSize: 10,
   fontWeight: 600,
   letterSpacing: 0.9,
   textTransform: "uppercase",
@@ -566,18 +566,18 @@ export function DetailsToggle({ open, onToggle, controls }) {
         gap: 4,
         background: "none",
         border: "none",
-        padding: "2px 0",
+        padding: "1px 0",
         margin: 0,
         color: C.dim,
         cursor: "pointer",
-        fontSize: 10,
-        lineHeight: 1.6,
+        fontSize: 11,
+        lineHeight: 1.4,
       }}
     >
       <span
         aria-hidden="true"
         style={{
-          fontSize: 9,
+          fontSize: 10,
           display: "inline-block",
           transition: "transform 0.15s",
           transform: open ? "rotate(0deg)" : "rotate(-90deg)",
@@ -648,7 +648,7 @@ export function HistoryRoundBanner({ historyView }) {
         background: C.panel,
         borderBottom: `1px solid ${C.revised}`,
         color: C.revised,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: "bold",
         letterSpacing: 0.5,
         padding: "5px 10px",
@@ -729,7 +729,7 @@ export function CoherenceGroup({ title, color, items }) {
     <div style={{ marginBottom: 12 }}>
       <div
         style={{
-          fontSize: 10,
+          fontSize: 11,
           color,
           fontWeight: "bold",
           letterSpacing: 1,

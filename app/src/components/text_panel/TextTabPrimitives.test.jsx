@@ -77,17 +77,17 @@ describe("ActionButtons", () => {
       ).container;
 
     it("drops every button to the metadata chips' type scale", () => {
-      // MetaChip is 10px. Wide, the chips and the buttons share one line, and
+      // MetaChip is 11px. Wide, the chips and the buttons share one line, and
       // the point of this is that they read as one band.
       buttons(render3(true)).forEach((b) => {
-        expect(b.style.fontSize).toBe("10px");
+        expect(b.style.fontSize).toBe("11px");
       });
     });
 
     it("keeps the larger text when it is not compact", () => {
       // Narrow, and the graph's pinned-node tooltip, which passes nothing.
       buttons(render3(false)).forEach((b) => {
-        expect(b.style.fontSize).toBe("12px");
+        expect(b.style.fontSize).toBe("13px");
       });
     });
 

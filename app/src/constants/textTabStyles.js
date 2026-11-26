@@ -13,7 +13,7 @@ export const GHOST_BTN_STYLE = {
   borderRadius: 4,
   color: C.dim,
   cursor: "pointer",
-  fontSize: 12,
+  fontSize: 13,
   padding: "4px 9px",
   lineHeight: 1.6,
   // Height is left to the text and padding, which come to about 29. Touchscreens
@@ -39,8 +39,8 @@ export const WITHDRAW_BTN_STYLE = {
  * A card's action buttons dropped to the metadata chips' type scale — the wide
  * layout only, applied by {@link module:components/text_panel/TextTabPrimitives.ActionButtons}.
  *
- * Wide, the chips and the buttons share one line, and at 12px against the chips'
- * 10px the controls were the loudest thing in a card whose point is the claim
+ * Wide, the chips and the buttons share one line, and at 13px against the chips'
+ * 11px the controls were the loudest thing in a card whose point is the claim
  * underneath them. Narrow keeps the larger text: there the panel is the whole
  * screen and these are the primary way to act on a card.
  *
@@ -51,15 +51,21 @@ export const WITHDRAW_BTN_STYLE = {
  * screen that is thumbed gets the smaller text and the bigger target both.
  */
 export const COMPACT_BTN_STYLE = {
-  fontSize: 10,
-  padding: "3px 8px",
+  fontSize: 11,
+  padding: "2px 8px",
   minHeight: 24,
 };
 
+/**
+ * Tight between cards, so a panel of larger text still shows most of a
+ * section at once: each card's left border and the rule under it already part
+ * them, and the 14 above and below each rule spent more height than the text
+ * did.
+ */
 export const CARD_STYLE = {
-  paddingBottom: 14,
+  paddingBottom: 8,
   borderBottom: `1px solid ${C.border}`,
-  marginBottom: 14,
+  marginBottom: 8,
 };
 
 /**
@@ -107,11 +113,13 @@ export const cardIdentity = {
  */
 /**
  * The claim itself — an element's statement, a relation's explanation, the
- * premises spelled out under an argument. A notch under the chrome around it
- * (headers at 12, chips at 10) so that a panel showing two dozen cards fits
- * more of them on screen without the text dropping to chip size.
+ * premises spelled out under an argument. The largest text in a card, a step
+ * above its chrome (headers at 13, chips at 11): it is what a reader scans the
+ * panel for, and what has to carry across a room when the panel is projected.
+ * It was 11, under the chrome, to fit more cards on screen; the cards are
+ * tighter instead (see CARD_STYLE).
  */
-export const CONTENT_FONT_SIZE = 11;
+export const CONTENT_FONT_SIZE = 13;
 
 /**
  * A grid rather than a row, so the fields line up *down* the list as well as
@@ -144,7 +152,7 @@ export const cardStats = {
   gridTemplateColumns: "repeat(auto-fill, minmax(22ch, 1fr))",
   alignItems: "start",
   columnGap: 10,
-  rowGap: 8,
+  rowGap: 4,
 };
 
 /**
@@ -152,8 +160,8 @@ export const cardStats = {
  * is above it is the statement; what is below is everything said about it.
  */
 export const cardDivider = {
-  marginTop: 8,
-  paddingTop: 4,
+  marginTop: 5,
+  paddingTop: 1,
   borderTop: `1px solid ${C.border}`,
 };
 
@@ -180,7 +188,7 @@ export const cardChips = (isWide) => ({
 export const cardActions = { marginLeft: "auto", flexShrink: 0 };
 
 export const META_LABEL_STYLE = {
-  fontSize: 11,
+  fontSize: 12,
   fontStyle: "italic",
   marginTop: 5,
   lineHeight: 1.5,

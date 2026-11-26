@@ -49,7 +49,7 @@ export function ClusterListing({ state, clusters }) {
     <>
       <div
         style={{
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: "bold",
           letterSpacing: 1,
           textTransform: "uppercase",
@@ -75,7 +75,7 @@ export function ClusterListing({ state, clusters }) {
               >
                 <span
                   style={{
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: "bold",
                     padding: "1px 7px",
                     borderRadius: 4,
@@ -89,7 +89,7 @@ export function ClusterListing({ state, clusters }) {
                 >
                   Cluster {i + 1}
                 </span>
-                <span style={{ fontSize: 11, color: C.dim }}>
+                <span style={{ fontSize: 12, color: C.dim }}>
                   {cluster.size} members
                 </span>
               </div>
@@ -124,7 +124,7 @@ export function ClusterListing({ state, clusters }) {
         <>
           <div
             style={{
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: "bold",
               letterSpacing: 1,
               textTransform: "uppercase",
@@ -168,7 +168,7 @@ export function ClusterListing({ state, clusters }) {
         <>
           <div
             style={{
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: "bold",
               letterSpacing: 1,
               textTransform: "uppercase",

@@ -102,7 +102,7 @@ export function ElementCard({ e, dim }) {
         paddingLeft: 10,
       }}
     >
-      <div style={{ ...cardHeader, gap: 6, marginBottom: 6 }}>
+      <div style={{ ...cardHeader, gap: 6, marginBottom: 4 }}>
         <Badge id={e.id} />
         <div style={cardActions}>
           <ActionButtons
@@ -117,7 +117,7 @@ export function ElementCard({ e, dim }) {
         style={{
           fontSize: CONTENT_FONT_SIZE,
           color: isW || isR ? C.dim : C.text,
-          lineHeight: 1.65,
+          lineHeight: 1.5,
           textDecoration: isW || isR ? "line-through" : "none",
         }}
       >
@@ -327,7 +327,7 @@ function RowSelect({ pressed, label, color, children }) {
       style={{
         all: "unset",
         color,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: "bold",
         cursor: "pointer",
         // `all: unset` takes the focus ring with it; this puts it back.
@@ -388,7 +388,7 @@ export function ArgumentCard({ rels, dim }) {
           <div
             style={{
               ...cardIdentity,
-              fontSize: 10,
+              fontSize: 11,
               color: C.dim,
               letterSpacing: 1,
               textTransform: "uppercase",
