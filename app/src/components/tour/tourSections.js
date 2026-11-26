@@ -248,6 +248,10 @@ function graphSections() {
         ),
         "The principle below was added in round 2 and withdrawn in round 3, once it turned out to conflict with judgments its owner was far more sure of.",
         byLayout(
+          "An argument is revised from its card in the text panel, below: swap a premise for another, reword one, take one out or add one, all as a single step.",
+          "An argument is revised from its card in the text view, further on: swap a premise for another, reword one, take one out or add one, all as a single step.",
+        ),
+        byLayout(
           "And nothing is final either way: Undo, ringed in the header, steps back through the changes, as does Ctrl+Z. Each is one step — a whole change, not a keystroke — so it walks back through the thinking rather than through the typing.",
           "And nothing is final either way: Undo, ringed in the ☰ menu, steps back through the changes. Each is one step — a whole change, not a keystroke — so it walks back through the thinking rather than through the typing.",
         ),
@@ -278,9 +282,10 @@ function graphSections() {
       title: "Saving your progress",
       body: [
         "Nothing you do here is stored on a server, so closing the tab is the end of the process. Export writes it out as a Markdown file instead, with the sections you pick — elements and relations, the log, step by step and round by round, the graph, an Argdown map — and Import reads one back, yours or one someone sent you, as long as it carries the full history.",
+        "Import also reads an Argdown file — an argument map made elsewhere, such as a reconstruction of a paper — and Import from text helps you make one: it gives you a prompt to paste into any chatbot along with a text, and reads the map it answers with. The app calls no model for this, so it works in the demo too.",
         byLayout(
-          "Both are in the ☰ menu, open beside this card, along with the settings. Hover any entry to find out what it does.",
-          "Both are under ☰ → Settings, open beside this card, along with the other options. Long-press any entry to find out what it does.",
+          "All three are in the ☰ menu, open beside this card, along with the settings. Hover any entry to find out what it does.",
+          "All three are under ☰ → Settings, open beside this card, along with the other options. Long-press any entry to find out what it does.",
         ),
       ],
       target: "menu-files",
@@ -311,12 +316,13 @@ function assistSections(cycle, llm) {
         "The Assist section is the part that uses a large language model: it reads your position and proposes candidates — questions to draw out judgments, principles that would systematise them, background theories that bear on both, and arguments hiding between elements you already hold.",
         "AI-generated statements within this app do not necessarily express the views of the Institute for Ethics in Technology.",
         "Each AI suggestion arrives as a proposal with an accept and a reject button. Nothing enters your position until you put it there, and anything you accept you can edit first.",
+        "Proposed arguments are, by default, checked for formal validity first. One that fails is still shown, below the others and with the reason it failed, so what the failure is worth is yours to judge too.",
         {
-          demo: "This demo has no model connected, so the Assist tabs show pre-recorded example suggestions from Claude Fable instead of live ones.",
+          demo: "This demo has no model connected, so the Assist tabs show pre-set example suggestions, written for this demo by Claude Fable and Claude Opus, instead of live ones.",
           // A first visit to the backend build: the features are on, but with
           // no key the tabs serve the same pre-set suggestions the demo does.
           keyless:
-            "Until you add an API key of your own — the last section of this chapter shows where — the Assist tabs show pre-set example suggestions from Claude Fable, made for this demo.",
+            "Until you add an API key of your own — the last section of this chapter shows where — the Assist tabs show pre-set example suggestions, written for this demo by Claude Fable and Claude Opus.",
           live: "Your key is set, so suggestions are generated live and follow whatever you have on screen.",
         }[llm],
       ],
